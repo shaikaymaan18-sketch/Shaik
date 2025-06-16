@@ -1,0 +1,14 @@
+<RCC>
+    <qresource prefix="/">
+        <file>icons/audio.svg</file>
+        <file>icons/controls.svg</file>
+        <file>icons/cpu.svg</file>
+        <file>icons/general.svg</file>
+        <file>icons/graphics.svg</file>
+        <file>icons/system.svg</file>
+        <file>icons/debug.svg</file>
+        <file>icons/forward.svg</file>
+        <file>icons/back.svg</file>
+        <file>icons/help.svg</file>
+    </qresource>
+</RCC>

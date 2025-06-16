@@ -231,7 +231,7 @@ endif()
 if (ENABLE_QT)
     add_definitions(-DYUZU_QT_WIDGETS)
     add_subdirectory(qt_common)
-    add_subdirectory(yuzu)
+    add_subdirectory(eden)
 endif()
 
 if (ENABLE_WEB_SERVICE)
