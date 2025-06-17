@@ -5,21 +5,28 @@ import QtQuick.Layouts
 import org.eden_emu.constants
 import org.eden_emu.items
 import org.eden_emu.interface
+import org.eden_emu.util
 
-Dialog {
+AnimatedDialog {
+    property list<var> configs
+
     preferredWidth: 1280
 
     title: "Configuration"
     standardButtons: Dialog.Ok | Dialog.Cancel
 
-    onOpened: {
-        for (var tab in tabBar.children) {
-            console.log(tab)
-        }
-    }
+    Component.onCompleted: configs = Util.searchItem(swipe, "BaseField")
 
     onAccepted: {
-
+        configs.forEach(config => {
+                            config.apply()
+                            // console.log(config.setting.label)
+                        })
+        QtConfig.save()
+    }
+    onRejected: {
+        configs.forEach(config => config.sync())
+        QtConfig.reload()
     }
 
     VerticalTabBar {

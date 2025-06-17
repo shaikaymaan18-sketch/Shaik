@@ -21,6 +21,7 @@ set(PLUGINS
     edenConfigplugin
     edenInterfaceplugin
     edenConstantsplugin
+    edenUtilplugin
 )
 
 if (ENABLE_SDL2)

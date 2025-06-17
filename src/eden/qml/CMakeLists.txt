@@ -1,5 +1,6 @@
 add_subdirectory(config)
 add_subdirectory(constants)
 add_subdirectory(items)
+add_subdirectory(util)
 
 add_subdirectory(main)

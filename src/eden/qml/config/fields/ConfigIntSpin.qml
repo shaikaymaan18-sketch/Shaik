@@ -6,6 +6,7 @@ import org.eden_emu.config
 import org.eden_emu.constants
 
 BaseField {
+    id: field
     contentItem: BetterSpinBox {
         enabled: enable
 
@@ -17,9 +18,9 @@ BaseField {
 
         font.pixelSize: 15 * Constants.scalar
 
-        value: setting.value
+        value: field.value
         label: setting.suffix
 
-        onValueModified: setting.value = value
+        onValueModified: field.value = value
     }
 }

@@ -20,7 +20,7 @@ BaseField {
         text: setting.label
         checked: setting.value
 
-        onClicked: setting.value = checked
+        onClicked: value = checked
 
         checkable: true
     }

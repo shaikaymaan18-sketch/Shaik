@@ -6,7 +6,7 @@
 
 #include "QMLSetting.h"
 #include "shared_translation.h"
-#include "yuzu/models/SettingsModel.h"
+#include "eden/models/SettingsModel.h"
 
 namespace SettingsCategories {
 Q_NAMESPACE

@@ -3,6 +3,7 @@ import QtQuick
 import org.eden_emu.config
 
 GlobalTab {
+    property alias swipe: swipe
     tabs: ["General", "Hotkeys", "Game List"]
 
     GlobalTabSwipeView {

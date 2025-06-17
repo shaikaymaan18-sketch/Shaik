@@ -8,6 +8,7 @@ import org.eden_emu.constants
 
 // Lots of cancer but idrc
 BaseField {
+    id: field
     contentItem: RowLayout {
         Layout.fillWidth: true
 
@@ -18,9 +19,9 @@ BaseField {
             to: setting.max
             stepSize: 1
 
-            value: setting.value
+            value: field.value
 
-            onMoved: setting.value = value
+            onMoved: field.value = value
 
             Layout.rightMargin: 10 * Constants.scalar
 
@@ -31,7 +32,7 @@ BaseField {
             font.pixelSize: 14 * Constants.scalar
             color: Constants.text
 
-            text: setting.value + setting.suffix
+            text: field.value + setting.suffix
 
             Layout.rightMargin: 10 * Constants.scalar
         }

@@ -9,5 +9,6 @@ qt_add_qml_module(edenInterface
         shared_translation.h shared_translation.cpp
         QMLSetting.h QMLSetting.cpp
         MetaObjectHelper.h
+        SOURCES QMLConfig.h
 
 )

@@ -2,7 +2,7 @@
 #define SETTINGSMODEL_H
 
 #include <QAbstractListModel>
-#include "yuzu/interface/QMLSetting.h"
+#include "eden/interface/QMLSetting.h"
 
 class SettingsModel : public QAbstractListModel {
     Q_OBJECT

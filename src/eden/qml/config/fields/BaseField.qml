@@ -14,11 +14,19 @@ Item {
     property alias enable: enable.checked
     property Item contentItem
 
+    readonly property string typeName: "BaseField"
+
     clip: true
     height: content.height + (helpText.height + helpText.anchors.topMargin)
 
+    Component.onCompleted: sync()
+
     function apply() {
-        setting.value = value
+        if (setting.value !== value) {
+            console.log(setting.label, "previous value:", setting.value,
+                        "new value:", value)
+            setting.value = value
+        }
     }
 
     function sync() {

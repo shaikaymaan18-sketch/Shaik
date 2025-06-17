@@ -1,10 +1,10 @@
-#include "core/core.h"
-#include "interface/SettingsInterface.h"
-#include "interface/qt_config.h"
-#include "models/GameListModel.h"
 #include <QApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include "core/core.h"
+#include "interface/QMLConfig.h"
+#include "models/GameListModel.h"
+#include "interface/SettingsInterface.h"
 
 #include <QQuickStyle>
 
@@ -14,18 +14,18 @@ int main(int argc, char *argv[])
 
     QQuickStyle::setStyle(QObject::tr("Material"));
 
-    QCoreApplication::setOrganizationName(QStringLiteral("yuzu"));
+    QCoreApplication::setOrganizationName(QStringLiteral("eden-emu"));
     QCoreApplication::setApplicationName(QStringLiteral("eden"));
+    QApplication::setDesktopFileName(QStringLiteral("org.eden-emu.eden"));
 
     /// Settings, etc
     Settings::SetConfiguringGlobal(true);
-    QtConfig *config = new QtConfig;
-    config->SaveAllValues();
+    QMLConfig *config = new QMLConfig;
 
-    // TODO: Save all values on launch and per game etc
-    app.connect(&app, &QCoreApplication::aboutToQuit, &app, [config]() {
-        config->SaveAllValues();
-    });
+    // // TODO: Save all values on launch and per game etc
+    // app.connect(&app, &QCoreApplication::aboutToQuit, &app, [config]() {
+    //     config->save();
+    // });
 
     /// Expose Enums
 
@@ -34,13 +34,16 @@ int main(int argc, char *argv[])
 
     /// CONTEXT
     QQmlApplicationEngine engine;
+    auto ctx = engine.rootContext();
+
+    ctx->setContextProperty(QStringLiteral("QtConfig"), QVariant::fromValue(config));
 
     // Enums
     qmlRegisterUncreatableMetaObject(SettingsCategories::staticMetaObject, "org.eden_emu.interface", 1, 0, "SettingsCategories", QString());
 
     // Directory List
     GameListModel *gameListModel = new GameListModel(&app);
-    engine.rootContext()->setContextProperty(QStringLiteral("EdenGameList"), gameListModel);
+    ctx->setContextProperty(QStringLiteral("EdenGameList"), gameListModel);
 
     /// LOAD
     QObject::connect(

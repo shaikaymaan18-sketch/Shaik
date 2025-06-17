@@ -20,9 +20,9 @@ BaseField {
 
         font.pixelSize: 15 * Constants.scalar
 
-        text: setting.value
+        text: value
         suffix: setting.suffix
 
-        onTextEdited: setting.value = parseInt(text)
+        onTextEdited: value = parseInt(text)
     }
 }

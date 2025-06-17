@@ -18,9 +18,9 @@ BaseField {
 
         font.pixelSize: 15 * Constants.scalar
 
-        text: Number(setting.value).toString(16)
+        text: Number(value).toString(16)
         suffix: setting.suffix
 
-        onTextEdited: setting.value = Number("0x" + text)
+        onTextEdited: value = Number("0x" + text)
     }
 }

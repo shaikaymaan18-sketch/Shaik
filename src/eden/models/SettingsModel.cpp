@@ -47,7 +47,9 @@ bool SettingsModel::setData(const QModelIndex &index, const QVariant &value, int
 
         switch (role) {
         case VALUE:
+            qDebug() << "Before" << s->value();
             s->setValue(value);
+            qDebug() << "After" << s->value();
 
             break;
         }
