@@ -534,11 +534,8 @@ void QtConfig::SaveMultiplayerValues() {
 
 std::vector<Settings::BasicSetting*>& QtConfig::FindRelevantList(Settings::Category category) {
     auto& map = Settings::values.linkage.by_category;
-    // if (!map[category].empty()) {
-    //     return map[category];
-    // }
-    if (map.contains(category)) {
-        return Settings::values.linkage.by_category[category];
+    if (!map[category].empty()) {
+        return map[category];
     }
     return UISettings::values.linkage.by_category[category];
 }

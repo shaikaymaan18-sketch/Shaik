@@ -5,13 +5,16 @@ import QtQuick.Layouts
 import org.eden_emu.constants
 
 CheckBox {
+    property bool force: false
     property var setting
+    property var other: setting.other === null ? setting : setting.other
 
     indicator.implicitHeight: 25 * Constants.scalar
     indicator.implicitWidth: 25 * Constants.scalar
 
-    checked: setting.other !== null ? setting.other.value : true
-    onClicked: setting.other.value = checked
+    checked: visible ? other.value : true
+    onClicked: if (visible)
+                   other.value = checked
 
-    visible: setting.other !== null
+    visible: setting.other !== null || force
 }

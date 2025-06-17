@@ -10,6 +10,7 @@ Item {
     property var setting
     property var value
     property bool showLabel: true
+    property bool forceCheckbox: false
 
     property alias enable: enable.checked
     property Item contentItem
@@ -23,19 +24,19 @@ Item {
 
     function apply() {
         if (setting.value !== value) {
-            console.log(setting.label, "previous value:", setting.value,
-                        "new value:", value)
             setting.value = value
         }
     }
 
     function sync() {
-        value = setting.value
+        if (value !== setting.value) {
+            value = setting.value
+        }
     }
 
     RowLayout {
         id: content
-        height: 45 * Constants.scalar
+        height: 50 * Constants.scalar
 
         spacing: 0
 
@@ -52,7 +53,7 @@ Item {
             icon.height: 20
 
             onClicked: helpText.toggle()
-            visible: setting.tooltip !== ""
+            icon.color: setting.tooltip !== "" ? Constants.text : Constants.dialog
             z: 2
         }
 
@@ -60,6 +61,7 @@ Item {
             id: enable
             setting: field.setting
             z: 2
+            force: field.forceCheckbox
         }
 
         RowLayout {
