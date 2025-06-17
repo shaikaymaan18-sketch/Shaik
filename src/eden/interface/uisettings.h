@@ -59,6 +59,12 @@ enum class Theme {
     MidnightBlueColorful,
 };
 
+enum class GameView {
+    Grid,
+    List,
+    Carousel,
+};
+
 static constexpr Theme default_theme{
 #ifdef _WIN32
     Theme::DarkColorful
@@ -192,15 +198,15 @@ struct Values {
     std::pair<std::vector<std::string>, std::vector<std::string>> multiplayer_ban_list;
 
     // Game List
-    Setting<bool> show_add_ons{linkage, true, "show_add_ons", Category::UiGameList};
-    Setting<u32> game_icon_size{linkage, 64, "game_icon_size", Category::UiGameList};
-    Setting<u32> folder_icon_size{linkage, 48, "folder_icon_size", Category::UiGameList};
-    Setting<u8> row_1_text_id{linkage, 3, "row_1_text_id", Category::UiGameList};
-    Setting<u8> row_2_text_id{linkage, 2, "row_2_text_id", Category::UiGameList};
-    std::atomic_bool is_game_list_reload_pending{false};
-    Setting<bool> cache_game_list{linkage, true, "cache_game_list", Category::UiGameList};
-    Setting<bool> favorites_expanded{linkage, true, "favorites_expanded", Category::UiGameList};
-    QVector<u64> favorited_ids;
+    // Setting<bool> show_add_ons{linkage, true, "show_add_ons", Category::UiGameList};
+    // Setting<u32> game_icon_size{linkage, 64, "game_icon_size", Category::UiGameList};
+    // Setting<u32> folder_icon_size{linkage, 48, "folder_icon_size", Category::UiGameList};
+    // Setting<u8> row_1_text_id{linkage, 3, "row_1_text_id", Category::UiGameList};
+    // Setting<u8> row_2_text_id{linkage, 2, "row_2_text_id", Category::UiGameList};
+    // std::atomic_bool is_game_list_reload_pending{false};
+    // Setting<bool> cache_game_list{linkage, true, "cache_game_list", Category::UiGameList};
+    // Setting<bool> favorites_expanded{linkage, true, "favorites_expanded", Category::UiGameList};
+    // QVector<u64> favorited_ids;
 
     Setting<u8, true> grid_columns{linkage, 4, 1, 8, "grid_columns", Category::UiGameList};
 

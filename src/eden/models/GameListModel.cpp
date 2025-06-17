@@ -56,9 +56,6 @@ void GameListModel::reload()
                 qreal size = entry.size();
                 QString sizeString = QLocale::system().formattedDataSize(size);
 
-                qDebug() << path << name << size;
-                // m_data << Game{path, name, size};
-
                 QStandardItem *game = new QStandardItem(name);
                 game->setData(path, GLMRoleTypes::PATH);
                 game->setData(sizeString, GLMRoleTypes::FILESIZE);

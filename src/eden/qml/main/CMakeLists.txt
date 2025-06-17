@@ -9,5 +9,10 @@ qt_add_qml_module(edenMain
     Main.qml
     StatusBar.qml
     GameList.qml
-    GamePreview.qml
+    GameGridCard.qml
+    MarqueeText.qml
+    GameGrid.qml
+
+    GameCarouselCard.qml
+    GameCarousel.qml
 )

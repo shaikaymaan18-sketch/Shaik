@@ -20,15 +20,16 @@ Rectangle {
 
     color: Constants.bg
 
-    // TODO: make this optional.
-    // Probably just make a Gamepad frontend/backend split with a null backend
+    // TODO: use the original yuzu backend for dis
     Gamepad {
         id: gamepad
 
-        onUpPressed: grid.moveCurrentIndexUp()
-        onDownPressed: grid.moveCurrentIndexDown()
-        onLeftPressed: grid.moveCurrentIndexLeft()
-        onRightPressed: grid.moveCurrentIndexRight()
+        // onUpPressed: grid.moveCurrentIndexUp()
+        // onDownPressed: grid.moveCurrentIndexDown()
+        // onLeftPressed: grid.moveCurrentIndexLeft()
+        // onRightPressed: grid.moveCurrentIndexRight()
+        onLeftPressed: carousel.decrementCurrentIndex()
+        onRightPressed: carousel.incrementCurrentIndex()
         onAPressed: console.log("A pressed")
         onLeftStickMoved: (x, y) => {
                               gx = x
@@ -54,67 +55,56 @@ Rectangle {
             }
         }
     }
-
     Timer {
         interval: 16
         running: true
         repeat: true
         onTriggered: gamepad.pollEvents()
     }
-
     FolderDialog {
         id: openDir
         folder: StandardPaths.writableLocation(StandardPaths.HomeLocation)
         onAccepted: {
             button.visible = false
-            grid.anchors.bottom = root.bottom
+            view.anchors.bottom = root.bottom
             EdenGameList.addDir(folder)
         }
     }
 
-    GridView {
-        id: grid
+    // GameGrid {
+    //     setting: parent.setting
 
-        property int cellSize: Math.floor(width / setting.value)
+    //     id: grid
 
-        highlightFollowsCurrentItem: true
-        clip: true
-
-        cellWidth: cellSize
-        cellHeight: cellSize + 60 * Constants.scalar
+    // anchors.bottom: button.top
+    // anchors.left: parent.left
+    // anchors.margins: 8
+    // anchors.right: parent.right
+    // anchors.top: parent.top
+    // }
+    Item {
+        id: view
 
         anchors {
-            top: parent.top
+            bottom: button.top
             left: parent.left
             right: parent.right
-
-            bottom: button.top
-
-            margins: 8
+            top: parent.top
+            margins: 8 * Constants.scalar
         }
 
-        model: EdenGameList
+        GameCarousel {
+            id: carousel
 
-        delegate: GamePreview {
-            id: game
+            height: 300
 
-            width: grid.cellSize - 20 * Constants.scalar
-            height: grid.cellHeight - 20 * Constants.scalar
-        }
+            anchors {
+                right: view.right
+                left: view.left
 
-        highlight: Rectangle {
-            color: "transparent"
-            z: 5
-
-            radius: 16 * Constants.scalar
-            border {
-                color: Constants.text
-                width: 3
+                verticalCenter: view.verticalCenter
             }
         }
-
-        focus: true
-        focusPolicy: "StrongFocus"
     }
 
     Button {

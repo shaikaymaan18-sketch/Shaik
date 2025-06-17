@@ -282,13 +282,13 @@ void QtConfig::ReadUIGamelistValues() {
 
     ReadCategory(Settings::Category::UiGameList);
 
-    const int favorites_size = BeginArray("favorites");
-    for (int i = 0; i < favorites_size; i++) {
-        SetArrayIndex(i);
-        UISettings::values.favorited_ids.append(
-            ReadUnsignedIntegerSetting(std::string("program_id")));
-    }
-    EndArray();
+    // const int favorites_size = BeginArray("favorites");
+    // for (int i = 0; i < favorites_size; i++) {
+    //     SetArrayIndex(i);
+    //     UISettings::values.favorited_ids.append(
+    //         ReadUnsignedIntegerSetting(std::string("program_id")));
+    // }
+    // EndArray();
 
     EndGroup();
 }
@@ -490,12 +490,12 @@ void QtConfig::SaveUIGamelistValues()
 
     WriteCategory(Settings::Category::UiGameList);
 
-    BeginArray(std::string("favorites"));
-    for (int i = 0; i < UISettings::values.favorited_ids.size(); i++) {
-        SetArrayIndex(i);
-        WriteIntegerSetting(std::string("program_id"), UISettings::values.favorited_ids[i]);
-    }
-    EndArray(); // favorites
+    // BeginArray(std::string("favorites"));
+    // for (int i = 0; i < UISettings::values.favorited_ids.size(); i++) {
+    //     SetArrayIndex(i);
+    //     WriteIntegerSetting(std::string("program_id"), UISettings::values.favorited_ids[i]);
+    // }
+    // EndArray(); // favorites
 
     EndGroup();
 }
