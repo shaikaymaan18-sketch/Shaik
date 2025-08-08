@@ -59,27 +59,126 @@ ListView {
 
         radius: 8 * Constants.scalar
 
-        // TODO: marquee
-        Text {
+        Item {
+            id: container
+
+            anchors {
+                bottom: hg.top
+
+                left: hg.left
+                right: hg.right
+            }
+
+            height: txt.contentHeight
+            clip: true
+
             function toTitleCase(str) {
                 return str.replace(/\w\S*/g, text => text.charAt(0).toUpperCase(
                                        ) + text.substring(1).toLowerCase())
             }
 
-            text: hg.item === null ? "" : toTitleCase(hg.item.title)
-            font.pixelSize: 22 * Constants.scalar
-            color: "lightblue"
+            property string text: hg.item === null ? "" : toTitleCase(
+                                                         hg.item.title)
+            property string spacing: "      "
+            property string combined: text + spacing
+            property string display: animate ? combined.substring(
+                                                   step) + combined.substring(
+                                                   0, step) : text
+            property int step: 0
+            property bool animate: txt.contentWidth > hg.width
 
-            anchors {
-                bottom: hg.top
+            Timer {
+                id: marquee
 
-                bottomMargin: 10 * Constants.scalar
-                left: hg.left
-                right: hg.right
+                interval: 150
+                running: false
+                repeat: true
+                onTriggered: {
+                    parent.step = (parent.step + 1) % parent.combined.length
+                    if (parent.step === 0) {
+                        stop()
+                        delay.start()
+                    }
+                }
             }
 
-            horizontalAlignment: Text.AlignHCenter
-            elide: Text.ElideRight
+            Timer {
+                id: delay
+                interval: 1500
+                repeat: false
+                onTriggered: {
+                    marquee.start()
+                }
+            }
+
+            // fake container to gauge contentWidth
+            Text {
+                id: txt
+                visible: false
+                text: parent.text
+                font.pixelSize: 22 * Constants.scalar
+                font.family: "Monospace"
+
+                onContentWidthChanged: {
+                    if (txt.contentWidth > hg.width) {
+                        container.step = 0
+                        delay.start()
+                    } else {
+                        delay.stop()
+                        marquee.stop()
+                    }
+                }
+            }
+
+            Text {
+                anchors {
+                    fill: parent
+                    leftMargin: 10
+                    rightMargin: 10
+                }
+
+                color: "lightblue"
+                font.pixelSize: 22 * Constants.scalar
+                font.family: "Monospace"
+                text: parent.display
+
+                horizontalAlignment: container.animate ? Text.AlignLeft : Text.AlignHCenter
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                z: 2
+
+                gradient: Gradient {
+                    orientation: Gradient.Horizontal
+                    GradientStop {
+                        position: 0.0
+                        color: marquee.running ? Constants.bg : "transparent"
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: 200
+                            }
+                        }
+                    }
+                    GradientStop {
+                        position: 0.1
+                        color: "transparent"
+                    }
+                    GradientStop {
+                        position: 0.9
+                        color: "transparent"
+                    }
+                    GradientStop {
+                        position: 1.0
+                        color: marquee.running ? Constants.bg : "transparent"
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: 200
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
