@@ -37,8 +37,6 @@ if (UNIX)
     target_sources(qt_common PRIVATE gui_settings.cpp gui_settings.h)
 endif()
 
-create_target_directory_groups(qt_common)
-
 if (USE_DISCORD_PRESENCE)
     target_sources(qt_common PRIVATE
         discord/discord_impl.cpp
