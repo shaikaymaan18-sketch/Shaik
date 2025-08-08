@@ -96,3 +96,5 @@ if (UNIX AND NOT APPLE)
         target_link_libraries(qt_common PRIVATE Qt6::GuiPrivate)
     endif()
 endif()
+
+create_target_directory_groups(qt_common)

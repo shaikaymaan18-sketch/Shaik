@@ -216,6 +216,8 @@ struct Values {
     QVector<u64> favorited_ids;
     QMap<u64, QDir> ryujinx_link_paths;
 
+    Setting<u8, true> grid_columns{linkage, 4, 1, 8, "grid_columns", Category::UiGameList};
+
     // Compatibility List
     Setting<bool> show_compat{linkage, true, "show_compat", Category::UiGameList};
 
