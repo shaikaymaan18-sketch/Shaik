@@ -21,20 +21,20 @@ if (YUZU_STATIC_BUILD)
 endif()
 
 # Set compilation flags
-if (MSVC AND NOT CXX_CLANG)
+if (MSVC)
     set(CMAKE_CONFIGURATION_TYPES Debug Release CACHE STRING "" FORCE)
 
     # Silence "deprecation" warnings
-    add_compile_definitions(_CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_DEPRECATE _SCL_SECURE_NO_WARNINGS)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS)
 
     # Avoid windows.h junk
-    add_compile_definitions(NOMINMAX)
+    add_definitions(-DNOMINMAX)
 
     # Avoid windows.h from including some usually unused libs like winsocks.h, since this might cause some redefinition errors.
-    add_compile_definitions(WIN32_LEAN_AND_MEAN)
+    add_definitions(-DWIN32_LEAN_AND_MEAN)
 
     # Ensure that projects are built with Unicode support.
-    add_compile_definitions(UNICODE _UNICODE)
+    add_definitions(-DUNICODE -D_UNICODE)
 
     # /W4                 - Level 4 warnings
     # /MP                 - Multi-threaded compilation
@@ -67,6 +67,10 @@ if (MSVC AND NOT CXX_CLANG)
         # External headers diagnostics
         /external:anglebrackets # Treats all headers included by #include <header>, where the header file is enclosed in angle brackets (< >), as external headers
         /external:W0            # Sets the default warning level to 0 for external headers, effectively disabling warnings for them.
+
+        # Warnings
+        /W4
+        /WX-
 
         /we4062 # Enumerator 'identifier' in a switch of enum 'enumeration' is not handled
         /we4189 # 'identifier': local variable is initialized but not referenced
@@ -110,13 +114,9 @@ if (MSVC AND NOT CXX_CLANG)
     set(CMAKE_EXE_LINKER_FLAGS_DEBUG   "/DEBUG /MANIFEST:NO" CACHE STRING "" FORCE)
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "/DEBUG /MANIFEST:NO /INCREMENTAL:NO /OPT:REF,ICF" CACHE STRING "" FORCE)
 else()
-    if (NOT MSVC)
-        add_compile_options(
-            -fwrapv
-        )
-    endif()
-
     add_compile_options(
+        -fwrapv
+
         -Werror=all
         -Werror=extra
         -Werror=shadow
@@ -141,6 +141,9 @@ else()
             -Wno-braced-scalar-init
             -Wno-unused-private-field
             -Wno-nullability-completeness
+            -Werror=shadow-uncaptured-local
+            -Werror=implicit-fallthrough
+            -Werror=type-limits
         )
     endif()
 
@@ -148,12 +151,12 @@ else()
         add_compile_options("-mcx16")
     endif()
 
-    if (APPLE AND CXX_CLANG)
+    if (APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL Clang)
         add_compile_options("-stdlib=libc++")
     endif()
 
     # GCC bugs
-    if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "11" AND CXX_GCC)
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "11" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         # These diagnostics would be great if they worked, but are just completely broken
         # and produce bogus errors on external libraries like fmt.
         add_compile_options(
@@ -169,7 +172,7 @@ else()
     # glibc, which may default to 32 bits. glibc allows this to be configured
     # by setting _FILE_OFFSET_BITS.
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR MINGW)
-        add_compile_definitions(_FILE_OFFSET_BITS=64)
+        add_definitions(-D_FILE_OFFSET_BITS=64)
     endif()
 
     if (YUZU_STATIC_BUILD AND NOT APPLE)
@@ -230,7 +233,7 @@ endif()
 if (ENABLE_QT)
     add_definitions(-DYUZU_QT_WIDGETS)
     add_subdirectory(qt_common)
-    add_subdirectory(eden)
+    add_subdirectory(Eden)
 endif()
 
 if (ENABLE_WEB_SERVICE)
@@ -241,5 +244,3 @@ if (ANDROID)
     add_subdirectory(android/app/src/main/jni)
     target_include_directories(yuzu-android PRIVATE android/app/src/main)
 endif()
-
-include(GenerateDepHashes)
