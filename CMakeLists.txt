@@ -197,6 +197,14 @@ CMAKE_DEPENDENT_OPTION(YUZU_CMD "Compile the eden-cli executable" ON "ENABLE_SDL
 CMAKE_DEPENDENT_OPTION(YUZU_CRASH_DUMPS "Compile crash dump (Minidump) support" OFF "WIN32 OR LINUX" OFF)
 
 option(YUZU_ENABLE_LTO "Enable link-time optimization" OFF)
+if(YUZU_ENABLE_LTO)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT COMPILER_SUPPORTS_LTO)
+    if(NOT COMPILER_SUPPORTS_LTO)
+        message(FATAL_ERROR "LTO is not supported, disable YUZU_ENABLE_LTO!")
+    endif()
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+endif()
 
 option(YUZU_DOWNLOAD_TIME_ZONE_DATA "Always download time zone binaries" ON)
 
