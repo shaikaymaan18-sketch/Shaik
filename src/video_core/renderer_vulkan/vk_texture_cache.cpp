@@ -125,6 +125,28 @@ constexpr VkBorderColor ConvertBorderColor(const std::array<float, 4>& color) {
     return usage;
 }
 
+[[nodiscard]] VkImageLayout AttachmentFeedbackLoopLayout(const Device& device,
+                                                   VkImageAspectFlags aspect_mask) {
+    if (!device.SupportsAttachmentFeedbackLoopLayout()) {
+        return VK_IMAGE_LAYOUT_GENERAL;
+    }
+    if ((aspect_mask & VK_IMAGE_ASPECT_COLOR_BIT) != 0) {
+        return VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+    }
+    const bool has_depth = (aspect_mask & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
+    const bool has_stencil = (aspect_mask & VK_IMAGE_ASPECT_STENCIL_BIT) != 0;
+    if (has_depth && has_stencil) {
+        return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+    }
+    if (has_depth) {
+        return VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+    }
+    if (has_stencil) {
+        return VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+    }
+    return VK_IMAGE_LAYOUT_GENERAL;
+}
+
 [[nodiscard]] VkImageCreateInfo MakeImageCreateInfo(const Device& device, const ImageInfo& info) {
     const auto format_info =
         MaxwellToVK::SurfaceFormat(device, FormatType::Optimal, false, info.format);
@@ -137,6 +159,11 @@ constexpr VkBorderColor ConvertBorderColor(const std::array<float, 4>& color) {
         flags |= VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT;
     }
     const auto [samples_x, samples_y] = VideoCommon::SamplesLog2(info.num_samples);
+    VkImageUsageFlags usage = ImageUsageFlags(format_info, info.format);
+    if (device.SupportsAttachmentFeedbackLoopLayout() &&
+        (usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT))) {
+        usage |= VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+    }
     return VkImageCreateInfo{
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .pNext = nullptr,
@@ -152,14 +179,13 @@ constexpr VkBorderColor ConvertBorderColor(const std::array<float, 4>& color) {
         .arrayLayers = static_cast<u32>(info.resources.layers),
         .samples = ConvertSampleCount(info.num_samples),
         .tiling = VK_IMAGE_TILING_OPTIMAL,
-        .usage = ImageUsageFlags(format_info, info.format),
+        .usage = usage,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .queueFamilyIndexCount = 0,
         .pQueueFamilyIndices = nullptr,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
     };
 }
-
 [[nodiscard]] vk::Image MakeImage(const Device& device, const MemoryAllocator& allocator,
                                   const ImageInfo& info, std::span<const VkFormat> view_formats) {
     if (info.type == ImageType::Buffer) {
@@ -940,6 +966,9 @@ VkBuffer TextureCacheRuntime::GetTemporaryBuffer(size_t needed_size) {
 }
 
 void TextureCacheRuntime::BarrierFeedbackLoop() {
+    if (device.SupportsAttachmentFeedbackLoopLayout()) {
+        return;
+    }
     scheduler.RequestOutsideRenderPassOperationContext();
 }
 
@@ -1086,8 +1115,8 @@ void TextureCacheRuntime::BlitImage(Framebuffer* dst_framebuffer, ImageView& dst
         return;
     }
     if (aspect_mask == VK_IMAGE_ASPECT_COLOR_BIT && !is_src_msaa && !is_dst_msaa) {
-        blit_image_helper.BlitColor(dst_framebuffer, src.Handle(Shader::TextureType::Color2D),
-                                    dst_region, src_region, filter, operation);
+        blit_image_helper.BlitColor(dst_framebuffer, src, dst_region, src_region, filter,
+                                    operation);
         return;
     }
     ASSERT(src.format == dst.format);
@@ -1106,8 +1135,8 @@ void TextureCacheRuntime::BlitImage(Framebuffer* dst_framebuffer, ImageView& dst
         }();
         if (!can_blit_depth_stencil) {
             UNIMPLEMENTED_IF(is_src_msaa || is_dst_msaa);
-            blit_image_helper.BlitDepthStencil(dst_framebuffer, src.DepthView(), src.StencilView(),
-                                               dst_region, src_region, filter, operation);
+            blit_image_helper.BlitDepthStencil(dst_framebuffer, src, dst_region, src_region,
+                                               filter, operation);
             return;
         }
     }
@@ -1968,17 +1997,14 @@ bool Image::BlitScaleHelper(bool scale_up) {
             blit_framebuffer =
                 std::make_unique<Framebuffer>(*runtime, view_ptr, nullptr, extent, scale_up);
         }
-        const auto color_view = blit_view->Handle(Shader::TextureType::Color2D);
-
-        runtime->blit_image_helper.BlitColor(blit_framebuffer.get(), color_view, dst_region,
+        runtime->blit_image_helper.BlitColor(blit_framebuffer.get(), *blit_view, dst_region,
                                              src_region, operation, BLIT_OPERATION);
     } else if (aspect_mask == (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) {
         if (!blit_framebuffer) {
             blit_framebuffer =
                 std::make_unique<Framebuffer>(*runtime, nullptr, view_ptr, extent, scale_up);
         }
-        runtime->blit_image_helper.BlitDepthStencil(blit_framebuffer.get(), blit_view->DepthView(),
-                                                    blit_view->StencilView(), dst_region,
+        runtime->blit_image_helper.BlitDepthStencil(blit_framebuffer.get(), *blit_view, dst_region,
                                                     src_region, operation, BLIT_OPERATION);
     } else {
         // TODO: Use helper blits where applicable
@@ -2294,6 +2320,9 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
     boost::container::small_vector<VkImageView, NUM_RT + 1> attachments;
     RenderPassKey renderpass_key{};
     s32 num_layers = 1;
+    num_images = 0;
+    num_color_buffers = 0;
+    image_layouts.fill(VK_IMAGE_LAYOUT_GENERAL);
 
     is_rescaled = is_rescaled_;
     const auto& resolution = runtime.resolution;
@@ -2314,7 +2343,10 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
         renderpass_key.color_formats[index] = color_buffer->format;
         num_layers = (std::max)(num_layers, color_buffer->range.extent.layers);
         images[num_images] = color_buffer->ImageHandle();
-        image_ranges[num_images] = MakeSubresourceRange(color_buffer);
+        const VkImageSubresourceRange subresource_range = MakeSubresourceRange(color_buffer);
+        image_ranges[num_images] = subresource_range;
+        image_layouts[num_images] =
+            AttachmentFeedbackLoopLayout(runtime.device, subresource_range.aspectMask);
         rt_map[index] = num_images;
         samples = color_buffer->Samples();
         ++num_images;
@@ -2331,6 +2363,8 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
         images[num_images] = depth_buffer->ImageHandle();
         const VkImageSubresourceRange subresource_range = MakeSubresourceRange(depth_buffer);
         image_ranges[num_images] = subresource_range;
+        image_layouts[num_images] =
+            AttachmentFeedbackLoopLayout(runtime.device, subresource_range.aspectMask);
         samples = depth_buffer->Samples();
         ++num_images;
         has_depth = (subresource_range.aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
@@ -2396,3 +2430,4 @@ void TextureCacheRuntime::TransitionImageLayout(Image& image) {
 }
 
 } // namespace Vulkan
+

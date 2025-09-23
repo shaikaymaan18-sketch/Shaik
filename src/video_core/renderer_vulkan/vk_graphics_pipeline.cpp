@@ -460,6 +460,9 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
     buffer_cache.UpdateGraphicsBuffers(is_indexed);
     buffer_cache.BindHostGeometryBuffers(is_indexed);
 
+    texture_cache.UpdateRenderTargets(false);
+    Framebuffer* const active_framebuffer = texture_cache.GetFramebuffer();
+
     guest_descriptor_queue.Acquire();
 
     RescalingPushConstant rescaling;
@@ -469,7 +472,7 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
     const auto prepare_stage{[&](size_t stage) LAMBDA_FORCEINLINE {
         buffer_cache.BindHostStageBuffers(stage);
         PushImageDescriptors(texture_cache, guest_descriptor_queue, stage_infos[stage], rescaling,
-                             samplers_it, views_it);
+                             samplers_it, views_it, active_framebuffer);
         const auto& info{stage_infos[0]};
         if (info.uses_render_area) {
             render_area.uses_render_area = true;
@@ -492,7 +495,6 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
     if constexpr (Spec::enabled_stages[4]) {
         prepare_stage(4);
     }
-    texture_cache.UpdateRenderTargets(false);
     texture_cache.CheckFeedbackLoop(views);
     ConfigureDraw(rescaling, render_area);
 
@@ -900,6 +902,18 @@ void GraphicsPipeline::MakePipeline(VkRenderPass render_pass) {
     VkPipelineCreateFlags flags{};
     if (device.IsKhrPipelineExecutablePropertiesEnabled() && Settings::values.renderer_debug.GetValue()) {
         flags |= VK_PIPELINE_CREATE_CAPTURE_STATISTICS_BIT_KHR;
+    }
+    if (device.SupportsAttachmentFeedbackLoopLayout()) {
+        const RenderPassKey render_pass_key = MakeRenderPassKey(key.state);
+        const bool has_color_feedback = std::ranges::any_of(render_pass_key.color_formats, [](PixelFormat format) {
+            return format != PixelFormat::Invalid;
+        });
+        if (has_color_feedback) {
+            flags |= VK_PIPELINE_CREATE_COLOR_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+        }
+        if (render_pass_key.depth_format != PixelFormat::Invalid) {
+            flags |= VK_PIPELINE_CREATE_DEPTH_STENCIL_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+        }
     }
 
     pipeline = device.GetLogical().CreateGraphicsPipeline(

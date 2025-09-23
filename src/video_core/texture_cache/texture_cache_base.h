@@ -137,6 +137,14 @@ public:
     /// Notify the cache that a new frame has been queued
     void TickFrame();
 
+    [[nodiscard]] Runtime& GetRuntime() noexcept {
+        return runtime;
+    }
+
+    [[nodiscard]] const Runtime& GetRuntime() const noexcept {
+        return runtime;
+    }
+
     /// Return a constant reference to the given image view id
     [[nodiscard]] const ImageView& GetImageView(ImageViewId id) const noexcept;
 

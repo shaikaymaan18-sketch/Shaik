@@ -6,6 +6,7 @@
 #include <condition_variable>
 #include <cstddef>
 #include <functional>
+#include <array>
 #include <memory>
 #include <thread>
 #include <utility>
@@ -249,6 +250,7 @@ private:
     u32 num_renderpass_images = 0;
     std::array<VkImage, 9> renderpass_images{};
     std::array<VkImageSubresourceRange, 9> renderpass_image_ranges{};
+    std::array<VkImageLayout, 9> renderpass_image_layouts{};
 
     std::queue<std::unique_ptr<CommandChunk>> work_queue;
     std::vector<std::unique_ptr<CommandChunk>> chunk_reserve;

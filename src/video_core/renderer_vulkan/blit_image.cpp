@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <algorithm>
+#include <array>
 
 #include "video_core/renderer_vulkan/vk_texture_cache.h"
 
@@ -43,9 +44,43 @@
 
 namespace Vulkan {
 
+using VideoCommon::ImageViewFlagBits;
 using VideoCommon::ImageViewType;
+using VideoCommon::SubresourceRange;
 
 namespace {
+
+[[nodiscard]] constexpr VkImageAspectFlags ImageAspectMask(VideoCore::Surface::PixelFormat format) {
+    using VideoCore::Surface::SurfaceType;
+    switch (VideoCore::Surface::GetFormatType(format)) {
+    case SurfaceType::ColorTexture:
+        return VK_IMAGE_ASPECT_COLOR_BIT;
+    case SurfaceType::Depth:
+        return VK_IMAGE_ASPECT_DEPTH_BIT;
+    case SurfaceType::Stencil:
+        return VK_IMAGE_ASPECT_STENCIL_BIT;
+    case SurfaceType::DepthStencil:
+        return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+    default:
+        return VkImageAspectFlags{};
+    }
+}
+
+[[nodiscard]] VkImageSubresourceRange MakeSubresourceRange(const ImageView* image_view) {
+    SubresourceRange range = image_view->range;
+    if ((image_view->flags & ImageViewFlagBits::Slice) != ImageViewFlagBits{}) {
+        range.base.layer = 0;
+        range.extent.layers = 1;
+    }
+    return VkImageSubresourceRange{
+        .aspectMask = ImageAspectMask(image_view->format),
+        .baseMipLevel = static_cast<u32>(range.base.level),
+        .levelCount = static_cast<u32>(range.extent.levels),
+        .baseArrayLayer = static_cast<u32>(range.base.layer),
+        .layerCount = static_cast<u32>(range.extent.layers),
+    };
+}
+
 struct PushConstants {
     std::array<float, 2> tex_scale;
     std::array<float, 2> tex_offset;
@@ -393,34 +428,128 @@ VkExtent2D GetConversionExtent(const ImageView& src_image_view) {
 
 void TransitionImageLayout(vk::CommandBuffer& cmdbuf, VkImage image, VkImageLayout target_layout,
                            VkImageLayout source_layout = VK_IMAGE_LAYOUT_GENERAL) {
-    constexpr VkFlags flags{VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT};
+    constexpr VkAccessFlags access_flags =
+        VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+        VK_ACCESS_SHADER_READ_BIT;
+    constexpr VkPipelineStageFlags stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                                                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                                                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    const VkImageSubresourceRange subresource_range{
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .baseMipLevel = 0,
+        .levelCount = VK_REMAINING_MIP_LEVELS,
+        .baseArrayLayer = 0,
+        .layerCount = VK_REMAINING_ARRAY_LAYERS,
+    };
     const VkImageMemoryBarrier barrier{
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .pNext = nullptr,
-        .srcAccessMask = flags,
-        .dstAccessMask = flags,
+        .srcAccessMask = access_flags,
+        .dstAccessMask = access_flags,
         .oldLayout = source_layout,
         .newLayout = target_layout,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .image = image,
-        .subresourceRange{
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1,
-        },
+        .subresourceRange = subresource_range,
     };
-    cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                           0, barrier);
+    cmdbuf.PipelineBarrier(stage_flags, stage_flags, 0, barrier);
+}
+
+void RecordShaderReadBarrier(Scheduler& scheduler, const ImageView& image_view) {
+    const VkImage image = image_view.ImageHandle();
+    const VkImageSubresourceRange subresource_range = MakeSubresourceRange(&image_view);
+    scheduler.RequestOutsideRenderPassOperationContext();
+    scheduler.Record([image, subresource_range](vk::CommandBuffer cmdbuf) {
+        const VkImageMemoryBarrier barrier{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = nullptr,
+            .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                             VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                             VK_ACCESS_SHADER_WRITE_BIT |
+                             VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+            .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = image,
+            .subresourceRange = subresource_range,
+        };
+        cmdbuf.PipelineBarrier(
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                VK_PIPELINE_STAGE_TRANSFER_BIT |
+                VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0,
+            barrier);
+    });
 }
 
 void BeginRenderPass(vk::CommandBuffer& cmdbuf, const Framebuffer* framebuffer) {
     const VkRenderPass render_pass = framebuffer->RenderPass();
     const VkFramebuffer framebuffer_handle = framebuffer->Handle();
     const VkExtent2D render_area = framebuffer->RenderArea();
+    const u32 num_images = framebuffer->NumImages();
+
+    if (num_images > 0) {
+        std::array<VkImageMemoryBarrier, 9> barriers{};
+        u32 barrier_count = 0;
+        VkPipelineStageFlags dst_stages = 0;
+        const auto& images = framebuffer->Images();
+        const auto& ranges = framebuffer->ImageRanges();
+        const auto& layouts = framebuffer->ImageLayouts();
+
+        for (u32 i = 0; i < num_images; ++i) {
+            const VkImageLayout layout = layouts[i];
+            if (layout == VK_IMAGE_LAYOUT_GENERAL) {
+                continue;
+            }
+            const VkImageSubresourceRange& range = ranges[i];
+            VkAccessFlags dst_access = 0;
+            VkPipelineStageFlags dst_stage = 0;
+            if ((range.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) != 0) {
+                dst_access |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                dst_stage |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            }
+            if ((range.aspectMask & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) != 0) {
+                dst_access |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                              VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                dst_stage |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                              VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            }
+            if (dst_access == 0) {
+                continue;
+            }
+            barriers[barrier_count++] = VkImageMemoryBarrier{
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = nullptr,
+                .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT |
+                                 VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                                 VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                                 VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                                 VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
+                .dstAccessMask = dst_access,
+                .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+                .newLayout = layout,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = images[i],
+                .subresourceRange = range,
+            };
+            dst_stages |= dst_stage;
+        }
+
+        if (barrier_count > 0) {
+            cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, dst_stages, 0, {}, {},
+                                   {barriers.data(), barrier_count});
+        }
+    }
+
     const VkRenderPassBeginInfo renderpass_bi{
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .pNext = nullptr,
@@ -435,6 +564,60 @@ void BeginRenderPass(vk::CommandBuffer& cmdbuf, const Framebuffer* framebuffer) 
     };
     cmdbuf.BeginRenderPass(renderpass_bi, VK_SUBPASS_CONTENTS_INLINE);
 }
+void EndRenderPass(vk::CommandBuffer& cmdbuf, const Framebuffer* framebuffer) {
+    const u32 num_images = framebuffer->NumImages();
+    const auto& images = framebuffer->Images();
+    const auto& ranges = framebuffer->ImageRanges();
+    const auto& layouts = framebuffer->ImageLayouts();
+
+    std::array<VkImageMemoryBarrier, 9> barriers{};
+    VkPipelineStageFlags src_stages = 0;
+    u32 barrier_count = 0;
+
+    for (u32 i = 0; i < num_images; ++i) {
+        const VkImageSubresourceRange& range = ranges[i];
+        const VkImageLayout layout = layouts[i];
+        VkAccessFlags src_access = 0;
+        VkPipelineStageFlags stage = 0;
+        if ((range.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) != 0) {
+            src_access |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            stage |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        }
+        if ((range.aspectMask & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) != 0) {
+            src_access |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            stage |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                     VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        }
+        if (stage == 0) {
+            continue;
+        }
+        src_stages |= stage;
+        barriers[barrier_count++] = VkImageMemoryBarrier{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = nullptr,
+            .srcAccessMask = src_access,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT |
+                             VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                             VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                             VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                             VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
+            .oldLayout = layout,
+            .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = images[i],
+            .subresourceRange = range,
+        };
+    }
+
+    cmdbuf.EndRenderPass();
+
+    if (barrier_count > 0) {
+        cmdbuf.PipelineBarrier(src_stages, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, {}, {},
+                               {barriers.data(), barrier_count});
+    }
+}
+
 } // Anonymous namespace
 
 BlitImageHelper::BlitImageHelper(const Device& device_, Scheduler& scheduler_,
@@ -484,7 +667,7 @@ BlitImageHelper::BlitImageHelper(const Device& device_, Scheduler& scheduler_,
 
 BlitImageHelper::~BlitImageHelper() = default;
 
-void BlitImageHelper::BlitColor(const Framebuffer* dst_framebuffer, VkImageView src_view,
+void BlitImageHelper::BlitColor(const Framebuffer* dst_framebuffer, const ImageView& src_image_view,
                                 const Region2D& dst_region, const Region2D& src_region,
                                 Tegra::Engines::Fermi2D::Filter filter,
                                 Tegra::Engines::Fermi2D::Operation operation) {
@@ -496,10 +679,13 @@ void BlitImageHelper::BlitColor(const Framebuffer* dst_framebuffer, VkImageView 
     const VkPipelineLayout layout = *one_texture_pipeline_layout;
     const VkSampler sampler = is_linear ? *linear_sampler : *nearest_sampler;
     const VkPipeline pipeline = FindOrEmplaceColorPipeline(key);
+    const VkImageView src_view = src_image_view.Handle(Shader::TextureType::Color2D);
+
+    RecordShaderReadBarrier(scheduler, src_image_view);
+
     scheduler.RequestRenderpass(dst_framebuffer);
     scheduler.Record([this, dst_region, src_region, pipeline, layout, sampler,
                       src_view](vk::CommandBuffer cmdbuf) {
-        // TODO: Barriers
         const VkDescriptorSet descriptor_set = one_texture_descriptor_allocator.Commit();
         UpdateOneTextureDescriptorSet(device, descriptor_set, sampler, src_view);
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
@@ -524,7 +710,7 @@ void BlitImageHelper::BlitColor(const Framebuffer* dst_framebuffer, VkImageView 
     scheduler.RequestOutsideRenderPassOperationContext();
     scheduler.Record([this, dst_framebuffer, src_image_view, src_image, src_sampler, dst_region,
                       src_region, src_size, pipeline, layout](vk::CommandBuffer cmdbuf) {
-        TransitionImageLayout(cmdbuf, src_image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        TransitionImageLayout(cmdbuf, src_image, VK_IMAGE_LAYOUT_GENERAL);
         BeginRenderPass(cmdbuf, dst_framebuffer);
         const VkDescriptorSet descriptor_set = one_texture_descriptor_allocator.Commit();
         UpdateOneTextureDescriptorSet(device, descriptor_set, src_sampler, src_image_view);
@@ -533,12 +719,12 @@ void BlitImageHelper::BlitColor(const Framebuffer* dst_framebuffer, VkImageView 
                                   nullptr);
         BindBlitState(cmdbuf, layout, dst_region, src_region, src_size);
         cmdbuf.Draw(3, 1, 0, 0);
-        cmdbuf.EndRenderPass();
+        EndRenderPass(cmdbuf, dst_framebuffer);
     });
 }
 
 void BlitImageHelper::BlitDepthStencil(const Framebuffer* dst_framebuffer,
-                                       VkImageView src_depth_view, VkImageView src_stencil_view,
+                                       ImageView& src_image_view,
                                        const Region2D& dst_region, const Region2D& src_region,
                                        Tegra::Engines::Fermi2D::Filter filter,
                                        Tegra::Engines::Fermi2D::Operation operation) {
@@ -554,10 +740,14 @@ void BlitImageHelper::BlitDepthStencil(const Framebuffer* dst_framebuffer,
     const VkPipelineLayout layout = *two_textures_pipeline_layout;
     const VkSampler sampler = *nearest_sampler;
     const VkPipeline pipeline = FindOrEmplaceDepthStencilPipeline(key);
+    const VkImageView src_depth_view = src_image_view.DepthView();
+    const VkImageView src_stencil_view = src_image_view.StencilView();
+
+    RecordShaderReadBarrier(scheduler, src_image_view);
+
     scheduler.RequestRenderpass(dst_framebuffer);
     scheduler.Record([dst_region, src_region, pipeline, layout, sampler, src_depth_view,
                       src_stencil_view, this](vk::CommandBuffer cmdbuf) {
-        // TODO: Barriers
         const VkDescriptorSet descriptor_set = two_textures_descriptor_allocator.Commit();
         UpdateTwoTexturesDescriptorSet(device, descriptor_set, sampler, src_depth_view,
                                        src_stencil_view);
@@ -692,6 +882,8 @@ void BlitImageHelper::Convert(VkPipeline pipeline, const Framebuffer* dst_frameb
     const VkSampler sampler = *nearest_sampler;
     const VkExtent2D extent = GetConversionExtent(src_image_view);
 
+    RecordShaderReadBarrier(scheduler, src_image_view);
+
     scheduler.RequestRenderpass(dst_framebuffer);
     scheduler.Record([pipeline, layout, sampler, src_view, extent, this](vk::CommandBuffer cmdbuf) {
         const VkOffset2D offset{
@@ -716,8 +908,6 @@ void BlitImageHelper::Convert(VkPipeline pipeline, const Framebuffer* dst_frameb
         };
         const VkDescriptorSet descriptor_set = one_texture_descriptor_allocator.Commit();
         UpdateOneTextureDescriptorSet(device, descriptor_set, sampler, src_view);
-
-        // TODO: Barriers
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, descriptor_set,
                                   nullptr);
@@ -736,6 +926,8 @@ void BlitImageHelper::ConvertDepthStencil(VkPipeline pipeline, const Framebuffer
     const VkImageView src_stencil_view = src_image_view.StencilView();
     const VkSampler sampler = *nearest_sampler;
     const VkExtent2D extent = GetConversionExtent(src_image_view);
+
+    RecordShaderReadBarrier(scheduler, src_image_view);
 
     scheduler.RequestRenderpass(dst_framebuffer);
     scheduler.Record([pipeline, layout, sampler, src_depth_view, src_stencil_view, extent,
@@ -763,7 +955,6 @@ void BlitImageHelper::ConvertDepthStencil(VkPipeline pipeline, const Framebuffer
         const VkDescriptorSet descriptor_set = two_textures_descriptor_allocator.Commit();
         UpdateTwoTexturesDescriptorSet(device, descriptor_set, sampler, src_depth_view,
                                        src_stencil_view);
-        // TODO: Barriers
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, descriptor_set,
                                   nullptr);

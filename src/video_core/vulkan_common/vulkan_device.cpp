@@ -1213,6 +1213,13 @@ void Device::RemoveUnsuitableExtensions() {
     RemoveExtensionFeatureIfUnsuitable(extensions.depth_clip_control, features.depth_clip_control,
                                        VK_EXT_DEPTH_CLIP_CONTROL_EXTENSION_NAME);
 
+    // VK_EXT_attachment_feedback_loop_layout
+    extensions.attachment_feedback_loop_layout =
+        features.attachment_feedback_loop_layout.attachmentFeedbackLoopLayout;
+    RemoveExtensionFeatureIfUnsuitable(extensions.attachment_feedback_loop_layout,
+                                       features.attachment_feedback_loop_layout,
+                                       VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME);
+
     /* */ // VK_EXT_extended_dynamic_state
     extensions.extended_dynamic_state = features.extended_dynamic_state.extendedDynamicState;
     RemoveExtensionFeatureIfUnsuitable(extensions.extended_dynamic_state,

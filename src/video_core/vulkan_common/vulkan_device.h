@@ -46,6 +46,8 @@ VK_DEFINE_HANDLE(VmaAllocator)
     FEATURE(EXT, CustomBorderColor, CUSTOM_BORDER_COLOR, custom_border_color)                      \
     FEATURE(EXT, DepthBiasControl, DEPTH_BIAS_CONTROL, depth_bias_control)                         \
     FEATURE(EXT, DepthClipControl, DEPTH_CLIP_CONTROL, depth_clip_control)                         \
+    FEATURE(EXT, AttachmentFeedbackLoopLayout, ATTACHMENT_FEEDBACK_LOOP_LAYOUT,                    \
+            attachment_feedback_loop_layout)                                                       \
     FEATURE(EXT, ExtendedDynamicState, EXTENDED_DYNAMIC_STATE, extended_dynamic_state)             \
     FEATURE(EXT, ExtendedDynamicState2, EXTENDED_DYNAMIC_STATE_2, extended_dynamic_state2)         \
     FEATURE(EXT, ExtendedDynamicState3, EXTENDED_DYNAMIC_STATE_3, extended_dynamic_state3)         \
@@ -562,6 +564,11 @@ public:
     bool IsExtLineRasterizationSupported() const {
         return extensions.line_rasterization;
     }
+    bool SupportsAttachmentFeedbackLoopLayout() const {
+        return extensions.attachment_feedback_loop_layout &&
+               features.attachment_feedback_loop_layout.attachmentFeedbackLoopLayout;
+    }
+
 
     /// Returns true if the device supports VK_EXT_vertex_input_dynamic_state.
     bool IsExtVertexInputDynamicStateSupported() const {

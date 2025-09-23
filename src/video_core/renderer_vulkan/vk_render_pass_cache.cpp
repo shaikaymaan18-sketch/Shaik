@@ -43,6 +43,24 @@ using VideoCore::Surface::SurfaceType;
             }
         }
 
+        VkImageLayout AttachmentLayout(const Device& device, SurfaceType surface_type) {
+            if (!device.SupportsAttachmentFeedbackLoopLayout()) {
+                return VK_IMAGE_LAYOUT_GENERAL;
+            }
+            switch (surface_type) {
+            case SurfaceType::ColorTexture:
+                return VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+            case SurfaceType::Depth:
+                return VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+            case SurfaceType::Stencil:
+                return VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+            case SurfaceType::DepthStencil:
+                return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+            default:
+                return VK_IMAGE_LAYOUT_GENERAL;
+            }
+        }
+
         VkAttachmentDescription AttachmentDescription(const Device& device, PixelFormat format,
                                                       VkSampleCountFlagBits samples) {
             using MaxwellToVK::SurfaceFormat;
@@ -50,7 +68,7 @@ using VideoCore::Surface::SurfaceType;
             const SurfaceType surface_type = GetSurfaceType(format);
             const bool has_stencil = surface_type == SurfaceType::DepthStencil ||
                                      surface_type == SurfaceType::Stencil;
-
+            const VkImageLayout layout = AttachmentLayout(device, surface_type);
             return {
                 .flags = {},
                 .format = SurfaceFormat(device, FormatType::Optimal, true, format).format,
@@ -61,8 +79,8 @@ using VideoCore::Surface::SurfaceType;
                                                  : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
                 .stencilStoreOp = has_stencil ? VK_ATTACHMENT_STORE_OP_STORE
                                                   : VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                .initialLayout = VK_IMAGE_LAYOUT_GENERAL,
-                .finalLayout = VK_IMAGE_LAYOUT_GENERAL,
+                .initialLayout = layout,
+                .finalLayout = layout,
             };
         }
     } // Anonymous namespace
@@ -81,28 +99,41 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
     u32 num_colors{};
     for (size_t index = 0; index < key.color_formats.size(); ++index) {
         const PixelFormat format{key.color_formats[index]};
-        const bool is_valid{format != PixelFormat::Invalid};
-        references[index] = VkAttachmentReference{
-            .attachment = is_valid ? num_colors : VK_ATTACHMENT_UNUSED,
-            .layout = VK_IMAGE_LAYOUT_GENERAL,
-        };
-        if (is_valid) {
-            descriptions.push_back(AttachmentDescription(*device, format, key.samples));
-            num_attachments = static_cast<u32>(index + 1);
-            ++num_colors;
+        if (format == PixelFormat::Invalid) {
+            references[index] = VkAttachmentReference{
+                .attachment = VK_ATTACHMENT_UNUSED,
+                .layout = VK_IMAGE_LAYOUT_GENERAL,
+            };
+            continue;
         }
+
+        const SurfaceType surface_type = GetSurfaceType(format);
+        const VkImageLayout layout = AttachmentLayout(*device, surface_type);
+        references[index] = VkAttachmentReference{
+            .attachment = num_colors,
+            .layout = layout,
+        };
+        descriptions.push_back(AttachmentDescription(*device, format, key.samples));
+        num_attachments = static_cast<u32>(index + 1);
+        ++num_colors;
     }
+
     const bool has_depth{key.depth_format != PixelFormat::Invalid};
     VkAttachmentReference depth_reference{};
-    if (key.depth_format != PixelFormat::Invalid) {
+    if (has_depth) {
+        const SurfaceType depth_type = GetSurfaceType(key.depth_format);
+        const VkImageLayout depth_layout = AttachmentLayout(*device, depth_type);
         depth_reference = VkAttachmentReference{
             .attachment = num_colors,
-            .layout = VK_IMAGE_LAYOUT_GENERAL,
+            .layout = depth_layout,
         };
         descriptions.push_back(AttachmentDescription(*device, key.depth_format, key.samples));
     }
+    const bool supports_feedback_loop = device->SupportsAttachmentFeedbackLoopLayout();
     const VkSubpassDescription subpass{
-        .flags = 0,
+        .flags = supports_feedback_loop
+                     ? VK_SUBPASS_DESCRIPTION_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT
+                     : 0u,
         .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
         .inputAttachmentCount = 0,
         .pInputAttachments = nullptr,
@@ -133,8 +164,8 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
         .pAttachments = descriptions.empty() ? nullptr : descriptions.data(),
         .subpassCount = 1,
         .pSubpasses = &subpass,
-        .dependencyCount = 1,
-        .pDependencies = &dependency,
+        .dependencyCount = supports_feedback_loop ? 1u : 0u,
+        .pDependencies = supports_feedback_loop ? &dependency : nullptr,
     });
     return *pair->second;
 }

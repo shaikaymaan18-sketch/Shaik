@@ -175,11 +175,47 @@ public:
     std::array<f32, 4> words{};
 };
 
+inline VkImageLayout DescriptorImageLayout(TextureCache& texture_cache,
+                                           const Framebuffer* framebuffer,
+                                           ImageView& image_view) {
+    const auto& runtime = texture_cache.GetRuntime();
+    if (!framebuffer || !runtime.device.SupportsAttachmentFeedbackLoopLayout()) {
+        return VK_IMAGE_LAYOUT_GENERAL;
+    }
+
+    const VkImage image_handle = image_view.ImageHandle();
+    const auto& images = framebuffer->Images();
+    const auto& ranges = framebuffer->ImageRanges();
+    const u32 num_images = framebuffer->NumImages();
+    for (u32 index = 0; index < num_images; ++index) {
+        if (images[index] != image_handle) {
+            continue;
+        }
+        const VkImageAspectFlags aspect = ranges[index].aspectMask;
+        if (aspect & VK_IMAGE_ASPECT_COLOR_BIT) {
+            return VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+        }
+        const bool has_depth = (aspect & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
+        const bool has_stencil = (aspect & VK_IMAGE_ASPECT_STENCIL_BIT) != 0;
+        if (has_depth && has_stencil) {
+            return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+        }
+        if (has_depth) {
+            return VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+        }
+        if (has_stencil) {
+            return VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+        }
+    }
+    return VK_IMAGE_LAYOUT_GENERAL;
+}
+
 inline void PushImageDescriptors(TextureCache& texture_cache,
                                  GuestDescriptorQueue& guest_descriptor_queue,
                                  const Shader::Info& info, RescalingPushConstant& rescaling,
                                  const VideoCommon::SamplerId*& samplers,
-                                 const VideoCommon::ImageViewInOut*& views) {
+                                 const VideoCommon::ImageViewInOut*& views,
+                                 const Framebuffer* framebuffer) {
     const u32 num_texture_buffers = Shader::NumDescriptors(info.texture_buffer_descriptors);
     const u32 num_image_buffers = Shader::NumDescriptors(info.image_buffer_descriptors);
     views += num_texture_buffers;
@@ -195,7 +231,9 @@ inline void PushImageDescriptors(TextureCache& texture_cache,
                                             !image_view.SupportsAnisotropy()};
             const VkSampler vk_sampler{use_fallback_sampler ? sampler.HandleWithDefaultAnisotropy()
                                                             : sampler.Handle()};
-            guest_descriptor_queue.AddSampledImage(vk_image_view, vk_sampler);
+            const VkImageLayout image_layout =
+                DescriptorImageLayout(texture_cache, framebuffer, image_view);
+            guest_descriptor_queue.AddSampledImage(vk_image_view, vk_sampler, image_layout);
             rescaling.PushTexture(texture_cache.IsRescaling(image_view));
         }
     }
@@ -206,10 +244,13 @@ inline void PushImageDescriptors(TextureCache& texture_cache,
                 texture_cache.MarkModification(image_view.image_id);
             }
             const VkImageView vk_image_view{image_view.StorageView(desc.type, desc.format)};
-            guest_descriptor_queue.AddImage(vk_image_view);
+            const VkImageLayout image_layout =
+                DescriptorImageLayout(texture_cache, framebuffer, image_view);
+            guest_descriptor_queue.AddImage(vk_image_view, image_layout);
             rescaling.PushImage(texture_cache.IsRescaling(image_view));
         }
     }
 }
 
 } // namespace Vulkan
+

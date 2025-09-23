@@ -47,19 +47,21 @@ public:
         return upload_start;
     }
 
-    void AddSampledImage(VkImageView image_view, VkSampler sampler) {
+    void AddSampledImage(VkImageView image_view, VkSampler sampler,
+                         VkImageLayout layout = VK_IMAGE_LAYOUT_GENERAL) {
         *(payload_cursor++) = VkDescriptorImageInfo{
             .sampler = sampler,
             .imageView = image_view,
-            .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+            .imageLayout = layout,
         };
     }
 
-    void AddImage(VkImageView image_view) {
+    void AddImage(VkImageView image_view,
+                  VkImageLayout layout = VK_IMAGE_LAYOUT_GENERAL) {
         *(payload_cursor++) = VkDescriptorImageInfo{
             .sampler = VK_NULL_HANDLE,
             .imageView = image_view,
-            .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+            .imageLayout = layout,
         };
     }
 
@@ -91,3 +93,6 @@ using GuestDescriptorQueue = UpdateDescriptorQueue;
 using ComputePassDescriptorQueue = UpdateDescriptorQueue;
 
 } // namespace Vulkan
+
+
+
