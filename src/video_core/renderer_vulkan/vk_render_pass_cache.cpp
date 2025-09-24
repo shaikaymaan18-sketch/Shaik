@@ -14,6 +14,7 @@
 #include "video_core/vulkan_common/vulkan_device.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
 
+
 namespace Vulkan {
 namespace {
 using VideoCore::Surface::PixelFormat;
@@ -43,42 +44,60 @@ using VideoCore::Surface::SurfaceType;
             }
         }
 
-        VkImageLayout AttachmentLayout(const Device& device, SurfaceType surface_type) {
-            if (!device.SupportsAttachmentFeedbackLoopLayout()) {
-                return VK_IMAGE_LAYOUT_GENERAL;
-            }
-            switch (surface_type) {
-            case SurfaceType::ColorTexture:
-                return VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
-            case SurfaceType::Depth:
-                return VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
-            case SurfaceType::Stencil:
-                return VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
-            case SurfaceType::DepthStencil:
-                return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
-            default:
-                return VK_IMAGE_LAYOUT_GENERAL;
-            }
+        VkImageLayout AttachmentLayout(const Device& device, SurfaceType surface_type, bool want_feedback_loop) {
+    if (want_feedback_loop && device.SupportsAttachmentFeedbackLoopLayout()) {
+        // Single layout works for color and depth/stencil images.
+        return VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+    }
+
+    // Normal (non-feedback) attachment layouts
+    switch (surface_type) {
+    case SurfaceType::ColorTexture:
+        return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    case SurfaceType::Depth:
+        return device.SupportsSeparateDepthStencilLayouts()
+            ? VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL
+            : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    case SurfaceType::Stencil:
+        return device.SupportsSeparateDepthStencilLayouts()
+            ? VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL
+            : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    case SurfaceType::DepthStencil:
+        return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    default:
+        return VK_IMAGE_LAYOUT_GENERAL; // last-resort fallback
         }
+    }   
 
         VkAttachmentDescription AttachmentDescription(const Device& device, PixelFormat format,
-                                                      VkSampleCountFlagBits samples) {
+                                                      VkSampleCountFlagBits samples,
+                                                      VkAttachmentLoadOp load_op,
+                                                      VkAttachmentStoreOp store_op,
+                                                      VkAttachmentLoadOp stencil_load_op,
+                                                      VkAttachmentStoreOp stencil_store_op,
+                                                      bool want_feedback_loop) {
             using MaxwellToVK::SurfaceFormat;
 
             const SurfaceType surface_type = GetSurfaceType(format);
             const bool has_stencil = surface_type == SurfaceType::DepthStencil ||
                                      surface_type == SurfaceType::Stencil;
-            const VkImageLayout layout = AttachmentLayout(device, surface_type);
+            const VkImageLayout layout = AttachmentLayout(device, surface_type, want_feedback_loop);
+            const VkAttachmentLoadOp resolved_stencil_load =
+                has_stencil ? stencil_load_op : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            const VkAttachmentStoreOp resolved_stencil_store =
+                has_stencil ? stencil_store_op : VK_ATTACHMENT_STORE_OP_DONT_CARE;
             return {
                 .flags = {},
                 .format = SurfaceFormat(device, FormatType::Optimal, true, format).format,
                 .samples = samples,
-                .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
-                .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-                .stencilLoadOp = has_stencil ? VK_ATTACHMENT_LOAD_OP_LOAD
-                                                 : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                .stencilStoreOp = has_stencil ? VK_ATTACHMENT_STORE_OP_STORE
-                                                  : VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                .loadOp = load_op,
+                .storeOp = store_op,
+                .stencilLoadOp = resolved_stencil_load,
+                .stencilStoreOp = resolved_stencil_store,
                 .initialLayout = layout,
                 .finalLayout = layout,
             };
@@ -97,6 +116,7 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
     std::array<VkAttachmentReference, 8> references{};
     u32 num_attachments{};
     u32 num_colors{};
+    const bool supports_feedback_loop = device->SupportsAttachmentFeedbackLoopLayout();
     for (size_t index = 0; index < key.color_formats.size(); ++index) {
         const PixelFormat format{key.color_formats[index]};
         if (format == PixelFormat::Invalid) {
@@ -108,12 +128,17 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
         }
 
         const SurfaceType surface_type = GetSurfaceType(format);
-        const VkImageLayout layout = AttachmentLayout(*device, surface_type);
+        const VkImageLayout layout = AttachmentLayout(*device, surface_type, supports_feedback_loop);
         references[index] = VkAttachmentReference{
             .attachment = num_colors,
             .layout = layout,
         };
-        descriptions.push_back(AttachmentDescription(*device, format, key.samples));
+        const VkAttachmentLoadOp load_op = key.color_load_ops[index];
+        const VkAttachmentStoreOp store_op = key.color_store_ops[index];
+        descriptions.push_back(AttachmentDescription(*device, format, key.samples, load_op, store_op,
+                                                     VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                                     VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                                     supports_feedback_loop));
         num_attachments = static_cast<u32>(index + 1);
         ++num_colors;
     }
@@ -122,18 +147,18 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
     VkAttachmentReference depth_reference{};
     if (has_depth) {
         const SurfaceType depth_type = GetSurfaceType(key.depth_format);
-        const VkImageLayout depth_layout = AttachmentLayout(*device, depth_type);
+        const VkImageLayout depth_layout = AttachmentLayout(*device, depth_type, supports_feedback_loop);
         depth_reference = VkAttachmentReference{
             .attachment = num_colors,
             .layout = depth_layout,
         };
-        descriptions.push_back(AttachmentDescription(*device, key.depth_format, key.samples));
+        descriptions.push_back(AttachmentDescription(*device, key.depth_format, key.samples,
+                                                     key.depth_load_op, key.depth_store_op,
+                                                     key.stencil_load_op, key.stencil_store_op,
+                                                     supports_feedback_loop));
     }
-    const bool supports_feedback_loop = device->SupportsAttachmentFeedbackLoopLayout();
     const VkSubpassDescription subpass{
-        .flags = supports_feedback_loop
-                     ? VK_SUBPASS_DESCRIPTION_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT
-                     : 0u,
+        .flags = 0u,
         .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
         .inputAttachmentCount = 0,
         .pInputAttachments = nullptr,
@@ -144,6 +169,11 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
         .preserveAttachmentCount = 0,
         .pPreserveAttachments = nullptr,
     };
+
+    VkDependencyFlags dependency_flags = VK_DEPENDENCY_BY_REGION_BIT;
+    if (supports_feedback_loop) {
+        dependency_flags |= VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT;
+    }
     const VkSubpassDependency dependency{
             .srcSubpass = 0,  // Current subpass
             .dstSubpass = 0,  // Same subpass (self-dependency)
@@ -153,9 +183,11 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
             .dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
                              VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-            .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INPUT_ATTACHMENT_READ_BIT,
+            .dependencyFlags = dependency_flags
     };
+    const VkSubpassDependency* dependency_ptr = supports_feedback_loop ? &dependency : nullptr;
+    const u32 dependency_count = supports_feedback_loop ? 1u : 0u;
     pair->second = device->GetLogical().CreateRenderPass({
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
         .pNext = nullptr,
@@ -164,10 +196,11 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
         .pAttachments = descriptions.empty() ? nullptr : descriptions.data(),
         .subpassCount = 1,
         .pSubpasses = &subpass,
-        .dependencyCount = supports_feedback_loop ? 1u : 0u,
-        .pDependencies = supports_feedback_loop ? &dependency : nullptr,
+        .dependencyCount = dependency_count,
+        .pDependencies = dependency_ptr,
     });
     return *pair->second;
 }
 
 } // namespace Vulkan
+

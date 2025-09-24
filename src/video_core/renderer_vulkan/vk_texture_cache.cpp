@@ -46,6 +46,7 @@ using VideoCore::Surface::HasAlpha;
 using VideoCore::Surface::IsPixelFormatASTC;
 using VideoCore::Surface::IsPixelFormatInteger;
 using VideoCore::Surface::SurfaceType;
+using VideoCore::Surface::GetFormatType;
 
 namespace {
 constexpr VkBorderColor ConvertBorderColor(const std::array<float, 4>& color) {
@@ -127,22 +128,32 @@ constexpr VkBorderColor ConvertBorderColor(const std::array<float, 4>& color) {
 
 [[nodiscard]] VkImageLayout AttachmentFeedbackLoopLayout(const Device& device,
                                                    VkImageAspectFlags aspect_mask) {
-    if (!device.SupportsAttachmentFeedbackLoopLayout()) {
+    if (device.SupportsAttachmentFeedbackLoopLayout()) {
+        static constexpr VkImageAspectFlags kSupportedAspects = VK_IMAGE_ASPECT_COLOR_BIT |
+                                                                VK_IMAGE_ASPECT_DEPTH_BIT |
+                                                                VK_IMAGE_ASPECT_STENCIL_BIT;
+        if ((aspect_mask & kSupportedAspects) != 0) {
+            return VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+        }
         return VK_IMAGE_LAYOUT_GENERAL;
     }
+    // No feedback-loop extension: return optimal attachment layouts
     if ((aspect_mask & VK_IMAGE_ASPECT_COLOR_BIT) != 0) {
-        return VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+        return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     }
+    const bool sep = device.SupportsSeparateDepthStencilLayouts();
     const bool has_depth = (aspect_mask & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
     const bool has_stencil = (aspect_mask & VK_IMAGE_ASPECT_STENCIL_BIT) != 0;
     if (has_depth && has_stencil) {
-        return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+        return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     }
     if (has_depth) {
-        return VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+        return sep ? VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL
+                   : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     }
     if (has_stencil) {
-        return VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+        return sep ? VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL
+                   : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     }
     return VK_IMAGE_LAYOUT_GENERAL;
 }
@@ -2318,11 +2329,13 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
                                     std::span<ImageView*, NUM_RT> color_buffers,
                                     ImageView* depth_buffer, bool is_rescaled_) {
     boost::container::small_vector<VkImageView, NUM_RT + 1> attachments;
-    RenderPassKey renderpass_key{};
     s32 num_layers = 1;
     num_images = 0;
     num_color_buffers = 0;
     image_layouts.fill(VK_IMAGE_LAYOUT_GENERAL);
+    this->runtime = &runtime;
+    color_formats.fill(PixelFormat::Invalid);
+    depth_format = PixelFormat::Invalid;
 
     is_rescaled = is_rescaled_;
     const auto& resolution = runtime.resolution;
@@ -2332,7 +2345,7 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
     for (size_t index = 0; index < NUM_RT; ++index) {
         const ImageView* const color_buffer = color_buffers[index];
         if (!color_buffer) {
-            renderpass_key.color_formats[index] = PixelFormat::Invalid;
+            color_formats[index] = PixelFormat::Invalid;
             continue;
         }
         width = (std::min)(width, is_rescaled ? resolution.ScaleUp(color_buffer->size.width)
@@ -2340,7 +2353,7 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
         height = (std::min)(height, is_rescaled ? resolution.ScaleUp(color_buffer->size.height)
                                               : color_buffer->size.height);
         attachments.push_back(color_buffer->RenderTarget());
-        renderpass_key.color_formats[index] = color_buffer->format;
+        color_formats[index] = color_buffer->format;
         num_layers = (std::max)(num_layers, color_buffer->range.extent.layers);
         images[num_images] = color_buffer->ImageHandle();
         const VkImageSubresourceRange subresource_range = MakeSubresourceRange(color_buffer);
@@ -2358,7 +2371,7 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
         height = (std::min)(height, is_rescaled ? resolution.ScaleUp(depth_buffer->size.height)
                                               : depth_buffer->size.height);
         attachments.push_back(depth_buffer->RenderTarget());
-        renderpass_key.depth_format = depth_buffer->format;
+        depth_format = depth_buffer->format;
         num_layers = (std::max)(num_layers, depth_buffer->range.extent.layers);
         images[num_images] = depth_buffer->ImageHandle();
         const VkImageSubresourceRange subresource_range = MakeSubresourceRange(depth_buffer);
@@ -2370,11 +2383,10 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
         has_depth = (subresource_range.aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
         has_stencil = (subresource_range.aspectMask & VK_IMAGE_ASPECT_STENCIL_BIT) != 0;
     } else {
-        renderpass_key.depth_format = PixelFormat::Invalid;
+        depth_format = PixelFormat::Invalid;
     }
-    renderpass_key.samples = samples;
-
-    renderpass = runtime.render_pass_cache.Get(renderpass_key);
+    std::array<bool, NUM_RT> no_discard{};
+    UpdateLoadOps(no_discard, false, false);
     render_area.width = (std::min)(render_area.width, width);
     render_area.height = (std::min)(render_area.height, height);
 
@@ -2390,6 +2402,64 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
         .height = render_area.height,
         .layers = static_cast<u32>((std::max)(num_layers, 1)),
     });
+}
+
+RenderPassKey Framebuffer::BuildRenderPassKey() const {
+    RenderPassKey key{};
+    key.color_formats = color_formats;
+    key.color_load_ops = color_load_ops;
+    key.color_store_ops = color_store_ops;
+    key.depth_format = depth_format;
+    key.depth_load_op = depth_load_op;
+    key.depth_store_op = depth_store_op;
+    key.stencil_load_op = stencil_load_op;
+    key.stencil_store_op = stencil_store_op;
+    key.samples = samples;
+    return key;
+}
+
+void Framebuffer::UpdateLoadOps(const std::array<bool, NUM_RT>& discard_colors, bool discard_depth,
+                       bool discard_stencil) {
+    for (size_t index = 0; index < NUM_RT; ++index) {
+        if (color_formats[index] != PixelFormat::Invalid) {
+            color_load_ops[index] = discard_colors[index] ? VK_ATTACHMENT_LOAD_OP_DONT_CARE
+                                                          : VK_ATTACHMENT_LOAD_OP_LOAD;
+            color_store_ops[index] = VK_ATTACHMENT_STORE_OP_STORE;
+        } else {
+            color_load_ops[index] = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            color_store_ops[index] = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        }
+    }
+
+    if (depth_format != PixelFormat::Invalid) {
+        const auto surface_type = GetFormatType(depth_format);
+        const bool has_depth_aspect = surface_type == SurfaceType::Depth ||
+                                      surface_type == SurfaceType::DepthStencil;
+        const bool has_stencil_aspect = surface_type == SurfaceType::Stencil ||
+                                        surface_type == SurfaceType::DepthStencil;
+        if (has_depth_aspect) {
+            depth_load_op = discard_depth ? VK_ATTACHMENT_LOAD_OP_DONT_CARE : VK_ATTACHMENT_LOAD_OP_LOAD;
+            depth_store_op = VK_ATTACHMENT_STORE_OP_STORE;
+        } else {
+            depth_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            depth_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        }
+        if (has_stencil_aspect) {
+            stencil_load_op = discard_stencil ? VK_ATTACHMENT_LOAD_OP_DONT_CARE
+                                              : VK_ATTACHMENT_LOAD_OP_LOAD;
+            stencil_store_op = VK_ATTACHMENT_STORE_OP_STORE;
+        } else {
+            stencil_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            stencil_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        }
+    } else {
+        depth_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        depth_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        stencil_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        stencil_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    }
+
+    renderpass = runtime->render_pass_cache.Get(BuildRenderPassKey());
 }
 
 void TextureCacheRuntime::AccelerateImageUpload(

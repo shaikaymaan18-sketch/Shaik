@@ -34,7 +34,9 @@ VK_DEFINE_HANDLE(VmaAllocator)
 #define FOR_EACH_VK_FEATURE_1_2(FEATURE)                                                           \
     FEATURE(EXT, HostQueryReset, HOST_QUERY_RESET, host_query_reset)                               \
     FEATURE(KHR, 8BitStorage, 8BIT_STORAGE, bit8_storage)                                          \
-    FEATURE(KHR, TimelineSemaphore, TIMELINE_SEMAPHORE, timeline_semaphore)
+    FEATURE(KHR, TimelineSemaphore, TIMELINE_SEMAPHORE, timeline_semaphore)                        \
+    FEATURE(KHR, SeparateDepthStencilLayouts, SEPARATE_DEPTH_STENCIL_LAYOUTS,                      \
+            separate_depth_stencil_layouts)
 
 #define FOR_EACH_VK_FEATURE_1_3(FEATURE)                                                           \
     FEATURE(EXT, ShaderDemoteToHelperInvocation, SHADER_DEMOTE_TO_HELPER_INVOCATION,               \
@@ -567,6 +569,11 @@ public:
     bool SupportsAttachmentFeedbackLoopLayout() const {
         return extensions.attachment_feedback_loop_layout &&
                features.attachment_feedback_loop_layout.attachmentFeedbackLoopLayout;
+    }
+
+    bool SupportsSeparateDepthStencilLayouts() const {
+        return extensions.separate_depth_stencil_layouts &&
+               features.separate_depth_stencil_layouts.separateDepthStencilLayouts;
     }
 
 

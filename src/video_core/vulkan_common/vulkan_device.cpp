@@ -1220,6 +1220,13 @@ void Device::RemoveUnsuitableExtensions() {
                                        features.attachment_feedback_loop_layout,
                                        VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME);
 
+    // VK_KHR_separate_depth_stencil_layouts
+    extensions.separate_depth_stencil_layouts =
+        features.separate_depth_stencil_layouts.separateDepthStencilLayouts;
+    RemoveExtensionFeatureIfUnsuitable(extensions.separate_depth_stencil_layouts,
+                                       features.separate_depth_stencil_layouts,
+                                       VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME);
+
     /* */ // VK_EXT_extended_dynamic_state
     extensions.extended_dynamic_state = features.extended_dynamic_state.extendedDynamicState;
     RemoveExtensionFeatureIfUnsuitable(extensions.extended_dynamic_state,

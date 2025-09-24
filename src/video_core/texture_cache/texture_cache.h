@@ -424,13 +424,43 @@ template <class P>
 void TextureCache<P>::UpdateRenderTargets(bool is_clear) {
     using namespace VideoCommon::Dirty;
     auto& flags = maxwell3d->dirty.flags;
+
+    discard_color_on_load.fill(false);
+    discard_depth_on_load = false;
+    discard_stencil_on_load = false;
+
+    const auto& regs = maxwell3d->regs;
+    const bool clear_color = is_clear && (regs.clear_surface.R || regs.clear_surface.G ||
+                                          regs.clear_surface.B || regs.clear_surface.A);
+    const u32 clear_rt = regs.clear_surface.RT;
+    const bool clear_depth = is_clear && regs.clear_surface.Z;
+    const bool clear_stencil = is_clear && regs.clear_surface.S;
+
+    const auto prepare_color = [&](size_t index, ImageViewId& color_buffer_id) {
+        const bool has_attachment = static_cast<bool>(color_buffer_id);
+        const bool full_clear = has_attachment ? IsFullClear(color_buffer_id) : true;
+        const bool valid_target = clear_rt < NUM_RT;
+        const bool target_clear = clear_color && valid_target && clear_rt == index && has_attachment;
+        discard_color_on_load[index] = !has_attachment || (target_clear && full_clear);
+        PrepareImageView(color_buffer_id, true, target_clear && full_clear);
+    };
+
+    const auto prepare_depth = [&](ImageViewId depth_buffer_id) {
+        const bool has_attachment = static_cast<bool>(depth_buffer_id);
+        const bool full_clear = has_attachment ? IsFullClear(depth_buffer_id) : true;
+        discard_depth_on_load = !has_attachment || (clear_depth && full_clear);
+        discard_stencil_on_load = !has_attachment || (clear_stencil && full_clear);
+        const bool invalidate = has_attachment && full_clear && (clear_depth || clear_stencil);
+        PrepareImageView(depth_buffer_id, true, invalidate);
+    };
+
     if (!flags[Dirty::RenderTargets]) {
         for (size_t index = 0; index < NUM_RT; ++index) {
             ImageViewId& color_buffer_id = render_targets.color_buffer_ids[index];
-            PrepareImageView(color_buffer_id, true, is_clear && IsFullClear(color_buffer_id));
+            prepare_color(index, color_buffer_id);
         }
         const ImageViewId depth_buffer_id = render_targets.depth_buffer_id;
-        PrepareImageView(depth_buffer_id, true, is_clear && IsFullClear(depth_buffer_id));
+        prepare_depth(depth_buffer_id);
         return;
     }
 
@@ -443,11 +473,11 @@ void TextureCache<P>::UpdateRenderTargets(bool is_clear) {
 
     for (size_t index = 0; index < NUM_RT; ++index) {
         ImageViewId& color_buffer_id = render_targets.color_buffer_ids[index];
-        PrepareImageView(color_buffer_id, true, is_clear && IsFullClear(color_buffer_id));
+        prepare_color(index, color_buffer_id);
     }
     const ImageViewId depth_buffer_id = render_targets.depth_buffer_id;
 
-    PrepareImageView(depth_buffer_id, true, is_clear && IsFullClear(depth_buffer_id));
+    prepare_depth(depth_buffer_id);
 
     for (size_t index = 0; index < NUM_RT; ++index) {
         render_targets.draw_buffers[index] = static_cast<u8>(maxwell3d->regs.rt_control.Map(index));
@@ -469,7 +499,9 @@ void TextureCache<P>::UpdateRenderTargets(bool is_clear) {
 
 template <class P>
 typename P::Framebuffer* TextureCache<P>::GetFramebuffer() {
-    return &slot_framebuffers[GetFramebufferId(render_targets)];
+    auto* framebuffer = &slot_framebuffers[GetFramebufferId(render_targets)];
+    framebuffer->UpdateLoadOps(discard_color_on_load, discard_depth_on_load, discard_stencil_on_load);
+    return framebuffer;
 }
 
 template <class P>

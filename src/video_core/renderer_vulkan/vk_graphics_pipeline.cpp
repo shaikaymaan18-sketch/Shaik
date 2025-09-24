@@ -44,6 +44,7 @@ using Tegra::Texture::TexturePair;
 using VideoCore::Surface::PixelFormat;
 using VideoCore::Surface::PixelFormatFromDepthFormat;
 using VideoCore::Surface::PixelFormatFromRenderTargetFormat;
+using VideoCore::Surface::GetFormatType;
 
 constexpr size_t NUM_STAGES = Maxwell::MaxShaderStage;
 constexpr size_t MAX_IMAGE_ELEMENTS = 64;
@@ -123,13 +124,33 @@ PixelFormat DecodeFormat(u8 encoded_format) {
 }
 
 RenderPassKey MakeRenderPassKey(const FixedPipelineState& state) {
-    RenderPassKey key;
+    RenderPassKey key{};
     std::ranges::transform(state.color_formats, key.color_formats.begin(), DecodeFormat);
+    for (size_t index = 0; index < key.color_formats.size(); ++index) {
+        if (key.color_formats[index] != PixelFormat::Invalid) {
+            key.color_load_ops[index] = VK_ATTACHMENT_LOAD_OP_LOAD;
+            key.color_store_ops[index] = VK_ATTACHMENT_STORE_OP_STORE;
+        } else {
+            key.color_load_ops[index] = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            key.color_store_ops[index] = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        }
+    }
     if (state.depth_enabled != 0) {
         const auto depth_format{static_cast<Tegra::DepthFormat>(state.depth_format.Value())};
         key.depth_format = PixelFormatFromDepthFormat(depth_format);
+        key.depth_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+        key.depth_store_op = VK_ATTACHMENT_STORE_OP_STORE;
+        const auto depth_type = GetFormatType(key.depth_format);
+        const bool has_stencil = depth_type == VideoCore::Surface::SurfaceType::DepthStencil ||
+                                 depth_type == VideoCore::Surface::SurfaceType::Stencil;
+        key.stencil_load_op = has_stencil ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        key.stencil_store_op = has_stencil ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
     } else {
         key.depth_format = PixelFormat::Invalid;
+        key.depth_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        key.depth_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        key.stencil_load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        key.stencil_store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     }
     key.samples = MaxwellToVK::MsaaMode(state.msaa_mode);
     return key;

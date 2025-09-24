@@ -4,8 +4,10 @@
 #pragma once
 
 #include <span>
+#include <array>
 
 #include "video_core/texture_cache/texture_cache_base.h"
+#include "video_core/renderer_vulkan/vk_render_pass_cache.h"
 
 #include "shader_recompiler/shader_info.h"
 #include "video_core/renderer_vulkan/vk_compute_pass.h"
@@ -318,6 +320,9 @@ public:
 
     ~Framebuffer();
 
+    void UpdateLoadOps(const std::array<bool, NUM_RT>& discard_colors, bool discard_depth,
+                       bool discard_stencil);
+
     Framebuffer(const Framebuffer&) = delete;
     Framebuffer& operator=(const Framebuffer&) = delete;
 
@@ -391,9 +396,20 @@ private:
     std::array<VkImageSubresourceRange, 9> image_ranges{};
     std::array<VkImageLayout, 9> image_layouts{};
     std::array<size_t, NUM_RT> rt_map{};
+    TextureCacheRuntime* runtime{};
+    std::array<PixelFormat, NUM_RT> color_formats{};
+    PixelFormat depth_format{PixelFormat::Invalid};
+    std::array<VkAttachmentLoadOp, NUM_RT> color_load_ops{};
+    std::array<VkAttachmentStoreOp, NUM_RT> color_store_ops{};
+    VkAttachmentLoadOp depth_load_op{VK_ATTACHMENT_LOAD_OP_DONT_CARE};
+    VkAttachmentStoreOp depth_store_op{VK_ATTACHMENT_STORE_OP_DONT_CARE};
+    VkAttachmentLoadOp stencil_load_op{VK_ATTACHMENT_LOAD_OP_DONT_CARE};
+    VkAttachmentStoreOp stencil_store_op{VK_ATTACHMENT_STORE_OP_DONT_CARE};
     bool has_depth{};
     bool has_stencil{};
     bool is_rescaled{};
+
+    [[nodiscard]] RenderPassKey BuildRenderPassKey() const;
 };
 
 struct TextureCacheParams {

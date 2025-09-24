@@ -353,6 +353,10 @@ public:
         return buffer_bits;
     }
 
+    // No-op in OpenGL: Vulkan uses this to adjust attachment load ops.
+    void UpdateLoadOps(const std::array<bool, NUM_RT>& /*discard_colors*/, bool /*discard_depth*/,
+                       bool /*discard_stencil*/) {}
+
 private:
     OGLFramebuffer framebuffer;
     GLbitfield buffer_bits = GL_NONE;

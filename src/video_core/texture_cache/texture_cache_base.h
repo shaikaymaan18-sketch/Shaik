@@ -11,6 +11,7 @@
 #include <limits>
 #include <mutex>
 #include <span>
+#include <array>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
@@ -439,6 +440,9 @@ private:
     std::deque<TextureCacheGPUMap> gpu_page_table_storage;
 
     RenderTargets render_targets;
+    std::array<bool, NUM_RT> discard_color_on_load{};
+    bool discard_depth_on_load{};
+    bool discard_stencil_on_load{};
 
     std::unordered_map<RenderTargets, FramebufferId> framebuffers;
 

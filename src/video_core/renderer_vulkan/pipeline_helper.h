@@ -175,6 +175,23 @@ public:
     std::array<f32, 4> words{};
 };
 
+inline bool OverlapsSubresource(const VideoCommon::SubresourceRange& view_range,
+                                const VkImageSubresourceRange& fb_range) {
+    const u32 view_level_begin = static_cast<u32>(view_range.base.level);
+    const u32 view_level_end = view_level_begin + static_cast<u32>(view_range.extent.levels);
+    const u32 fb_level_begin = fb_range.baseMipLevel;
+    const u32 fb_level_end = fb_level_begin + fb_range.levelCount;
+
+    const u32 view_layer_begin = static_cast<u32>(view_range.base.layer);
+    const u32 view_layer_end = view_layer_begin + static_cast<u32>(view_range.extent.layers);
+    const u32 fb_layer_begin = fb_range.baseArrayLayer;
+    const u32 fb_layer_end = fb_layer_begin + fb_range.layerCount;
+
+    const bool levels_overlap = view_level_begin < fb_level_end && fb_level_begin < view_level_end;
+    const bool layers_overlap = view_layer_begin < fb_layer_end && fb_layer_begin < view_layer_end;
+    return levels_overlap && layers_overlap;
+}
+
 inline VkImageLayout DescriptorImageLayout(TextureCache& texture_cache,
                                            const Framebuffer* framebuffer,
                                            ImageView& image_view) {
@@ -191,20 +208,18 @@ inline VkImageLayout DescriptorImageLayout(TextureCache& texture_cache,
         if (images[index] != image_handle) {
             continue;
         }
-        const VkImageAspectFlags aspect = ranges[index].aspectMask;
-        if (aspect & VK_IMAGE_ASPECT_COLOR_BIT) {
+        const VkImageSubresourceRange& fb_range = ranges[index];
+
+        // Only return feedback-loop layout if the descriptor's view overlaps the
+        // subresource range actually attached in the framebuffer. This avoids
+        // setting a layout that doesn't match the descriptor's subresource.
+        static constexpr VkImageAspectFlags FeedbackAspects =
+            VK_IMAGE_ASPECT_COLOR_BIT | VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+        if ((fb_range.aspectMask & FeedbackAspects) == 0) {
+            continue;
+        }
+        if (OverlapsSubresource(image_view.range, fb_range)) {
             return VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
-        }
-        const bool has_depth = (aspect & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
-        const bool has_stencil = (aspect & VK_IMAGE_ASPECT_STENCIL_BIT) != 0;
-        if (has_depth && has_stencil) {
-            return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
-        }
-        if (has_depth) {
-            return VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
-        }
-        if (has_stencil) {
-            return VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
         }
     }
     return VK_IMAGE_LAYOUT_GENERAL;
