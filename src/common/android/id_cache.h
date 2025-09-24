@@ -67,6 +67,7 @@ jclass GetOverlayControlDataClass();
 jmethodID GetOverlayControlDataConstructor();
 jfieldID GetOverlayControlDataIdField();
 jfieldID GetOverlayControlDataEnabledField();
+jfieldID GetOverlayControlDataIndividualScaleField();
 jfieldID GetOverlayControlDataLandscapePositionField();
 jfieldID GetOverlayControlDataPortraitPositionField();
 jfieldID GetOverlayControlDataFoldablePositionField();
