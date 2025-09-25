@@ -198,6 +198,7 @@ CMAKE_DEPENDENT_OPTION(YUZU_CRASH_DUMPS "Compile crash dump (Minidump) support" 
 
 option(YUZU_ENABLE_LTO "Enable link-time optimization" OFF)
 if(YUZU_ENABLE_LTO)
+    cmake_policy(SET CMP0069 NEW)
     include(CheckIPOSupported)
     check_ipo_supported(RESULT COMPILER_SUPPORTS_LTO)
     if(NOT COMPILER_SUPPORTS_LTO)
