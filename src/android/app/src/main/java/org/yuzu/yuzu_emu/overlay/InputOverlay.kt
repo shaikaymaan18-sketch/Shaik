@@ -837,6 +837,17 @@ class InputOverlay(context: Context, attrs: AttributeSet?) :
         refreshControls()
     }
 
+    fun resetIndividualControlScale() {
+        val overlayControlData = NativeConfig.getOverlayControlData()
+        overlayControlData.forEach { data ->
+            val defaultControlData = OverlayControl.from(data.id) ?: return@forEach
+            data.individualScale = defaultControlData.defaultIndividualScaleResource
+        }
+        NativeConfig.setOverlayControlData(overlayControlData)
+        NativeConfig.saveGlobalConfig()
+        refreshControls()
+    }
+
     private fun defaultOverlayPositionByLayout(layout: OverlayLayout) {
         val overlayControlData = NativeConfig.getOverlayControlData()
         for (data in overlayControlData) {
