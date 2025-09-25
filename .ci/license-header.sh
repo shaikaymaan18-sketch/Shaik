@@ -1,145 +1,206 @@
 #!/bin/sh -e
 
-HEADER="$(cat "$PWD/.ci/license/header.txt")"
-HEADER_HASH="$(cat "$PWD/.ci/license/header-hash.txt")"
+# SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+# SPDX-License-Identifier: GPL-3.0-or-later
 
-echo "Getting branch changes"
+COPYRIGHT_YEAR="2025"
+COPYRIGHT_OWNER="Eden Emulator Project"
+COPYRIGHT_LICENSE="GPL-3.0-or-later"
 
-# BRANCH=`git rev-parse --abbrev-ref HEAD`
-# COMMITS=`git log ${BRANCH} --not master --pretty=format:"%h"`
-# RANGE="${COMMITS[${#COMMITS[@]}-1]}^..${COMMITS[0]}"
-# FILES=`git diff-tree --no-commit-id --name-only ${RANGE} -r`
+if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+    echo
+    echo "license-header.sh: Eden License Headers Accreditation Script"
+    echo
+    echo "This script checks and optionally fixes license headers in source, CMake and shell script files."
+    echo
+    echo "Environment Variables:"
+    echo "  FIX=true    | Automatically add the correct license headers to offending files."
+    echo "  UPDATE=true | Automatically update current license headers of offending files."
+    echo "  COMMIT=true | If FIX=true, commit the changes automatically."
+    echo
+    echo "Usage Examples:"
+    echo "  # Just check headers (will fail if headers are missing)"
+    echo "  .ci/license-header.sh"
+    echo
+    echo "  # Fix headers only"
+    echo "  FIX=true .ci/license-header.sh"
+    echo
+    echo "  # Update headers only"
+    echo "  #   if COPYRIGHT_OWNER is '$COPYRIGHT_OWNER'"
+    echo "  #   or else will have 'FIX=true' behavior)"
+    echo "  UPDATE=true .ci/license-header.sh"
+    echo
+    echo "  # Fix headers and commit changes"
+    echo "  FIX=true COMMIT=true .ci/license-header.sh"
+    echo
+    echo "  # Update headers and commit changes"
+    echo "  #   if COPYRIGHT_OWNER is '$COPYRIGHT_OWNER'"
+    echo "  #   or else will have 'FIX=true' behavior)"
+    echo "  UPDATE=true COMMIT=true .ci/license-header.sh"
+    exit 0
+fi
 
-BASE=`git merge-base master HEAD`
-FILES=`git diff --name-only $BASE`
+SRC_FILES=""
+OTHER_FILES=""
 
-#FILES=$(git diff --name-only master)
+BASE=$(git merge-base master HEAD)
+if git diff --quiet "$BASE"..HEAD; then
+    echo
+    echo "license-header.sh: No commits on this branch different from master."
+    exit 0
+fi
+FILES=$(git diff --name-only "$BASE")
 
-echo "Done"
-
-check_header() {
-    CONTENT="`head -n3 < $1`"
-    case "$CONTENT" in
-        "$HEADER"*) ;;
-        *) BAD_FILES="$BAD_FILES $1" ;;
-    esac
+echo_header() {
+    COMMENT_TYPE="$1"
+    echo "$COMMENT_TYPE SPDX-FileCopyrightText: Copyright $COPYRIGHT_YEAR $COPYRIGHT_OWNER"
+    echo "$COMMENT_TYPE SPDX-License-Identifier: $COPYRIGHT_LICENSE"
 }
 
-check_cmake_header() {
-    CONTENT="`head -n3 < $1`"
-
-    case "$CONTENT" in
-        "$HEADER_HASH"*) ;;
-        *)
-            BAD_CMAKE="$BAD_CMAKE $1" ;;
-    esac
-}
 for file in $FILES; do
     [ -f "$file" ] || continue
 
-    if [ `basename -- "$file"` = "CMakeLists.txt" ]; then
-        check_cmake_header "$file"
+    case "$(basename "$file")" in
+        CMakeLists.txt)
+            COMMENT_TYPE="#" ;;
+        *)
+            EXT="${file##*.}"
+            case "$EXT" in
+                kts|kt|cpp|h) COMMENT_TYPE="//" ;;
+                cmake|sh|ps1) COMMENT_TYPE="#" ;;
+                *)            continue ;;
+            esac ;;
+    esac
+
+    HEADER=$(echo_header "$COMMENT_TYPE")
+    HEAD_LINES=$(head -n5 "$file")
+
+    CORRECT_COPYRIGHT=$(echo "$HEAD_LINES" | awk \
+        -v line1="$(echo "$HEADER" | sed -n '1p')" \
+        -v line2="$(echo "$HEADER" | sed -n '2p')" \
+        '($0==line1){getline; if($0==line2){f=1}else{f=0}} END{print (f?f:0)}')
+
+    if [ "$CORRECT_COPYRIGHT" != "1" ]; then
+        case "$COMMENT_TYPE" in
+            "//") SRC_FILES="$SRC_FILES $file" ;;
+            "#")  OTHER_FILES="$OTHER_FILES $file" ;;
+        esac
+    fi
+done
+
+if [ -z "$SRC_FILES" ] && [ -z "$OTHER_FILES" ]; then
+    echo
+    echo "license-header.sh: All good!"
+    exit 0
+fi
+
+for TYPE in "SRC" "OTHER"; do
+    if [ "$TYPE" = "SRC" ] && [ -n "$SRC_FILES" ]; then
+        FILES_LIST="$SRC_FILES"
+        COMMENT_TYPE="//"
+        DESC="Source"
+    elif [ "$TYPE" = "OTHER" ] && [ -n "$OTHER_FILES" ]; then
+        FILES_LIST="$OTHER_FILES"
+        COMMENT_TYPE="#"
+        DESC="CMake and shell script"
+    else
         continue
     fi
 
-    EXTENSION="${file##*.}"
-    case "$EXTENSION" in
-        kts|kt|cpp|h)
-            check_header "$file"
-            ;;
-        cmake)
-            check_cmake_header "$file"
-            ;;
-    esac
+    echo
+    echo "------------------------------------------------------------"
+    echo "$DESC files"
+    echo "------------------------------------------------------------"
+    echo
+    echo "  The following files contain incorrect license headers:"
+    for file in $FILES_LIST; do
+        echo "  - $file"
+    done
+
+    echo
+    echo "  The correct license header to be added to all affected"
+    echo "  '$DESC' files is:"
+    echo
+    echo "=== BEGIN ==="
+    echo_header "$COMMENT_TYPE"
+    echo "===  END  ==="
 done
 
-if [ "$BAD_FILES" = "" ] && [ "$BAD_CMAKE" = "" ]; then
-    echo
-    echo "All good."
-
-    exit
-fi
-
-if [ "$BAD_FILES" != "" ]; then
-    echo "The following source files have incorrect license headers:"
-    echo
-
-    for file in $BAD_FILES; do echo $file; done
-
-    cat << EOF
-
-The following license header should be added to the start of all offending SOURCE files:
-
-=== BEGIN ===
-$HEADER
-===  END  ===
-
-EOF
-
-fi
-
-if [ "$BAD_CMAKE" != "" ]; then
-    echo "The following CMake files have incorrect license headers:"
-    echo
-
-    for file in $BAD_CMAKE; do echo $file; done
-
-    cat << EOF
-
-The following license header should be added to the start of all offending CMake files:
-
-=== BEGIN ===
-$HEADER_HASH
-===  END  ===
-
-EOF
-
-fi
-
 cat << EOF
-If some of the code in this PR is not being contributed by the original author,
-the files which have been exclusively changed by that code can be ignored.
-If this happens, this PR requirement can be bypassed once all other files are addressed.
+
+------------------------------------------------------------
+
+  If some of the code in this pull request was not contributed by the original
+  author, the files that have been modified exclusively by that code can be
+  safely ignored. In such cases, this PR requirement may be bypassed once all
+  other files have been reviewed and addressed.
 EOF
 
-if [ "$FIX" = "true" ]; then
+TMP_DIR=$(mktemp -d /tmp/license-header.XXXXXX) || exit 1
+if [ "$FIX" = "true" ] || [ "$UPDATE" = "true" ]; then
     echo
-    echo "FIX set to true. Fixing headers."
-    echo
+    echo "license-header.sh: FIX set to true, fixing headers..."
 
-    for file in $BAD_FILES; do
-        cat $file > $file.bak
+    for file in $SRC_FILES $OTHER_FILES; do
+        BASENAME=$(basename "$file")
 
-        cat .ci/license/header.txt > $file
-        echo >> $file
-        cat $file.bak >> $file
+        case "$BASENAME" in
+            CMakeLists.txt) COMMENT_TYPE="#" ;;
+            *)
+                EXT="${file##*.}"
+                case "$EXT" in
+                    kts|kt|cpp|h) COMMENT_TYPE="//" ;;
+                    cmake|sh|ps1) COMMENT_TYPE="#" ;;
+                    *) continue ;;
+                esac
+                ;;
+        esac
 
-        rm $file.bak
+        TMP="$TMP_DIR/$BASENAME.tmp"
+        UPDATED=0
+        cp -p "$file" "$TMP"
+        > "$TMP"
 
-        git add $file
+        # this logic is bit hacky but sed don't work well with $VARIABLES
+        # it's this or complete remove this logic and keep only the old way
+        if [ "$UPDATE" = "true" ]; then
+            while IFS= read -r line || [ -n "$line" ]; do
+                if [ "$UPDATED" -eq 0 ] && echo "$line" | grep "$COPYRIGHT_OWNER" >/dev/null 2>&1; then
+                    echo_header "$COMMENT_TYPE" >> "$TMP"
+                    IFS= read -r _ || true
+                    UPDATED=1
+                else
+                    echo "$line" >> "$TMP"
+                fi
+            done < "$file"
+        fi
+
+        if [ "$UPDATED" -eq 0 ]; then
+            {
+                echo_header "$COMMENT_TYPE"
+                echo
+                cat "$TMP"
+            } > "$file"
+        else
+            mv "$TMP" "$file"
+        fi
+
+        git add "$file"
     done
 
-    for file in $BAD_CMAKE; do
-        cat $file > $file.bak
+    rm -rf "$TMP_DIR"
 
-        cat .ci/license/header-hash.txt > $file
-        echo >> $file
-        cat $file.bak >> $file
-
-        rm $file.bak
-
-        git add $file
-    done
-    echo "License headers fixed."
+    echo
+    echo "license-header.sh: License headers fixed!"
 
     if [ "$COMMIT" = "true" ]; then
         echo
-        echo "COMMIT set to true. Committing changes."
+        echo "license-header.sh: COMMIT set to true, committing changes..."
+
+        git commit -m "[license] Fix license headers [script]"
+
         echo
-
-        git commit -m "Fix license headers"
-
-        echo "Changes committed. You may now push."
+        echo "license-header.sh: Changes committed. You may now push."
     fi
 else
     exit 1
