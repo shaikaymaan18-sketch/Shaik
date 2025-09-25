@@ -139,6 +139,7 @@ else()
         -Wno-invalid-offsetof
         -Wno-unused-parameter
         -Wno-missing-field-initializers
+        -Wno-unused-private-field
     )
 
     if (CXX_CLANG OR CXX_ICC) # Clang or AppleClang
