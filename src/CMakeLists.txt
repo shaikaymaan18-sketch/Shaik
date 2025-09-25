@@ -139,7 +139,6 @@ else()
         -Wno-invalid-offsetof
         -Wno-unused-parameter
         -Wno-missing-field-initializers
-        -Wno-unused-private-field
     )
 
     if (CXX_CLANG OR CXX_ICC) # Clang or AppleClang
@@ -164,6 +163,10 @@ else()
 
     if (APPLE AND CXX_CLANG)
         add_compile_options("-stdlib=libc++")
+    endif()
+
+    if (CXX_APPLE)
+        add_compile_options(-Wno-unused-private-field)
     endif()
 
     # GCC bugs
