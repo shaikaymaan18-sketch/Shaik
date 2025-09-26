@@ -3,6 +3,10 @@
 # SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# specify full path if dupes may exist
+EXCLUDE_FILES="CPM.cmake CPMUtil.cmake GetSCMRev.cmake"
+EXCLUDE_FILES=$(echo "$EXCLUDE_FILES" | sed 's/ /|/g')
+
 COPYRIGHT_YEAR="2025"
 COPYRIGHT_OWNER="Eden Emulator Project"
 COPYRIGHT_LICENSE="GPL-3.0-or-later"
@@ -49,7 +53,7 @@ if git diff --quiet "$BASE"..HEAD; then
     echo "license-header.sh: No commits on this branch different from master."
     exit 0
 fi
-FILES=$(git diff --name-only "$BASE")
+FILES=$(git diff --name-only "$BASE" | grep -E -v "$EXCLUDE_FILES")
 
 echo_header() {
     COMMENT_TYPE="$1"
