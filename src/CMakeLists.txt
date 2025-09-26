@@ -141,7 +141,7 @@ else()
         -Wno-missing-field-initializers
     )
 
-    if (CXX_CLANG OR CXX_ICC) # Clang or AppleClang
+    if (CXX_CLANG OR CXX_ICC OR CXX_APPLE) # Clang, AppleClang, or Intel C++
         if (NOT MSVC)
             add_compile_options(
                 -Werror=shadow-uncaptured-local
@@ -163,10 +163,6 @@ else()
 
     if (APPLE AND CXX_CLANG)
         add_compile_options("-stdlib=libc++")
-    endif()
-
-    if (CXX_APPLE)
-        add_compile_options(-Wno-unused-private-field)
     endif()
 
     # GCC bugs
