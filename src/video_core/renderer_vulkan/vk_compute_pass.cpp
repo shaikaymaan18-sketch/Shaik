@@ -437,7 +437,7 @@ void ConditionalRenderingResolvePass::Resolve(VkBuffer dst_buffer, VkBuffer src_
             .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
             .pNext = nullptr,
             .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_CONDITIONAL_RENDERING_READ_BIT_EXT,
+            .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
         };
         const VkDescriptorSet set = descriptor_allocator.Commit();
         device.GetLogical().UpdateDescriptorSet(set, *descriptor_template, descriptor_data);
@@ -448,7 +448,7 @@ void ConditionalRenderingResolvePass::Resolve(VkBuffer dst_buffer, VkBuffer src_
         cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_COMPUTE, *layout, 0, set, {});
         cmdbuf.Dispatch(1, 1, 1);
         cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                               VK_PIPELINE_STAGE_CONDITIONAL_RENDERING_BIT_EXT, 0, write_barrier);
+                               VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, write_barrier);
     });
 }
 
@@ -497,11 +497,7 @@ void QueriesPrefixScanPass::Run(VkBuffer accumulation_buffer, VkBuffer dst_buffe
                 .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
                 .pNext = nullptr,
                 .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT |
-                                 VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
-                                 VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_INDEX_READ_BIT |
-                                 VK_ACCESS_UNIFORM_READ_BIT |
-                                 VK_ACCESS_CONDITIONAL_RENDERING_READ_BIT_EXT,
+                .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT
             };
             const QueriesPrefixScanPushConstants uniforms{
                 .min_accumulation_base = static_cast<u32>(min_accumulation_limit),
@@ -519,7 +515,7 @@ void QueriesPrefixScanPass::Run(VkBuffer accumulation_buffer, VkBuffer dst_buffe
             cmdbuf.PushConstants(*layout, VK_SHADER_STAGE_COMPUTE_BIT, uniforms);
             cmdbuf.Dispatch(1, 1, 1);
             cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                                   VK_PIPELINE_STAGE_CONDITIONAL_RENDERING_BIT_EXT, 0,
+                                   VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
                                    write_barrier);
         });
     }
@@ -701,8 +697,30 @@ void MSAACopyPass::CopyImage(Image& dst_image, Image& src_image,
             copy.extent.depth,
         };
 
-        scheduler.Record([this, dst = dst_image.Handle(), msaa_pipeline, num_dispatches,
-                          descriptor_data](vk::CommandBuffer cmdbuf) {
+        scheduler.Record([this, src = src_image.Handle(), dst = dst_image.Handle(), msaa_pipeline, num_dispatches,
+                           descriptor_data](vk::CommandBuffer cmdbuf) {
+            const VkImageMemoryBarrier read_barrier{
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = nullptr,
+                .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                                 VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+                .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = src,
+                .subresourceRange{
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = VK_REMAINING_MIP_LEVELS,
+                    .baseArrayLayer = 0,
+                    .layerCount = VK_REMAINING_ARRAY_LAYERS,
+                },
+            };
+            cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                                   VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, read_barrier);
+
             const VkDescriptorSet set = descriptor_allocator.Commit();
             device.GetLogical().UpdateDescriptorSet(set, *descriptor_template, descriptor_data);
             cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_COMPUTE, msaa_pipeline);

@@ -6,6 +6,7 @@
 
 #include <unordered_map>
 
+#include <algorithm>
 #include <boost/container/static_vector.hpp>
 
 #include "video_core/renderer_vulkan/maxwell_to_vk.h"
@@ -77,9 +78,10 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
     }
     boost::container::static_vector<VkAttachmentDescription, 9> descriptions;
     std::array<VkAttachmentReference, 8> references{};
-    u32 num_attachments{};
+    const u32 total_color_slots =
+        std::min<u32>(key.color_attachment_count, static_cast<u32>(key.color_formats.size()));
     u32 num_colors{};
-    for (size_t index = 0; index < key.color_formats.size(); ++index) {
+    for (u32 index = 0; index < total_color_slots; ++index) {
         const PixelFormat format{key.color_formats[index]};
         const bool is_valid{format != PixelFormat::Invalid};
         references[index] = VkAttachmentReference{
@@ -88,10 +90,10 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
         };
         if (is_valid) {
             descriptions.push_back(AttachmentDescription(*device, format, key.samples));
-            num_attachments = static_cast<u32>(index + 1);
             ++num_colors;
         }
     }
+    const u32 num_attachments = total_color_slots;
     const bool has_depth{key.depth_format != PixelFormat::Invalid};
     VkAttachmentReference depth_reference{};
     if (key.depth_format != PixelFormat::Invalid) {

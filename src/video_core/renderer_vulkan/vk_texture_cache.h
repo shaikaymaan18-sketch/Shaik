@@ -237,6 +237,7 @@ public:
                                           Shader::ImageFormat image_format);
 
     [[nodiscard]] bool IsRescaled() const noexcept;
+    [[nodiscard]] bool SupportsDepthCompare() const noexcept;
 
     [[nodiscard]] VkImageView Handle(Shader::TextureType texture_type) const noexcept {
         return *image_views[static_cast<size_t>(texture_type)];
@@ -303,9 +304,18 @@ public:
         return static_cast<bool>(sampler_default_anisotropy);
     }
 
+    [[nodiscard]] bool DepthCompareEnabled() const noexcept {
+        return depth_compare_enabled;
+    }
+
+    [[nodiscard]] VkSampler HandleForUsage(bool use_default_anisotropy, bool enable_compare) const noexcept;
+
 private:
     vk::Sampler sampler;
     vk::Sampler sampler_default_anisotropy;
+    vk::Sampler sampler_no_compare;
+    vk::Sampler sampler_no_compare_default_anisotropy;
+    bool depth_compare_enabled = false;
 };
 
 class Framebuffer {
