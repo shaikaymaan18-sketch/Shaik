@@ -132,18 +132,8 @@ RenderPassKey MakeRenderPassKey(const FixedPipelineState& state) {
         key.depth_format = PixelFormat::Invalid;
     }
     key.samples = MaxwellToVK::MsaaMode(state.msaa_mode);
+    key.color_attachment_count = static_cast<u8>(Maxwell::NumRenderTargets);
     return key;
-}
-
-size_t NumAttachments(const FixedPipelineState& state) {
-    size_t num{};
-    for (size_t index = 0; index < Maxwell::NumRenderTargets; ++index) {
-        const auto format{static_cast<Tegra::RenderTargetFormat>(state.color_formats[index])};
-        if (format != Tegra::RenderTargetFormat::NONE) {
-            num = index + 1;
-        }
-    }
-    return num;
 }
 
 template <typename Spec>
@@ -770,30 +760,45 @@ void GraphicsPipeline::MakePipeline(VkRenderPass render_pass) {
         LOG_WARNING(Render_Vulkan, "Depth bounds is enabled but not supported");
     }
     static_vector<VkPipelineColorBlendAttachmentState, Maxwell::NumRenderTargets> cb_attachments;
-    const size_t num_attachments{NumAttachments(key.state)};
-    for (size_t index = 0; index < num_attachments; ++index) {
+    for (size_t index = 0; index < Maxwell::NumRenderTargets; ++index) {
         static constexpr std::array mask_table{
             VK_COLOR_COMPONENT_R_BIT,
             VK_COLOR_COMPONENT_G_BIT,
             VK_COLOR_COMPONENT_B_BIT,
             VK_COLOR_COMPONENT_A_BIT,
         };
-        const auto& blend{key.state.attachments[index]};
-        const std::array mask{blend.Mask()};
-        VkColorComponentFlags write_mask{};
-        for (size_t i = 0; i < mask_table.size(); ++i) {
-            write_mask |= mask[i] ? mask_table[i] : 0;
+        VkPipelineColorBlendAttachmentState attachment{};
+        const auto format{static_cast<Tegra::RenderTargetFormat>(key.state.color_formats[index])};
+        if (format != Tegra::RenderTargetFormat::NONE) {
+            const auto& blend{key.state.attachments[index]};
+            const std::array mask{blend.Mask()};
+            VkColorComponentFlags write_mask{};
+            for (size_t i = 0; i < mask_table.size(); ++i) {
+                write_mask |= mask[i] ? mask_table[i] : 0;
+            }
+            attachment = VkPipelineColorBlendAttachmentState{
+                .blendEnable = blend.enable != 0,
+                .srcColorBlendFactor = MaxwellToVK::BlendFactor(blend.SourceRGBFactor()),
+                .dstColorBlendFactor = MaxwellToVK::BlendFactor(blend.DestRGBFactor()),
+                .colorBlendOp = MaxwellToVK::BlendEquation(blend.EquationRGB()),
+                .srcAlphaBlendFactor = MaxwellToVK::BlendFactor(blend.SourceAlphaFactor()),
+                .dstAlphaBlendFactor = MaxwellToVK::BlendFactor(blend.DestAlphaFactor()),
+                .alphaBlendOp = MaxwellToVK::BlendEquation(blend.EquationAlpha()),
+                .colorWriteMask = write_mask,
+            };
+        } else {
+            attachment = VkPipelineColorBlendAttachmentState{
+                .blendEnable = VK_FALSE,
+                .srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
+                .dstColorBlendFactor = VK_BLEND_FACTOR_ZERO,
+                .colorBlendOp = VK_BLEND_OP_ADD,
+                .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+                .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+                .alphaBlendOp = VK_BLEND_OP_ADD,
+                .colorWriteMask = 0,
+            };
         }
-        cb_attachments.push_back({
-            .blendEnable = blend.enable != 0,
-            .srcColorBlendFactor = MaxwellToVK::BlendFactor(blend.SourceRGBFactor()),
-            .dstColorBlendFactor = MaxwellToVK::BlendFactor(blend.DestRGBFactor()),
-            .colorBlendOp = MaxwellToVK::BlendEquation(blend.EquationRGB()),
-            .srcAlphaBlendFactor = MaxwellToVK::BlendFactor(blend.SourceAlphaFactor()),
-            .dstAlphaBlendFactor = MaxwellToVK::BlendFactor(blend.DestAlphaFactor()),
-            .alphaBlendOp = MaxwellToVK::BlendEquation(blend.EquationAlpha()),
-            .colorWriteMask = write_mask,
-        });
+        cb_attachments.push_back(attachment);
     }
     const VkPipelineColorBlendStateCreateInfo color_blend_ci{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,

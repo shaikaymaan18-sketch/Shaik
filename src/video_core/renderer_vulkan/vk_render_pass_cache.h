@@ -6,6 +6,7 @@
 #include <mutex>
 #include <unordered_map>
 
+#include "common/common_types.h"
 #include "video_core/surface.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
 
@@ -17,6 +18,7 @@ struct RenderPassKey {
     std::array<VideoCore::Surface::PixelFormat, 8> color_formats;
     VideoCore::Surface::PixelFormat depth_format;
     VkSampleCountFlagBits samples;
+    u8 color_attachment_count{};
 };
 
 } // namespace Vulkan
@@ -27,6 +29,7 @@ struct hash<Vulkan::RenderPassKey> {
     [[nodiscard]] size_t operator()(const Vulkan::RenderPassKey& key) const noexcept {
         size_t value = static_cast<size_t>(key.depth_format) << 48;
         value ^= static_cast<size_t>(key.samples) << 52;
+        value ^= static_cast<size_t>(key.color_attachment_count) << 56;
         for (size_t i = 0; i < key.color_formats.size(); ++i) {
             value ^= static_cast<size_t>(key.color_formats[i]) << (i * 6);
         }

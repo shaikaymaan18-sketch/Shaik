@@ -307,11 +307,12 @@ constexpr std::array<VkPipelineShaderStageCreateInfo, 2> MakeStages(
 }
 
 void UpdateOneTextureDescriptorSet(const Device& device, VkDescriptorSet descriptor_set,
-                                   VkSampler sampler, VkImageView image_view) {
+                                   VkSampler sampler, VkImageView image_view,
+                                   VkImageLayout image_layout = VK_IMAGE_LAYOUT_GENERAL) {
     const VkDescriptorImageInfo image_info{
         .sampler = sampler,
         .imageView = image_view,
-        .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+        .imageLayout = image_layout,
     };
     const VkWriteDescriptorSet write_descriptor_set{
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -440,9 +441,9 @@ void TransitionImageLayout(vk::CommandBuffer& cmdbuf, VkImage image, VkImageLayo
         .subresourceRange{
             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
             .baseMipLevel = 0,
-            .levelCount = 1,
+            .levelCount = VK_REMAINING_MIP_LEVELS,
             .baseArrayLayer = 0,
-            .layerCount = 1,
+            .layerCount = VK_REMAINING_ARRAY_LAYERS,
         },
     };
     cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
@@ -580,7 +581,7 @@ void BlitImageHelper::BlitColor(const Framebuffer* dst_framebuffer, const ImageV
 }
 
 void BlitImageHelper::BlitColor(const Framebuffer* dst_framebuffer, VkImageView src_image_view,
-                                VkImage src_image, VkSampler src_sampler,
+                                VkImage src_image, VkSampler sampler,
                                 const Region2D& dst_region, const Region2D& src_region,
                                 const Extent3D& src_size) {
     const BlitImagePipelineKey key{
@@ -590,12 +591,12 @@ void BlitImageHelper::BlitColor(const Framebuffer* dst_framebuffer, VkImageView 
     const VkPipelineLayout layout = *one_texture_pipeline_layout;
     const VkPipeline pipeline = FindOrEmplaceColorPipeline(key);
     scheduler.RequestOutsideRenderPassOperationContext();
-    scheduler.Record([this, dst_framebuffer, src_image_view, src_image, src_sampler, dst_region,
+    scheduler.Record([this, dst_framebuffer, src_image_view, src_image, sampler, dst_region,
                       src_region, src_size, pipeline, layout](vk::CommandBuffer cmdbuf) {
         TransitionImageLayout(cmdbuf, src_image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         BeginRenderPass(cmdbuf, dst_framebuffer);
         const VkDescriptorSet descriptor_set = one_texture_descriptor_allocator.Commit();
-        UpdateOneTextureDescriptorSet(device, descriptor_set, src_sampler, src_image_view);
+        UpdateOneTextureDescriptorSet(device, descriptor_set, sampler, src_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, descriptor_set,
                                   nullptr);
@@ -1076,7 +1077,7 @@ void BlitImageHelper::ConvertColorToDepthPipeline(vk::Pipeline& pipeline, VkRend
     if (pipeline) {
         return;
     }
-    VkShaderModule frag_shader = *convert_depth_to_float_frag;
+    VkShaderModule frag_shader = *convert_float_to_depth_frag;
     const std::array stages = MakeStages(*full_screen_vert, frag_shader);
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_ci = GetPipelineInputAssemblyStateCreateInfo(device);
     pipeline = device.GetLogical().CreateGraphicsPipeline({
@@ -1092,7 +1093,7 @@ void BlitImageHelper::ConvertColorToDepthPipeline(vk::Pipeline& pipeline, VkRend
         .pRasterizationState = &PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .pMultisampleState = &PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
         .pDepthStencilState = &PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        .pColorBlendState = &PIPELINE_COLOR_BLEND_STATE_GENERIC_CREATE_INFO,
+        .pColorBlendState = &PIPELINE_COLOR_BLEND_STATE_EMPTY_CREATE_INFO,
         .pDynamicState = &PIPELINE_DYNAMIC_STATE_CREATE_INFO,
         .layout = *one_texture_pipeline_layout,
         .renderPass = renderpass,
@@ -1110,6 +1111,9 @@ void BlitImageHelper::ConvertPipelineEx(vk::Pipeline& pipeline, VkRenderPass ren
     }
     const std::array stages = MakeStages(*full_screen_vert, *module);
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_ci = GetPipelineInputAssemblyStateCreateInfo(device);
+    const VkPipelineColorBlendStateCreateInfo* const color_blend_state =
+        is_target_depth ? &PIPELINE_COLOR_BLEND_STATE_EMPTY_CREATE_INFO
+                         : &PIPELINE_COLOR_BLEND_STATE_GENERIC_CREATE_INFO;
     pipeline = device.GetLogical().CreateGraphicsPipeline({
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = nullptr,
@@ -1123,7 +1127,7 @@ void BlitImageHelper::ConvertPipelineEx(vk::Pipeline& pipeline, VkRenderPass ren
         .pRasterizationState = &PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .pMultisampleState = &PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
         .pDepthStencilState = is_target_depth ? &PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO : nullptr,
-        .pColorBlendState = &PIPELINE_COLOR_BLEND_STATE_GENERIC_CREATE_INFO,
+        .pColorBlendState = color_blend_state,
         .pDynamicState = &PIPELINE_DYNAMIC_STATE_CREATE_INFO,
         .layout = single_texture ? *one_texture_pipeline_layout : *two_textures_pipeline_layout,
         .renderPass = renderpass,

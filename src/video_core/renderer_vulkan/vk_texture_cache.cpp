@@ -2025,15 +2025,27 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
         }
     }
     const auto format_info = MaxwellToVK::SurfaceFormat(*device, FormatType::Optimal, true, format);
-    if (ImageUsageFlags(format_info, format) != image.UsageFlags()) {
+    VkImageUsageFlags view_usage = ImageUsageFlags(format_info, format);
+    const VkImageUsageFlags image_usage = image.UsageFlags();
+    const VkImageUsageFlags original_view_usage = view_usage;
+    const VkImageUsageFlags unsupported_usage = view_usage & ~image_usage;
+    if (unsupported_usage != 0) {
         LOG_WARNING(Render_Vulkan,
-                    "Image view format {} has different usage flags than image format {}", format,
-                    image.info.format);
+                    "Clamping image view usage 0x{:X} for format {} to match image format {} (0x{:X})",
+                    static_cast<unsigned>(original_view_usage), format, image.info.format,
+                    static_cast<unsigned>(image_usage));
+        view_usage &= image_usage;
+    }
+    if (view_usage == 0) {
+        LOG_WARNING(Render_Vulkan,
+                    "Image view usage for format {} became 0 after clamping; falling back to image usage 0x{:X}",
+                    format, static_cast<unsigned>(image_usage));
+        view_usage = image_usage;
     }
     const VkImageViewUsageCreateInfo image_view_usage{
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO,
         .pNext = nullptr,
-        .usage = ImageUsageFlags(format_info, format),
+        .usage = view_usage,
     };
     const VkImageViewCreateInfo create_info{
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -2187,6 +2199,11 @@ bool ImageView::IsRescaled() const noexcept {
     return src_image.IsRescaled();
 }
 
+bool ImageView::SupportsDepthCompare() const noexcept {
+    const auto surface_type = VideoCore::Surface::GetFormatType(format);
+    return surface_type == SurfaceType::Depth || surface_type == SurfaceType::DepthStencil;
+}
+
 vk::ImageView ImageView::MakeView(VkFormat vk_format, VkImageAspectFlags aspect_mask) {
     return device->GetLogical().CreateImageView({
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -2234,7 +2251,7 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
     // Some games have samplers with garbage. Sanitize them here.
     const f32 max_anisotropy = std::clamp(tsc.MaxAnisotropy(), 1.0f, 16.0f);
 
-    const auto create_sampler = [&](const f32 anisotropy) {
+    const auto create_sampler = [&](const f32 anisotropy, bool compare_enabled) {
         return device.GetLogical().CreateSampler(VkSamplerCreateInfo{
             .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
             .pNext = pnext,
@@ -2248,7 +2265,7 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
             .mipLodBias = tsc.LodBias(),
             .anisotropyEnable = static_cast<VkBool32>(anisotropy > 1.0f ? VK_TRUE : VK_FALSE),
             .maxAnisotropy = anisotropy,
-            .compareEnable = tsc.depth_compare_enabled,
+            .compareEnable = compare_enabled ? VK_TRUE : VK_FALSE,
             .compareOp = MaxwellToVK::Sampler::DepthCompareFunction(tsc.depth_compare_func),
             .minLod = tsc.mipmap_filter == TextureMipmapFilter::None ? 0.0f : tsc.MinLod(),
             .maxLod = tsc.mipmap_filter == TextureMipmapFilter::None ? 0.25f : tsc.MaxLod(),
@@ -2258,12 +2275,41 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
         });
     };
 
-    sampler = create_sampler(max_anisotropy);
+    depth_compare_enabled = tsc.depth_compare_enabled != 0;
+    sampler = create_sampler(max_anisotropy, depth_compare_enabled);
 
     const f32 max_anisotropy_default = static_cast<f32>(1U << tsc.max_anisotropy);
-    if (max_anisotropy > max_anisotropy_default) {
-        sampler_default_anisotropy = create_sampler(max_anisotropy_default);
+    const bool needs_default_anisotropy = max_anisotropy > max_anisotropy_default;
+    if (needs_default_anisotropy) {
+        sampler_default_anisotropy = create_sampler(max_anisotropy_default, depth_compare_enabled);
     }
+    if (depth_compare_enabled) {
+        sampler_no_compare = create_sampler(max_anisotropy, false);
+        if (needs_default_anisotropy) {
+            sampler_no_compare_default_anisotropy = create_sampler(max_anisotropy_default, false);
+        }
+    }
+}
+
+VkSampler Sampler::HandleForUsage(bool use_default_anisotropy, bool enable_compare) const noexcept {
+    const bool wants_default = use_default_anisotropy && HasAddedAnisotropy();
+    if (enable_compare || !depth_compare_enabled) {
+        if (wants_default && sampler_default_anisotropy) {
+            return *sampler_default_anisotropy;
+        }
+        return *sampler;
+    }
+    if (wants_default) {
+        if (sampler_no_compare_default_anisotropy) {
+            return *sampler_no_compare_default_anisotropy;
+        }
+        if (sampler_default_anisotropy) {
+            return *sampler_default_anisotropy;
+        }
+    } else if (sampler_no_compare) {
+        return *sampler_no_compare;
+    }
+    return wants_default && sampler_default_anisotropy ? *sampler_default_anisotropy : *sampler;
 }
 
 Framebuffer::Framebuffer(TextureCacheRuntime& runtime, std::span<ImageView*, NUM_RT> color_buffers,
@@ -2292,6 +2338,7 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
                                     ImageView* depth_buffer, bool is_rescaled_) {
     boost::container::small_vector<VkImageView, NUM_RT + 1> attachments;
     RenderPassKey renderpass_key{};
+    renderpass_key.color_attachment_count = static_cast<u8>(NUM_RT);
     s32 num_layers = 1;
 
     is_rescaled = is_rescaled_;
