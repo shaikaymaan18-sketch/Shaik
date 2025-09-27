@@ -237,7 +237,7 @@ public:
                                           Shader::ImageFormat image_format);
 
     [[nodiscard]] bool IsRescaled() const noexcept;
-    [[nodiscard]] bool SupportsDepthCompare() const noexcept;
+    [[nodiscard]] bool SupportsDepthCompare(Shader::TextureType texture_type) const noexcept;
 
     [[nodiscard]] VkImageView Handle(Shader::TextureType texture_type) const noexcept {
         return *image_views[static_cast<size_t>(texture_type)];
@@ -283,6 +283,8 @@ private:
     VkImage image_handle = VK_NULL_HANDLE;
     VkImageView render_target = VK_NULL_HANDLE;
     VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+    VkFormat view_format = VK_FORMAT_UNDEFINED;
+    std::array<VkFormat, Shader::NUM_TEXTURE_TYPES> sampled_formats{};
     u32 buffer_size = 0;
 };
 

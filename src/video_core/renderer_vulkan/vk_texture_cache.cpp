@@ -2009,6 +2009,8 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
       samples(ConvertSampleCount(image.info.num_samples)) {
     using Shader::TextureType;
 
+    sampled_formats.fill(VK_FORMAT_UNDEFINED);
+
     const VkImageAspectFlags aspect_mask = ImageViewAspectMask(info);
     std::array<SwizzleSource, 4> swizzle{
         SwizzleSource::R,
@@ -2025,6 +2027,7 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
         }
     }
     const auto format_info = MaxwellToVK::SurfaceFormat(*device, FormatType::Optimal, true, format);
+    view_format = format_info.format;
     VkImageUsageFlags view_usage = ImageUsageFlags(format_info, format);
     const VkImageUsageFlags image_usage = image.UsageFlags();
     const VkImageUsageFlags original_view_usage = view_usage;
@@ -2073,6 +2076,7 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
             handle.SetObjectNameEXT(VideoCommon::Name(*this, gpu_addr).c_str());
         }
         image_views[static_cast<size_t>(tex_type)] = std::move(handle);
+        sampled_formats[static_cast<size_t>(tex_type)] = ci.format;
     };
     switch (info.type) {
     case VideoCommon::ImageViewType::e1D:
@@ -2112,10 +2116,14 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
 ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageInfo& info,
                      const VideoCommon::ImageViewInfo& view_info, GPUVAddr gpu_addr_)
     : VideoCommon::ImageViewBase{info, view_info, gpu_addr_},
-      buffer_size{VideoCommon::CalculateGuestSizeInBytes(info)} {}
+      buffer_size{VideoCommon::CalculateGuestSizeInBytes(info)} {
+    sampled_formats.fill(VK_FORMAT_UNDEFINED);
+    view_format = VK_FORMAT_UNDEFINED;
+}
 
 ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::NullImageViewParams& params)
     : VideoCommon::ImageViewBase{params}, device{&runtime.device} {
+    sampled_formats.fill(VK_FORMAT_UNDEFINED);
     if (device->HasNullDescriptor()) {
         return;
     }
@@ -2128,7 +2136,9 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::NullImageV
     image_handle = *null_image;
     for (u32 i = 0; i < Shader::NUM_TEXTURE_TYPES; i++) {
         image_views[i] = MakeView(VK_FORMAT_A8B8G8R8_UNORM_PACK32, VK_IMAGE_ASPECT_COLOR_BIT);
+        sampled_formats[i] = VK_FORMAT_A8B8G8R8_UNORM_PACK32;
     }
+    view_format = VK_FORMAT_A8B8G8R8_UNORM_PACK32;
 }
 
 ImageView::~ImageView() = default;
@@ -2199,9 +2209,22 @@ bool ImageView::IsRescaled() const noexcept {
     return src_image.IsRescaled();
 }
 
-bool ImageView::SupportsDepthCompare() const noexcept {
+bool ImageView::SupportsDepthCompare(Shader::TextureType texture_type) const noexcept {
+    if (device == nullptr || image_handle == VK_NULL_HANDLE) {
+        return false;
+    }
     const auto surface_type = VideoCore::Surface::GetFormatType(format);
-    return surface_type == SurfaceType::Depth || surface_type == SurfaceType::DepthStencil;
+    if (surface_type != SurfaceType::Depth && surface_type != SurfaceType::DepthStencil) {
+        return false;
+    }
+    const VkFormat sampled_format = sampled_formats[static_cast<size_t>(texture_type)];
+    if (sampled_format != VK_FORMAT_UNDEFINED) {
+        return device->SupportsDepthComparisonSampling(sampled_format);
+    }
+    if (view_format == VK_FORMAT_UNDEFINED) {
+        return false;
+    }
+    return device->SupportsDepthComparisonSampling(view_format);
 }
 
 vk::ImageView ImageView::MakeView(VkFormat vk_format, VkImageAspectFlags aspect_mask) {

@@ -306,14 +306,48 @@ void Swapchain::CreateSwapchain(const VkSurfaceCapabilitiesKHR& capabilities) {
         swapchain_ci.queueFamilyIndexCount = static_cast<u32>(queue_indices.size());
         swapchain_ci.pQueueFamilyIndices = queue_indices.data();
     }
-    static constexpr std::array view_formats{VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_SRGB};
+    const VkFormat swapchain_format = surface_format.format;
+    const bool has_mutable_swapchain = device.IsKhrSwapchainMutableFormatEnabled();
+#ifdef ANDROID
+    // Android is already ordered the same as Switch.
+    VkFormat preferred_view_format = VK_FORMAT_R8G8B8A8_UNORM;
+#else
+    VkFormat preferred_view_format = VK_FORMAT_B8G8R8A8_UNORM;
+#endif
+    if (!has_mutable_swapchain) {
+        preferred_view_format = swapchain_format;
+    }
+    std::array<VkFormat, 4> view_formats{};
+    u32 view_format_count = 0;
+    const auto push_format = [&](VkFormat format) {
+        if (format == VK_FORMAT_UNDEFINED || view_format_count >= static_cast<u32>(view_formats.size())) {
+            return;
+        }
+        const auto end_iterator = view_formats.begin() + view_format_count;
+        if (std::find(view_formats.begin(), end_iterator, format) != end_iterator) {
+            return;
+        }
+        view_formats[view_format_count++] = format;
+    };
+    push_format(swapchain_format);
+    if (has_mutable_swapchain) {
+        push_format(preferred_view_format);
+        if (swapchain_format == VK_FORMAT_B8G8R8A8_UNORM ||
+            preferred_view_format == VK_FORMAT_B8G8R8A8_UNORM) {
+            push_format(VK_FORMAT_B8G8R8A8_SRGB);
+        }
+        if (swapchain_format == VK_FORMAT_R8G8B8A8_UNORM ||
+            preferred_view_format == VK_FORMAT_R8G8B8A8_UNORM) {
+            push_format(VK_FORMAT_R8G8B8A8_SRGB);
+        }
+    }
     VkImageFormatListCreateInfo format_list{
         .sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO_KHR,
         .pNext = nullptr,
-        .viewFormatCount = static_cast<u32>(view_formats.size()),
+        .viewFormatCount = view_format_count,
         .pViewFormats = view_formats.data(),
     };
-    if (device.IsKhrSwapchainMutableFormatEnabled()) {
+    if (has_mutable_swapchain && view_format_count > 1) {
         format_list.pNext = std::exchange(swapchain_ci.pNext, &format_list);
         swapchain_ci.flags |= VK_SWAPCHAIN_CREATE_MUTABLE_FORMAT_BIT_KHR;
     }
@@ -331,12 +365,7 @@ void Swapchain::CreateSwapchain(const VkSurfaceCapabilitiesKHR& capabilities) {
 
     images = swapchain.GetImages();
     image_count = static_cast<u32>(images.size());
-#ifdef ANDROID
-    // Android is already ordered the same as Switch.
-    image_view_format = VK_FORMAT_R8G8B8A8_UNORM;
-#else
-    image_view_format = VK_FORMAT_B8G8R8A8_UNORM;
-#endif
+    image_view_format = preferred_view_format;
 }
 
 void Swapchain::CreateSemaphores() {

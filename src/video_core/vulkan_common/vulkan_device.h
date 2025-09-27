@@ -214,6 +214,9 @@ public:
     bool IsFormatSupported(VkFormat wanted_format, VkFormatFeatureFlags wanted_usage,
                            FormatType format_type) const;
 
+    /// Returns true when the format supports depth comparison sampling on optimal tiling images.
+    bool SupportsDepthComparisonSampling(VkFormat format) const;
+
     /// Reports a device loss.
     void ReportLoss() const;
 

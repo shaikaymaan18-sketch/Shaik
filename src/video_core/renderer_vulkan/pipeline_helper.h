@@ -193,8 +193,8 @@ inline void PushImageDescriptors(TextureCache& texture_cache,
             const Sampler& sampler{texture_cache.GetSampler(sampler_id)};
             const bool use_fallback_sampler{sampler.HasAddedAnisotropy() &&
                                             !image_view.SupportsAnisotropy()};
-            const bool enable_compare =
-                sampler.DepthCompareEnabled() && image_view.SupportsDepthCompare();
+            const bool enable_compare = sampler.DepthCompareEnabled() &&
+                                        image_view.SupportsDepthCompare(desc.type);
             const VkSampler vk_sampler =
                 sampler.HandleForUsage(use_fallback_sampler, enable_compare);
             guest_descriptor_queue.AddSampledImage(vk_image_view, vk_sampler);
