@@ -275,6 +275,7 @@ class SettingsFragmentPresenter(
 
     private fun addInputOverlaySettings(sl: ArrayList<SettingsItem>) {
         sl.apply {
+            add(BooleanSetting.ENABLE_INPUT_OVERLAY_AUTO_HIDE.key)
             add(IntSetting.INPUT_OVERLAY_AUTO_HIDE.key)
         }
     }

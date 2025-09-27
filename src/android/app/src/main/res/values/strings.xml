@@ -24,8 +24,8 @@
 
     <!-- Input Overlay -->
     <string name="overlay_auto_hide">Overlay Auto Hide</string>
-    <string name="overlay_auto_hide_description">Automatically hide the touch controls overlay after the specified time of inactivity. Select "Never" to keep the overlay always visible.</string>
-
+    <string name="overlay_auto_hide_description">Automatically hide the touch controls overlay after the specified time of inactivity.</string>
+    <string name="enable_input_overlay_auto_hide">Enable Overlay Auto Hide</string>
     <string name="overlay_auto_hide_never">Never</string>
     <string name="overlay_auto_hide_instant">Instantly</string>
     <string name="overlay_auto_hide_5s">5 seconds</string>

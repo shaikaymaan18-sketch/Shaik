@@ -1750,20 +1750,20 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
         }, seconds * 1000L)
     }
 
-
     fun handleScreenTap(isLongTap: Boolean) {
         val autoHideSeconds = IntSetting.INPUT_OVERLAY_AUTO_HIDE.getInt()
+        val shouldProceed = BooleanSetting.SHOW_INPUT_OVERLAY.getBoolean() && BooleanSetting.ENABLE_INPUT_OVERLAY_AUTO_HIDE.getBoolean()
 
-        if (!BooleanSetting.SHOW_INPUT_OVERLAY.getBoolean()) {
+        if (!shouldProceed) {
             return
         }
 
+        // failsafe
         if (autoHideSeconds == 0) {
             showOverlay()
             return
         }
 
-        // Show overlay for quick taps when it's hidden
         if (!isOverlayVisible && !isLongTap) {
             showOverlay()
         }
@@ -1772,14 +1772,15 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
     }
 
     private fun initializeOverlayAutoHide() {
-            val autoHideSeconds = IntSetting.INPUT_OVERLAY_AUTO_HIDE.getInt()
-            if (autoHideSeconds > 0) {
-                handler.postDelayed({
-                    // since the timer starts only after touch input, we need to always force hide it
-                    hideOverlay()
-                }, autoHideSeconds * 1000L)
-            }
+        val autoHideSeconds = IntSetting.INPUT_OVERLAY_AUTO_HIDE.getInt()
+        val autoHideEnabled = BooleanSetting.ENABLE_INPUT_OVERLAY_AUTO_HIDE.getBoolean()
+        val showOverlay = BooleanSetting.SHOW_INPUT_OVERLAY.getBoolean()
+
+        if (autoHideEnabled && showOverlay) {
+            showOverlay()
+            startOverlayAutoHideTimer(autoHideSeconds)
         }
+    }
 
 
     fun showOverlay() {

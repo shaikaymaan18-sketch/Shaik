@@ -387,12 +387,18 @@ abstract class SettingsItem(
                 )
             )
             put(
-                SingleChoiceSetting(
+                SwitchSetting(
+                    BooleanSetting.ENABLE_INPUT_OVERLAY_AUTO_HIDE,
+                    titleId = R.string.enable_input_overlay_auto_hide,
+                )
+            )
+            put(
+                SpinBoxSetting(
                     IntSetting.INPUT_OVERLAY_AUTO_HIDE,
                     titleId = R.string.overlay_auto_hide,
                     descriptionId = R.string.overlay_auto_hide_description,
-                    choicesId = R.array.overlayAutoHideEntries,
-                    valuesId = R.array.overlayAutoHideValues,
+                    min = 1,
+                    max = 999
                 )
             )
 
