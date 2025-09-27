@@ -16,6 +16,7 @@ class SpinBoxSetting(
     titleString: String = "",
     @StringRes descriptionId: Int = 0,
     descriptionString: String = "",
+    val valueHint: Int,
     val min: Int,
     val max: Int
 ) : SettingsItem(setting, titleId, titleString, descriptionId, descriptionString) {

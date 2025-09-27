@@ -152,6 +152,7 @@ class SettingsDialogFragment : DialogFragment(), DialogInterface.OnClickListener
 
                 val currentValue = item.getSelectedValue()
                 spinboxBinding.editValue.setText(currentValue.toString())
+                spinboxBinding.textInputLayout.hint = getString(item.valueHint)
 
                 val dialog = MaterialAlertDialogBuilder(requireContext())
                     .setTitle(item.title)

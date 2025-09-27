@@ -30,7 +30,7 @@
             android:layout_marginLeft="@dimen/spacing_medlarge"
             android:layout_marginRight="@dimen/spacing_medlarge"
             android:layout_weight="1"
-            android:hint="@string/value">
+            android:hint="Value">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/edit_value"

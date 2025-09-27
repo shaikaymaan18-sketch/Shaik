@@ -398,7 +398,8 @@ abstract class SettingsItem(
                     titleId = R.string.overlay_auto_hide,
                     descriptionId = R.string.overlay_auto_hide_description,
                     min = 1,
-                    max = 999
+                    max = 999,
+                    valueHint = R.string.seconds
                 )
             )
 
