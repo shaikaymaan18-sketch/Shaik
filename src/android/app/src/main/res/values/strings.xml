@@ -13,6 +13,14 @@
     <string name="app_notification_channel_description">Eden Switch emulator notifications</string>
     <string name="app_notification_running">Eden is Running</string>
 
+    <!-- Spinbox strings -->
+    <string name="increment">Increment</string>
+    <string name="decrement">Decrement</string>
+    <string name="value">Value</string>
+    <string name="value_too_low">Value must be at least %1$d</string>
+    <string name="value_too_high">Value must be at most %1$d</string>
+    <string name="invalid_value">Invalid value</string>
+
 
     <!-- Input Overlay -->
     <string name="overlay_auto_hide">Overlay Auto Hide</string>
