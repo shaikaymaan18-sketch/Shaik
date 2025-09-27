@@ -886,6 +886,34 @@ bool Device::IsFormatSupported(VkFormat wanted_format, VkFormatFeatureFlags want
     return (supported_usage & wanted_usage) == wanted_usage;
 }
 
+bool Device::SupportsDepthComparisonSampling(VkFormat format) const {
+    const auto it = format_properties.find(format);
+    if (it == format_properties.end()) {
+        UNIMPLEMENTED_MSG("Unimplemented depth comparison query format={}", format);
+        return false;
+    }
+#if defined(VK_FORMAT_FEATURE_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT)
+    const auto features = it->second.optimalTilingFeatures;
+    return (features & VK_FORMAT_FEATURE_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT) != 0;
+#elif defined(VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT)
+    const auto get_props2 = reinterpret_cast<PFN_vkGetPhysicalDeviceFormatProperties2>(
+        dld.vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceFormatProperties2"));
+    if (!get_props2) {
+        const auto fallback_features = it->second.optimalTilingFeatures;
+        return (fallback_features & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) != 0;
+    }
+    VkFormatProperties3 format_props3{VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_3};
+    VkFormatProperties2 format_props2{VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2};
+    format_props2.pNext = &format_props3;
+    get_props2(physical, format, &format_props2);
+    return (format_props3.optimalTilingFeatures &
+            VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT) != 0;
+#else
+    const auto fallback_features = it->second.optimalTilingFeatures;
+    return (fallback_features & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) != 0;
+#endif
+}
+
 std::string Device::GetDriverName() const {
     switch (properties.driver.driverID) {
     case VK_DRIVER_ID_AMD_PROPRIETARY:
@@ -1448,3 +1476,4 @@ std::vector<VkDeviceQueueCreateInfo> Device::GetDeviceQueueCreateInfos() const {
 }
 
 } // namespace Vulkan
+
