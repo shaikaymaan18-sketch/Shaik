@@ -28,9 +28,23 @@ enum class Operation {
     FPMax,
 };
 
+Id ComponentTypeId(EmitContext& ctx, TextureComponentType component_type) {
+    switch (component_type) {
+    case TextureComponentType::Float:
+        return ctx.F32[1];
+    case TextureComponentType::Sint:
+        return ctx.S32[1];
+    case TextureComponentType::Uint:
+        return ctx.U32[1];
+    }
+    throw LogicError("Unhandled texture component type {}", static_cast<u32>(component_type));
+}
+
 Id ImageType(EmitContext& ctx, const TextureDescriptor& desc) {
     const spv::ImageFormat format{spv::ImageFormat::Unknown};
-    const Id type{ctx.F32[1]};
+    const TextureComponentType component_type = desc.is_depth ? TextureComponentType::Float
+                                                             : desc.component_type;
+    const Id type{ComponentTypeId(ctx, component_type)};
     const bool depth{desc.is_depth};
     const bool ms{desc.is_multisample};
     switch (desc.type) {
@@ -1374,6 +1388,8 @@ void EmitContext::DefineTextures(const Info& info, u32& binding, u32& scaling_in
             .image_type = image_type,
             .count = desc.count,
             .is_multisample = desc.is_multisample,
+            .component_type = desc.component_type,
+            .component_bit_size = desc.component_bit_size,
         });
         if (profile.supported_spirv >= 0x00010400) {
             interfaces.push_back(id);
@@ -1417,6 +1433,12 @@ void EmitContext::DefineInputs(const IR::Program& program) {
     const Info& info{program.info};
     const VaryingState loads{info.loads.mask | info.passthrough.mask};
 
+    const auto decorate_flat_if_fragment = [this](Id id) {
+        if (stage == Stage::Fragment) {
+            Decorate(id, spv::Decoration::Flat);
+        }
+    };
+
     if (info.uses_workgroup_id) {
         workgroup_id = DefineInput(*this, U32[3], false, spv::BuiltIn::WorkgroupId);
     }
@@ -1432,16 +1454,22 @@ void EmitContext::DefineInputs(const IR::Program& program) {
     }
     if (info.uses_sample_id) {
         sample_id = DefineInput(*this, U32[1], false, spv::BuiltIn::SampleId);
+        decorate_flat_if_fragment(sample_id);
     }
     if (info.uses_is_helper_invocation) {
         is_helper_invocation = DefineInput(*this, U1, false, spv::BuiltIn::HelperInvocation);
     }
     if (info.uses_subgroup_mask) {
         subgroup_mask_eq = DefineInput(*this, U32[4], false, spv::BuiltIn::SubgroupEqMaskKHR);
+        decorate_flat_if_fragment(subgroup_mask_eq);
         subgroup_mask_lt = DefineInput(*this, U32[4], false, spv::BuiltIn::SubgroupLtMaskKHR);
+        decorate_flat_if_fragment(subgroup_mask_lt);
         subgroup_mask_le = DefineInput(*this, U32[4], false, spv::BuiltIn::SubgroupLeMaskKHR);
+        decorate_flat_if_fragment(subgroup_mask_le);
         subgroup_mask_gt = DefineInput(*this, U32[4], false, spv::BuiltIn::SubgroupGtMaskKHR);
+        decorate_flat_if_fragment(subgroup_mask_gt);
         subgroup_mask_ge = DefineInput(*this, U32[4], false, spv::BuiltIn::SubgroupGeMaskKHR);
+        decorate_flat_if_fragment(subgroup_mask_ge);
     }
     if (info.uses_fswzadd || info.uses_subgroup_invocation_id || info.uses_subgroup_shuffles ||
         (profile.warp_size_potentially_larger_than_guest &&
@@ -1461,6 +1489,7 @@ void EmitContext::DefineInputs(const IR::Program& program) {
     }
     if (loads[IR::Attribute::PrimitiveId]) {
         primitive_id = DefineInput(*this, U32[1], false, spv::BuiltIn::PrimitiveId);
+        decorate_flat_if_fragment(primitive_id);
     }
     if (loads[IR::Attribute::Layer]) {
         AddCapability(spv::Capability::Geometry);

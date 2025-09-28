@@ -38,6 +38,8 @@ struct TextureDefinition {
     Id image_type;
     u32 count;
     bool is_multisample;
+    TextureComponentType component_type{TextureComponentType::Float};
+    u32 component_bit_size{};
 };
 
 struct TextureBufferDefinition {

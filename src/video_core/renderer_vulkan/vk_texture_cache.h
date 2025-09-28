@@ -238,6 +238,10 @@ public:
 
     [[nodiscard]] bool IsRescaled() const noexcept;
 
+    [[nodiscard]] bool SupportsLinearFiltering() const noexcept {
+        return supports_linear_filtering;
+    }
+
     [[nodiscard]] VkImageView Handle(Shader::TextureType texture_type) const noexcept {
         return *image_views[static_cast<size_t>(texture_type)];
     }
@@ -278,6 +282,7 @@ private:
     vk::ImageView depth_view;
     vk::ImageView stencil_view;
     vk::ImageView color_view;
+    bool supports_linear_filtering{};
     vk::Image null_image;
     VkImage image_handle = VK_NULL_HANDLE;
     VkImageView render_target = VK_NULL_HANDLE;
@@ -296,16 +301,26 @@ public:
     }
 
     [[nodiscard]] VkSampler HandleWithDefaultAnisotropy() const noexcept {
-        return *sampler_default_anisotropy;
+        return sampler_default_anisotropy ? *sampler_default_anisotropy : *sampler;
+    }
+
+    [[nodiscard]] VkSampler HandleWithoutLinearFiltering() const noexcept {
+        return sampler_no_linear ? *sampler_no_linear : *sampler;
     }
 
     [[nodiscard]] bool HasAddedAnisotropy() const noexcept {
         return static_cast<bool>(sampler_default_anisotropy);
     }
 
+    [[nodiscard]] bool RequiresLinearFiltering() const noexcept {
+        return requires_linear_filtering;
+    }
+
 private:
     vk::Sampler sampler;
     vk::Sampler sampler_default_anisotropy;
+    vk::Sampler sampler_no_linear;
+    bool requires_linear_filtering{};
 };
 
 class Framebuffer {

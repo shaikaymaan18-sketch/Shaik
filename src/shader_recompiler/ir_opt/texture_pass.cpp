@@ -19,6 +19,7 @@
 #include "shader_recompiler/host_translate_info.h"
 #include "shader_recompiler/ir_opt/passes.h"
 #include "shader_recompiler/shader_info.h"
+#include "video_core/surface.h"
 
 namespace Shader::Optimization {
 namespace {
@@ -248,11 +249,19 @@ bool IsTextureInstruction(const IR::Inst& inst) {
     }
     static inline TexturePixelFormat ReadTexturePixelFormatCached(Environment& env,
                                                                   const ConstBufferAddr& cbuf) {
-        return env.ReadTexturePixelFormat(GetTextureHandleCached(env, cbuf));
+        const u32 handle = GetTextureHandleCached(env, cbuf);
+        if (handle == 0) {
+            return TexturePixelFormat::A8B8G8R8_UNORM;
+        }
+        return env.ReadTexturePixelFormat(handle);
     }
     static inline bool IsTexturePixelFormatIntegerCached(Environment& env,
                                                          const ConstBufferAddr& cbuf) {
-        return env.IsTexturePixelFormatInteger(GetTextureHandleCached(env, cbuf));
+        const u32 handle = GetTextureHandleCached(env, cbuf);
+        if (handle == 0) {
+            return false;
+        }
+        return env.IsTexturePixelFormatInteger(handle);
     }
 
 
@@ -524,6 +533,8 @@ public:
         const u32 index{Add(texture_descriptors, desc, [&desc](const auto& existing) {
             return desc.type == existing.type && desc.is_depth == existing.is_depth &&
                    desc.has_secondary == existing.has_secondary &&
+                   desc.component_type == existing.component_type &&
+                   desc.component_bit_size == existing.component_bit_size &&
                    desc.cbuf_index == existing.cbuf_index &&
                    desc.cbuf_offset == existing.cbuf_offset &&
                    desc.shift_left == existing.shift_left &&
@@ -596,6 +607,35 @@ bool IsPixelFormatSNorm(TexturePixelFormat pixel_format) {
     default:
         return false;
     }
+}
+
+TextureComponentType PixelFormatComponentType(TexturePixelFormat pixel_format, bool is_integer) {
+    if (!is_integer) {
+        return TextureComponentType::Float;
+    }
+
+    switch (pixel_format) {
+    case TexturePixelFormat::A8B8G8R8_SINT:
+    case TexturePixelFormat::R8_SINT:
+    case TexturePixelFormat::R16G16B16A16_SINT:
+    case TexturePixelFormat::R32G32B32A32_SINT:
+    case TexturePixelFormat::R32G32_SINT:
+    case TexturePixelFormat::R16_SINT:
+    case TexturePixelFormat::R16G16_SINT:
+    case TexturePixelFormat::R8G8_SINT:
+    case TexturePixelFormat::R32_SINT:
+        return TextureComponentType::Sint;
+    default:
+        return TextureComponentType::Uint;
+    }
+}
+
+u8 PixelFormatIntegerComponentBits(TexturePixelFormat pixel_format, bool is_integer) {
+    if (!is_integer) {
+        return 0;
+    }
+    return static_cast<u8>(VideoCore::Surface::PixelComponentSizeBitsInteger(
+        static_cast<VideoCore::Surface::PixelFormat>(pixel_format)));
 }
 
 void PatchTexelFetch(IR::Block& block, IR::Inst& inst, TexturePixelFormat pixel_format) {
@@ -698,6 +738,8 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
         default:
             break;
         }
+        const TexturePixelFormat pixel_format{ReadTexturePixelFormatCached(env, cbuf)};
+        const bool is_integer{IsTexturePixelFormatIntegerCached(env, cbuf)};
         u32 index;
         switch (inst->GetOpcode()) {
         case IR::Opcode::ImageRead:
@@ -718,7 +760,6 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
             }
             const bool is_written{inst->GetOpcode() != IR::Opcode::ImageRead};
             const bool is_read{inst->GetOpcode() != IR::Opcode::ImageWrite};
-            const bool is_integer{IsTexturePixelFormatIntegerCached(env, cbuf)};
             if (flags.type == TextureType::Buffer) {
                 index = descriptors.Add(ImageBufferDescriptor{
                     .format = flags.image_format,
@@ -764,6 +805,8 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
                     .is_depth = flags.is_depth != 0,
                     .is_multisample = is_multisample,
                     .has_secondary = cbuf.has_secondary,
+                    .component_type = PixelFormatComponentType(pixel_format, is_integer),
+                    .component_bit_size = PixelFormatIntegerComponentBits(pixel_format, is_integer),
                     .cbuf_index = cbuf.index,
                     .cbuf_offset = cbuf.offset,
                     .shift_left = cbuf.shift_left,
