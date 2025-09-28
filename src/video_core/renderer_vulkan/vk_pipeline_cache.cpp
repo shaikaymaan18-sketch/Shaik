@@ -324,7 +324,8 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         .support_descriptor_aliasing = device.IsDescriptorAliasingSupported(),
         .support_int8 = device.IsInt8Supported(),
         .support_int16 = device.IsShaderInt16Supported(),
-        .support_int64 = device.IsShaderInt64Supported(),
+        .support_int64 = device.IsShaderInt64Supported() && !device.UsesShaderInt64Emulation(),
+        .emulate_int64_with_uint2 = device.UsesShaderInt64Emulation(),
         .support_vertex_instance_id = false,
         .support_float_controls = device.IsKhrShaderFloatControlsSupported(),
         .support_separate_denorm_behavior =
@@ -384,7 +385,8 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
     host_info = Shader::HostTranslateInfo{
         .support_float64 = device.IsFloat64Supported(),
         .support_float16 = device.IsFloat16Supported(),
-        .support_int64 = device.IsShaderInt64Supported(),
+        .support_int64 = device.IsShaderInt64Supported() && !device.UsesShaderInt64Emulation(),
+        .emulate_int64_with_uint2 = device.UsesShaderInt64Emulation(),
         .needs_demote_reorder = driver_id == VK_DRIVER_ID_AMD_PROPRIETARY ||
                                 driver_id == VK_DRIVER_ID_AMD_OPEN_SOURCE ||
                                 driver_id == VK_DRIVER_ID_SAMSUNG_PROPRIETARY,

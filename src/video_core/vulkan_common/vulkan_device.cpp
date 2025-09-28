@@ -980,6 +980,7 @@ bool Device::HasTimelineSemaphore() const {
 bool Device::GetSuitability(bool requires_swapchain) {
     // Assume we will be suitable.
     bool suitable = true;
+    shader_int64_emulation = false;
 
     // Configure properties.
     VkPhysicalDeviceVulkan12Features features_1_2{};
@@ -999,8 +1000,13 @@ bool Device::GetSuitability(bool requires_swapchain) {
         .pNext = &driver_probe_props,
     };
     physical.GetProperties2(driver_probe);
-    const bool disable_shader_int64 = driver_probe_props.driverID == VK_DRIVER_ID_QUALCOMM_PROPRIETARY ||
-                                      driver_probe_props.driverID == VK_DRIVER_ID_MESA_TURNIP;
+    const VkDriverId driver_id = driver_probe_props.driverID;
+    const bool is_qualcomm_proprietary = driver_id == VK_DRIVER_ID_QUALCOMM_PROPRIETARY;
+    const bool is_turnip = driver_id == VK_DRIVER_ID_MESA_TURNIP;
+
+    shader_int64_emulation = is_qualcomm_proprietary;
+
+    const bool disable_shader_int64 = shader_int64_emulation || is_turnip;
 
     // Minimum of API version 1.1 is required. (This is well-supported.)
     ASSERT(instance_version >= VK_API_VERSION_1_1);
@@ -1122,7 +1128,12 @@ bool Device::GetSuitability(bool requires_swapchain) {
         features.features.shaderInt64 = VK_FALSE;
         features.shader_atomic_int64.shaderBufferInt64Atomics = VK_FALSE;
         features.shader_atomic_int64.shaderSharedInt64Atomics = VK_FALSE;
-        LOG_WARNING(Render_Vulkan, "Disabling shaderInt64 support on Qualcomm/Turnip drivers");
+        if (shader_int64_emulation) {
+            LOG_WARNING(Render_Vulkan,
+                        "Using shaderInt64 emulation on Qualcomm proprietary drivers");
+        } else {
+            LOG_WARNING(Render_Vulkan, "Disabling shaderInt64 support on Turnip drivers");
+        }
     }
 
 // Some features are mandatory. Check those.

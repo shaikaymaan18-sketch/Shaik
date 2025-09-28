@@ -2,14 +2,245 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <bit>
+#include <utility>
 
+#include "common/assert.h"
 #include "shader_recompiler/backend/spirv/emit_spirv.h"
 #include "shader_recompiler/backend/spirv/emit_spirv_instructions.h"
 #include "shader_recompiler/backend/spirv/spirv_emit_context.h"
 
 namespace Shader::Backend::SPIRV {
 namespace {
-Id SharedPointer(EmitContext& ctx, Id offset, u32 index_offset = 0) {
+Id SharedPointer(EmitContext& ctx, Id offset, u32 index_offset = 0);
+std::pair<Id, Id> AtomicArgs(EmitContext& ctx);
+
+enum class PairAtomicOp {
+    Add,
+    SMin,
+    UMin,
+    SMax,
+    UMax,
+    And,
+    Or,
+    Xor,
+    Exchange,
+};
+
+struct PairComponents {
+    Id lo;
+    Id hi;
+};
+
+PairComponents ComputePairComponents(EmitContext& ctx, PairAtomicOp op, Id current_lo, Id current_hi,
+                                     Id value_lo, Id value_hi) {
+    switch (op) {
+    case PairAtomicOp::Add: {
+        const Id sum_lo{ctx.OpIAdd(ctx.U32[1], current_lo, value_lo)};
+        const Id carry_pred{ctx.OpULessThan(ctx.U1, sum_lo, current_lo)};
+        const Id carry{ctx.OpSelect(ctx.U32[1], carry_pred, ctx.Const(1u), ctx.u32_zero_value)};
+        const Id sum_hi_base{ctx.OpIAdd(ctx.U32[1], current_hi, value_hi)};
+        const Id sum_hi{ctx.OpIAdd(ctx.U32[1], sum_hi_base, carry)};
+        return {sum_lo, sum_hi};
+    }
+    case PairAtomicOp::SMin: {
+        const Id current_hi_signed{ctx.OpBitcast(ctx.S32[1], current_hi)};
+        const Id value_hi_signed{ctx.OpBitcast(ctx.S32[1], value_hi)};
+        const Id hi_less{ctx.OpSLessThan(ctx.U1, current_hi_signed, value_hi_signed)};
+        const Id hi_equal{ctx.OpIEqual(ctx.U1, current_hi_signed, value_hi_signed)};
+        const Id lo_less{ctx.OpULessThan(ctx.U1, current_lo, value_lo)};
+        const Id lo_equal{ctx.OpIEqual(ctx.U1, current_lo, value_lo)};
+        const Id select_current{ctx.OpLogicalOr(ctx.U1, hi_less,
+                                                ctx.OpLogicalAnd(ctx.U1, hi_equal,
+                                                                 ctx.OpLogicalOr(ctx.U1, lo_less, lo_equal)))};
+        const Id new_lo{ctx.OpSelect(ctx.U32[1], select_current, current_lo, value_lo)};
+        const Id new_hi{ctx.OpSelect(ctx.U32[1], select_current, current_hi, value_hi)};
+        return {new_lo, new_hi};
+    }
+    case PairAtomicOp::UMin: {
+        const Id hi_less{ctx.OpULessThan(ctx.U1, current_hi, value_hi)};
+        const Id hi_equal{ctx.OpIEqual(ctx.U1, current_hi, value_hi)};
+        const Id lo_less{ctx.OpULessThan(ctx.U1, current_lo, value_lo)};
+        const Id lo_equal{ctx.OpIEqual(ctx.U1, current_lo, value_lo)};
+        const Id select_current{ctx.OpLogicalOr(ctx.U1, hi_less,
+                                                ctx.OpLogicalAnd(ctx.U1, hi_equal,
+                                                                 ctx.OpLogicalOr(ctx.U1, lo_less, lo_equal)))};
+        const Id new_lo{ctx.OpSelect(ctx.U32[1], select_current, current_lo, value_lo)};
+        const Id new_hi{ctx.OpSelect(ctx.U32[1], select_current, current_hi, value_hi)};
+        return {new_lo, new_hi};
+    }
+    case PairAtomicOp::SMax: {
+        const Id current_hi_signed{ctx.OpBitcast(ctx.S32[1], current_hi)};
+        const Id value_hi_signed{ctx.OpBitcast(ctx.S32[1], value_hi)};
+        const Id hi_greater{ctx.OpSGreaterThan(ctx.U1, current_hi_signed, value_hi_signed)};
+        const Id hi_equal{ctx.OpIEqual(ctx.U1, current_hi_signed, value_hi_signed)};
+        const Id lo_greater{ctx.OpUGreaterThan(ctx.U1, current_lo, value_lo)};
+        const Id lo_equal{ctx.OpIEqual(ctx.U1, current_lo, value_lo)};
+        const Id select_current{ctx.OpLogicalOr(ctx.U1, hi_greater,
+                                                ctx.OpLogicalAnd(ctx.U1, hi_equal,
+                                                                 ctx.OpLogicalOr(ctx.U1, lo_greater, lo_equal)))};
+        const Id new_lo{ctx.OpSelect(ctx.U32[1], select_current, current_lo, value_lo)};
+        const Id new_hi{ctx.OpSelect(ctx.U32[1], select_current, current_hi, value_hi)};
+        return {new_lo, new_hi};
+    }
+    case PairAtomicOp::UMax: {
+        const Id hi_greater{ctx.OpUGreaterThan(ctx.U1, current_hi, value_hi)};
+        const Id hi_equal{ctx.OpIEqual(ctx.U1, current_hi, value_hi)};
+        const Id lo_greater{ctx.OpUGreaterThan(ctx.U1, current_lo, value_lo)};
+        const Id lo_equal{ctx.OpIEqual(ctx.U1, current_lo, value_lo)};
+        const Id select_current{ctx.OpLogicalOr(ctx.U1, hi_greater,
+                                                ctx.OpLogicalAnd(ctx.U1, hi_equal,
+                                                                 ctx.OpLogicalOr(ctx.U1, lo_greater, lo_equal)))};
+        const Id new_lo{ctx.OpSelect(ctx.U32[1], select_current, current_lo, value_lo)};
+        const Id new_hi{ctx.OpSelect(ctx.U32[1], select_current, current_hi, value_hi)};
+        return {new_lo, new_hi};
+    }
+    case PairAtomicOp::And: {
+        const Id new_lo{ctx.OpBitwiseAnd(ctx.U32[1], current_lo, value_lo)};
+        const Id new_hi{ctx.OpBitwiseAnd(ctx.U32[1], current_hi, value_hi)};
+        return {new_lo, new_hi};
+    }
+    case PairAtomicOp::Or: {
+        const Id new_lo{ctx.OpBitwiseOr(ctx.U32[1], current_lo, value_lo)};
+        const Id new_hi{ctx.OpBitwiseOr(ctx.U32[1], current_hi, value_hi)};
+        return {new_lo, new_hi};
+    }
+    case PairAtomicOp::Xor: {
+        const Id new_lo{ctx.OpBitwiseXor(ctx.U32[1], current_lo, value_lo)};
+        const Id new_hi{ctx.OpBitwiseXor(ctx.U32[1], current_hi, value_hi)};
+        return {new_lo, new_hi};
+    }
+    case PairAtomicOp::Exchange:
+        return {value_lo, value_hi};
+    }
+    ASSERT_MSG(false, "Unhandled pair atomic operation");
+    return {current_lo, current_hi};
+}
+
+PairAtomicOp GetPairAtomicOp(Id (Sirit::Module::*func)(Id, Id, Id)) {
+    if (func == &Sirit::Module::OpIAdd) {
+        return PairAtomicOp::Add;
+    }
+    if (func == &Sirit::Module::OpSMin) {
+        return PairAtomicOp::SMin;
+    }
+    if (func == &Sirit::Module::OpUMin) {
+        return PairAtomicOp::UMin;
+    }
+    if (func == &Sirit::Module::OpSMax) {
+        return PairAtomicOp::SMax;
+    }
+    if (func == &Sirit::Module::OpUMax) {
+        return PairAtomicOp::UMax;
+    }
+    if (func == &Sirit::Module::OpBitwiseAnd) {
+        return PairAtomicOp::And;
+    }
+    if (func == &Sirit::Module::OpBitwiseOr) {
+        return PairAtomicOp::Or;
+    }
+    if (func == &Sirit::Module::OpBitwiseXor) {
+        return PairAtomicOp::Xor;
+    }
+    ASSERT_MSG(false, "Unsupported pair atomic opcode");
+    return PairAtomicOp::Exchange;
+}
+
+Id EmulateStorageAtomicPair(EmitContext& ctx, PairAtomicOp op, Id pointer, Id value_pair) {
+    const auto [scope, semantics]{AtomicArgs(ctx)};
+    const Id zero{ctx.u32_zero_value};
+    const Id one{ctx.Const(1u)};
+    const Id low_pointer{ctx.OpAccessChain(ctx.storage_types.U32.element, pointer, zero)};
+    const Id high_pointer{ctx.OpAccessChain(ctx.storage_types.U32.element, pointer, one)};
+    const Id value_lo{ctx.OpCompositeExtract(ctx.U32[1], value_pair, 0U)};
+    const Id value_hi{ctx.OpCompositeExtract(ctx.U32[1], value_pair, 1U)};
+    const Id loop_header{ctx.OpLabel()};
+    const Id loop_body{ctx.OpLabel()};
+    const Id loop_continue{ctx.OpLabel()};
+    const Id loop_merge{ctx.OpLabel()};
+    const Id high_block{ctx.OpLabel()};
+    const Id revert_block{ctx.OpLabel()};
+
+    ctx.OpBranch(loop_header);
+    ctx.AddLabel(loop_header);
+    ctx.OpLoopMerge(loop_merge, loop_continue, spv::LoopControlMask::MaskNone);
+    ctx.OpBranch(loop_body);
+
+    ctx.AddLabel(loop_body);
+    const Id current_pair{ctx.OpLoad(ctx.U32[2], pointer)};
+    const Id expected_lo{ctx.OpCompositeExtract(ctx.U32[1], current_pair, 0U)};
+    const Id expected_hi{ctx.OpCompositeExtract(ctx.U32[1], current_pair, 1U)};
+    const PairComponents new_pair{ComputePairComponents(ctx, op, expected_lo, expected_hi, value_lo, value_hi)};
+    const Id low_result{ctx.OpAtomicCompareExchange(ctx.U32[1], low_pointer, scope, semantics, semantics,
+                                                    new_pair.lo, expected_lo)};
+    const Id low_success{ctx.OpIEqual(ctx.U1, low_result, expected_lo)};
+    ctx.OpSelectionMerge(loop_continue, spv::SelectionControlMask::MaskNone);
+    ctx.OpBranchConditional(low_success, high_block, loop_continue);
+
+    ctx.AddLabel(high_block);
+    const Id high_result{ctx.OpAtomicCompareExchange(ctx.U32[1], high_pointer, scope, semantics, semantics,
+                                                     new_pair.hi, expected_hi)};
+    const Id high_success{ctx.OpIEqual(ctx.U1, high_result, expected_hi)};
+    ctx.OpBranchConditional(high_success, loop_merge, revert_block);
+
+    ctx.AddLabel(revert_block);
+    ctx.OpAtomicCompareExchange(ctx.U32[1], low_pointer, scope, semantics, semantics, expected_lo,
+                                new_pair.lo);
+    ctx.OpBranch(loop_continue);
+
+    ctx.AddLabel(loop_continue);
+    ctx.OpBranch(loop_header);
+
+    ctx.AddLabel(loop_merge);
+    return current_pair;
+}
+
+Id EmulateSharedAtomicExchange(EmitContext& ctx, Id offset, Id value_pair) {
+    const Id scope{ctx.Const(static_cast<u32>(spv::Scope::Workgroup))};
+    const Id semantics{ctx.u32_zero_value};
+    const Id value_lo{ctx.OpCompositeExtract(ctx.U32[1], value_pair, 0U)};
+    const Id value_hi{ctx.OpCompositeExtract(ctx.U32[1], value_pair, 1U)};
+    const Id low_pointer{SharedPointer(ctx, offset, 0)};
+    const Id high_pointer{SharedPointer(ctx, offset, 1)};
+    const Id loop_header{ctx.OpLabel()};
+    const Id loop_body{ctx.OpLabel()};
+    const Id loop_continue{ctx.OpLabel()};
+    const Id loop_merge{ctx.OpLabel()};
+    const Id high_block{ctx.OpLabel()};
+    const Id revert_block{ctx.OpLabel()};
+
+    ctx.OpBranch(loop_header);
+    ctx.AddLabel(loop_header);
+    ctx.OpLoopMerge(loop_merge, loop_continue, spv::LoopControlMask::MaskNone);
+    ctx.OpBranch(loop_body);
+
+    ctx.AddLabel(loop_body);
+    const Id expected_lo{ctx.OpLoad(ctx.U32[1], low_pointer)};
+    const Id expected_hi{ctx.OpLoad(ctx.U32[1], high_pointer)};
+    const Id current_pair{ctx.OpCompositeConstruct(ctx.U32[2], expected_lo, expected_hi)};
+    const Id low_result{ctx.OpAtomicCompareExchange(ctx.U32[1], low_pointer, scope, semantics, semantics,
+                                                    value_lo, expected_lo)};
+    const Id low_success{ctx.OpIEqual(ctx.U1, low_result, expected_lo)};
+    ctx.OpSelectionMerge(loop_continue, spv::SelectionControlMask::MaskNone);
+    ctx.OpBranchConditional(low_success, high_block, loop_continue);
+
+    ctx.AddLabel(high_block);
+    const Id high_result{ctx.OpAtomicCompareExchange(ctx.U32[1], high_pointer, scope, semantics, semantics,
+                                                     value_hi, expected_hi)};
+    const Id high_success{ctx.OpIEqual(ctx.U1, high_result, expected_hi)};
+    ctx.OpBranchConditional(high_success, loop_merge, revert_block);
+
+    ctx.AddLabel(revert_block);
+    ctx.OpAtomicCompareExchange(ctx.U32[1], low_pointer, scope, semantics, semantics, expected_lo, value_lo);
+    ctx.OpBranch(loop_continue);
+
+    ctx.AddLabel(loop_continue);
+    ctx.OpBranch(loop_header);
+
+    ctx.AddLabel(loop_merge);
+    return current_pair;
+}
+
+Id SharedPointer(EmitContext& ctx, Id offset, u32 index_offset) {
     const Id shift_id{ctx.Const(2U)};
     Id index{ctx.OpShiftRightArithmetic(ctx.U32[1], offset, shift_id)};
     if (index_offset > 0) {
@@ -96,6 +327,12 @@ Id StorageAtomicU32x2(EmitContext& ctx, const IR::Value& binding, const IR::Valu
         return ctx.ConstantNull(ctx.U32[2]);
     }
 
+    if (ctx.profile.emulate_int64_with_uint2) {
+        const Id pointer{StoragePointer(ctx, ctx.storage_types.U32x2, &StorageDefinitions::U32x2,
+                                        binding, offset, sizeof(u32[2]))};
+        return EmulateStorageAtomicPair(ctx, GetPairAtomicOp(non_atomic_func), pointer, value);
+    }
+
     LOG_WARNING(Shader_SPIRV, "Int64 atomics not supported, fallback to non-atomic");
     const Id pointer{StoragePointer(ctx, ctx.storage_types.U32x2, &StorageDefinitions::U32x2,
                                     binding, offset, sizeof(u32[2]))};
@@ -175,6 +412,10 @@ Id EmitSharedAtomicExchange64(EmitContext& ctx, Id offset, Id value) {
 }
 
 Id EmitSharedAtomicExchange32x2(EmitContext& ctx, Id offset, Id value) {
+    if (ctx.profile.emulate_int64_with_uint2) {
+        return EmulateSharedAtomicExchange(ctx, offset, value);
+    }
+
     LOG_WARNING(Shader_SPIRV, "Int64 atomics not supported, fallback to non-atomic");
     const Id pointer_1{SharedPointer(ctx, offset, 0)};
     const Id pointer_2{SharedPointer(ctx, offset, 1)};
@@ -351,6 +592,12 @@ Id EmitStorageAtomicXor32x2(EmitContext& ctx, const IR::Value& binding, const IR
 
 Id EmitStorageAtomicExchange32x2(EmitContext& ctx, const IR::Value& binding,
                                  const IR::Value& offset, Id value) {
+    if (ctx.profile.emulate_int64_with_uint2) {
+        const Id pointer{StoragePointer(ctx, ctx.storage_types.U32x2, &StorageDefinitions::U32x2,
+                                        binding, offset, sizeof(u32[2]))};
+        return EmulateStorageAtomicPair(ctx, PairAtomicOp::Exchange, pointer, value);
+    }
+
     LOG_WARNING(Shader_SPIRV, "Int64 atomics not supported, fallback to non-atomic");
     const Id pointer{StoragePointer(ctx, ctx.storage_types.U32x2, &StorageDefinitions::U32x2,
                                     binding, offset, sizeof(u32[2]))};
