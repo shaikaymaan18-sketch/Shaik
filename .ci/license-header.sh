@@ -140,10 +140,10 @@ cat << EOF
   other files have been reviewed and addressed.
 EOF
 
-TMP_DIR=$(mktemp -d /tmp/license-header.XXXXXX) || exit 1
+TMP_DIR=$(mktemp -d "/tmp/license-header.XXXXXX") || exit 1
 if [ "$FIX" = "true" ] || [ "$UPDATE" = "true" ]; then
     echo
-    echo "license-header.sh: FIX set to true, fixing headers..."
+    echo "license-header.sh: FIX or UPDATE set to true, fixing headers..."
 
     for file in $SRC_FILES $OTHER_FILES; do
         BASENAME=$(basename "$file")
@@ -163,7 +163,7 @@ if [ "$FIX" = "true" ] || [ "$UPDATE" = "true" ]; then
         TMP="$TMP_DIR/$BASENAME.tmp"
         UPDATED=0
         cp -p "$file" "$TMP"
-        > "$TMP"
+        : > "$TMP"
 
         # this logic is bit hacky but sed don't work well with $VARIABLES
         # it's this or complete remove this logic and keep only the old way
