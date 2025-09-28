@@ -376,6 +376,10 @@ public:
 
     /// Returns true if shader int64 is supported.
     bool IsShaderInt64Supported() const {
+        const auto driver = GetDriverID();
+        if (driver == VK_DRIVER_ID_QUALCOMM_PROPRIETARY || driver == VK_DRIVER_ID_MESA_TURNIP) {
+            return false;
+        }
         return features.features.shaderInt64;
     }
 
@@ -585,6 +589,11 @@ public:
 
     /// Returns true if the device supports VK_KHR_shader_atomic_int64.
     bool IsExtShaderAtomicInt64Supported() const {
+        const auto driver = GetDriverID();
+        if (driver == VK_DRIVER_ID_QUALCOMM_PROPRIETARY ||
+            driver == VK_DRIVER_ID_MESA_TURNIP) {
+            return false;
+        }
         return extensions.shader_atomic_int64;
     }
 
