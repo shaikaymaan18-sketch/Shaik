@@ -374,15 +374,18 @@ public:
         return features.features.shaderStorageImageReadWithoutFormat;
     }
 
-    /// Returns true if shader int64 is supported.
+    /// Returns true if shader int64 is supported (natively or via emulation).
     bool IsShaderInt64Supported() const {
-        const auto driver = GetDriverID();
-        if (driver == VK_DRIVER_ID_QUALCOMM_PROPRIETARY || driver == VK_DRIVER_ID_MESA_TURNIP) {
-            return false;
+        if (shader_int64_emulation) {
+            return true;
         }
         return features.features.shaderInt64;
     }
 
+    /// Returns true when shader int64 operations must be emulated with 32-bit pairs.
+    bool UsesShaderInt64Emulation() const {
+        return shader_int64_emulation;
+    }
     /// Returns true if shader int16 is supported.
     bool IsShaderInt16Supported() const {
         return features.features.shaderInt16;
@@ -849,6 +852,7 @@ private:
     bool cant_blit_msaa{};                     ///< Does not support MSAA<->MSAA blitting.
     bool must_emulate_scaled_formats{};        ///< Requires scaled vertex format emulation
     bool must_emulate_bgr565{};                ///< Emulates BGR565 by swizzling RGB565 format.
+    bool shader_int64_emulation{};             ///< Emulates shader Int64 using 32-bit pairs.
     bool dynamic_state3_blending{};            ///< Has all blending features of dynamic_state3.
     bool dynamic_state3_enables{};             ///< Has all enables features of dynamic_state3.
     bool supports_conditional_barriers{};      ///< Allows barriers in conditional control flow.

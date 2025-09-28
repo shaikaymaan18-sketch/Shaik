@@ -14,6 +14,7 @@ struct Profile {
     bool support_int8{};
     bool support_int16{};
     bool support_int64{};
+    bool emulate_int64_with_uint2{};
     bool support_vertex_instance_id{};
     bool support_float_controls{};
     bool support_separate_denorm_behavior{};
