@@ -108,7 +108,7 @@ function(determine_qt_parameters target host_out type_out arch_out arch_path_out
         set(host "linux")
         set(type "desktop")
         set(arch "linux_gcc_64")
-        set(arch_path "linux")
+        set(arch_path "gcc_64")
     endif()
 
     set(${host_out} "${host}" PARENT_SCOPE)
