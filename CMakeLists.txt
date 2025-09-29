@@ -212,7 +212,7 @@ option(YUZU_DOWNLOAD_TIME_ZONE_DATA "Always download time zone binaries" ON)
 
 CMAKE_DEPENDENT_OPTION(YUZU_USE_FASTER_LD "Check if a faster linker is available" ON "LINUX" OFF)
 
-CMAKE_DEPENDENT_OPTION(USE_SYSTEM_MOLTENVK "Use the system MoltenVK lib (instead of the bundled one)" OFF "APPLE" OFF)
+CMAKE_DEPENDENT_OPTION(YUZU_APPLE_USE_BUNDLED_MONTENVK "Download bundled MoltenVK lib" ON "APPLE" OFF)
 
 set(YUZU_TZDB_PATH "" CACHE STRING "Path to a pre-downloaded timezone database")
 
