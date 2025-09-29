@@ -205,6 +205,7 @@ if(YUZU_ENABLE_LTO)
     if(NOT COMPILER_SUPPORTS_LTO)
         message(FATAL_ERROR "Your compiler does not support interprocedural optimization (IPO). Re-run CMake with -DYUZU_ENABLE_LTO=OFF.")
     endif()
+    set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ${COMPILER_SUPPORTS_LTO})
 endif()
 
