@@ -448,6 +448,11 @@ public:
 
     /// Returns true if VK_KHR_shader_float_controls is enabled.
     bool IsKhrShaderFloatControlsSupported() const {
+        const bool is_qualcomm =
+            properties.driver.driverID == VK_DRIVER_ID_QUALCOMM_PROPRIETARY;
+        if (is_qualcomm) {
+            return false;
+        }
         return extensions.shader_float_controls;
     }
 
