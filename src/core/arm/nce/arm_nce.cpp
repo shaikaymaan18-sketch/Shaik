@@ -12,6 +12,7 @@
 #include "core/arm/nce/interpreter_visitor.h"
 #include "core/arm/nce/patcher.h"
 #include "core/core.h"
+#include "core/device_memory.h"
 #include "core/memory.h"
 
 #include "core/hle/kernel/k_process.h"
@@ -173,12 +174,40 @@ bool ArmNce::HandleGuestAccessFault(GuestContext* guest_ctx, void* raw_info, voi
     return HandleFailedGuestFault(guest_ctx, raw_info, raw_context);
 }
 
+namespace {
+
+void ChainSignalHandler(const struct sigaction& action, int sig, void* raw_info,
+                        void* raw_context) {
+    if ((action.sa_flags & SA_SIGINFO) != 0) {
+        if (action.sa_sigaction) {
+            action.sa_sigaction(sig, static_cast<siginfo_t*>(raw_info), raw_context);
+        }
+        return;
+    }
+
+    if (action.sa_handler == SIG_IGN) {
+        return;
+    }
+
+    if (action.sa_handler == SIG_DFL) {
+        signal(sig, SIG_DFL);
+        raise(sig);
+        return;
+    }
+
+    if (action.sa_handler) {
+        action.sa_handler(sig);
+    }
+}
+
+} // namespace
+
 void ArmNce::HandleHostAlignmentFault(int sig, void* raw_info, void* raw_context) {
-    return g_orig_bus_action.sa_sigaction(sig, static_cast<siginfo_t*>(raw_info), raw_context);
+    ChainSignalHandler(g_orig_bus_action, sig, raw_info, raw_context);
 }
 
 void ArmNce::HandleHostAccessFault(int sig, void* raw_info, void* raw_context) {
-    return g_orig_segv_action.sa_sigaction(sig, static_cast<siginfo_t*>(raw_info), raw_context);
+    ChainSignalHandler(g_orig_segv_action, sig, raw_info, raw_context);
 }
 
 void ArmNce::LockThread(Kernel::KThread* thread) {
@@ -322,7 +351,7 @@ void ArmNce::Initialize() {
         alignment_fault_action.sa_sigaction =
             reinterpret_cast<HandlerType>(&ArmNce::GuestAlignmentFaultSignalHandler);
         alignment_fault_action.sa_mask = signal_mask;
-        Common::SigAction(GuestAlignmentFaultSignal, &alignment_fault_action, nullptr);
+        Common::SigAction(GuestAlignmentFaultSignal, &alignment_fault_action, &g_orig_bus_action);
 
         struct sigaction access_fault_action {};
         access_fault_action.sa_flags = SA_SIGINFO | SA_ONSTACK | SA_RESTART;
@@ -385,41 +414,52 @@ void ArmNce::SignalInterrupt(Kernel::KThread* thread) {
     }
 }
 
-const std::size_t CACHE_PAGE_SIZE = 4096;
-
 void ArmNce::ClearInstructionCache() {
-#if defined(__GNUC__) || defined(__clang__)
-    void* start = (void*)((uintptr_t)__builtin_return_address(0) & ~(CACHE_PAGE_SIZE - 1));
-    void* end =
-        (void*)((uintptr_t)start + CACHE_PAGE_SIZE * 2); // Clear two pages for better coverage
-    // Prefetch next likely pages
-    __builtin_prefetch((void*)((uintptr_t)end), 1, 3);
-    __builtin___clear_cache(static_cast<char*>(start), static_cast<char*>(end));
-#endif
-#ifdef __aarch64__
-    // Ensure all previous memory operations complete
-    asm volatile("dmb ish" ::: "memory");
+#if defined(__aarch64__)
+    // Invalidate the entire instruction cache to the point of unification.
+    asm volatile("ic iallu" ::: "memory");
     asm volatile("dsb ish" ::: "memory");
     asm volatile("isb" ::: "memory");
+#else
+    // Fallback: nothing to do on unsupported architectures since NCE is AArch64-only.
 #endif
 }
 
 void ArmNce::InvalidateCacheRange(u64 addr, std::size_t size) {
-    #if defined(__GNUC__) || defined(__clang__)
-        // Align the start address to cache line boundary for better performance
-        const size_t CACHE_LINE_SIZE = 64;
-        addr &= ~(CACHE_LINE_SIZE - 1);
+    if (size == 0) {
+        return;
+    }
 
-        // Round up size to nearest cache line
-        size = (size + CACHE_LINE_SIZE - 1) & ~(CACHE_LINE_SIZE - 1);
+#if defined(__aarch64__)
+    constexpr std::size_t CACHE_LINE_SIZE = 64;
 
-        // Prefetch the range to be invalidated
-        for (size_t offset = 0; offset < size; offset += CACHE_LINE_SIZE) {
-            __builtin_prefetch((void*)(addr + offset), 1, 3);
+    const u64 start = addr & ~(static_cast<u64>(CACHE_LINE_SIZE) - 1ULL);
+    const u64 end = (addr + size + CACHE_LINE_SIZE - 1ULL) &
+                    ~(static_cast<u64>(CACHE_LINE_SIZE) - 1ULL);
+
+    auto* const virtual_base = m_system.DeviceMemory().buffer.VirtualBasePointer();
+    if (virtual_base == nullptr) {
+        // Fall back to full invalidation if the direct mapping is unavailable.
+        ClearInstructionCache();
+        return;
+    }
+
+    for (u64 line = start; line < end; line += CACHE_LINE_SIZE) {
+        if (line < Core::DramMemoryMap::Base) {
+            continue;
         }
-    #endif
 
-    this->ClearInstructionCache();
+        const u64 offset = line - Core::DramMemoryMap::Base;
+        const void* line_ptr = virtual_base + offset;
+        asm volatile("ic ivau, %0" : : "r"(line_ptr) : "memory");
+    }
+
+    asm volatile("dsb ish" ::: "memory");
+    asm volatile("isb" ::: "memory");
+#else
+    (void)addr;
+    (void)size;
+#endif
 }
 
 } // namespace Core
