@@ -204,24 +204,36 @@ QList<QStandardItem*> MakeGameListEntry(const std::string& path,
                                         const PlayTime::PlayTimeManager& play_time_manager,
                                         const FileSys::PatchManager& patch)
 {
-    auto const it = FindMatchingCompatibilityEntry(compatibility_list, program_id);
-    // The game list uses 99 as compatibility number for untested games
-    QString compatibility = it != compatibility_list.end() ? it->second.first : QStringLiteral("99");
+    const auto it = FindMatchingCompatibilityEntry(compatibility_list, program_id);
 
-    auto const file_type = loader.GetFileType();
-    auto const file_type_string = QString::fromStdString(Loader::GetFileTypeString(file_type));
+    // The game list uses this as compatibility number for untested games
+    QString compatibility{QStringLiteral("99")};
+    if (it != compatibility_list.end()) {
+        compatibility = it->second.first;
+    }
 
-    QString patch_versions = GetGameListCachedObject(fmt::format("{:016X}", patch.GetTitleID()), "pv.txt", [&patch, &loader] {
-        return FormatPatchNameVersions(patch, loader, loader.IsRomFSUpdatable());
-    });
-    return QList<QStandardItem*>{
-        new GameListItemPath(FormatGameName(path), icon, QString::fromStdString(name), file_type_string, program_id),
+    const auto file_type = loader.GetFileType();
+    const auto file_type_string = QString::fromStdString(Loader::GetFileTypeString(file_type));
+
+    QList<QStandardItem*> list{
+        new GameListItemPath(FormatGameName(path), icon, QString::fromStdString(name),
+                             file_type_string, program_id),
+        new GameListItemCompat(compatibility),
         new GameListItem(file_type_string),
         new GameListItemSize(size),
         new GameListItemPlayTime(play_time_manager.GetPlayTime(program_id)),
-        new GameListItem(patch_versions),
-        new GameListItemCompat(compatibility),
     };
+
+    QString patch_versions;
+
+    patch_versions = GetGameListCachedObject(
+        fmt::format("{:016X}", patch.GetTitleID()), "pv.txt", [&patch, &loader] {
+            return FormatPatchNameVersions(patch, loader, loader.IsRomFSUpdatable());
+        });
+
+    list.insert(2, new GameListItem(patch_versions));
+
+    return list;
 }
 } // Anonymous namespace
 

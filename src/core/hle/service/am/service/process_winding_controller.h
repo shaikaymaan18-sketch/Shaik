@@ -1,12 +1,8 @@
-// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 // SPDX-FileCopyrightText: Copyright 2024 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
 
-#include "core/hle/service/am/service/storage.h"
 #include "core/hle/service/am/am_types.h"
 #include "core/hle/service/cmif_types.h"
 #include "core/hle/service/service.h"
@@ -25,12 +21,6 @@ private:
     Result GetLaunchReason(Out<AppletProcessLaunchReason> out_launch_reason);
     Result OpenCallingLibraryApplet(
         Out<SharedPointer<ILibraryAppletAccessor>> out_calling_library_applet);
-    Result PushContext(SharedPointer<IStorage> in_context);
-    Result PopContext(Out<SharedPointer<IStorage>> out_context);
-    Result CancelWindingReservation();
-    Result WindAndDoReserved();
-    Result ReserveToStartAndWaitAndUnwindThis();
-    Result ReserveToStartAndWait();
 
     const std::shared_ptr<Applet> m_applet;
 };

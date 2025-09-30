@@ -13,7 +13,6 @@
 #include <QString>
 #include <QStringLiteral>
 #include <QWidget>
-#include <QObject>
 #include <qobjectdefs.h>
 #include "qt_common/shared_translation.h"
 

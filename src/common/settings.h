@@ -178,7 +178,7 @@ struct Values {
     SwitchableSetting<std::string> audio_input_device_id{
                                                          linkage, "auto", "input_device", Category::Audio, Specialization::RuntimeList};
     SwitchableSetting<AudioMode, true> sound_index{
-                                                   linkage,       AudioMode::Stereo,
+                                                   linkage,       AudioMode::Stereo,     AudioMode::Mono,         AudioMode::Surround,
                                                    "sound_index", Category::SystemAudio, Specialization::Default, true,
                                                    true};
     SwitchableSetting<u8, true> volume{linkage,
@@ -199,6 +199,8 @@ struct Values {
     SwitchableSetting<bool> use_multi_core{linkage, true, "use_multi_core", Category::Core};
     SwitchableSetting<MemoryLayout, true> memory_layout_mode{linkage,
                                                              MemoryLayout::Memory_4Gb,
+                                                             MemoryLayout::Memory_4Gb,
+                                                             MemoryLayout::Memory_12Gb,
                                                              "memory_layout_mode",
                                                              Category::Core,
                                                              Specialization::Default,
@@ -238,8 +240,9 @@ struct Values {
 #endif
                                                     "cpu_backend",
                                                     Category::Cpu};
-    SwitchableSetting<CpuAccuracy, true> cpu_accuracy{linkage, CpuAccuracy::Auto,
-                                                      "cpu_accuracy", Category::Cpu};
+    SwitchableSetting<CpuAccuracy, true> cpu_accuracy{linkage,           CpuAccuracy::Auto,
+                                                      CpuAccuracy::Auto, CpuAccuracy::Paranoid,
+                                                      "cpu_accuracy",    Category::Cpu};
 
     SwitchableSetting<bool> use_fast_cpu_time{linkage,
                                               false,
@@ -321,10 +324,10 @@ struct Values {
 
     // Renderer
     SwitchableSetting<RendererBackend, true> renderer_backend{
-                                                              linkage, RendererBackend::Vulkan,
+                                                              linkage,   RendererBackend::Vulkan, RendererBackend::OpenGL, RendererBackend::Null,
                                                               "backend", Category::Renderer};
     SwitchableSetting<ShaderBackend, true> shader_backend{
-                                                          linkage, ShaderBackend::SpirV,
+                                                          linkage,          ShaderBackend::SpirV, ShaderBackend::Glsl,        ShaderBackend::SpirV,
                                                           "shader_backend", Category::Renderer,  Specialization::RuntimeList};
     SwitchableSetting<int> vulkan_device{linkage, 0, "vulkan_device", Category::Renderer,
                                          Specialization::RuntimeList};
@@ -339,6 +342,8 @@ struct Values {
                                                   Category::Renderer};
     SwitchableSetting<SpirvOptimizeMode, true> optimize_spirv_output{linkage,
                                                                      SpirvOptimizeMode::Never,
+                                                                     SpirvOptimizeMode::Never,
+                                                                     SpirvOptimizeMode::Always,
                                                                      "optimize_spirv_output",
                                                                      Category::Renderer};
     SwitchableSetting<bool> use_asynchronous_gpu_emulation{
@@ -349,10 +354,12 @@ struct Values {
 #else
                                                             AstcDecodeMode::Gpu,
 #endif
+                                                            AstcDecodeMode::Cpu,
+                                                            AstcDecodeMode::CpuAsynchronous,
                                                             "accelerate_astc",
                                                             Category::Renderer};
     SwitchableSetting<VSyncMode, true> vsync_mode{
-                                                  linkage,     VSyncMode::Fifo,
+                                                  linkage,     VSyncMode::Fifo,    VSyncMode::Immediate,        VSyncMode::FifoRelaxed,
                                                   "use_vsync", Category::Renderer, Specialization::RuntimeList, true,
                                                   true};
     SwitchableSetting<NvdecEmulation> nvdec_emulation{linkage, NvdecEmulation::Gpu,
@@ -365,6 +372,8 @@ struct Values {
 #else
                                                             FullscreenMode::Exclusive,
 #endif
+                                                            FullscreenMode::Borderless,
+                                                            FullscreenMode::Exclusive,
                                                             "fullscreen_mode",
                                                             Category::Renderer,
                                                             Specialization::Default,
@@ -372,6 +381,8 @@ struct Values {
                                                             true};
     SwitchableSetting<AspectRatio, true> aspect_ratio{linkage,
                                                       AspectRatio::R16_9,
+                                                      AspectRatio::R16_9,
+                                                      AspectRatio::Stretch,
                                                       "aspect_ratio",
                                                       Category::Renderer,
                                                       Specialization::Default,
@@ -419,6 +430,8 @@ struct Values {
 #else
                                                       GpuAccuracy::High,
 #endif
+                                                      GpuAccuracy::Normal,
+                                                      GpuAccuracy::Extreme,
                                                       "gpu_accuracy",
                                                       Category::RendererAdvanced,
                                                       Specialization::Default,
@@ -429,6 +442,8 @@ struct Values {
 
     SwitchableSetting<DmaAccuracy, true> dma_accuracy{linkage,
                                                       DmaAccuracy::Default,
+                                                      DmaAccuracy::Default,
+                                                      DmaAccuracy::Safe,
                                                       "dma_accuracy",
                                                       Category::RendererAdvanced,
                                                       Specialization::Default,
@@ -441,14 +456,20 @@ struct Values {
 #else
                                                            AnisotropyMode::Automatic,
 #endif
+                                                           AnisotropyMode::Automatic,
+                                                           AnisotropyMode::X16,
                                                            "max_anisotropy",
                                                            Category::RendererAdvanced};
     SwitchableSetting<AstcRecompression, true> astc_recompression{linkage,
                                                                   AstcRecompression::Uncompressed,
+                                                                  AstcRecompression::Uncompressed,
+                                                                  AstcRecompression::Bc3,
                                                                   "astc_recompression",
                                                                   Category::RendererAdvanced};
     SwitchableSetting<VramUsageMode, true> vram_usage_mode{linkage,
                                                            VramUsageMode::Conservative,
+                                                           VramUsageMode::Conservative,
+                                                           VramUsageMode::Aggressive,
                                                            "vram_usage_mode",
                                                            Category::RendererAdvanced};
     SwitchableSetting<bool> skip_cpu_inner_invalidation{linkage,
@@ -574,10 +595,14 @@ struct Values {
     // System
     SwitchableSetting<Language, true> language_index{linkage,
                                                      Language::EnglishAmerican,
+                                                     Language::Japanese,
+                                                     Language::Serbian,
                                                      "language_index",
                                                      Category::System};
-    SwitchableSetting<Region, true> region_index{linkage, Region::Usa, "region_index", Category::System};
-    SwitchableSetting<TimeZone, true> time_zone_index{linkage, TimeZone::Auto,
+    SwitchableSetting<Region, true> region_index{linkage,        Region::Usa,    Region::Japan,
+                                                 Region::Taiwan, "region_index", Category::System};
+    SwitchableSetting<TimeZone, true> time_zone_index{linkage,           TimeZone::Auto,
+                                                      TimeZone::Auto,    TimeZone::Zulu,
                                                       "time_zone_index", Category::System};
     // Measured in seconds since epoch
     SwitchableSetting<bool> custom_rtc_enabled{

@@ -8,7 +8,6 @@
 
 #include <deque>
 #include <mutex>
-#include <stack>
 
 #include "common/math_util.h"
 #include "core/hle/service/apm/apm_controller.h"
@@ -24,7 +23,6 @@
 #include "core/hle/service/am/hid_registration.h"
 #include "core/hle/service/am/lifecycle_manager.h"
 #include "core/hle/service/am/process_holder.h"
-#include "core/hle/service/am/service/storage.h"
 
 namespace Service::AM {
 
@@ -98,9 +96,6 @@ struct Applet {
     std::deque<std::vector<u8>> user_channel_launch_parameter{};
     std::deque<std::vector<u8>> preselected_user_launch_parameter{};
     std::deque<std::vector<u8>> friend_invitation_storage_channel{};
-
-    // Context Stack
-    std::stack<SharedPointer<IStorage>> context_stack{};
 
     // Caller applet
     std::weak_ptr<Applet> caller_applet{};
