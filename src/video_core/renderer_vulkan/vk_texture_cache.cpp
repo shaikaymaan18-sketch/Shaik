@@ -2061,8 +2061,6 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
         },
         .subresourceRange = MakeSubresourceRange(aspect_mask, info.range),
     };
-    supports_linear_filtering = device->IsFormatSupported(
-        create_info.format, VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT, FormatType::Optimal);
     const auto create = [&](TextureType tex_type, std::optional<u32> num_layers) {
         VkImageViewCreateInfo ci{create_info};
         ci.viewType = ImageViewType(tex_type);
@@ -2113,13 +2111,10 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
 ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageInfo& info,
                      const VideoCommon::ImageViewInfo& view_info, GPUVAddr gpu_addr_)
     : VideoCommon::ImageViewBase{info, view_info, gpu_addr_},
-      buffer_size{VideoCommon::CalculateGuestSizeInBytes(info)} {
-    supports_linear_filtering = true;
-}
+      buffer_size{VideoCommon::CalculateGuestSizeInBytes(info)} {}
 
 ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::NullImageViewParams& params)
     : VideoCommon::ImageViewBase{params}, device{&runtime.device} {
-    supports_linear_filtering = true;
     if (device->HasNullDescriptor()) {
         return;
     }
@@ -2180,7 +2175,6 @@ VkImageView ImageView::StorageView(Shader::TextureType texture_type,
     if (image_format == Shader::ImageFormat::Typeless) {
         return Handle(texture_type);
     }
-
     const bool is_signed{image_format == Shader::ImageFormat::R8_SINT ||
                          image_format == Shader::ImageFormat::R16_SINT};
     if (!storage_views) {
@@ -2250,23 +2244,15 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
     }
     // Some games have samplers with garbage. Sanitize them here.
     const f32 max_anisotropy = std::clamp(tsc.MaxAnisotropy(), 1.0f, 16.0f);
-    const VkFilter mag_filter = MaxwellToVK::Sampler::Filter(tsc.mag_filter);
-    const VkFilter min_filter = MaxwellToVK::Sampler::Filter(tsc.min_filter);
-    const VkSamplerMipmapMode mipmap_mode = MaxwellToVK::Sampler::MipmapMode(tsc.mipmap_filter);
-    const f32 min_lod = tsc.mipmap_filter == TextureMipmapFilter::None ? 0.0f : tsc.MinLod();
-    const f32 max_lod = tsc.mipmap_filter == TextureMipmapFilter::None ? 0.25f : tsc.MaxLod();
-    requires_linear_filtering = mag_filter == VK_FILTER_LINEAR || min_filter == VK_FILTER_LINEAR ||
-                                mipmap_mode == VK_SAMPLER_MIPMAP_MODE_LINEAR || max_anisotropy > 1.0f;
 
-    const auto create_sampler = [&](VkFilter mag, VkFilter min, VkSamplerMipmapMode mip,
-                                    f32 anisotropy) {
+    const auto create_sampler = [&](const f32 anisotropy) {
         return device.GetLogical().CreateSampler(VkSamplerCreateInfo{
             .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
             .pNext = pnext,
             .flags = 0,
-            .magFilter = mag,
-            .minFilter = min,
-            .mipmapMode = mip,
+            .magFilter = MaxwellToVK::Sampler::Filter(tsc.mag_filter),
+            .minFilter = MaxwellToVK::Sampler::Filter(tsc.min_filter),
+            .mipmapMode = MaxwellToVK::Sampler::MipmapMode(tsc.mipmap_filter),
             .addressModeU = MaxwellToVK::Sampler::WrapMode(device, tsc.wrap_u, tsc.mag_filter),
             .addressModeV = MaxwellToVK::Sampler::WrapMode(device, tsc.wrap_v, tsc.mag_filter),
             .addressModeW = MaxwellToVK::Sampler::WrapMode(device, tsc.wrap_p, tsc.mag_filter),
@@ -2275,25 +2261,19 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
             .maxAnisotropy = anisotropy,
             .compareEnable = tsc.depth_compare_enabled,
             .compareOp = MaxwellToVK::Sampler::DepthCompareFunction(tsc.depth_compare_func),
-            .minLod = min_lod,
-            .maxLod = max_lod,
+            .minLod = tsc.mipmap_filter == TextureMipmapFilter::None ? 0.0f : tsc.MinLod(),
+            .maxLod = tsc.mipmap_filter == TextureMipmapFilter::None ? 0.25f : tsc.MaxLod(),
             .borderColor =
                 arbitrary_borders ? VK_BORDER_COLOR_FLOAT_CUSTOM_EXT : ConvertBorderColor(color),
             .unnormalizedCoordinates = VK_FALSE,
         });
     };
 
-    sampler = create_sampler(mag_filter, min_filter, mipmap_mode, max_anisotropy);
+    sampler = create_sampler(max_anisotropy);
 
     const f32 max_anisotropy_default = static_cast<f32>(1U << tsc.max_anisotropy);
     if (max_anisotropy > max_anisotropy_default) {
-        sampler_default_anisotropy = create_sampler(mag_filter, min_filter, mipmap_mode,
-                                                    max_anisotropy_default);
-    }
-
-    if (requires_linear_filtering) {
-        sampler_no_linear = create_sampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
-                                           VK_SAMPLER_MIPMAP_MODE_NEAREST, 1.0f);
+        sampler_default_anisotropy = create_sampler(max_anisotropy_default);
     }
 }
 

@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 // SPDX-FileCopyrightText: Copyright 2021 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -37,12 +34,6 @@ enum class TextureType : u32 {
     Color2DRect,
 };
 constexpr u32 NUM_TEXTURE_TYPES = 9;
-
-enum class TextureComponentType : u32 {
-    Float,
-    Sint,
-    Uint,
-};
 
 enum class TexturePixelFormat {
     A8B8G8R8_UNORM,
@@ -183,9 +174,7 @@ struct StorageBufferDescriptor {
 };
 
 struct TextureBufferDescriptor {
-    TextureComponentType component_type{TextureComponentType::Float};
-    u8 component_bit_size{};
-    bool has_secondary{};
+    bool has_secondary;
     u32 cbuf_index;
     u32 cbuf_offset;
     u32 shift_left;
@@ -218,8 +207,6 @@ struct TextureDescriptor {
     bool is_depth;
     bool is_multisample;
     bool has_secondary;
-    TextureComponentType component_type{TextureComponentType::Float};
-    u8 component_bit_size{};
     u32 cbuf_index;
     u32 cbuf_offset;
     u32 shift_left;

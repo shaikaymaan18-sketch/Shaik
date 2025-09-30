@@ -191,19 +191,10 @@ inline void PushImageDescriptors(TextureCache& texture_cache,
             ImageView& image_view{texture_cache.GetImageView(image_view_id)};
             const VkImageView vk_image_view{image_view.Handle(desc.type)};
             const Sampler& sampler{texture_cache.GetSampler(sampler_id)};
-            const bool needs_linear_fallback = sampler.RequiresLinearFiltering() &&
-                                                !image_view.SupportsLinearFiltering();
-            const bool needs_aniso_fallback = sampler.HasAddedAnisotropy() &&
-                                              !image_view.SupportsAnisotropy();
-            if (!image_view.SupportsLinearFiltering()) {
-                ASSERT_MSG(!sampler.RequiresLinearFiltering() || needs_linear_fallback,
-                           "Linear filtering sampler bound to unsupported image view");
-            }
-            // Prefer degrading to nearest sampling when the view lacks linear support.
-            const VkSampler vk_sampler = needs_linear_fallback
-                                             ? sampler.HandleWithoutLinearFiltering()
-                                             : (needs_aniso_fallback ? sampler.HandleWithDefaultAnisotropy()
-                                                                     : sampler.Handle());
+            const bool use_fallback_sampler{sampler.HasAddedAnisotropy() &&
+                                            !image_view.SupportsAnisotropy()};
+            const VkSampler vk_sampler{use_fallback_sampler ? sampler.HandleWithDefaultAnisotropy()
+                                                            : sampler.Handle()};
             guest_descriptor_queue.AddSampledImage(vk_image_view, vk_sampler);
             rescaling.PushTexture(texture_cache.IsRescaling(image_view));
         }

@@ -14,10 +14,6 @@
 
 namespace Shader::Optimization {
 namespace {
-constexpr bool IsOneDimensional(TextureType type) {
-    return type == TextureType::Color1D || type == TextureType::ColorArray1D;
-}
-
 void AddConstantBufferDescriptor(Info& info, u32 index, u32 count) {
     if (count != 1) {
         throw NotImplementedException("Constant buffer descriptor indexing");
@@ -552,7 +548,7 @@ void VisitUsages(Info& info, IR::Inst& inst) {
     case IR::Opcode::ImageQueryDimensions:
     case IR::Opcode::ImageGradient: {
         const TextureType type{inst.Flags<IR::TextureInstInfo>().type};
-        info.uses_sampled_1d |= IsOneDimensional(type);
+        info.uses_sampled_1d |= type == TextureType::Color1D || type == TextureType::ColorArray1D;
         info.uses_sparse_residency |=
             inst.GetAssociatedPseudoOperation(IR::Opcode::GetSparseFromOp) != nullptr;
         break;
@@ -564,7 +560,7 @@ void VisitUsages(Info& info, IR::Inst& inst) {
     case IR::Opcode::ImageQueryLod: {
         const auto flags{inst.Flags<IR::TextureInstInfo>()};
         const TextureType type{flags.type};
-        info.uses_sampled_1d |= IsOneDimensional(type);
+        info.uses_sampled_1d |= type == TextureType::Color1D || type == TextureType::ColorArray1D;
         info.uses_shadow_lod |= flags.is_depth != 0;
         info.uses_sparse_residency |=
             inst.GetAssociatedPseudoOperation(IR::Opcode::GetSparseFromOp) != nullptr;
@@ -573,7 +569,6 @@ void VisitUsages(Info& info, IR::Inst& inst) {
     case IR::Opcode::ImageRead: {
         const auto flags{inst.Flags<IR::TextureInstInfo>()};
         info.uses_typeless_image_reads |= flags.image_format == ImageFormat::Typeless;
-        info.uses_image_1d |= IsOneDimensional(flags.type);
         info.uses_sparse_residency |=
             inst.GetAssociatedPseudoOperation(IR::Opcode::GetSparseFromOp) != nullptr;
         break;
@@ -581,7 +576,6 @@ void VisitUsages(Info& info, IR::Inst& inst) {
     case IR::Opcode::ImageWrite: {
         const auto flags{inst.Flags<IR::TextureInstInfo>()};
         info.uses_typeless_image_writes |= flags.image_format == ImageFormat::Typeless;
-        info.uses_image_1d |= IsOneDimensional(flags.type);
         info.uses_image_buffers |= flags.type == TextureType::Buffer;
         break;
     }
@@ -767,12 +761,9 @@ void VisitUsages(Info& info, IR::Inst& inst) {
     case IR::Opcode::ImageAtomicAnd32:
     case IR::Opcode::ImageAtomicOr32:
     case IR::Opcode::ImageAtomicXor32:
-    case IR::Opcode::ImageAtomicExchange32: {
-        const auto flags{inst.Flags<IR::TextureInstInfo>()};
+    case IR::Opcode::ImageAtomicExchange32:
         info.uses_atomic_image_u32 = true;
-        info.uses_image_1d |= IsOneDimensional(flags.type);
         break;
-    }
     default:
         break;
     }

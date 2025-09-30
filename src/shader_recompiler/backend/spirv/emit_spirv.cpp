@@ -409,7 +409,7 @@ void SetupTransformFeedbackCapabilities(EmitContext& ctx, Id main_func) {
 }
 
 void SetupCapabilities(const Profile& profile, const Info& info, EmitContext& ctx) {
-    if (info.uses_sampled_1d || info.uses_image_1d) {
+    if (info.uses_sampled_1d) {
         ctx.AddCapability(spv::Capability::Sampled1D);
     }
     if (info.uses_sparse_residency) {
