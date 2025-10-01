@@ -155,14 +155,6 @@
         "git_version": "3.2.24",
         "bundled": true
     },
-    "sdl3_steamdeck": {
-        "package": "SDL3",
-        "repo": "libsdl-org/SDL",
-        "sha": "cc016b0046",
-        "hash": "34d5ef58da6a4f9efa6689c82f67badcbd741f5a4f562a9c2c30828fa839830fb07681c5dc6a7851520e261c8405a416ac0a2c2513b51984fb3b4fa4dcb3e20b",
-        "key": "steamdeck",
-        "bundled": true
-    },
     "sdl3-ci": {
         "ci": true,
         "package": "SDL3",
