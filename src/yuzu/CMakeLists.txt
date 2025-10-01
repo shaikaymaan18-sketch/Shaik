@@ -433,9 +433,9 @@ if (YUZU_USE_BUNDLED_QT)
     copy_yuzu_Qt6_deps(yuzu)
 endif()
 
-if (ENABLE_SDL2)
-    target_link_libraries(yuzu PRIVATE SDL2::SDL2)
-    target_compile_definitions(yuzu PRIVATE HAVE_SDL2)
+if (ENABLE_SDL3)
+    target_link_libraries(yuzu PRIVATE SDL3::SDL3)
+    target_compile_definitions(yuzu PRIVATE HAVE_SDL3)
 endif()
 
 if (MSVC)

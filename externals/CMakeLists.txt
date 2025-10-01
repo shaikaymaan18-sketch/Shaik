@@ -109,10 +109,10 @@ if(ENABLE_CUBEB)
     endif()
 endif()
 
-# find SDL2 exports a bunch of variables that are needed, so its easier to do this outside of the YUZU_find_package
-if (ENABLE_SDL2)
-    if (YUZU_USE_EXTERNAL_SDL2)
-        message(STATUS "Using SDL2 from externals.")
+# find SDL3 exports a bunch of variables that are needed, so its easier to do this outside of the YUZU_find_package
+if (ENABLE_SDL3)
+    if (YUZU_USE_EXTERNAL_SDL3)
+        message(STATUS "Using SDL3 from externals.")
         if (NOT WIN32)
             # Yuzu itself needs: Atomic Audio Events Joystick Haptic Sensor Threads Timers
             # Since 2.0.18 Atomic+Threads required for HIDAPI/libusb (see https://github.com/libsdl-org/SDL/issues/5095)
@@ -135,16 +135,16 @@ if (ENABLE_SDL2)
 
         if ("${YUZU_SYSTEM_PROFILE}" STREQUAL "steamdeck")
             set(SDL_PIPEWIRE OFF) # build errors out with this on
-            AddJsonPackage("sdl2_steamdeck")
+            AddJsonPackage("sdl3_steamdeck")
         else()
-            AddJsonPackage("sdl2_generic")
+            AddJsonPackage("sdl3_generic")
         endif()
-    elseif (YUZU_USE_BUNDLED_SDL2)
-        message(STATUS "Using bundled SDL2")
-        AddJsonPackage(sdl2)
+    elseif (YUZU_USE_BUNDLED_SDL3)
+        message(STATUS "Using bundled SDL3")
+        AddJsonPackage(sdl3)
     endif()
 
-    find_package(SDL2 2.26.4 REQUIRED)
+    find_package(SDL3 3.2.22 REQUIRED)
 endif()
 
 # SPIRV Headers

@@ -16,7 +16,7 @@
 #ifdef HAVE_CUBEB
 #include "audio_core/sink/cubeb_sink.h"
 #endif
-#ifdef HAVE_SDL2
+#ifdef HAVE_SDL3
 #include "audio_core/sink/sdl2_sink.h"
 #endif
 #include "audio_core/sink/null_sink.h"
@@ -71,7 +71,7 @@ constexpr SinkDetails sink_details[] = {
         &GetCubebLatency,
     },
 #endif
-#ifdef HAVE_SDL2
+#ifdef HAVE_SDL3
     SinkDetails{
         Settings::AudioEngine::Sdl2,
         [](std::string_view device_id) -> std::unique_ptr<Sink> {
@@ -115,7 +115,7 @@ const SinkDetails& GetOutputSinkDetails(Settings::AudioEngine sink_id) {
         // BEGIN REINTRODUCED FROM 3833 - REPLACED CODE BLOCK ABOVE - DIABLO 3 FIX
         // Auto-select a backend. Prefer CubeB, but it may report a large minimum latency which
         // causes audio issues, in that case go with SDL.
-#if defined(HAVE_CUBEB) && defined(HAVE_SDL2)
+#if defined(HAVE_CUBEB) && defined(HAVE_SDL3)
         iter = find_backend(Settings::AudioEngine::Cubeb);
         if (iter->latency() > TargetSampleCount * 3) {
             iter = find_backend(Settings::AudioEngine::Sdl2);

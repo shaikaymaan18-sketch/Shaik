@@ -40,12 +40,12 @@ Notes:
   * Unavailable on OpenBSD
 
 The following options are desktop only:
-- `ENABLE_SDL2` (ON) Enable the SDL2 desktop, audio, and input frontend (HIGHLY RECOMMENDED!)
+- `ENABLE_SDL3` (ON) Enable the SDL2 desktop, audio, and input frontend (HIGHLY RECOMMENDED!)
   * Unavailable on Android
 - `YUZU_USE_EXTERNAL_SDL2` (ON for non-UNIX) Compiles SDL2 from source
 - `YUZU_USE_BUNDLED_SDL2` (ON for MSVC) Download a prebuilt SDL2
   * Unavailable on OpenBSD
-  * Only enabled if YUZU_USE_CPM and ENABLE_SDL2 are both ON
+  * Only enabled if YUZU_USE_CPM and ENABLE_SDL3 are both ON
 - `ENABLE_LIBUSB` (ON) Enable the use of the libusb input frontend (HIGHLY RECOMMENDED)
 - `ENABLE_OPENGL` (ON) Enable the OpenGL graphics frontend
   * Unavailable on Windows/ARM64 and Android

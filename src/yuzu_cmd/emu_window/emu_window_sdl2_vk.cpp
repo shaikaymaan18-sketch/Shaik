@@ -12,7 +12,7 @@
 #include "video_core/renderer_vulkan/renderer_vulkan.h"
 #include "yuzu_cmd/emu_window/emu_window_sdl2_vk.h"
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #include <SDL_syswm.h>
 
 EmuWindow_SDL2_VK::EmuWindow_SDL2_VK(InputCommon::InputSubsystem* input_subsystem_,

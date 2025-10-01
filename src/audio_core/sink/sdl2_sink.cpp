@@ -7,7 +7,7 @@
 #include <span>
 #include <vector>
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include "audio_core/common/common.h"
 #include "audio_core/sink/sdl2_sink.h"

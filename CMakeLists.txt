@@ -147,14 +147,14 @@ if (PLATFORM_FREEBSD)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L/usr/local/lib")
 endif()
 
-# Set bundled sdl2/qt as dependent options.
-# On Linux system SDL2 is likely to be lacking HIDAPI support which have drawbacks but is needed for SDL motion
-cmake_dependent_option(ENABLE_SDL2 "Enable the SDL2 frontend" ON "NOT ANDROID" OFF)
+# Set bundled sdl3/qt as dependent options.
+# On Linux system SDL3 is likely to be lacking HIDAPI support which have drawbacks but is needed for SDL motion
+cmake_dependent_option(ENABLE_SDL3 "Enable the SDL3 frontend" ON "NOT ANDROID" OFF)
 
-if (ENABLE_SDL2)
+if (ENABLE_SDL3)
     # TODO(crueter): Cleanup, each dep that has a bundled option should allow to choose between bundled, external, system
-    cmake_dependent_option(YUZU_USE_EXTERNAL_SDL2 "Compile external SDL2" OFF "NOT MSVC" OFF)
-    option(YUZU_USE_BUNDLED_SDL2 "Download bundled SDL2 build" "${MSVC}")
+    cmake_dependent_option(YUZU_USE_EXTERNAL_SDL3 "Compile external SDL3" OFF "NOT MSVC" OFF)
+    option(YUZU_USE_BUNDLED_SDL3 "Download bundled SDL3 build" "${MSVC}")
 endif()
 
 # qt stuff
@@ -232,7 +232,7 @@ option(YUZU_LEGACY "Apply patches that improve compatibility with older GPUs (e.
 cmake_dependent_option(YUZU_ROOM "Enable dedicated room functionality" ON "NOT ANDROID" OFF)
 cmake_dependent_option(YUZU_ROOM_STANDALONE "Enable standalone room executable" ON "YUZU_ROOM" OFF)
 
-cmake_dependent_option(YUZU_CMD "Compile the eden-cli executable" ON "ENABLE_SDL2;NOT ANDROID" OFF)
+cmake_dependent_option(YUZU_CMD "Compile the eden-cli executable" ON "ENABLE_SDL3;NOT ANDROID" OFF)
 
 cmake_dependent_option(YUZU_CRASH_DUMPS "Compile crash dump (Minidump) support" OFF "WIN32 OR LINUX" OFF)
 

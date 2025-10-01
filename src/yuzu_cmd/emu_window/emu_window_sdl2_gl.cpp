@@ -9,7 +9,7 @@
 #include <string>
 
 #define SDL_MAIN_HANDLED
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include <fmt/ranges.h>
 #include <glad/glad.h>

@@ -147,16 +147,30 @@
             "BUNDLE_SPEEX ON"
         ]
     },
-    "sdl2": {
+    "sdl3": {
+        "package": "SDL3",
+        "repo": "libsdl-org/SDL",
+        "tag": "release-%VERSION%",
+        "hash": "93766ed1f2be0af75e82c05fcb1dc0aac29ded4d0ae9a98137edfc6a4ab85412ea51199d0469254e7e5751fb37d78daff8bc0cbbc20650972f182d976c6bcc61",
+        "git_version": "3.2.24",
+        "bundled": true
+    },
+    "sdl3_steamdeck": {
+        "package": "SDL3",
+        "repo": "libsdl-org/SDL",
+        "sha": "cc016b0046",
+        "hash": "34d5ef58da6a4f9efa6689c82f67badcbd741f5a4f562a9c2c30828fa839830fb07681c5dc6a7851520e261c8405a416ac0a2c2513b51984fb3b4fa4dcb3e20b",
+        "key": "steamdeck",
+        "bundled": true
+    },
+    "sdl3-ci": {
         "ci": true,
-        "package": "SDL2",
-        "name": "SDL2",
-        "repo": "crueter-ci/SDL2",
-        "version": "2.32.10",
-        "min_version": "2.26.4",
-        "disabled_platforms": [
-            "macos-universal"
-        ]
+        "package": "SDL3",
+        "name": "SDL3",
+        "repo": "libsdl-org/SDL3",
+        "version": "3.2.22",
+        "min_version": "3.2.12",
+        "cmake_filename": "sdl3"
     },
     "catch2": {
         "package": "Catch2",
@@ -180,24 +194,5 @@
         "hash": "6c198636816a0018adbf7f735d402c64245c6fcd540b7360d4388d46f007f3a520686cdaec4705cb8cb31401b2cb4797a80b42ea5d08a6a5807c0848386f7ca1",
         "find_args": "MODULE",
         "git_version": "4.22"
-    },
-    "sdl2_generic": {
-        "package": "SDL2",
-        "repo": "libsdl-org/SDL",
-        "tag": "release-%VERSION%",
-        "hash": "d5622d6bb7266f7942a7b8ad43e8a22524893bf0c2ea1af91204838d9b78d32768843f6faa248757427b8404b8c6443776d4afa6b672cd8571a4e0c03a829383",
-        "key": "generic",
-        "bundled": true,
-        "git_version": "2.32.10",
-        "skip_updates": true
-    },
-    "sdl2_steamdeck": {
-        "package": "SDL2",
-        "repo": "libsdl-org/SDL",
-        "sha": "cc016b0046",
-        "hash": "34d5ef58da6a4f9efa6689c82f67badcbd741f5a4f562a9c2c30828fa839830fb07681c5dc6a7851520e261c8405a416ac0a2c2513b51984fb3b4fa4dcb3e20b",
-        "key": "steamdeck",
-        "bundled": true,
-        "skip_updates": "true"
     }
 }

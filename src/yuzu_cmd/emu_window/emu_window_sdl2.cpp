@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: 2016 Citra Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include "common/logging/log.h"
 #include "common/scm_rev.h"

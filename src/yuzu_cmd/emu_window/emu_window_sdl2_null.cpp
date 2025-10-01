@@ -18,7 +18,7 @@
 #include <SDL_config.h>
 #endif
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 EmuWindow_SDL2_Null::EmuWindow_SDL2_Null(InputCommon::InputSubsystem* input_subsystem_,
                                          Core::System& system_, bool fullscreen)
