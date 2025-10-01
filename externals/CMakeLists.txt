@@ -133,18 +133,13 @@ if (ENABLE_SDL3)
             set(SDL_FILE ON)
         endif()
 
-        if ("${YUZU_SYSTEM_PROFILE}" STREQUAL "steamdeck")
-            set(SDL_PIPEWIRE OFF) # build errors out with this on
-            AddJsonPackage("sdl3_steamdeck")
-        else()
-            AddJsonPackage("sdl3_generic")
-        endif()
+        AddJsonPackage(sdl3)
     elseif (YUZU_USE_BUNDLED_SDL3)
         message(STATUS "Using bundled SDL3")
-        AddJsonPackage(sdl3)
+        AddJsonPackage(sdl3-ci)
     endif()
 
-    find_package(SDL3 3.2.22 REQUIRED)
+    find_package(SDL3 3.2.12 REQUIRED)
 endif()
 
 # SPIRV Headers
