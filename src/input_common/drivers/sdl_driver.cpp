@@ -8,7 +8,6 @@
 #include "common/param_package.h"
 #include "common/settings.h"
 #include "common/thread.h"
-// #include "common/vector_math.h" // Not used directly
 #include "input_common/drivers/sdl_driver.h"
 
 namespace InputCommon {
