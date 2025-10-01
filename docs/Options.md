@@ -40,10 +40,10 @@ Notes:
   * Unavailable on OpenBSD
 
 The following options are desktop only:
-- `ENABLE_SDL3` (ON) Enable the SDL2 desktop, audio, and input frontend (HIGHLY RECOMMENDED!)
+- `ENABLE_SDL3` (ON) Enable the SDL3 desktop, audio, and input frontend (HIGHLY RECOMMENDED!)
   * Unavailable on Android
-- `YUZU_USE_EXTERNAL_SDL2` (ON for non-UNIX) Compiles SDL2 from source
-- `YUZU_USE_BUNDLED_SDL2` (ON for MSVC) Download a prebuilt SDL2
+- `YUZU_USE_EXTERNAL_SDL3` (ON for non-UNIX) Compiles SDL3 from source
+- `YUZU_USE_BUNDLED_SDL3` (ON for MSVC) Download a prebuilt SDL3
   * Unavailable on OpenBSD
   * Only enabled if YUZU_USE_CPM and ENABLE_SDL3 are both ON
 - `ENABLE_LIBUSB` (ON) Enable the use of the libusb input frontend (HIGHLY RECOMMENDED)
@@ -62,7 +62,7 @@ The following options are desktop only:
 - `YUZU_ROOM` (ON) Enable dedicated room functionality
 - `YUZU_ROOM_STANDALONE` (ON) Enable standalone room executable (eden-room)
   * Requires `YUZU_ROOM`
-- `YUZU_CMD` (ON) Compile the SDL2 frontend (eden-cli) - requires SDL2
+- `YUZU_CMD` (ON) Compile the SDL3 frontend (eden-cli) - requires SDL3
 - `YUZU_CRASH_DUMPS` Compile crash dump (Minidump) support"
   * Currently only available on Windows and Linux
 

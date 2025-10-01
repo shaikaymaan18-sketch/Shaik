@@ -32,7 +32,7 @@ If you are on Windows and NOT building with MSYS2, you may go [back home](Build.
 The following are handled by Eden's externals:
 
 * [FFmpeg](https://ffmpeg.org/) (should use `-DYUZU_USE_EXTERNAL_FFMPEG=ON`)
-* [SDL2](https://www.libsdl.org/download-2.0.php) 2.0.18+ (should use `-DYUZU_USE_EXTERNAL_SDL2=ON` OR `-DYUZU_USE_BUNDLED_SDL2=ON` to reduce compile time)
+* [SDL3](https://github.com/libsdl-org/SDL/releases) 2.0.18+ (should use `-DYUZU_USE_EXTERNAL_SDL3=ON` OR `-DYUZU_USE_BUNDLED_SDL3=ON` to reduce compile time)
 
 All other dependencies will be downloaded and built by [CPM](https://github.com/cpm-cmake/CPM.cmake/) if `YUZU_USE_CPM` is on, but will always use system dependencies if available (UNIX-like only):
 
@@ -117,7 +117,7 @@ sudo dnf install autoconf ccache cmake fmt-devel gcc{,-c++} glslang hidapi-devel
 ```
 
 * Force system libraries via CMake arguments:
-  * SDL2: `-DYUZU_USE_BUNDLED_SDL2=OFF -DYUZU_USE_EXTERNAL_SDL2=OFF`
+  * SDL3: `-DYUZU_USE_BUNDLED_SDL3=OFF -DYUZU_USE_EXTERNAL_SDL3=OFF`
   * FFmpeg: `-DYUZU_USE_EXTERNAL_FFMPEG=OFF`
 * [RPM Fusion](https://rpmfusion.org/) is required for `ffmpeg-devel`
 * Fedora 32 or later is required.
@@ -203,7 +203,7 @@ Then install the libraries: `sudo pkg install qt6 boost glslang libzip library/l
 
 * Open the `MSYS2 MinGW 64-bit` shell (`mingw64.exe`)
 * Download and install all dependencies using:
-  * `pacman -Syu git make mingw-w64-x86_64-SDL2 mingw-w64-x86_64-cmake mingw-w64-x86_64-python-pip mingw-w64-x86_64-qt6 mingw-w64-x86_64-toolchain autoconf libtool automake-wrapper`
+  * `pacman -Syu git make mingw-w64-x86_64-SDL3 mingw-w64-x86_64-cmake mingw-w64-x86_64-python-pip mingw-w64-x86_64-qt6 mingw-w64-x86_64-toolchain autoconf libtool automake-wrapper`
 * Add MinGW binaries to the PATH:
   * `echo 'PATH=/mingw64/bin:$PATH' >> ~/.bashrc`
 * Add VulkanSDK to the PATH:

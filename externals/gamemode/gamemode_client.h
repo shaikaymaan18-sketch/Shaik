@@ -89,7 +89,7 @@ static char internal_gamemode_client_error_string[512] = { 0 };
 /**
  * Load libgamemode dynamically to dislodge us from most dependencies.
  * This allows clients to link and/or use this regardless of runtime.
- * See SDL2 for an example of the reasoning behind this in terms of
+ * See SDL3 for an example of the reasoning behind this in terms of
  * dynamic versioning as well.
  */
 static volatile int internal_libgamemode_loaded = 1;

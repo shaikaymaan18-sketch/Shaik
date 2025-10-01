@@ -38,7 +38,7 @@ export LIBGL_ALWAYS_SOFTWARE=1
 ```
 
 - Modify the generated ffmpeg.make (in build dir) if using multiple threads (base system `make` doesn't use `-j4`, so change for `gmake`).
-- If using OpenIndiana, due to a bug in SDL2's CMake configuration, audio driver defaults to SunOS `<sys/audioio.h>`, which does not exist on OpenIndiana. Using external or bundled SDL2 may solve this.
+- If using OpenIndiana, due to a bug in SDL3's CMake configuration, audio driver defaults to SunOS `<sys/audioio.h>`, which does not exist on OpenIndiana. Using external or bundled SDL3 may solve this.
 - System OpenSSL generally does not work. Instead, use `-DYUZU_USE_BUNDLED_OPENSSL=ON` to use a bundled static OpenSSL, or build a system dependency from source.
 
 ## OpenBSD
