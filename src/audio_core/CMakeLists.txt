@@ -249,8 +249,8 @@ endif()
 
 if (ENABLE_SDL3)
     target_sources(audio_core PRIVATE
-        sink/sdl2_sink.cpp
-        sink/sdl2_sink.h
+        sink/sdl3_sink.cpp
+        sink/sdl3_sink.h
     )
 
     target_link_libraries(audio_core PRIVATE SDL3::SDL3)

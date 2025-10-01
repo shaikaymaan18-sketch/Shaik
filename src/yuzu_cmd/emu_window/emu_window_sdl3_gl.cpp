@@ -18,7 +18,7 @@
 #include "core/core.h"
 #include "input_common/main.h"
 #include "video_core/renderer_base.h"
-#include "yuzu_cmd/emu_window/emu_window_sdl2_gl.h"
+#include "yuzu_cmd/emu_window/emu_window_sdl3_gl.h"
 
 class SDLGLContext : public Core::Frontend::GraphicsContext {
 public:

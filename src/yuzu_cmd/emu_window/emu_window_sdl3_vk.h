@@ -6,7 +6,7 @@
 #include <memory>
 
 #include "core/frontend/emu_window.h"
-#include "yuzu_cmd/emu_window/emu_window_sdl2.h"
+#include "yuzu_cmd/emu_window/emu_window_sdl3.h"
 
 namespace Core {
 class System;

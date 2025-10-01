@@ -11,7 +11,7 @@
 #include <SDL3/SDL.h>
 
 #include "audio_core/common/common.h"
-#include "audio_core/sink/sdl2_sink.h"
+#include "audio_core/sink/sdl3_sink.h"
 #include "audio_core/sink/sink_stream.h"
 #include "common/logging/log.h"
 #include "core/core.h"

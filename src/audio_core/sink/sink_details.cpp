@@ -17,7 +17,7 @@
 #include "audio_core/sink/cubeb_sink.h"
 #endif
 #ifdef HAVE_SDL3
-#include "audio_core/sink/sdl2_sink.h"
+#include "audio_core/sink/sdl3_sink.h"
 #endif
 #include "audio_core/sink/null_sink.h"
 #include "common/logging/log.h"
@@ -73,7 +73,7 @@ constexpr SinkDetails sink_details[] = {
 #endif
 #ifdef HAVE_SDL3
     SinkDetails{
-        Settings::AudioEngine::Sdl2,
+        Settings::AudioEngine::Sdl3,
         [](std::string_view device_id) -> std::unique_ptr<Sink> {
             return std::make_unique<SDLSink>(device_id);
         },
@@ -118,7 +118,7 @@ const SinkDetails& GetOutputSinkDetails(Settings::AudioEngine sink_id) {
 #if defined(HAVE_CUBEB) && defined(HAVE_SDL3)
         iter = find_backend(Settings::AudioEngine::Cubeb);
         if (iter->latency() > TargetSampleCount * 3) {
-            iter = find_backend(Settings::AudioEngine::Sdl2);
+            iter = find_backend(Settings::AudioEngine::Sdl3);
         }
 #else
         iter = std::begin(sink_details);

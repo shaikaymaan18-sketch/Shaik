@@ -10,7 +10,7 @@
 #include "common/logging/log.h"
 #include "common/scm_rev.h"
 #include "video_core/renderer_null/renderer_null.h"
-#include "yuzu_cmd/emu_window/emu_window_sdl2_null.h"
+#include "yuzu_cmd/emu_window/emu_window_sdl3_null.h"
 
 #ifdef YUZU_USE_EXTERNAL_SDL3
 // Include this before SDL.h to prevent the external from including a dummy

@@ -9,7 +9,7 @@
 
 #include "common/logging/log.h"
 #include "common/scm_rev.h"
-#include "yuzu_cmd/emu_window/emu_window_sdl2_vk.h"
+#include "yuzu_cmd/emu_window/emu_window_sdl3_vk.h"
 
 #include <SDL3/SDL.h>
 

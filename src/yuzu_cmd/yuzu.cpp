@@ -34,10 +34,10 @@
 #include "network/network.h"
 #include "sdl_config.h"
 #include "video_core/renderer_base.h"
-#include "yuzu_cmd/emu_window/emu_window_sdl2.h"
-#include "yuzu_cmd/emu_window/emu_window_sdl2_gl.h"
-#include "yuzu_cmd/emu_window/emu_window_sdl2_null.h"
-#include "yuzu_cmd/emu_window/emu_window_sdl2_vk.h"
+#include "yuzu_cmd/emu_window/emu_window_sdl3.h"
+#include "yuzu_cmd/emu_window/emu_window_sdl3_gl.h"
+#include "yuzu_cmd/emu_window/emu_window_sdl3_null.h"
+#include "yuzu_cmd/emu_window/emu_window_sdl3_vk.h"
 
 #ifdef _WIN32
 // windows.h needs to be included before shellapi.h
