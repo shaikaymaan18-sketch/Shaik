@@ -30,7 +30,7 @@ public:
 
     ~SDLGLContext() {
         DoneCurrent();
-        SDL_GL_DeleteContext(context);
+        SDL_GL_DestroyContext(context);
     }
 
     void SwapBuffers() override {
@@ -100,7 +100,7 @@ EmuWindow_SDL2_GL::EmuWindow_SDL2_GL(InputCommon::InputSubsystem* input_subsyste
                          SDL_WINDOWPOS_UNDEFINED, // x position
                          SDL_WINDOWPOS_UNDEFINED, // y position
                          Layout::ScreenUndocked::Width, Layout::ScreenUndocked::Height,
-                         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+                         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
 
     if (render_window == nullptr) {
         LOG_CRITICAL(Frontend, "Failed to create SDL2 window! {}", SDL_GetError());
@@ -148,7 +148,7 @@ EmuWindow_SDL2_GL::EmuWindow_SDL2_GL(InputCommon::InputSubsystem* input_subsyste
 
 EmuWindow_SDL2_GL::~EmuWindow_SDL2_GL() {
     core_context.reset();
-    SDL_GL_DeleteContext(window_context);
+    SDL_GL_DestroyContext(window_context);
 }
 
 std::unique_ptr<Core::Frontend::GraphicsContext> EmuWindow_SDL2_GL::CreateSharedContext() const {

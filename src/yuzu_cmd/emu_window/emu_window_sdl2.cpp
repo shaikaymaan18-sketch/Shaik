@@ -21,7 +21,7 @@
 EmuWindow_SDL2::EmuWindow_SDL2(InputCommon::InputSubsystem* input_subsystem_, Core::System& system_)
     : input_subsystem{input_subsystem_}, system{system_} {
     input_subsystem->Initialize();
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD) < 0) {
         LOG_CRITICAL(Frontend, "Failed to initialize SDL2: {}, Exiting...", SDL_GetError());
         exit(1);
     }
@@ -176,50 +176,50 @@ void EmuWindow_SDL2::WaitEvent() {
     switch (event.type) {
     case SDL_WINDOWEVENT:
         switch (event.window.event) {
-        case SDL_WINDOWEVENT_SIZE_CHANGED:
-        case SDL_WINDOWEVENT_RESIZED:
-        case SDL_WINDOWEVENT_MAXIMIZED:
-        case SDL_WINDOWEVENT_RESTORED:
+        case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        case SDL_EVENT_WINDOW_RESIZED:
+        case SDL_EVENT_WINDOW_MAXIMIZED:
+        case SDL_EVENT_WINDOW_RESTORED:
             OnResize();
             break;
-        case SDL_WINDOWEVENT_MINIMIZED:
-        case SDL_WINDOWEVENT_EXPOSED:
-            is_shown = event.window.event == SDL_WINDOWEVENT_EXPOSED;
+        case SDL_EVENT_WINDOW_MINIMIZED:
+        case SDL_EVENT_WINDOW_EXPOSED:
+            is_shown = event.window.event == SDL_EVENT_WINDOW_EXPOSED;
             OnResize();
             break;
-        case SDL_WINDOWEVENT_CLOSE:
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
             is_open = false;
             break;
         }
         break;
-    case SDL_KEYDOWN:
-    case SDL_KEYUP:
+    case SDL_EVENT_KEY_DOWN:
+    case SDL_EVENT_KEY_UP:
         OnKeyEvent(static_cast<int>(event.key.keysym.scancode), event.key.state);
         break;
-    case SDL_MOUSEMOTION:
+    case SDL_EVENT_MOUSE_MOTION:
         // ignore if it came from touch
         if (event.button.which != SDL_TOUCH_MOUSEID)
             OnMouseMotion(event.motion.x, event.motion.y);
         break;
-    case SDL_MOUSEBUTTONDOWN:
-    case SDL_MOUSEBUTTONUP:
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP:
         // ignore if it came from touch
         if (event.button.which != SDL_TOUCH_MOUSEID) {
             OnMouseButton(event.button.button, event.button.state, event.button.x, event.button.y);
         }
         break;
-    case SDL_FINGERDOWN:
+    case SDL_EVENT_FINGER_DOWN:
         OnFingerDown(event.tfinger.x, event.tfinger.y,
                      static_cast<std::size_t>(event.tfinger.touchId));
         break;
-    case SDL_FINGERMOTION:
+    case SDL_EVENT_FINGER_MOTION:
         OnFingerMotion(event.tfinger.x, event.tfinger.y,
                        static_cast<std::size_t>(event.tfinger.touchId));
         break;
-    case SDL_FINGERUP:
+    case SDL_EVENT_FINGER_UP:
         OnFingerUp();
         break;
-    case SDL_QUIT:
+    case SDL_EVENT_QUIT:
         is_open = false;
         break;
     default:
@@ -242,19 +242,19 @@ void EmuWindow_SDL2::WaitEvent() {
 
 // Credits to Samantas5855 and others for this function.
 void EmuWindow_SDL2::SetWindowIcon() {
-    SDL_RWops* const yuzu_icon_stream = SDL_RWFromConstMem((void*)yuzu_icon, yuzu_icon_size);
+    SDL_IOStream* const yuzu_icon_stream = SDL_IOFromConstMem((void*)yuzu_icon, yuzu_icon_size);
     if (yuzu_icon_stream == nullptr) {
         LOG_WARNING(Frontend, "Failed to create Eden icon stream.");
         return;
     }
-    SDL_Surface* const window_icon = SDL_LoadBMP_RW(yuzu_icon_stream, 1);
+    SDL_Surface* const window_icon = SDL_LoadBMP_IO(yuzu_icon_stream, 1);
     if (window_icon == nullptr) {
         LOG_WARNING(Frontend, "Failed to read BMP from stream.");
         return;
     }
     // The icon is attached to the window pointer
     SDL_SetWindowIcon(render_window, window_icon);
-    SDL_FreeSurface(window_icon);
+    SDL_DestroySurface(window_icon);
 }
 
 void EmuWindow_SDL2::OnMinimalClientAreaChangeRequest(std::pair<u32, u32> minimal_size) {

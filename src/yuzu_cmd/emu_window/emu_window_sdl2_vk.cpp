@@ -25,11 +25,11 @@ EmuWindow_SDL2_VK::EmuWindow_SDL2_VK(InputCommon::InputSubsystem* input_subsyste
     render_window =
         SDL_CreateWindow(window_title.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                          Layout::ScreenUndocked::Width, Layout::ScreenUndocked::Height,
-                         SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+                         SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
 
     SDL_SysWMinfo wm;
     SDL_VERSION(&wm.version);
-    if (SDL_GetWindowWMInfo(render_window, &wm) == SDL_FALSE) {
+    if (SDL_GetWindowWMInfo(render_window, &wm) == false) {
         LOG_CRITICAL(Frontend, "Failed to get information from the window manager: {}",
                      SDL_GetError());
         std::exit(EXIT_FAILURE);

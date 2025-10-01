@@ -42,7 +42,7 @@ public:
         SDL_AudioSpec spec;
         spec.freq = TargetSampleRate;
         spec.channels = static_cast<u8>(device_channels);
-        spec.format = AUDIO_S16SYS;
+        spec.format = SDL_AUDIO_S16;
         spec.samples = TargetSampleCount * 2;
         spec.callback = &SDLSinkStream::DataCallback;
         spec.userdata = this;
@@ -260,7 +260,7 @@ bool IsSDLSuitable() {
     SDL_AudioSpec spec;
     spec.freq = TargetSampleRate;
     spec.channels = 2u;
-    spec.format = AUDIO_S16SYS;
+    spec.format = SDL_AUDIO_S16;
     spec.samples = TargetSampleCount * 2;
     spec.callback = nullptr;
     spec.userdata = nullptr;

@@ -15,7 +15,7 @@
 #include "input_common/input_engine.h"
 
 union SDL_Event;
-using SDL_GameController = struct _SDL_GameController;
+using SDL_Gamepad = struct _SDL_GameController;
 using SDL_Joystick = struct _SDL_Joystick;
 using SDL_JoystickID = s32;
 
@@ -24,9 +24,9 @@ namespace InputCommon {
 class SDLJoystick;
 
 using ButtonBindings =
-    std::array<std::pair<Settings::NativeButton::Values, SDL_GameControllerButton>, 20>;
+    std::array<std::pair<Settings::NativeButton::Values, SDL_GamepadButton>, 20>;
 using ZButtonBindings =
-    std::array<std::pair<Settings::NativeButton::Values, SDL_GameControllerAxis>, 2>;
+    std::array<std::pair<Settings::NativeButton::Values, SDL_GamepadAxis>, 2>;
 
 class SDLDriver : public InputEngine {
 public:
