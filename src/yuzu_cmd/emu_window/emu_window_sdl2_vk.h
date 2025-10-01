@@ -16,11 +16,11 @@ namespace InputCommon {
 class InputSubsystem;
 }
 
-class EmuWindow_SDL2_VK final : public EmuWindow_SDL2 {
+class EmuWindow_SDL3_VK final : public EmuWindow_SDL3 {
 public:
-    explicit EmuWindow_SDL2_VK(InputCommon::InputSubsystem* input_subsystem_, Core::System& system,
+    explicit EmuWindow_SDL3_VK(InputCommon::InputSubsystem* input_subsystem_, Core::System& system,
                                bool fullscreen);
-    ~EmuWindow_SDL2_VK() override;
+    ~EmuWindow_SDL3_VK() override;
 
     std::unique_ptr<Core::Frontend::GraphicsContext> CreateSharedContext() const override;
 };

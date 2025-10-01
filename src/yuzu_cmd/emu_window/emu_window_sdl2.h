@@ -22,10 +22,10 @@ class InputSubsystem;
 enum class MouseButton;
 } // namespace InputCommon
 
-class EmuWindow_SDL2 : public Core::Frontend::EmuWindow {
+class EmuWindow_SDL3 : public Core::Frontend::EmuWindow {
 public:
-    explicit EmuWindow_SDL2(InputCommon::InputSubsystem* input_subsystem_, Core::System& system_);
-    ~EmuWindow_SDL2();
+    explicit EmuWindow_SDL3(InputCommon::InputSubsystem* input_subsystem_, Core::System& system_);
+    ~EmuWindow_SDL3();
 
     /// Whether the window is still open, and a close request hasn't yet been sent
     bool IsOpen() const;
@@ -41,7 +41,7 @@ public:
 
 protected:
     /// Called by WaitEvent when a key is pressed or released.
-    void OnKeyEvent(int key, u8 state);
+    void OnKeyEvent(int key, bool pressed);
 
     /// Converts a SDL mouse button into MouseInput mouse button
     InputCommon::MouseButton SDLButtonToMouseButton(u32 button) const;
@@ -53,7 +53,7 @@ protected:
     FloatPairNonHFA MouseToTouchPos(s32 touch_x, s32 touch_y) const;
 
     /// Called by WaitEvent when a mouse button is pressed or released
-    void OnMouseButton(u32 button, u8 state, s32 x, s32 y);
+    void OnMouseButton(u32 button, bool pressed, s32 x, s32 y);
 
     /// Called by WaitEvent when the mouse moves.
     void OnMouseMotion(s32 x, s32 y);
@@ -85,7 +85,7 @@ protected:
     /// Is the window being shown?
     bool is_shown = true;
 
-    /// Internal SDL2 render window
+    /// Internal SDL3 render window
     SDL_Window* render_window{};
 
     /// Keeps track of how often to update the title bar during gameplay
