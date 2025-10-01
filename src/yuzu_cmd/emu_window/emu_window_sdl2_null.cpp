@@ -15,7 +15,7 @@
 #ifdef YUZU_USE_EXTERNAL_SDL2
 // Include this before SDL.h to prevent the external from including a dummy
 #define USING_GENERATED_CONFIG_H
-#include <SDL_config.h>
+#include <SDL3/SDL_config.h>
 #endif
 
 #include <SDL3/SDL.h>

@@ -13,7 +13,7 @@
 #include "yuzu_cmd/emu_window/emu_window_sdl2_vk.h"
 
 #include <SDL3/SDL.h>
-#include <SDL_syswm.h>
+#include <SDL3/SDL_syswm.h>
 
 EmuWindow_SDL2_VK::EmuWindow_SDL2_VK(InputCommon::InputSubsystem* input_subsystem_,
                                      Core::System& system_, bool fullscreen)
