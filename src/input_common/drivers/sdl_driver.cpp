@@ -407,6 +407,27 @@ void SDLDriver::PumpEvents() const {
 
 void SDLDriver::HandleGameControllerEvent(const SDL_Event& event) {
     switch (event.type) {
+    case SDL_EVENT_GAMEPAD_BUTTON_UP: {
+        if (const auto joystick = GetSDLJoystickBySDLID(event.gbutton.which)) {
+            const PadIdentifier identifier = joystick->GetPadIdentifier();
+            SetButton(identifier, event.gbutton.button, false);
+        }
+        break;
+    }
+    case SDL_EVENT_GAMEPAD_BUTTON_DOWN: {
+        if (const auto joystick = GetSDLJoystickBySDLID(event.gbutton.which)) {
+            const PadIdentifier identifier = joystick->GetPadIdentifier();
+            SetButton(identifier, event.gbutton.button, true);
+        }
+        break;
+    }
+    case SDL_EVENT_GAMEPAD_AXIS_MOTION: {
+        if (const auto joystick = GetSDLJoystickBySDLID(event.gaxis.which)) {
+            const PadIdentifier identifier = joystick->GetPadIdentifier();
+            SetAxis(identifier, event.gaxis.axis, event.gaxis.value / 32767.0f);
+        }
+        break;
+    }
     case SDL_EVENT_JOYSTICK_BUTTON_UP: {
         if (const auto joystick = GetSDLJoystickBySDLID(event.jbutton.which)) {
             const PadIdentifier identifier = joystick->GetPadIdentifier();
@@ -451,6 +472,14 @@ void SDLDriver::HandleGameControllerEvent(const SDL_Event& event) {
         }
         break;
     }
+    case SDL_EVENT_GAMEPAD_REMOVED:
+        LOG_DEBUG(Input, "Gamepad removed with Instance_ID {}", event.gdevice.which);
+        CloseJoystick(SDL_GetJoystickFromID(event.gdevice.which));
+        break;
+    case SDL_EVENT_GAMEPAD_ADDED:
+        LOG_DEBUG(Input, "Gamepad connected with device ID {}", event.gdevice.which);
+        InitJoystick(event.gdevice.which);
+        break;
     case SDL_EVENT_JOYSTICK_REMOVED:
         LOG_DEBUG(Input, "Controller removed with Instance_ID {}", event.jdevice.which);
         CloseJoystick(SDL_GetJoystickFromID(event.jdevice.which));
