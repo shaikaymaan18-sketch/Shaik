@@ -6,6 +6,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_mouse.h>
+#include "SDL3/SDL_video.h"
 #include "common/logging/log.h"
 #include "common/scm_rev.h"
 #include "common/settings.h"
@@ -124,14 +125,14 @@ void EmuWindow_SDL3::Fullscreen() {
     case Settings::FullscreenMode::Exclusive:
         // Set window size to render size before entering fullscreen -- SDL3 does not resize window
         // to display dimensions automatically in this mode.
-        display_mode = SDL_GetDesktopDisplayMode(0);
+        display_mode = SDL_GetDesktopDisplayMode(SDL_GetDisplayForWindow(render_window));
         if (display_mode) {
             SDL_SetWindowSize(render_window, display_mode->w, display_mode->h);
         } else {
             LOG_ERROR(Frontend, "SDL_GetDesktopDisplayMode failed: {}", SDL_GetError());
         }
 
-        if (SDL_SetWindowFullscreen(render_window, SDL_WINDOW_FULLSCREEN)) {
+        if (!SDL_SetWindowFullscreen(render_window, SDL_WINDOW_FULLSCREEN)) {
             return;
         }
 
@@ -139,12 +140,13 @@ void EmuWindow_SDL3::Fullscreen() {
         LOG_INFO(Frontend, "Attempting to use borderless fullscreen...");
         [[fallthrough]];
     case Settings::FullscreenMode::Borderless:
-        if (SDL_SetWindowFullscreen(render_window, true)) {
+        SDL_SetWindowFullscreenMode(render_window, NULL);
+        if (!SDL_SetWindowFullscreen(render_window, true)) {
+            LOG_ERROR(Frontend, "Borderless fullscreening failed: {}", SDL_GetError());
+            [[fallthrough]];
+        } else {
             return;
         }
-
-        LOG_ERROR(Frontend, "Borderless fullscreening failed: {}", SDL_GetError());
-        [[fallthrough]];
     default:
         // Fallback algorithm: Maximise window.
         // Works on all systems (unless something is seriously wrong), so no fallback for this one.
@@ -226,12 +228,9 @@ void EmuWindow_SDL3::WaitEvent() {
     const u32 current_time = SDL_GetTicks();
     if (current_time > last_time + 2000) {
         const auto results = system.GetAndResetPerfStats();
-        const auto title = fmt::format("{} | {}-{} | FPS: {:.0f} ({:.0f}%)",
-                                       Common::g_build_fullname,
-                                       Common::g_scm_branch,
-                                       Common::g_scm_desc,
-                                       results.average_game_fps,
-                                       results.emulation_speed * 100.0);
+        const auto title = fmt::format(
+            "{} | {}-{} | FPS: {:.0f} ({:.0f}%)", Common::g_build_fullname, Common::g_scm_branch,
+            Common::g_scm_desc, results.average_game_fps, results.emulation_speed * 100.0);
         SDL_SetWindowTitle(render_window, title.c_str());
         last_time = current_time;
     }
