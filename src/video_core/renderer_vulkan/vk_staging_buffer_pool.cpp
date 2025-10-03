@@ -135,9 +135,10 @@ StagingBufferRef StagingBufferPool::GetStreamBuffer(size_t size) {
         .buffer = *stream_buffer,
         .offset = static_cast<VkDeviceSize>(offset),
         .mapped_span = stream_pointer.subspan(offset, size),
-        .usage{},
-        .log2_level{},
-        .index{},
+        .usage = MemoryUsage::Stream,
+        .log2_level = 0,
+        .index = 0,
+        .owner = &stream_buffer,
     };
 }
 

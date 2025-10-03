@@ -115,6 +115,10 @@ public:
 
     VkFormat GetSupportedFormat(VkFormat requested_format, VkFormatFeatureFlags required_features) const;
 
+    bool SupportsLinearFiltering(PixelFormat format) const;
+    bool ShouldForceNearest(PixelFormat format) const;
+    bool IsUiHudCandidate(const VideoCommon::ImageInfo& info) const;
+
     const Device& device;
     Scheduler& scheduler;
     MemoryAllocator& memory_allocator;
@@ -128,6 +132,9 @@ public:
 
     static constexpr size_t indexing_slots = 8 * sizeof(size_t);
     std::array<vk::Buffer, indexing_slots> buffers{};
+
+    bool supports_b5g6r5_linear_filter = true;
+    bool supports_r5g6b5_linear_filter = true;
 };
 
 class Image : public VideoCommon::ImageBase {
@@ -171,6 +178,18 @@ public:
         return (this->*current_image).UsageFlags();
     }
 
+    [[nodiscard]] bool IsUiHudTexture() const noexcept {
+        return is_ui_hud_texture;
+    }
+
+    [[nodiscard]] VkImageLayout KnownLayout() const noexcept {
+        return known_layout;
+    }
+
+    void SetKnownLayout(VkImageLayout layout) noexcept {
+        known_layout = layout;
+    }
+
     /// Returns true when the image is already initialized and mark it as initialized
     [[nodiscard]] bool ExchangeInitialization() noexcept {
         return std::exchange(initialized, true);
@@ -198,6 +217,9 @@ private:
     // Use a pointer to field because it is relative, so that the object can be
     // moved without breaking the reference.
     vk::Image Image::*current_image{};
+
+    bool is_ui_hud_texture = false;
+    VkImageLayout known_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     std::vector<vk::ImageView> storage_image_views;
     VkImageAspectFlags aspect_mask = 0;
@@ -262,6 +284,20 @@ public:
         return buffer_size;
     }
 
+    [[nodiscard]] bool IsUiHudTexture() const noexcept {
+        return is_ui_hud_texture;
+    }
+
+    [[nodiscard]] bool RequiresNearestSampling() const noexcept {
+        return force_nearest_sampling;
+    }
+
+    [[nodiscard]] VkImageLayout SampleLayout() const noexcept {
+        return sample_layout;
+    }
+
+    void LogUiSamplerDecision(VkSampler sampler, bool force_nearest) const;
+
 private:
     struct StorageViews {
         std::array<vk::ImageView, Shader::NUM_TEXTURE_TYPES> signeds;
@@ -283,6 +319,10 @@ private:
     VkImageView render_target = VK_NULL_HANDLE;
     VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
     u32 buffer_size = 0;
+
+    bool is_ui_hud_texture = false;
+    bool force_nearest_sampling = false;
+    VkImageLayout sample_layout = VK_IMAGE_LAYOUT_GENERAL;
 };
 
 class ImageAlloc : public VideoCommon::ImageAllocBase {};
@@ -303,9 +343,17 @@ public:
         return static_cast<bool>(sampler_default_anisotropy);
     }
 
+    [[nodiscard]] VkSampler HandleUi(bool force_nearest) const noexcept;
+
+    [[nodiscard]] bool HasUiSampler() const noexcept {
+        return static_cast<bool>(sampler_ui_single_mip);
+    }
+
 private:
     vk::Sampler sampler;
     vk::Sampler sampler_default_anisotropy;
+    vk::Sampler sampler_ui_single_mip;
+    vk::Sampler sampler_ui_single_mip_nearest;
 };
 
 class Framebuffer {

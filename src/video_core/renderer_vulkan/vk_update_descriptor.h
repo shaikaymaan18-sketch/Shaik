@@ -47,11 +47,11 @@ public:
         return upload_start;
     }
 
-    void AddSampledImage(VkImageView image_view, VkSampler sampler) {
+    void AddSampledImage(VkImageView image_view, VkSampler sampler, VkImageLayout layout) {
         *(payload_cursor++) = VkDescriptorImageInfo{
             .sampler = sampler,
             .imageView = image_view,
-            .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+            .imageLayout = layout,
         };
     }
 

@@ -23,6 +23,7 @@ struct StagingBufferRef {
     MemoryUsage usage;
     u32 log2_level;
     u64 index;
+    const vk::Buffer* owner = nullptr;
 };
 
 class StagingBufferPool {
@@ -65,6 +66,7 @@ private:
                 .usage = usage,
                 .log2_level = log2_level,
                 .index = index,
+                .owner = &buffer,
             };
         }
     };

@@ -125,6 +125,72 @@ constexpr VkBorderColor ConvertBorderColor(const std::array<float, 4>& color) {
     return usage;
 }
 
+constexpr VkAccessFlags WRITE_ACCESS_FLAGS = VK_ACCESS_SHADER_WRITE_BIT |
+                                             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                                             VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+constexpr VkAccessFlags READ_ACCESS_FLAGS = VK_ACCESS_SHADER_READ_BIT |
+                                            VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                                            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+constexpr VkPipelineStageFlags PRE_UPLOAD_STAGE_MASK =
+    VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+constexpr VkPipelineStageFlags GENERAL_POST_STAGE_MASK = PRE_UPLOAD_STAGE_MASK;
+constexpr VkPipelineStageFlags UI_SHADER_STAGE_MASK =
+    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+
+constexpr u32 UI_HUD_MAX_DIMENSION = 128;
+
+[[nodiscard]] bool IsHudFormat(PixelFormat format) {
+    switch (format) {
+    case PixelFormat::B5G6R5_UNORM:
+    case PixelFormat::R5G6B5_UNORM:
+    case PixelFormat::R8G8_UNORM:
+        return true;
+    default:
+        return false;
+    }
+}
+
+[[nodiscard]] char SwizzleChar(SwizzleSource value) {
+    switch (value) {
+    case SwizzleSource::R:
+        return 'R';
+    case SwizzleSource::G:
+        return 'G';
+    case SwizzleSource::B:
+        return 'B';
+    case SwizzleSource::A:
+        return 'A';
+    case SwizzleSource::Zero:
+        return '0';
+    case SwizzleSource::OneFloat:
+    case SwizzleSource::OneInt:
+        return '1';
+    default:
+        return '?';
+    }
+}
+
+void LogUiSwizzleEvent(GPUVAddr address, PixelFormat format,
+                       const std::array<SwizzleSource, 4>& swizzle) {
+    LOG_DEBUG(Render_Vulkan, "UI hud swizzle addr=0x{:x} fmt={} -> {}{}{}{}", address,
+              static_cast<int>(format), SwizzleChar(swizzle[0]), SwizzleChar(swizzle[1]),
+              SwizzleChar(swizzle[2]), SwizzleChar(swizzle[3]));
+}
+
+void LogUiSamplerEvent(GPUVAddr address, PixelFormat format, bool force_nearest,
+                       VkSampler sampler, VkImageLayout layout) {
+    LOG_DEBUG(Render_Vulkan, "UI hud sampler addr=0x{:x} fmt={} force_nearest={} sampler=0x{:x} "
+                              "layout={}",
+              address, static_cast<int>(format), force_nearest,
+              reinterpret_cast<uintptr_t>(sampler), static_cast<int>(layout));
+}
+
+void LogUiBarrierEvent(GPUVAddr address, PixelFormat format, VkImageLayout final_layout) {
+    LOG_DEBUG(Render_Vulkan, "UI hud barrier addr=0x{:x} fmt={} final_layout={}", address,
+              static_cast<int>(format), static_cast<int>(final_layout));
+}
+
 [[nodiscard]] VkImageCreateInfo MakeImageCreateInfo(const Device& device, const ImageInfo& info) {
     const auto format_info =
         MaxwellToVK::SurfaceFormat(device, FormatType::Optimal, false, info.format);
@@ -532,60 +598,51 @@ struct RangedBarrierRange {
     }
 };
 void CopyBufferToImage(vk::CommandBuffer cmdbuf, VkBuffer src_buffer, VkImage image,
-                       VkImageAspectFlags aspect_mask, bool is_initialized,
-                       std::span<const VkBufferImageCopy> copies) {
-    static constexpr VkAccessFlags WRITE_ACCESS_FLAGS =
-                                           VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-                                           VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    static constexpr VkAccessFlags READ_ACCESS_FLAGS = VK_ACCESS_SHADER_READ_BIT |
-                                                       VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                                                       VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-
-    //  Compute exact mip/layer range being written to
+                       VkImageAspectFlags aspect_mask, VkImageLayout current_layout,
+                       VkImageLayout final_layout,
+                       std::span<const VkBufferImageCopy> copies,
+                       VkPipelineStageFlags dst_stage_mask, VkAccessFlags dst_access_mask) {
+    // Compute exact mip/layer range being written to
     RangedBarrierRange range;
     for (const auto& region : copies) {
         range.AddLayers(region.imageSubresource);
     }
     const VkImageSubresourceRange subresource_range = range.SubresourceRange(aspect_mask);
 
+    const bool has_defined_layout = current_layout != VK_IMAGE_LAYOUT_UNDEFINED;
     const VkImageMemoryBarrier read_barrier{
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .pNext = nullptr,
-            .srcAccessMask = WRITE_ACCESS_FLAGS,
-            .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .oldLayout = is_initialized ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = image,
-            .subresourceRange = subresource_range,
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = has_defined_layout ? WRITE_ACCESS_FLAGS | READ_ACCESS_FLAGS : VK_ACCESS_NONE,
+        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+        .oldLayout = has_defined_layout ? current_layout : VK_IMAGE_LAYOUT_UNDEFINED,
+        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = image,
+        .subresourceRange = subresource_range,
     };
 
     const VkImageMemoryBarrier write_barrier{
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .pNext = nullptr,
-            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = WRITE_ACCESS_FLAGS | READ_ACCESS_FLAGS,
-            .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = image,
-            .subresourceRange = subresource_range,
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+        .dstAccessMask = dst_access_mask,
+        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .newLayout = final_layout,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = image,
+        .subresourceRange = subresource_range,
     };
 
-    cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
-                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-                           read_barrier);
+    const VkPipelineStageFlags src_stage_mask = has_defined_layout ? PRE_UPLOAD_STAGE_MASK
+                                                                   : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+    cmdbuf.PipelineBarrier(src_stage_mask, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, read_barrier);
     cmdbuf.CopyBufferToImage(src_buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, copies);
-    // TODO: Move this to another API
-    cmdbuf.PipelineBarrier(
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            0, nullptr, nullptr, write_barrier);
+    cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, dst_stage_mask, 0, nullptr, nullptr,
+                           write_barrier);
 }
 
 [[nodiscard]] VkImageBlit MakeImageBlit(const Region2D& dst_region, const Region2D& src_region,
@@ -861,6 +918,12 @@ TextureCacheRuntime::TextureCacheRuntime(const Device& device_, Scheduler& sched
         msaa_copy_pass = std::make_unique<MSAACopyPass>(
             device, scheduler, descriptor_pool, staging_buffer_pool, compute_pass_descriptor_queue);
     }
+    supports_b5g6r5_linear_filter = device.IsFormatSupported(
+        VK_FORMAT_B5G6R5_UNORM_PACK16, VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT,
+        FormatType::Optimal);
+    supports_r5g6b5_linear_filter = device.IsFormatSupported(
+        VK_FORMAT_R5G6B5_UNORM_PACK16, VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT,
+        FormatType::Optimal);
     if (!device.IsKhrImageFormatListSupported()) {
         return;
     }
@@ -937,6 +1000,56 @@ VkBuffer TextureCacheRuntime::GetTemporaryBuffer(size_t needed_size) {
     };
     buffers[level] = memory_allocator.CreateBuffer(temp_ci, MemoryUsage::DeviceLocal);
     return *buffers[level];
+}
+
+bool TextureCacheRuntime::SupportsLinearFiltering(PixelFormat format) const {
+    if (!IsHudFormat(format)) {
+        return device.IsFormatSupported(
+            MaxwellToVK::SurfaceFormat(device, FormatType::Optimal, false, format).format,
+            VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT, FormatType::Optimal);
+    }
+    switch (format) {
+    case PixelFormat::B5G6R5_UNORM:
+        return supports_b5g6r5_linear_filter;
+    case PixelFormat::R5G6B5_UNORM:
+        return supports_r5g6b5_linear_filter;
+    default:
+        break;
+    }
+    return true;
+}
+
+bool TextureCacheRuntime::ShouldForceNearest(PixelFormat format) const {
+    switch (format) {
+    case PixelFormat::B5G6R5_UNORM:
+        return !supports_b5g6r5_linear_filter;
+    case PixelFormat::R5G6B5_UNORM:
+        return !supports_r5g6b5_linear_filter;
+    default:
+        return false;
+    }
+}
+
+bool TextureCacheRuntime::IsUiHudCandidate(const ImageInfo& info) const {
+    if (!IsHudFormat(info.format)) {
+        return false;
+    }
+    if (info.resources.levels != 1 || info.size.depth != 1) {
+        return false;
+    }
+    if (info.size.width > UI_HUD_MAX_DIMENSION || info.size.height > UI_HUD_MAX_DIMENSION) {
+        return false;
+    }
+    if (info.type != ImageType::e2D && info.type != ImageType::Linear) {
+        return false;
+    }
+    const auto format_info =
+        MaxwellToVK::SurfaceFormat(device, FormatType::Optimal, false, info.format);
+    const VkImageUsageFlags usage = ImageUsageFlags(format_info, info.format);
+    if ((usage & VK_IMAGE_USAGE_SAMPLED_BIT) == 0) {
+        return false;
+    }
+    return true;
 }
 
 void TextureCacheRuntime::BarrierFeedbackLoop() {
@@ -1545,6 +1658,8 @@ Image::Image(TextureCacheRuntime& runtime_, const ImageInfo& info_, GPUVAddr gpu
                 MakeStorageView(device, level, *original_image, VK_FORMAT_A8B8G8R8_UNORM_PACK32);
         }
     }
+    is_ui_hud_texture = runtime->IsUiHudCandidate(info);
+    known_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 }
 
 Image::Image(const VideoCommon::NullImageParams& params) : VideoCommon::ImageBase{params} {}
@@ -1600,8 +1715,11 @@ void Image::UploadMemory(VkBuffer buffer, VkDeviceSize offset,
 
         scheduler->Record([src_buffer, temp_vk_image, vk_aspect_mask, vk_copies,
                            keep = temp_wrapper](vk::CommandBuffer cmdbuf) {
-            CopyBufferToImage(cmdbuf, src_buffer, temp_vk_image, vk_aspect_mask, false, vk_copies);
+            CopyBufferToImage(cmdbuf, src_buffer, temp_vk_image, vk_aspect_mask,
+                              VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, vk_copies,
+                              GENERAL_POST_STAGE_MASK, WRITE_ACCESS_FLAGS | READ_ACCESS_FLAGS);
         });
+        temp_wrapper->SetKnownLayout(VK_IMAGE_LAYOUT_GENERAL);
 
         // Use MSAACopyPass to convert from non-MSAA to MSAA
         std::vector<VideoCommon::ImageCopy> image_copies;
@@ -1636,11 +1754,25 @@ void Image::UploadMemory(VkBuffer buffer, VkDeviceSize offset,
     const VkImage vk_image = *original_image;
     const VkImageAspectFlags vk_aspect_mask = aspect_mask;
     const bool was_initialized = std::exchange(initialized, true);
+    const VkImageLayout current_layout = was_initialized ? KnownLayout() : VK_IMAGE_LAYOUT_UNDEFINED;
+    const bool use_shader_read_layout = is_ui_hud_texture;
+    const VkImageLayout final_layout = use_shader_read_layout ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                                                              : VK_IMAGE_LAYOUT_GENERAL;
+    const VkPipelineStageFlags dst_stage_mask =
+        use_shader_read_layout ? UI_SHADER_STAGE_MASK : GENERAL_POST_STAGE_MASK;
+    const VkAccessFlags dst_access_mask =
+        use_shader_read_layout ? VK_ACCESS_SHADER_READ_BIT : (WRITE_ACCESS_FLAGS | READ_ACCESS_FLAGS);
 
-    scheduler->Record([src_buffer, vk_image, vk_aspect_mask, was_initialized,
-                       vk_copies](vk::CommandBuffer cmdbuf) {
-        CopyBufferToImage(cmdbuf, src_buffer, vk_image, vk_aspect_mask, was_initialized, vk_copies);
+    scheduler->Record([src_buffer, vk_image, vk_aspect_mask, current_layout, final_layout,
+                       dst_stage_mask, dst_access_mask, vk_copies](vk::CommandBuffer cmdbuf) {
+        CopyBufferToImage(cmdbuf, src_buffer, vk_image, vk_aspect_mask, current_layout, final_layout,
+                          vk_copies, dst_stage_mask, dst_access_mask);
     });
+
+    SetKnownLayout(final_layout);
+    if (use_shader_read_layout) {
+        LogUiBarrierEvent(gpu_addr, info.format, final_layout);
+    }
 
     if (is_rescaled) {
         ScaleUp();
@@ -2017,12 +2149,32 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
         SwizzleSource::B,
         SwizzleSource::A,
     };
+    is_ui_hud_texture = image.IsUiHudTexture() && IsHudFormat(format);
+    force_nearest_sampling = is_ui_hud_texture && runtime.ShouldForceNearest(format);
+    sample_layout = is_ui_hud_texture ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                                      : VK_IMAGE_LAYOUT_GENERAL;
     if (!info.IsRenderTarget()) {
         swizzle = info.Swizzle();
         TryTransformSwizzleIfNeeded(format, swizzle, device->MustEmulateBGR565(),
                                     !device->IsExt4444FormatsSupported());
         if ((aspect_mask & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) != 0) {
             std::ranges::transform(swizzle, swizzle.begin(), ConvertGreenRed);
+        }
+        if (is_ui_hud_texture) {
+            switch (format) {
+            case PixelFormat::B5G6R5_UNORM:
+            case PixelFormat::R5G6B5_UNORM:
+                swizzle = {SwizzleSource::R, SwizzleSource::G, SwizzleSource::B,
+                           SwizzleSource::OneFloat};
+                break;
+            case PixelFormat::R8G8_UNORM:
+                swizzle = {SwizzleSource::R, SwizzleSource::R, SwizzleSource::R,
+                           SwizzleSource::G};
+                break;
+            default:
+                break;
+            }
+            LogUiSwizzleEvent(gpu_addr, format, swizzle);
         }
     }
     const auto format_info = MaxwellToVK::SurfaceFormat(*device, FormatType::Optimal, true, format);
@@ -2096,6 +2248,13 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
                      ImageId image_id_, Image& image, const SlotVector<Image>& slot_imgs)
     : ImageView{runtime, info, image_id_, image} {
     slot_images = &slot_imgs;
+}
+
+void ImageView::LogUiSamplerDecision(VkSampler sampler, bool force_nearest) const {
+    if (!is_ui_hud_texture) {
+        return;
+    }
+    LogUiSamplerEvent(gpu_addr, format, force_nearest, sampler, sample_layout);
 }
 
 ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageInfo& info,
@@ -2235,36 +2394,66 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
     // Some games have samplers with garbage. Sanitize them here.
     const f32 max_anisotropy = std::clamp(tsc.MaxAnisotropy(), 1.0f, 16.0f);
 
-    const auto create_sampler = [&](const f32 anisotropy) {
-        return device.GetLogical().CreateSampler(VkSamplerCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-            .pNext = pnext,
-            .flags = 0,
-            .magFilter = MaxwellToVK::Sampler::Filter(tsc.mag_filter),
-            .minFilter = MaxwellToVK::Sampler::Filter(tsc.min_filter),
-            .mipmapMode = MaxwellToVK::Sampler::MipmapMode(tsc.mipmap_filter),
-            .addressModeU = MaxwellToVK::Sampler::WrapMode(device, tsc.wrap_u, tsc.mag_filter),
-            .addressModeV = MaxwellToVK::Sampler::WrapMode(device, tsc.wrap_v, tsc.mag_filter),
-            .addressModeW = MaxwellToVK::Sampler::WrapMode(device, tsc.wrap_p, tsc.mag_filter),
-            .mipLodBias = tsc.LodBias(),
-            .anisotropyEnable = static_cast<VkBool32>(anisotropy > 1.0f ? VK_TRUE : VK_FALSE),
-            .maxAnisotropy = anisotropy,
-            .compareEnable = tsc.depth_compare_enabled,
-            .compareOp = MaxwellToVK::Sampler::DepthCompareFunction(tsc.depth_compare_func),
-            .minLod = tsc.mipmap_filter == TextureMipmapFilter::None ? 0.0f : tsc.MinLod(),
-            .maxLod = tsc.mipmap_filter == TextureMipmapFilter::None ? 0.25f : tsc.MaxLod(),
-            .borderColor =
-                arbitrary_borders ? VK_BORDER_COLOR_FLOAT_CUSTOM_EXT : ConvertBorderColor(color),
-            .unnormalizedCoordinates = VK_FALSE,
-        });
+    VkSamplerCreateInfo base_ci{
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .pNext = pnext,
+        .flags = 0,
+        .magFilter = MaxwellToVK::Sampler::Filter(tsc.mag_filter),
+        .minFilter = MaxwellToVK::Sampler::Filter(tsc.min_filter),
+        .mipmapMode = MaxwellToVK::Sampler::MipmapMode(tsc.mipmap_filter),
+        .addressModeU = MaxwellToVK::Sampler::WrapMode(device, tsc.wrap_u, tsc.mag_filter),
+        .addressModeV = MaxwellToVK::Sampler::WrapMode(device, tsc.wrap_v, tsc.mag_filter),
+        .addressModeW = MaxwellToVK::Sampler::WrapMode(device, tsc.wrap_p, tsc.mag_filter),
+        .mipLodBias = tsc.LodBias(),
+        .anisotropyEnable = static_cast<VkBool32>(max_anisotropy > 1.0f ? VK_TRUE : VK_FALSE),
+        .maxAnisotropy = max_anisotropy,
+        .compareEnable = tsc.depth_compare_enabled,
+        .compareOp = MaxwellToVK::Sampler::DepthCompareFunction(tsc.depth_compare_func),
+        .minLod = tsc.mipmap_filter == TextureMipmapFilter::None ? 0.0f : tsc.MinLod(),
+        .maxLod = tsc.mipmap_filter == TextureMipmapFilter::None ? 0.25f : tsc.MaxLod(),
+        .borderColor =
+            arbitrary_borders ? VK_BORDER_COLOR_FLOAT_CUSTOM_EXT : ConvertBorderColor(color),
+        .unnormalizedCoordinates = VK_FALSE,
     };
 
-    sampler = create_sampler(max_anisotropy);
+    const auto make_sampler = [&](const VkSamplerCreateInfo& ci) {
+        return device.GetLogical().CreateSampler(ci);
+    };
+
+    sampler = make_sampler(base_ci);
 
     const f32 max_anisotropy_default = static_cast<f32>(1U << tsc.max_anisotropy);
     if (max_anisotropy > max_anisotropy_default) {
-        sampler_default_anisotropy = create_sampler(max_anisotropy_default);
+        VkSamplerCreateInfo fallback_ci = base_ci;
+        fallback_ci.maxAnisotropy = max_anisotropy_default;
+        fallback_ci.anisotropyEnable = static_cast<VkBool32>(fallback_ci.maxAnisotropy > 1.0f
+                                                                 ? VK_TRUE
+                                                                 : VK_FALSE);
+        sampler_default_anisotropy = make_sampler(fallback_ci);
     }
+
+    VkSamplerCreateInfo ui_ci = base_ci;
+    ui_ci.minLod = 0.0f;
+    ui_ci.maxLod = 0.0f;
+    ui_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    ui_ci.anisotropyEnable = VK_FALSE;
+    ui_ci.maxAnisotropy = 1.0f;
+    sampler_ui_single_mip = make_sampler(ui_ci);
+
+    VkSamplerCreateInfo ui_nearest_ci = ui_ci;
+    ui_nearest_ci.magFilter = VK_FILTER_NEAREST;
+    ui_nearest_ci.minFilter = VK_FILTER_NEAREST;
+    sampler_ui_single_mip_nearest = make_sampler(ui_nearest_ci);
+}
+
+VkSampler Sampler::HandleUi(bool force_nearest) const noexcept {
+    if (force_nearest && sampler_ui_single_mip_nearest) {
+        return *sampler_ui_single_mip_nearest;
+    }
+    if (sampler_ui_single_mip) {
+        return *sampler_ui_single_mip;
+    }
+    return Handle();
 }
 
 Framebuffer::Framebuffer(TextureCacheRuntime& runtime, std::span<ImageView*, NUM_RT> color_buffers,
@@ -2392,6 +2581,7 @@ void TextureCacheRuntime::TransitionImageLayout(Image& image) {
             cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                                    VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, barrier);
         });
+        image.SetKnownLayout(VK_IMAGE_LAYOUT_GENERAL);
     }
 }
 

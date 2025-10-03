@@ -193,9 +193,15 @@ inline void PushImageDescriptors(TextureCache& texture_cache,
             const Sampler& sampler{texture_cache.GetSampler(sampler_id)};
             const bool use_fallback_sampler{sampler.HasAddedAnisotropy() &&
                                             !image_view.SupportsAnisotropy()};
-            const VkSampler vk_sampler{use_fallback_sampler ? sampler.HandleWithDefaultAnisotropy()
-                                                            : sampler.Handle()};
-            guest_descriptor_queue.AddSampledImage(vk_image_view, vk_sampler);
+            VkSampler vk_sampler = use_fallback_sampler ? sampler.HandleWithDefaultAnisotropy()
+                                                        : sampler.Handle();
+            if (image_view.IsUiHudTexture()) {
+                const bool force_nearest = image_view.RequiresNearestSampling();
+                vk_sampler = sampler.HandleUi(force_nearest);
+                image_view.LogUiSamplerDecision(vk_sampler, force_nearest);
+            }
+            guest_descriptor_queue.AddSampledImage(vk_image_view, vk_sampler,
+                                                   image_view.SampleLayout());
             rescaling.PushTexture(texture_cache.IsRescaling(image_view));
         }
     }

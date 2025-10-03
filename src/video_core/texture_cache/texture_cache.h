@@ -7,6 +7,8 @@
 #pragma once
 
 #include <unordered_set>
+#include <type_traits>
+#include <utility>
 #include <boost/container/small_vector.hpp>
 
 #include "common/alignment.h"
@@ -29,6 +31,32 @@ using VideoCore::Surface::GetFormatType;
 using VideoCore::Surface::PixelFormat;
 using VideoCore::Surface::SurfaceType;
 using namespace Common::Literals;
+
+namespace detail {
+
+template <typename Staging, typename = void>
+struct HasStagingOwner : std::false_type {};
+
+template <typename Staging>
+struct HasStagingOwner<Staging, std::void_t<decltype(std::declval<Staging&>().owner)>>
+    : std::true_type {};
+
+template <typename Staging>
+void FlushStagingHostWritesImpl(Staging& staging, std::true_type) {
+    if (staging.owner != nullptr) {
+        staging.owner->Flush();
+    }
+}
+
+template <typename Staging>
+void FlushStagingHostWritesImpl(Staging&, std::false_type) {}
+
+} // namespace detail
+
+template <typename Staging>
+void FlushStagingHostWrites(Staging& staging) {
+    detail::FlushStagingHostWritesImpl(staging, detail::HasStagingOwner<Staging>{});
+}
 
 template <class P>
 TextureCache<P>::TextureCache(Runtime& runtime_, Tegra::MaxwellDeviceMemoryManager& device_memory_)
