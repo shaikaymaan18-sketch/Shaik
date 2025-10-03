@@ -53,9 +53,12 @@ enum class NetDbError : s32 {
     NoData = 4,
 };
 
-static constexpr const std::array<std::string, 6> blockedDomains = {"srv.nintendo.net", "battle.net",
-                                                 "microsoft.com",    "mojang.com",
-                                                 "xboxlive.com",     "minecraftservices.com"};
+static const constexpr std::array blockedDomains = {"srv.nintendo.net",
+                                                    "battle.net",
+                                                    "microsoft.com",
+                                                    "mojang.com",
+                                                    "xboxlive.com",
+                                                    "minecraftservices.com"};
 
 static bool IsBlockedHost(const std::string& host) {
     return std::any_of(
