@@ -9,6 +9,7 @@
 #include "dynarmic/common/crypto/aes.h"
 
 #include <array>
+#include <cstddef>
 
 #include "dynarmic/common/common_types.h"
 
