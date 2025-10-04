@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: 0BSD
  */
 
+#include "common/assert.h"
+
 #include "dynarmic/backend/arm64/emit_arm64.h"
 
 #include <oaknut/oaknut.hpp>
