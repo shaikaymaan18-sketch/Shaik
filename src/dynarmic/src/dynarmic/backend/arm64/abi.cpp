@@ -11,6 +11,7 @@
 #include <vector>
 
 #include <mcl/bit/bit_field.hpp>
+#include "dynarmic/common/assert.h"
 #include "dynarmic/common/common_types.h"
 #include <oaknut/oaknut.hpp>
 
