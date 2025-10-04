@@ -445,7 +445,7 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
 
     // GetSuitability has already configured the linked list of features for us.
     // Reuse it here.
-    const void* first_next = &features2;
+    const VkBaseInStructure* first_next = reinterpret_cast<const VkBaseInStructure*>(&features2);
 
     VkDeviceDiagnosticsConfigCreateInfoNV diagnostics_nv{};
     const bool use_diagnostics_nv = Settings::values.enable_nsight_aftermath && extensions.device_diagnostics_config;
@@ -454,24 +454,24 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
 
         diagnostics_nv = {
             .sType = VK_STRUCTURE_TYPE_DEVICE_DIAGNOSTICS_CONFIG_CREATE_INFO_NV,
-            .pNext = &features2,
+            .pNext = static_cast<const void*>(first_next),
             .flags = VK_DEVICE_DIAGNOSTICS_CONFIG_ENABLE_SHADER_DEBUG_INFO_BIT_NV |
                      VK_DEVICE_DIAGNOSTICS_CONFIG_ENABLE_RESOURCE_TRACKING_BIT_NV |
                      VK_DEVICE_DIAGNOSTICS_CONFIG_ENABLE_AUTOMATIC_CHECKPOINTS_BIT_NV,
         };
-        first_next = &diagnostics_nv;
+        first_next = reinterpret_cast<const VkBaseInStructure*>(&diagnostics_nv);
     }
 
     VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptor_indexing{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT,
-        .pNext = use_diagnostics_nv ? static_cast<void*>(&diagnostics_nv) : static_cast<void*>(&features2),
+        .pNext = const_cast<void*>(static_cast<const void*>(first_next)),
         .shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
         .descriptorBindingPartiallyBound = VK_TRUE,
         .descriptorBindingVariableDescriptorCount = VK_TRUE,
     };
 
     if (extensions.descriptor_indexing && Settings::values.descriptor_indexing.GetValue()) {
-        first_next = &descriptor_indexing;
+        first_next = reinterpret_cast<const VkBaseInStructure*>(&descriptor_indexing);
     }
 
     is_blit_depth24_stencil8_supported = TestDepthStencilBlits(VK_FORMAT_D24_UNORM_S8_UINT);
@@ -502,6 +502,29 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
     }
 
     if (is_qualcomm) {
+        if (extensions.shader_float_controls) {
+            LOG_WARNING(Render_Vulkan,
+                        "Disabling VK_KHR_shader_float_controls on Qualcomm proprietary drivers");
+            RemoveExtension(extensions.shader_float_controls,
+                            VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
+            properties.float_controls = {};
+            properties.float_controls.sType =
+                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT_CONTROLS_PROPERTIES;
+        }
+        if (extensions.shader_atomic_int64) {
+            LOG_WARNING(Render_Vulkan,
+                        "Disabling VK_KHR_shader_atomic_int64 on Qualcomm proprietary drivers");
+            RemoveExtensionFeature(extensions.shader_atomic_int64, features.shader_atomic_int64,
+                                   VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME);
+        }
+        if (features.features.shaderInt64) {
+            LOG_WARNING(Render_Vulkan, "Disabling shaderInt64 on Qualcomm proprietary drivers");
+            features.features.shaderInt64 = VK_FALSE;
+            features2.features.shaderInt64 = VK_FALSE;
+        }
+    }
+
+    if (is_qualcomm) {
         LOG_WARNING(Render_Vulkan,
                     "Qualcomm drivers have a slow VK_KHR_push_descriptor implementation");
         //RemoveExtension(extensions.push_descriptor, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
@@ -528,7 +551,6 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         }
 #endif
     }
-
     if (is_nvidia) {
         const u32 nv_major_version = (properties.properties.driverVersion >> 22) & 0x3ff;
         const auto arch = GetNvidiaArch();
@@ -749,7 +771,7 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         LOG_INFO(Render_Vulkan, "Dynamic state is enabled (dyna_state = 1-3), disabling scaled format emulation");
     }
 
-    logical = vk::Device::Create(physical, queue_cis, ExtensionListForVulkan(loaded_extensions), first_next, dld);
+    logical = vk::Device::Create(physical, queue_cis, ExtensionListForVulkan(loaded_extensions), static_cast<const void*>(first_next), dld);
 
     graphics_queue = logical.GetQueue(graphics_family);
     present_queue = logical.GetQueue(present_family);
