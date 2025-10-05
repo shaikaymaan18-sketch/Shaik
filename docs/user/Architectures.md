@@ -8,7 +8,7 @@ Eden is primarily designed to run on amd64 (x86_64--Intel/AMD 64-bit) and aarch6
 
 ## amd64
 
-AMD64 is the most tested and supported architecture for desktop targets. Android is entirely unsupported.
+AMD64, aka x86_64, is the most tested and supported architecture for desktop targets. Android is entirely unsupported.
 
 ### Caveats
 
@@ -20,7 +20,7 @@ Intel Macs are believed to be supported, but no CI is provided for them. Perform
 
 ## aarch64
 
-ARM64/aarch64 is the only supported architecture for Android, with limited experimental support available on Linux, Windows, and macOS.
+ARM64, aka aarch64, is the only supported architecture for Android, with limited experimental support available on Linux, Windows, and macOS.
 
 ### Caveats
 
@@ -32,7 +32,7 @@ Windows/arm64 is *very* experimental and is unlikely to work at all. Support and
 
 ## riscv64
 
-RISC-V/riscv64 is sparsely tested, but preliminary tests from developers have reported at least partial support on Milk-V's Fedora/riscv64 Linux distribution. Performance, Vulkan support, compatibility, and build system caveats are largely unknown for the time being.
+RISC-V, aka riscv64, is sparsely tested, but preliminary tests from developers have reported at least partial support on Milk-V's Fedora/riscv64 Linux distribution. Performance, Vulkan support, compatibility, and build system caveats are largely unknown for the time being.
 
 ### Caveats
 
@@ -59,7 +59,7 @@ The vast majority of Eden's testing is done on Windows, Linux, and Android. Howe
 
 ## Linux
 
-While all modern Linux distributions are supported (Fedora >40, Ubuntu >24.04, Debian >12, Arch, Gentoo, etc.), the vast majority of testing and development for Linux is on Arch and Gentoo. Most major build systems changes are tested on Gentoo first and foremost, so if builds fail on any modern distribution no matter what you do, it's likely a bug and should be reported.
+While all modern Linux distributions are supported (Fedora >40, Ubuntu >24.04, Debian >12, Arch, Gentoo, etc.), the vast majority of testing and development for Linux is on Arch and Gentoo. Most major build system changes are tested on Gentoo first and foremost, so if builds fail on any modern distribution no matter what you do, it's likely a bug and should be reported.
 
 Intel and Nvidia GPU support is limited. AMD (RADV) drivers receive first-class testing and are known to provide the most stable Eden experience possible.
 
@@ -101,7 +101,7 @@ Qualcomm Snapdragon SoCs are generally the most well supported.
   * Remember--always use a cooler if you can, and you MUST have *at least* 8GB of RAM!
 - If you're not sure what SoC you have, check [GSMArena](https://www.gsmarena.com) - e.g. [Pixel 9 Pro](https://archive.ph/91VhA)
 
-Custom ROMs are recommdended, *as long as* you know what you're doing.
+Custom ROMs are recommended, *as long as* you know what you're doing.
 - For most devices, [LineageOS](https://lineageos.org/) is preferred.
 - [CalyxOS](https://calyxos.org/) is available as well.
 - For Google Pixel devices ONLY... and [soon another OEM](https://archive.ph/cPpMd)... [GrapheneOS](https://grapheneos.org/) is highly recommended.
@@ -113,7 +113,9 @@ Eden is currently unavailable on F-Droid or the Play Store. Check back occasiona
 
 ## macOS
 
-macOS is relatively stable, with only the occasional crash and bug. Compatibility may suffer due to the MoltenVK layer, however. Do note that building the GUI version with Qt versions higher than 6.7.3 will cause mysterious bugs, Vulkan errors, and crashes, alongside the cool feature of freezing the entire system UI randomly; we recommend you build with 6.7.3 (via aqtinstall) or earlier as the CI does.
+macOS is relatively stable, with only the occasional crash and bug. Compatibility may suffer due to the MoltenVK layer, however.
+
+Do note that building the GUI version with Qt versions higher than 6.7.3 will cause mysterious bugs, Vulkan errors, and crashes, alongside the cool feature of freezing the entire system UI randomly; we recommend you build with 6.7.3 (via aqtinstall) or earlier as the CI does.
 
 ## *BSD, Solaris
 
