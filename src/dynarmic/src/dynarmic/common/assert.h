@@ -7,6 +7,7 @@
 #pragma once
 
 #include <fmt/format.h>
+#include <mcl/assert.hpp>
 
 [[noreturn]] void assert_terminate_impl(const char* expr_str, fmt::string_view msg, fmt::format_args args);
 template<typename... Ts>
