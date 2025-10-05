@@ -135,17 +135,6 @@ RenderPassKey MakeRenderPassKey(const FixedPipelineState& state) {
     return key;
 }
 
-size_t NumAttachments(const FixedPipelineState& state) {
-    size_t num{};
-    for (size_t index = 0; index < Maxwell::NumRenderTargets; ++index) {
-        const auto format{static_cast<Tegra::RenderTargetFormat>(state.color_formats[index])};
-        if (format != Tegra::RenderTargetFormat::NONE) {
-            num = index + 1;
-        }
-    }
-    return num;
-}
-
 template <typename Spec>
 bool Passes(const std::array<vk::ShaderModule, NUM_STAGES>& modules,
             const std::array<Shader::Info, NUM_STAGES>& stage_infos) {
@@ -460,6 +449,10 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
     buffer_cache.UpdateGraphicsBuffers(is_indexed);
     buffer_cache.BindHostGeometryBuffers(is_indexed);
 
+    // Ensure framebuffer and feedback-loop state are ready before writing descriptors
+    texture_cache.UpdateRenderTargets(false);
+    texture_cache.CheckFeedbackLoop(views);
+
     guest_descriptor_queue.Acquire();
 
     RescalingPushConstant rescaling;
@@ -492,8 +485,6 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
     if constexpr (Spec::enabled_stages[4]) {
         prepare_stage(4);
     }
-    texture_cache.UpdateRenderTargets(false);
-    texture_cache.CheckFeedbackLoop(views);
     ConfigureDraw(rescaling, render_area);
 
     return true;
@@ -769,14 +760,28 @@ void GraphicsPipeline::MakePipeline(VkRenderPass render_pass) {
         LOG_WARNING(Render_Vulkan, "Depth bounds is enabled but not supported");
     }
     static_vector<VkPipelineColorBlendAttachmentState, Maxwell::NumRenderTargets> cb_attachments;
-    const size_t num_attachments{NumAttachments(key.state)};
-    for (size_t index = 0; index < num_attachments; ++index) {
+    for (size_t index = 0; index < Maxwell::NumRenderTargets; ++index) {
         static constexpr std::array mask_table{
             VK_COLOR_COMPONENT_R_BIT,
             VK_COLOR_COMPONENT_G_BIT,
             VK_COLOR_COMPONENT_B_BIT,
             VK_COLOR_COMPONENT_A_BIT,
         };
+        const auto format{
+            static_cast<Tegra::RenderTargetFormat>(key.state.color_formats[index])};
+        if (format == Tegra::RenderTargetFormat::NONE) {
+            cb_attachments.push_back({
+                .blendEnable = VK_FALSE,
+                .srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
+                .dstColorBlendFactor = VK_BLEND_FACTOR_ZERO,
+                .colorBlendOp = VK_BLEND_OP_ADD,
+                .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+                .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+                .alphaBlendOp = VK_BLEND_OP_ADD,
+                .colorWriteMask = 0,
+            });
+            continue;
+        }
         const auto& blend{key.state.attachments[index]};
         const std::array mask{blend.Mask()};
         VkColorComponentFlags write_mask{};

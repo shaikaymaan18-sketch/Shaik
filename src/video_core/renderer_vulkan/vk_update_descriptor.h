@@ -55,11 +55,28 @@ public:
         };
     }
 
+    // Overload allowing explicit image layout
+    void AddSampledImage(VkImageView image_view, VkSampler sampler, VkImageLayout layout) {
+        *(payload_cursor++) = VkDescriptorImageInfo{
+            .sampler = sampler,
+            .imageView = image_view,
+            .imageLayout = layout,
+        };
+    }
+
     void AddImage(VkImageView image_view) {
         *(payload_cursor++) = VkDescriptorImageInfo{
             .sampler = VK_NULL_HANDLE,
             .imageView = image_view,
             .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+        };
+    }
+
+    void AddImage(VkImageView image_view, VkImageLayout layout) {
+        *(payload_cursor++) = VkDescriptorImageInfo{
+            .sampler = VK_NULL_HANDLE,
+            .imageView = image_view,
+            .imageLayout = layout,
         };
     }
 

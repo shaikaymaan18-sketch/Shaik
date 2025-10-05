@@ -159,6 +159,9 @@ public:
     /// Handle feedback loops during draws.
     void CheckFeedbackLoop(std::span<const ImageViewInOut> views);
 
+    /// Peek current pending attachment feedback loop request (without consuming it)
+    [[nodiscard]] const typename P::Runtime::FeedbackLoopRequest& PeekFeedbackLoopRequest() const noexcept;
+
     /// Get the sampler from the graphics descriptor table in the specified index
     Sampler* GetGraphicsSampler(u32 index);
 

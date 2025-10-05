@@ -121,6 +121,9 @@ public:
     void BarrierFeedbackLoop();
     void SetFeedbackLoopRequest(u8 color_mask, bool depth, bool supported);
     FeedbackLoopRequest ConsumeFeedbackLoopRequest();
+    const FeedbackLoopRequest& PeekFeedbackLoopRequest() const noexcept {
+        return pending_feedback_request;
+    }
 
     bool IsFormatDitherable(VideoCore::Surface::PixelFormat format);
     bool IsFormatScalable(VideoCore::Surface::PixelFormat format);
@@ -390,6 +393,13 @@ public:
         return is_rescaled;
     }
 
+    [[nodiscard]] VkImage ColorImage(size_t slot) const noexcept;
+
+    [[nodiscard]] VkImage DepthStencilImage() const noexcept;
+
+    [[nodiscard]] const VkImageSubresourceRange* ColorSubresourceRange(size_t slot) const noexcept;
+    [[nodiscard]] const VkImageSubresourceRange* DepthStencilSubresourceRange() const noexcept;
+
 private:
     vk::Framebuffer framebuffer;
     VkRenderPass renderpass{};
@@ -427,3 +437,4 @@ struct TextureCacheParams {
 using TextureCache = VideoCommon::TextureCache<TextureCacheParams>;
 
 } // namespace Vulkan
+

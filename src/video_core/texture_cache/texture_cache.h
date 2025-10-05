@@ -268,6 +268,11 @@ void TextureCache<P>::CheckFeedbackLoop(std::span<const ImageViewInOut> views) {
 }
 
 template <class P>
+const typename P::Runtime::FeedbackLoopRequest& TextureCache<P>::PeekFeedbackLoopRequest() const noexcept {
+    return runtime.PeekFeedbackLoopRequest();
+}
+
+template <class P>
 typename P::Sampler* TextureCache<P>::GetGraphicsSampler(u32 index) {
     return &slot_samplers[GetGraphicsSamplerId(index)];
 }
@@ -2575,3 +2580,4 @@ void TextureCache<P>::OnGPUASRegister([[maybe_unused]] size_t map_id) {
 }
 
 } // namespace VideoCommon
+

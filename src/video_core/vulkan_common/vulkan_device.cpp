@@ -1359,6 +1359,12 @@ void Device::RemoveUnsuitableExtensions() {
     if (extensions.attachment_feedback_loop_layout) {
         supports_attachment_feedback_loop_layout =
             features.attachment_feedback_loop_layout.attachmentFeedbackLoopLayout;
+        if (!supports_attachment_feedback_loop_layout) {
+            LOG_WARNING(Render_Vulkan,
+                        "VK_EXT_attachment_feedback_loop_layout advertised without reported feature support; disabling");
+        }
+        features.attachment_feedback_loop_layout.attachmentFeedbackLoopLayout =
+            supports_attachment_feedback_loop_layout ? VK_TRUE : VK_FALSE;
         extensions.attachment_feedback_loop_layout =
             supports_attachment_feedback_loop_layout;
     }

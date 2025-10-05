@@ -155,6 +155,9 @@ public:
 
     void SetFeedbackLoopRequest(u8 color_mask, bool depth, bool supported);
     FeedbackLoopRequest ConsumeFeedbackLoopRequest();
+    const FeedbackLoopRequest& PeekFeedbackLoopRequest() const noexcept {
+        return pending_feedback_request;
+    }
     bool SupportsAttachmentFeedbackLoopFormat(VideoCore::Surface::PixelFormat format, bool is_depth) const;
 
 private:

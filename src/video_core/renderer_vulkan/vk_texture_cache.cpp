@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <limits>
 #include <span>
 #include <memory>
 #include <vector>
@@ -2330,6 +2331,7 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
     s32 num_layers = 1;
 
     is_rescaled = is_rescaled_;
+    rt_map.fill(std::numeric_limits<size_t>::max());
     const auto& resolution = runtime.resolution;
 
     u32 width = (std::numeric_limits<u32>::max)();
@@ -2402,6 +2404,56 @@ VkRenderPass Framebuffer::RenderPass(std::uint8_t color_feedback_mask, bool dept
     key.color_feedback_mask = color_feedback_mask;
     key.depth_feedback = depth_feedback;
     return render_pass_cache->Get(key);
+}
+
+VkImage Framebuffer::ColorImage(size_t slot) const noexcept {
+    if (slot >= NUM_RT) {
+        return VK_NULL_HANDLE;
+    }
+    const size_t mapped_index = rt_map[slot];
+    if (mapped_index >= num_images) {
+        return VK_NULL_HANDLE;
+    }
+    if ((image_ranges[mapped_index].aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) == 0) {
+        return VK_NULL_HANDLE;
+    }
+    return images[mapped_index];
+}
+
+VkImage Framebuffer::DepthStencilImage() const noexcept {
+    if (!has_depth && !has_stencil) {
+        return VK_NULL_HANDLE;
+    }
+    const size_t mapped_index = num_color_buffers;
+    if (mapped_index >= num_images) {
+        return VK_NULL_HANDLE;
+    }
+    return images[mapped_index];
+}
+
+const VkImageSubresourceRange* Framebuffer::ColorSubresourceRange(size_t slot) const noexcept {
+    if (slot >= NUM_RT) {
+        return nullptr;
+    }
+    const size_t mapped_index = rt_map[slot];
+    if (mapped_index == std::numeric_limits<size_t>::max()) {
+        return nullptr;
+    }
+    if (mapped_index >= num_color_buffers || mapped_index >= num_images) {
+        return nullptr;
+    }
+    return &image_ranges[mapped_index];
+}
+
+const VkImageSubresourceRange* Framebuffer::DepthStencilSubresourceRange() const noexcept {
+    if (!has_depth && !has_stencil) {
+        return nullptr;
+    }
+    const size_t mapped_index = num_color_buffers;
+    if (mapped_index >= num_images) {
+        return nullptr;
+    }
+    return &image_ranges[mapped_index];
 }
 
 void TextureCacheRuntime::AccelerateImageUpload(

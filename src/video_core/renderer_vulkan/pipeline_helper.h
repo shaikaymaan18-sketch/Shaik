@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstddef>
+#include <limits>
 
 #include <boost/container/small_vector.hpp>
 
@@ -18,6 +19,62 @@
 namespace Vulkan {
 
 using Shader::Backend::SPIRV::NUM_TEXTURE_AND_IMAGE_SCALING_WORDS;
+
+namespace detail {
+
+inline VkImageAspectFlags AttachmentAspectMask(VideoCore::Surface::PixelFormat format) {
+    switch (VideoCore::Surface::GetFormatType(format)) {
+    case VideoCore::Surface::SurfaceType::ColorTexture:
+        return VK_IMAGE_ASPECT_COLOR_BIT;
+    case VideoCore::Surface::SurfaceType::Depth:
+        return VK_IMAGE_ASPECT_DEPTH_BIT;
+    case VideoCore::Surface::SurfaceType::Stencil:
+        return VK_IMAGE_ASPECT_STENCIL_BIT;
+    case VideoCore::Surface::SurfaceType::DepthStencil:
+        return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+    default:
+        return 0;
+    }
+}
+
+inline VkImageSubresourceRange NormalizeImageViewRange(const ImageView& image_view) {
+    const VkImageAspectFlags aspect_mask = AttachmentAspectMask(image_view.format);
+    VkImageSubresourceRange range{
+        .aspectMask = aspect_mask,
+        .baseMipLevel = static_cast<u32>(image_view.range.base.level),
+        .levelCount = static_cast<u32>(image_view.range.extent.levels),
+        .baseArrayLayer = static_cast<u32>(image_view.range.base.layer),
+        .layerCount = static_cast<u32>(image_view.range.extent.layers),
+    };
+    if ((image_view.flags & VideoCommon::ImageViewFlagBits::Slice) != VideoCommon::ImageViewFlagBits{}) {
+        range.baseArrayLayer = 0;
+        range.layerCount = 1;
+    }
+    return range;
+}
+
+inline bool SubresourceRangeIntersects(const VkImageSubresourceRange& lhs,
+                                       const VkImageSubresourceRange& rhs) {
+    if ((lhs.aspectMask & rhs.aspectMask) == 0) {
+        return false;
+    }
+    const auto range_end = [](u32 base, u32 count, u32 remaining_value) -> u32 {
+        return count == remaining_value ? std::numeric_limits<u32>::max() : base + count;
+    };
+    const u32 lhs_level_end = range_end(lhs.baseMipLevel, lhs.levelCount, VK_REMAINING_MIP_LEVELS);
+    const u32 rhs_level_end = range_end(rhs.baseMipLevel, rhs.levelCount, VK_REMAINING_MIP_LEVELS);
+    if (lhs_level_end <= rhs.baseMipLevel || rhs_level_end <= lhs.baseMipLevel) {
+        return false;
+    }
+    const u32 lhs_layer_end = range_end(lhs.baseArrayLayer, lhs.layerCount, VK_REMAINING_ARRAY_LAYERS);
+    const u32 rhs_layer_end = range_end(rhs.baseArrayLayer, rhs.layerCount, VK_REMAINING_ARRAY_LAYERS);
+    if (lhs_layer_end <= rhs.baseArrayLayer || rhs_layer_end <= lhs.baseArrayLayer) {
+        return false;
+    }
+    return true;
+}
+
+} // namespace detail
 
 class DescriptorLayoutBuilder {
 public:
@@ -180,6 +237,48 @@ inline void PushImageDescriptors(TextureCache& texture_cache,
                                  const Shader::Info& info, RescalingPushConstant& rescaling,
                                  const VideoCommon::SamplerId*& samplers,
                                  const VideoCommon::ImageViewInOut*& views) {
+    const Framebuffer* framebuffer = texture_cache.GetFramebuffer();
+    const auto& feedback_req = texture_cache.PeekFeedbackLoopRequest();
+
+    const auto choose_layout = [&](const ImageView& image_view) -> VkImageLayout {
+        if (!feedback_req.active || !feedback_req.supported || framebuffer == nullptr) {
+            return VK_IMAGE_LAYOUT_GENERAL;
+        }
+        const VkImage descriptor_image = image_view.ImageHandle();
+        if (descriptor_image == VK_NULL_HANDLE) {
+            return VK_IMAGE_LAYOUT_GENERAL;
+        }
+
+        const VkImageSubresourceRange view_range = detail::NormalizeImageViewRange(image_view);
+
+        for (u32 slot = 0; slot < VideoCommon::NUM_RT; ++slot) {
+            if (((feedback_req.color_mask >> slot) & 1u) == 0) {
+                continue;
+            }
+            if (framebuffer->ColorImage(slot) != descriptor_image) {
+                continue;
+            }
+            const VkImageSubresourceRange* attachment_range = framebuffer->ColorSubresourceRange(slot);
+            if (attachment_range == nullptr) {
+                continue;
+            }
+            if (detail::SubresourceRangeIntersects(view_range, *attachment_range)) {
+                return VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+            }
+        }
+        if (feedback_req.depth) {
+            const VkImage depth_image = framebuffer->DepthStencilImage();
+            if (depth_image == descriptor_image) {
+                const VkImageSubresourceRange* attachment_range =
+                    framebuffer->DepthStencilSubresourceRange();
+                if (attachment_range != nullptr &&
+                    detail::SubresourceRangeIntersects(view_range, *attachment_range)) {
+                    return VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT;
+                }
+            }
+        }
+        return VK_IMAGE_LAYOUT_GENERAL;
+    };
     const u32 num_texture_buffers = Shader::NumDescriptors(info.texture_buffer_descriptors);
     const u32 num_image_buffers = Shader::NumDescriptors(info.image_buffer_descriptors);
     views += num_texture_buffers;
@@ -195,7 +294,8 @@ inline void PushImageDescriptors(TextureCache& texture_cache,
                                             !image_view.SupportsAnisotropy()};
             const VkSampler vk_sampler{use_fallback_sampler ? sampler.HandleWithDefaultAnisotropy()
                                                             : sampler.Handle()};
-            guest_descriptor_queue.AddSampledImage(vk_image_view, vk_sampler);
+            const VkImageLayout layout = choose_layout(image_view);
+            guest_descriptor_queue.AddSampledImage(vk_image_view, vk_sampler, layout);
             rescaling.PushTexture(texture_cache.IsRescaling(image_view));
         }
     }
@@ -206,7 +306,8 @@ inline void PushImageDescriptors(TextureCache& texture_cache,
                 texture_cache.MarkModification(image_view.image_id);
             }
             const VkImageView vk_image_view{image_view.StorageView(desc.type, desc.format)};
-            guest_descriptor_queue.AddImage(vk_image_view);
+            const VkImageLayout layout = VK_IMAGE_LAYOUT_GENERAL; // Storage images must remain in GENERAL layout
+            guest_descriptor_queue.AddImage(vk_image_view, layout);
             rescaling.PushImage(texture_cache.IsRescaling(image_view));
         }
     }
