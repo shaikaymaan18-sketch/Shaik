@@ -77,7 +77,6 @@ if (MSVC)
         /wd4592 # Symbol will be dynamically initialized (implementation limitation)
         /permissive- # Stricter C++ standards conformance
         /MP
-        /Zi
         /Zo
         /EHsc
         /Zc:externConstexpr # Allows external linkage for variables declared "extern constexpr", as the standard permits.
@@ -86,6 +85,11 @@ if (MSVC)
         /volatile:iso       # Use strict standard-abiding volatile semantics
         /bigobj             # Increase number of sections in .obj files
         /DNOMINMAX)
+
+    if (WIN32 AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
+        string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+        string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+   endif()
 
     if (DYNARMIC_WARNINGS_AS_ERRORS)
         list(APPEND DYNARMIC_CXX_FLAGS
