@@ -37,7 +37,7 @@ cmake .. -G Ninja \
     -DDYNARMIC_ENABLE_LTO=ON \
     -DYUZU_USE_BUNDLED_QT=${BUNDLE_QT:-false} \
     -DUSE_CCACHE=${CCACHE:-false} \
-    -DENABLE_QT_UPDATE_CHECKER=${DEVEL:-true} \
+    -DENABLE_UPDATE_CHECKER=${DEVEL:-true} \
     "${EXTRA_CMAKE_FLAGS[@]}" \
     "$@"
 

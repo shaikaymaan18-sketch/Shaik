@@ -23,6 +23,7 @@ import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import androidx.preference.PreferenceManager
 import com.google.android.material.color.MaterialColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.io.File
 import java.io.FilenameFilter
 import org.yuzu.yuzu_emu.NativeLibrary
@@ -50,6 +51,7 @@ import java.util.zip.ZipInputStream
 import androidx.core.content.edit
 import org.yuzu.yuzu_emu.activities.EmulationActivity
 import kotlin.text.compareTo
+import androidx.core.net.toUri
 
 class MainActivity : AppCompatActivity(), ThemeProvider {
     private lateinit var binding: ActivityMainBinding
@@ -152,8 +154,38 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
         // Dismiss previous notifications (should not happen unless a crash occurred)
         EmulationActivity.stopForegroundService(this)
 
+        val firstTimeSetup = PreferenceManager.getDefaultSharedPreferences(applicationContext)
+                .getBoolean(Settings.PREF_FIRST_APP_LAUNCH, true)
+            if (!firstTimeSetup) {
+             checkForUpdates()
+        }
         setInsets()
     }
+
+    private fun checkForUpdates() {
+        Thread {
+            val latestVersion = NativeLibrary.checkForUpdate()
+            if (latestVersion != null) {
+                runOnUiThread {
+                    showUpdateDialog(latestVersion)
+                }
+            }
+        }.start()
+    }
+
+    private fun showUpdateDialog(version: String) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.update_available)
+            .setMessage(getString(R.string.update_available_description, version))
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val url = NativeLibrary.getUpdateUrl(version)
+                val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+                startActivity(intent)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
 
     fun displayMultiplayerDialog() {
         val dialog = NetPlayDialog(this)

@@ -79,8 +79,7 @@ std::optional<std::string> UpdateChecker::GetResponse(std::string url, std::stri
     }
 }
 
-std::optional<std::string> UpdateChecker::GetLatestRelease(bool include_prereleases)
-{
+std::optional<std::string> GetLatestRelease(bool include_prereleases) {
     const auto update_check_url = std::string{Common::g_build_auto_update_api};
     std::string update_check_path = fmt::format("/repos/{}",
                                                 std::string{Common::g_build_auto_update_repo});
@@ -135,3 +134,5 @@ std::optional<std::string> UpdateChecker::GetLatestRelease(bool include_prerelea
         return {};
     }
 }
+
+} // namespace UpdateChecker
