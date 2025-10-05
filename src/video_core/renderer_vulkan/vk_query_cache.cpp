@@ -166,7 +166,7 @@ public:
         });
 
         // Manually restart the render pass (required for vkCmdClearAttachments, etc.)
-        scheduler.RequestRenderpass(texture_cache.GetFramebuffer());
+        scheduler.RequestRenderpass(texture_cache.GetFramebuffer(), 0, false);
 
         // Begin query inside the newly started render pass
         scheduler.Record([query_pool = current_query_pool,

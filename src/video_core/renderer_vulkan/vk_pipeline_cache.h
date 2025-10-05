@@ -107,6 +107,7 @@ public:
     ~PipelineCache();
 
     [[nodiscard]] GraphicsPipeline* CurrentGraphicsPipeline();
+    void SetAttachmentFeedback(u8 color_mask, bool depth_feedback);
 
     [[nodiscard]] ComputePipeline* CurrentComputePipeline();
 
@@ -154,6 +155,8 @@ private:
 
     GraphicsPipelineCacheKey graphics_key{};
     GraphicsPipeline* current_pipeline{};
+    u8 pending_feedback_mask{};
+    bool pending_depth_feedback{};
 
     std::unordered_map<ComputePipelineCacheKey, std::unique_ptr<ComputePipeline>> compute_cache;
     std::unordered_map<GraphicsPipelineCacheKey, std::unique_ptr<GraphicsPipeline>> graphics_cache;

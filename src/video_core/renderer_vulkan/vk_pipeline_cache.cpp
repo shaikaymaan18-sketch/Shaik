@@ -430,6 +430,11 @@ PipelineCache::~PipelineCache() {
     }
 }
 
+void PipelineCache::SetAttachmentFeedback(u8 color_mask, bool depth_feedback) {
+    pending_feedback_mask = color_mask;
+    pending_depth_feedback = depth_feedback;
+}
+
 GraphicsPipeline* PipelineCache::CurrentGraphicsPipeline() {
 
     if (!RefreshStages(graphics_key.unique_hashes)) {
@@ -437,6 +442,7 @@ GraphicsPipeline* PipelineCache::CurrentGraphicsPipeline() {
         return nullptr;
     }
     graphics_key.state.Refresh(*maxwell3d, dynamic_features);
+    graphics_key.state.SetAttachmentFeedback(pending_feedback_mask, pending_depth_feedback);
 
     if (current_pipeline) {
         GraphicsPipeline* const next{current_pipeline->Next(graphics_key)};

@@ -673,6 +673,23 @@ void TextureCacheRuntime::InsertUploadMemoryBarrier() {
     glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 
+void TextureCacheRuntime::SetFeedbackLoopRequest(u8 color_mask, bool depth, bool supported) {
+    pending_feedback_request.active = (color_mask != 0) || depth;
+    pending_feedback_request.color_mask = color_mask;
+    pending_feedback_request.depth = depth;
+    pending_feedback_request.supported = supported;
+}
+
+TextureCacheRuntime::FeedbackLoopRequest TextureCacheRuntime::ConsumeFeedbackLoopRequest() {
+    FeedbackLoopRequest request = pending_feedback_request;
+    pending_feedback_request = {};
+    return request;
+}
+
+bool TextureCacheRuntime::SupportsAttachmentFeedbackLoopFormat(VideoCore::Surface::PixelFormat, bool) const {
+    return true;
+}
+
 FormatProperties TextureCacheRuntime::FormatInfo(ImageType type, GLenum internal_format) const {
     switch (type) {
     case ImageType::e1D:

@@ -208,41 +208,63 @@ void TextureCache<P>::FillComputeImageViews(std::span<ImageViewInOut> views) {
 template <class P>
 void TextureCache<P>::CheckFeedbackLoop(std::span<const ImageViewInOut> views) {
     if (!Settings::values.barrier_feedback_loops.GetValue()) {
+        runtime.SetFeedbackLoopRequest(0, false, true);
         return;
     }
 
-    const bool requires_barrier = [&] {
-        for (const auto& view : views) {
-            if (!view.id) {
+    u8 color_mask = 0;
+    bool depth_feedback = false;
+
+    for (const auto& view : views) {
+        if (!view.id) {
+            continue;
+        }
+        const auto& image_view = slot_image_views[view.id];
+
+        for (std::size_t index = 0; index < render_targets.color_buffer_ids.size(); ++index) {
+            const auto ct_view_id = render_targets.color_buffer_ids[index];
+            if (!ct_view_id) {
                 continue;
             }
-            auto& image_view = slot_image_views[view.id];
-
-            // Check color targets
-            for (const auto& ct_view_id : render_targets.color_buffer_ids) {
-                if (ct_view_id) {
-                    auto& ct_view = slot_image_views[ct_view_id];
-                    if (image_view.image_id == ct_view.image_id) {
-                        return true;
-                    }
-                }
-            }
-
-            // Check zeta target
-            if (render_targets.depth_buffer_id) {
-                auto& zt_view = slot_image_views[render_targets.depth_buffer_id];
-                if (image_view.image_id == zt_view.image_id) {
-                    return true;
-                }
+            const auto& ct_view = slot_image_views[ct_view_id];
+            if (image_view.image_id == ct_view.image_id) {
+                color_mask |= static_cast<u8>(1u << index);
             }
         }
 
-        return false;
-    }();
-
-    if (requires_barrier) {
-        runtime.BarrierFeedbackLoop();
+        if (render_targets.depth_buffer_id) {
+            const auto& depth_view = slot_image_views[render_targets.depth_buffer_id];
+            if (image_view.image_id == depth_view.image_id) {
+                depth_feedback = true;
+            }
+        }
     }
+
+    if (color_mask == 0 && !depth_feedback) {
+        runtime.SetFeedbackLoopRequest(0, false, true);
+        return;
+    }
+
+    bool supported = true;
+    if (color_mask != 0) {
+        for (std::size_t index = 0; index < render_targets.color_buffer_ids.size(); ++index) {
+            if (((color_mask >> index) & 1u) == 0) {
+                continue;
+            }
+            const auto ct_view_id = render_targets.color_buffer_ids[index];
+            if (!ct_view_id) {
+                continue;
+            }
+            const auto& ct_view = slot_image_views[ct_view_id];
+            supported &= runtime.SupportsAttachmentFeedbackLoopFormat(ct_view.format, false);
+        }
+    }
+    if (depth_feedback && render_targets.depth_buffer_id) {
+        const auto& depth_view = slot_image_views[render_targets.depth_buffer_id];
+        supported &= runtime.SupportsAttachmentFeedbackLoopFormat(depth_view.format, true);
+    }
+
+    runtime.SetFeedbackLoopRequest(color_mask, depth_feedback, supported);
 }
 
 template <class P>
@@ -470,6 +492,11 @@ void TextureCache<P>::UpdateRenderTargets(bool is_clear) {
 template <class P>
 typename P::Framebuffer* TextureCache<P>::GetFramebuffer() {
     return &slot_framebuffers[GetFramebufferId(render_targets)];
+}
+
+template <class P>
+typename TextureCache<P>::Runtime::FeedbackLoopRequest TextureCache<P>::ConsumeFeedbackLoopRequest() {
+    return runtime.ConsumeFeedbackLoopRequest();
 }
 
 template <class P>

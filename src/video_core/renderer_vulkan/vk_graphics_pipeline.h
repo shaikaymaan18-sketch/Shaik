@@ -82,6 +82,10 @@ public:
         const std::array<const Shader::Info*, NUM_STAGES>& infos);
     // True if this pipeline was created with VK_DYNAMIC_STATE_VERTEX_INPUT_EXT
     bool HasDynamicVertexInput() const noexcept { return key.state.dynamic_vertex_input; }
+
+    u8 AttachmentFeedbackMask() const noexcept { return key.state.AttachmentFeedbackMask(); }
+    bool HasDepthAttachmentFeedback() const noexcept { return key.state.HasDepthAttachmentFeedback(); }
+
     GraphicsPipeline& operator=(GraphicsPipeline&&) noexcept = delete;
     GraphicsPipeline(GraphicsPipeline&&) noexcept = delete;
 

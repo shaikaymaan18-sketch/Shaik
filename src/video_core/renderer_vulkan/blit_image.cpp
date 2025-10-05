@@ -418,7 +418,7 @@ void TransitionImageLayout(vk::CommandBuffer& cmdbuf, VkImage image, VkImageLayo
 }
 
 void BeginRenderPass(vk::CommandBuffer& cmdbuf, const Framebuffer* framebuffer) {
-    const VkRenderPass render_pass = framebuffer->RenderPass();
+    const VkRenderPass render_pass = framebuffer->RenderPass(0, false);
     const VkFramebuffer framebuffer_handle = framebuffer->Handle();
     const VkExtent2D render_area = framebuffer->RenderArea();
     const VkRenderPassBeginInfo renderpass_bi{
@@ -490,13 +490,13 @@ void BlitImageHelper::BlitColor(const Framebuffer* dst_framebuffer, VkImageView 
                                 Tegra::Engines::Fermi2D::Operation operation) {
     const bool is_linear = filter == Tegra::Engines::Fermi2D::Filter::Bilinear;
     const BlitImagePipelineKey key{
-        .renderpass = dst_framebuffer->RenderPass(),
+        .renderpass = dst_framebuffer->RenderPass(0, false),
         .operation = operation,
     };
     const VkPipelineLayout layout = *one_texture_pipeline_layout;
     const VkSampler sampler = is_linear ? *linear_sampler : *nearest_sampler;
     const VkPipeline pipeline = FindOrEmplaceColorPipeline(key);
-    scheduler.RequestRenderpass(dst_framebuffer);
+    scheduler.RequestRenderpass(dst_framebuffer, 0, false);
     scheduler.Record([this, dst_region, src_region, pipeline, layout, sampler,
                       src_view](vk::CommandBuffer cmdbuf) {
         // TODO: Barriers
@@ -516,7 +516,7 @@ void BlitImageHelper::BlitColor(const Framebuffer* dst_framebuffer, VkImageView 
                                 const Region2D& dst_region, const Region2D& src_region,
                                 const Extent3D& src_size) {
     const BlitImagePipelineKey key{
-        .renderpass = dst_framebuffer->RenderPass(),
+        .renderpass = dst_framebuffer->RenderPass(0, false),
         .operation = Tegra::Engines::Fermi2D::Operation::SrcCopy,
     };
     const VkPipelineLayout layout = *one_texture_pipeline_layout;
@@ -548,13 +548,13 @@ void BlitImageHelper::BlitDepthStencil(const Framebuffer* dst_framebuffer,
     ASSERT(filter == Tegra::Engines::Fermi2D::Filter::Point);
     ASSERT(operation == Tegra::Engines::Fermi2D::Operation::SrcCopy);
     const BlitImagePipelineKey key{
-        .renderpass = dst_framebuffer->RenderPass(),
+        .renderpass = dst_framebuffer->RenderPass(0, false),
         .operation = operation,
     };
     const VkPipelineLayout layout = *two_textures_pipeline_layout;
     const VkSampler sampler = *nearest_sampler;
     const VkPipeline pipeline = FindOrEmplaceDepthStencilPipeline(key);
-    scheduler.RequestRenderpass(dst_framebuffer);
+    scheduler.RequestRenderpass(dst_framebuffer, 0, false);
     scheduler.Record([dst_region, src_region, pipeline, layout, sampler, src_depth_view,
                       src_stencil_view, this](vk::CommandBuffer cmdbuf) {
         // TODO: Barriers
@@ -572,59 +572,59 @@ void BlitImageHelper::BlitDepthStencil(const Framebuffer* dst_framebuffer,
 
 void BlitImageHelper::ConvertD32ToR32(const Framebuffer* dst_framebuffer,
                                       const ImageView& src_image_view) {
-    ConvertDepthToColorPipeline(convert_d32_to_r32_pipeline, dst_framebuffer->RenderPass());
+    ConvertDepthToColorPipeline(convert_d32_to_r32_pipeline, dst_framebuffer->RenderPass(0, false));
     Convert(*convert_d32_to_r32_pipeline, dst_framebuffer, src_image_view);
 }
 
 void BlitImageHelper::ConvertR32ToD32(const Framebuffer* dst_framebuffer,
                                       const ImageView& src_image_view) {
-    ConvertColorToDepthPipeline(convert_r32_to_d32_pipeline, dst_framebuffer->RenderPass());
+    ConvertColorToDepthPipeline(convert_r32_to_d32_pipeline, dst_framebuffer->RenderPass(0, false));
     Convert(*convert_r32_to_d32_pipeline, dst_framebuffer, src_image_view);
 }
 
 void BlitImageHelper::ConvertD16ToR16(const Framebuffer* dst_framebuffer,
                                       const ImageView& src_image_view) {
-    ConvertDepthToColorPipeline(convert_d16_to_r16_pipeline, dst_framebuffer->RenderPass());
+    ConvertDepthToColorPipeline(convert_d16_to_r16_pipeline, dst_framebuffer->RenderPass(0, false));
     Convert(*convert_d16_to_r16_pipeline, dst_framebuffer, src_image_view);
 }
 
 void BlitImageHelper::ConvertR16ToD16(const Framebuffer* dst_framebuffer,
                                       const ImageView& src_image_view) {
-    ConvertColorToDepthPipeline(convert_r16_to_d16_pipeline, dst_framebuffer->RenderPass());
+    ConvertColorToDepthPipeline(convert_r16_to_d16_pipeline, dst_framebuffer->RenderPass(0, false));
     Convert(*convert_r16_to_d16_pipeline, dst_framebuffer, src_image_view);
 }
 
 void BlitImageHelper::ConvertABGR8ToD24S8(const Framebuffer* dst_framebuffer,
                                           const ImageView& src_image_view) {
-    ConvertPipelineDepthTargetEx(convert_abgr8_to_d24s8_pipeline, dst_framebuffer->RenderPass(),
+    ConvertPipelineDepthTargetEx(convert_abgr8_to_d24s8_pipeline, dst_framebuffer->RenderPass(0, false),
                                  convert_abgr8_to_d24s8_frag);
     Convert(*convert_abgr8_to_d24s8_pipeline, dst_framebuffer, src_image_view);
 }
 
 void BlitImageHelper::ConvertABGR8ToD32F(const Framebuffer* dst_framebuffer,
                                          const ImageView& src_image_view) {
-    ConvertPipelineDepthTargetEx(convert_abgr8_to_d32f_pipeline, dst_framebuffer->RenderPass(),
+    ConvertPipelineDepthTargetEx(convert_abgr8_to_d32f_pipeline, dst_framebuffer->RenderPass(0, false),
                                  convert_abgr8_to_d32f_frag);
     Convert(*convert_abgr8_to_d32f_pipeline, dst_framebuffer, src_image_view);
 }
 
 void BlitImageHelper::ConvertD32FToABGR8(const Framebuffer* dst_framebuffer,
                                          ImageView& src_image_view) {
-    ConvertPipelineColorTargetEx(convert_d32f_to_abgr8_pipeline, dst_framebuffer->RenderPass(),
+    ConvertPipelineColorTargetEx(convert_d32f_to_abgr8_pipeline, dst_framebuffer->RenderPass(0, false),
                                  convert_d32f_to_abgr8_frag);
     ConvertDepthStencil(*convert_d32f_to_abgr8_pipeline, dst_framebuffer, src_image_view);
 }
 
 void BlitImageHelper::ConvertD24S8ToABGR8(const Framebuffer* dst_framebuffer,
                                           ImageView& src_image_view) {
-    ConvertPipelineColorTargetEx(convert_d24s8_to_abgr8_pipeline, dst_framebuffer->RenderPass(),
+    ConvertPipelineColorTargetEx(convert_d24s8_to_abgr8_pipeline, dst_framebuffer->RenderPass(0, false),
                                  convert_d24s8_to_abgr8_frag);
     ConvertDepthStencil(*convert_d24s8_to_abgr8_pipeline, dst_framebuffer, src_image_view);
 }
 
 void BlitImageHelper::ConvertS8D24ToABGR8(const Framebuffer* dst_framebuffer,
                                           ImageView& src_image_view) {
-    ConvertPipelineColorTargetEx(convert_s8d24_to_abgr8_pipeline, dst_framebuffer->RenderPass(),
+    ConvertPipelineColorTargetEx(convert_s8d24_to_abgr8_pipeline, dst_framebuffer->RenderPass(0, false),
                                  convert_s8d24_to_abgr8_frag);
     ConvertDepthStencil(*convert_s8d24_to_abgr8_pipeline, dst_framebuffer, src_image_view);
 }
@@ -632,7 +632,7 @@ void BlitImageHelper::ConvertS8D24ToABGR8(const Framebuffer* dst_framebuffer,
 void BlitImageHelper::ConvertABGR8SRGBToD24S8(const Framebuffer* dst_framebuffer,
                                              const ImageView& src_image_view) {
     ConvertPipelineDepthTargetEx(convert_abgr8_srgb_to_d24s8_pipeline,
-                                dst_framebuffer->RenderPass(),
+                                dst_framebuffer->RenderPass(0, false),
                                 convert_abgr8_srgb_to_d24s8_frag);
     Convert(*convert_abgr8_srgb_to_d24s8_pipeline, dst_framebuffer, src_image_view);
 }
@@ -641,12 +641,12 @@ void BlitImageHelper::ClearColor(const Framebuffer* dst_framebuffer, u8 color_ma
                                  const std::array<f32, 4>& clear_color,
                                  const Region2D& dst_region) {
     const BlitImagePipelineKey key{
-        .renderpass = dst_framebuffer->RenderPass(),
+        .renderpass = dst_framebuffer->RenderPass(0, false),
         .operation = Tegra::Engines::Fermi2D::Operation::BlendPremult,
     };
     const VkPipeline pipeline = FindOrEmplaceClearColorPipeline(key);
     const VkPipelineLayout layout = *clear_color_pipeline_layout;
-    scheduler.RequestRenderpass(dst_framebuffer);
+    scheduler.RequestRenderpass(dst_framebuffer, 0, false);
     scheduler.Record(
         [pipeline, layout, color_mask, clear_color, dst_region](vk::CommandBuffer cmdbuf) {
             cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
@@ -665,7 +665,7 @@ void BlitImageHelper::ClearDepthStencil(const Framebuffer* dst_framebuffer, bool
                                         f32 clear_depth, u8 stencil_mask, u32 stencil_ref,
                                         u32 stencil_compare_mask, const Region2D& dst_region) {
     const BlitDepthStencilPipelineKey key{
-        .renderpass = dst_framebuffer->RenderPass(),
+        .renderpass = dst_framebuffer->RenderPass(0, false),
         .depth_clear = depth_clear,
         .stencil_mask = stencil_mask,
         .stencil_compare_mask = stencil_compare_mask,
@@ -673,7 +673,7 @@ void BlitImageHelper::ClearDepthStencil(const Framebuffer* dst_framebuffer, bool
     };
     const VkPipeline pipeline = FindOrEmplaceClearStencilPipeline(key);
     const VkPipelineLayout layout = *clear_color_pipeline_layout;
-    scheduler.RequestRenderpass(dst_framebuffer);
+    scheduler.RequestRenderpass(dst_framebuffer, 0, false);
     scheduler.Record([pipeline, layout, clear_depth, dst_region](vk::CommandBuffer cmdbuf) {
         constexpr std::array blend_constants{0.0f, 0.0f, 0.0f, 0.0f};
         cmdbuf.SetBlendConstants(blend_constants.data());
@@ -692,7 +692,7 @@ void BlitImageHelper::Convert(VkPipeline pipeline, const Framebuffer* dst_frameb
     const VkSampler sampler = *nearest_sampler;
     const VkExtent2D extent = GetConversionExtent(src_image_view);
 
-    scheduler.RequestRenderpass(dst_framebuffer);
+    scheduler.RequestRenderpass(dst_framebuffer, 0, false);
     scheduler.Record([pipeline, layout, sampler, src_view, extent, this](vk::CommandBuffer cmdbuf) {
         const VkOffset2D offset{
             .x = 0,
@@ -737,7 +737,7 @@ void BlitImageHelper::ConvertDepthStencil(VkPipeline pipeline, const Framebuffer
     const VkSampler sampler = *nearest_sampler;
     const VkExtent2D extent = GetConversionExtent(src_image_view);
 
-    scheduler.RequestRenderpass(dst_framebuffer);
+    scheduler.RequestRenderpass(dst_framebuffer, 0, false);
     scheduler.Record([pipeline, layout, sampler, src_depth_view, src_stencil_view, extent,
                       this](vk::CommandBuffer cmdbuf) {
         const VkOffset2D offset{
@@ -1108,7 +1108,7 @@ void BlitImageHelper::ConvertPipeline(vk::Pipeline& pipeline, VkRenderPass rende
 void BlitImageHelper::ConvertRGBAtoGBRA(const Framebuffer* dst_framebuffer,
                                        const ImageView& src_image_view) {
     ConvertPipeline(convert_rgba_to_bgra_pipeline,
-                    dst_framebuffer->RenderPass(),
+                    dst_framebuffer->RenderPass(0, false),
                     false);
     Convert(*convert_rgba_to_bgra_pipeline, dst_framebuffer, src_image_view);
 }
@@ -1116,7 +1116,7 @@ void BlitImageHelper::ConvertRGBAtoGBRA(const Framebuffer* dst_framebuffer,
 void BlitImageHelper::ConvertYUV420toRGB(const Framebuffer* dst_framebuffer,
                                        const ImageView& src_image_view) {
     ConvertPipeline(convert_yuv420_to_rgb_pipeline,
-                    dst_framebuffer->RenderPass(),
+                    dst_framebuffer->RenderPass(0, false),
                     false);
     Convert(*convert_yuv420_to_rgb_pipeline, dst_framebuffer, src_image_view);
 }
@@ -1124,7 +1124,7 @@ void BlitImageHelper::ConvertYUV420toRGB(const Framebuffer* dst_framebuffer,
 void BlitImageHelper::ConvertRGBtoYUV420(const Framebuffer* dst_framebuffer,
                                        const ImageView& src_image_view) {
     ConvertPipeline(convert_rgb_to_yuv420_pipeline,
-                    dst_framebuffer->RenderPass(),
+                    dst_framebuffer->RenderPass(0, false),
                     false);
     Convert(*convert_rgb_to_yuv420_pipeline, dst_framebuffer, src_image_view);
 }
@@ -1132,7 +1132,7 @@ void BlitImageHelper::ConvertRGBtoYUV420(const Framebuffer* dst_framebuffer,
 void BlitImageHelper::ConvertBC7toRGBA8(const Framebuffer* dst_framebuffer,
                                        const ImageView& src_image_view) {
     ConvertPipeline(convert_bc7_to_rgba8_pipeline,
-                    dst_framebuffer->RenderPass(),
+                    dst_framebuffer->RenderPass(0, false),
                     false);
     Convert(*convert_bc7_to_rgba8_pipeline, dst_framebuffer, src_image_view);
 }
@@ -1140,7 +1140,7 @@ void BlitImageHelper::ConvertBC7toRGBA8(const Framebuffer* dst_framebuffer,
 void BlitImageHelper::ConvertASTCHDRtoRGBA16F(const Framebuffer* dst_framebuffer,
                                              const ImageView& src_image_view) {
     ConvertPipeline(convert_astc_hdr_to_rgba16f_pipeline,
-                    dst_framebuffer->RenderPass(),
+                    dst_framebuffer->RenderPass(0, false),
                     false);
     Convert(*convert_astc_hdr_to_rgba16f_pipeline, dst_framebuffer, src_image_view);
 }
@@ -1148,7 +1148,7 @@ void BlitImageHelper::ConvertASTCHDRtoRGBA16F(const Framebuffer* dst_framebuffer
 void BlitImageHelper::ConvertRGBA16FtoRGBA8(const Framebuffer* dst_framebuffer,
                                            const ImageView& src_image_view) {
     ConvertPipeline(convert_rgba16f_to_rgba8_pipeline,
-                    dst_framebuffer->RenderPass(),
+                    dst_framebuffer->RenderPass(0, false),
                     false);
     Convert(*convert_rgba16f_to_rgba8_pipeline, dst_framebuffer, src_image_view);
 }
@@ -1156,7 +1156,7 @@ void BlitImageHelper::ConvertRGBA16FtoRGBA8(const Framebuffer* dst_framebuffer,
 void BlitImageHelper::ApplyDitherTemporal(const Framebuffer* dst_framebuffer,
                                          const ImageView& src_image_view) {
     ConvertPipeline(dither_temporal_pipeline,
-                    dst_framebuffer->RenderPass(),
+                    dst_framebuffer->RenderPass(0, false),
                     false);
     Convert(*dither_temporal_pipeline, dst_framebuffer, src_image_view);
 }
@@ -1164,7 +1164,7 @@ void BlitImageHelper::ApplyDitherTemporal(const Framebuffer* dst_framebuffer,
 void BlitImageHelper::ApplyDynamicResolutionScale(const Framebuffer* dst_framebuffer,
                                                  const ImageView& src_image_view) {
     ConvertPipeline(dynamic_resolution_scale_pipeline,
-                    dst_framebuffer->RenderPass(),
+                    dst_framebuffer->RenderPass(0, false),
                     false);
     Convert(*dynamic_resolution_scale_pipeline, dst_framebuffer, src_image_view);
 }

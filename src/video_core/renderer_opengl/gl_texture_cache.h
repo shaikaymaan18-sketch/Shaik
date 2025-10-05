@@ -15,6 +15,7 @@
 #include "video_core/renderer_opengl/util_shaders.h"
 #include "video_core/texture_cache/image_view_base.h"
 #include "video_core/texture_cache/texture_cache_base.h"
+#include "video_core/surface.h"
 
 namespace Settings {
 struct ResolutionScalingInfo;
@@ -65,6 +66,13 @@ class TextureCacheRuntime {
     friend Sampler;
 
 public:
+    struct FeedbackLoopRequest {
+        bool active{};
+        u8 color_mask{};
+        bool depth{};
+        bool supported{};
+    };
+
     explicit TextureCacheRuntime(const Device& device, ProgramManager& program_manager,
                                  StateTracker& state_tracker,
                                  StagingBufferPool& staging_buffer_pool);
@@ -145,6 +153,10 @@ public:
         // OpenGL does not require a barrier for attachment feedback loops.
     }
 
+    void SetFeedbackLoopRequest(u8 color_mask, bool depth, bool supported);
+    FeedbackLoopRequest ConsumeFeedbackLoopRequest();
+    bool SupportsAttachmentFeedbackLoopFormat(VideoCore::Surface::PixelFormat format, bool is_depth) const;
+
 private:
     const Device& device;
     StateTracker& state_tracker;
@@ -170,6 +182,7 @@ private:
     std::array<OGLFramebuffer, 4> rescale_read_fbos;
     const Settings::ResolutionScalingInfo& resolution;
     u64 device_access_memory;
+    FeedbackLoopRequest pending_feedback_request{};
 };
 
 class Image : public VideoCommon::ImageBase {

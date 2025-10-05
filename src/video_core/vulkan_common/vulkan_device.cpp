@@ -376,10 +376,10 @@ void Device::RemoveExtension(bool& extension, const std::string& extension_name)
     loaded_extensions.erase(extension_name);
 }
 
-void Device::RemoveExtensionIfUnsuitable(bool is_suitable, const std::string& extension_name) {
-    if (loaded_extensions.contains(extension_name) && !is_suitable) {
+void Device::RemoveExtensionIfUnsuitable(bool& extension, const std::string& extension_name) {
+    if (!extension && loaded_extensions.contains(extension_name)) {
         LOG_WARNING(Render_Vulkan, "Removing unsuitable extension {}", extension_name);
-        this->RemoveExtension(is_suitable, extension_name);
+        RemoveExtension(extension, extension_name);
     }
 }
 
@@ -400,11 +400,11 @@ void Device::RemoveExtensionFeature(bool& extension, Feature& feature,
 }
 
 template <typename Feature>
-void Device::RemoveExtensionFeatureIfUnsuitable(bool is_suitable, Feature& feature,
+void Device::RemoveExtensionFeatureIfUnsuitable(bool& extension, Feature& feature,
                                                 const std::string& extension_name) {
-    if (loaded_extensions.contains(extension_name) && !is_suitable) {
+    if (!extension && loaded_extensions.contains(extension_name)) {
         LOG_WARNING(Render_Vulkan, "Removing features for unsuitable extension {}", extension_name);
-        this->RemoveExtensionFeature(is_suitable, feature, extension_name);
+        RemoveExtensionFeature(extension, feature, extension_name);
     }
 }
 
@@ -886,6 +886,65 @@ bool Device::IsFormatSupported(VkFormat wanted_format, VkFormatFeatureFlags want
     return (supported_usage & wanted_usage) == wanted_usage;
 }
 
+bool Device::SupportsAttachmentFeedbackLoop(VkFormat format, FormatType type) const noexcept {
+    if (!supports_attachment_feedback_loop_layout || format == VK_FORMAT_UNDEFINED) {
+        return false;
+    }
+
+    VkFormatProperties3 props3{
+        .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_3,
+        .pNext = nullptr,
+    };
+    VkFormatProperties2 props2{
+        .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2,
+        .pNext = &props3,
+    };
+    physical.GetFormatProperties2(format, props2);
+
+    [[maybe_unused]] VkFormatFeatureFlags feature_flags = 0;
+    [[maybe_unused]] VkFormatFeatureFlags2 feature_flags2 = 0;
+    switch (type) {
+    case FormatType::Linear:
+        feature_flags = props2.formatProperties.linearTilingFeatures;
+        feature_flags2 = props3.linearTilingFeatures;
+        break;
+    case FormatType::Optimal:
+        feature_flags = props2.formatProperties.optimalTilingFeatures;
+        feature_flags2 = props3.optimalTilingFeatures;
+        break;
+    case FormatType::Buffer:
+        feature_flags = props2.formatProperties.bufferFeatures;
+        feature_flags2 = props3.bufferFeatures;
+        break;
+    default:
+        break;
+    }
+
+#ifdef VK_FORMAT_FEATURE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT
+    const bool has_core_bit =
+        (feature_flags & VK_FORMAT_FEATURE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT) != 0;
+#else
+    const bool has_core_bit = false;
+#endif
+#ifdef VK_FORMAT_FEATURE_2_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT
+    const bool has_khr_bit =
+        (feature_flags2 & VK_FORMAT_FEATURE_2_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT) != 0;
+#else
+    const bool has_khr_bit = false;
+#endif
+
+    const bool supported = has_core_bit || has_khr_bit;
+    if (supported) {
+        static bool logged = false;
+        if (!logged) {
+            logged = true;
+            LOG_INFO(Render_Vulkan, "Attachment feedback loop layout successfully enabled");
+        }
+    }
+
+    return supported;
+}
+
 std::string Device::GetDriverName() const {
     switch (properties.driver.driverID) {
     case VK_DRIVER_ID_AMD_PROPRIETARY:
@@ -1294,6 +1353,20 @@ void Device::RemoveUnsuitableExtensions() {
     RemoveExtensionFeatureIfUnsuitable(extensions.vertex_input_dynamic_state,
                                        features.vertex_input_dynamic_state,
                                        VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
+
+    // VK_EXT_attachment_feedback_loop_layout
+    supports_attachment_feedback_loop_layout = false;
+    if (extensions.attachment_feedback_loop_layout) {
+        supports_attachment_feedback_loop_layout =
+            features.attachment_feedback_loop_layout.attachmentFeedbackLoopLayout;
+        extensions.attachment_feedback_loop_layout =
+            supports_attachment_feedback_loop_layout;
+    }
+    RemoveExtensionFeatureIfUnsuitable(extensions.attachment_feedback_loop_layout,
+                                       features.attachment_feedback_loop_layout,
+                                       VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME);
+    supports_attachment_feedback_loop_layout =
+        extensions.attachment_feedback_loop_layout;
 
     // VK_KHR_pipeline_executable_properties
     if (Settings::values.renderer_shader_feedback.GetValue()) {

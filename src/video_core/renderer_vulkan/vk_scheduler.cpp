@@ -89,19 +89,24 @@ void Scheduler::DispatchWork() {
     AcquireNewChunk();
 }
 
-void Scheduler::RequestRenderpass(const Framebuffer* framebuffer) {
-    const VkRenderPass renderpass = framebuffer->RenderPass();
+void Scheduler::RequestRenderpass(const Framebuffer* framebuffer, std::uint8_t color_feedback_mask,
+                                  bool depth_feedback) {
+    const VkRenderPass renderpass = framebuffer->RenderPass(color_feedback_mask, depth_feedback);
     const VkFramebuffer framebuffer_handle = framebuffer->Handle();
     const VkExtent2D render_area = framebuffer->RenderArea();
     if (renderpass == state.renderpass && framebuffer_handle == state.framebuffer &&
         render_area.width == state.render_area.width &&
-        render_area.height == state.render_area.height) {
+        render_area.height == state.render_area.height &&
+        state.renderpass_color_feedback_mask == color_feedback_mask &&
+        state.renderpass_depth_feedback == depth_feedback) {
         return;
     }
     EndRenderPass();
     state.renderpass = renderpass;
     state.framebuffer = framebuffer_handle;
     state.render_area = render_area;
+    state.renderpass_color_feedback_mask = color_feedback_mask;
+    state.renderpass_depth_feedback = depth_feedback;
 
     Record([renderpass, framebuffer_handle, render_area](vk::CommandBuffer cmdbuf) {
         const VkRenderPassBeginInfo renderpass_bi{
@@ -338,6 +343,8 @@ void Scheduler::EndRenderPass()
         });
 
         state.renderpass = nullptr;
+        state.renderpass_color_feedback_mask = 0;
+        state.renderpass_depth_feedback = false;
         num_renderpass_images = 0;
     }
 

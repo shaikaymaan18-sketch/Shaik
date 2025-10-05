@@ -53,7 +53,8 @@ public:
     void DispatchWork();
 
     /// Requests to begin a renderpass.
-    void RequestRenderpass(const Framebuffer* framebuffer);
+    void RequestRenderpass(const Framebuffer* framebuffer, std::uint8_t color_feedback_mask,
+                             bool depth_feedback);
 
     /// Requests the current execution context to be able to execute operations only allowed outside
     /// of a renderpass.
@@ -211,6 +212,8 @@ private:
         VkRenderPass renderpass = nullptr;
         VkFramebuffer framebuffer = nullptr;
         VkExtent2D render_area = {0, 0};
+        std::uint8_t renderpass_color_feedback_mask = 0;
+        bool renderpass_depth_feedback = false;
         GraphicsPipeline* graphics_pipeline = nullptr;
         bool is_rescaling = false;
         bool rescaling_defined = false;

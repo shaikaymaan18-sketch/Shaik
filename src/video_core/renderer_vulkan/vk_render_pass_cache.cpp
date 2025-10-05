@@ -82,9 +82,11 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
     for (size_t index = 0; index < key.color_formats.size(); ++index) {
         const PixelFormat format{key.color_formats[index]};
         const bool is_valid{format != PixelFormat::Invalid};
+        const bool feedback = (key.color_feedback_mask & (1u << index)) != 0;
         references[index] = VkAttachmentReference{
             .attachment = is_valid ? num_colors : VK_ATTACHMENT_UNUSED,
-            .layout = VK_IMAGE_LAYOUT_GENERAL,
+            .layout = feedback ? VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                               : VK_IMAGE_LAYOUT_GENERAL,
         };
         if (is_valid) {
             descriptions.push_back(AttachmentDescription(*device, format, key.samples));
@@ -97,7 +99,8 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
     if (key.depth_format != PixelFormat::Invalid) {
         depth_reference = VkAttachmentReference{
             .attachment = num_colors,
-            .layout = VK_IMAGE_LAYOUT_GENERAL,
+            .layout = key.depth_feedback ? VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT
+                                         : VK_IMAGE_LAYOUT_GENERAL,
         };
         descriptions.push_back(AttachmentDescription(*device, key.depth_format, key.samples));
     }
@@ -113,6 +116,11 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
         .preserveAttachmentCount = 0,
         .pPreserveAttachments = nullptr,
     };
+    VkDependencyFlags dependency_flags = VK_DEPENDENCY_BY_REGION_BIT;
+    if (device->IsAttachmentFeedbackLoopLayoutSupported() &&
+        (key.color_feedback_mask != 0 || key.depth_feedback)) {
+        dependency_flags |= VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT;
+    }
     const VkSubpassDependency dependency{
             .srcSubpass = 0,  // Current subpass
             .dstSubpass = 0,  // Same subpass (self-dependency)
@@ -123,7 +131,7 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
             .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
                              VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-            .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT
+            .dependencyFlags = dependency_flags
     };
     pair->second = device->GetLogical().CreateRenderPass({
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,

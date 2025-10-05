@@ -11,6 +11,7 @@
 
 #include "video_core/renderer_vulkan/renderer_vulkan.h"
 
+#include "common/common_types.h"
 #include "common/assert.h"
 #include "common/logging/log.h"
 #include "common/scope_exit.h"
@@ -210,26 +211,62 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {
     FlushWork();
     gpu_memory->FlushCaching();
 
-    GraphicsPipeline* const pipeline{pipeline_cache.CurrentGraphicsPipeline()};
-    if (!pipeline) {
-        return;
+    TextureCacheRuntime::FeedbackLoopRequest feedback_request{};
+
+    while (true) {
+        GraphicsPipeline* const pipeline{pipeline_cache.CurrentGraphicsPipeline()};
+        if (!pipeline) {
+            return;
+        }
+        bool configured = false;
+        {
+            std::scoped_lock lock{buffer_cache.mutex, texture_cache.mutex};
+            pipeline->SetEngine(maxwell3d, gpu_memory);
+            configured = pipeline->Configure(is_indexed);
+            feedback_request = texture_cache.ConsumeFeedbackLoopRequest();
+            if (feedback_request.active && feedback_request.supported) {
+                const bool mask_matches = pipeline->AttachmentFeedbackMask() == feedback_request.color_mask;
+                const bool depth_matches = pipeline->HasDepthAttachmentFeedback() == feedback_request.depth;
+                if (!configured || !mask_matches || !depth_matches) {
+                    pipeline_cache.SetAttachmentFeedback(feedback_request.color_mask, feedback_request.depth);
+                    continue;
+                }
+                pipeline_cache.SetAttachmentFeedback(feedback_request.color_mask, feedback_request.depth);
+            } else if (feedback_request.active && !feedback_request.supported) {
+                pipeline_cache.SetAttachmentFeedback(0, false);
+                LOG_WARNING(Render_Vulkan, "Falling back to feedback loop copy path");
+                texture_cache_runtime.BarrierFeedbackLoop();
+                feedback_request = {};
+                if (!configured) {
+                    return;
+                }
+            } else {
+                pipeline_cache.SetAttachmentFeedback(0, false);
+            }
+            if (!configured) {
+                return;
+            }
+
+            const u8 feedback_mask =
+                (feedback_request.active && feedback_request.supported) ? feedback_request.color_mask : 0;
+            const bool depth_feedback =
+                (feedback_request.active && feedback_request.supported) ? feedback_request.depth : false;
+            const Framebuffer* const framebuffer = texture_cache.GetFramebuffer();
+            scheduler.RequestRenderpass(framebuffer, feedback_mask, depth_feedback);
+
+            UpdateDynamicStates();
+
+            HandleTransformFeedback();
+            query_cache.NotifySegment(true);
+            query_cache.CounterEnable(VideoCommon::QueryType::ZPassPixelCount64,
+                                      maxwell3d->regs.zpass_pixel_count_enable);
+
+            draw_func();
+
+            query_cache.CounterEnable(VideoCommon::QueryType::StreamingByteCount, false);
+            return;
+        }
     }
-    std::scoped_lock lock{buffer_cache.mutex, texture_cache.mutex};
-    // update engine as channel may be different.
-    pipeline->SetEngine(maxwell3d, gpu_memory);
-    if (!pipeline->Configure(is_indexed))
-        return;
-
-    UpdateDynamicStates();
-
-    HandleTransformFeedback();
-    query_cache.NotifySegment(true);
-    query_cache.CounterEnable(VideoCommon::QueryType::ZPassPixelCount64,
-                              maxwell3d->regs.zpass_pixel_count_enable);
-
-    draw_func();
-
-    query_cache.CounterEnable(VideoCommon::QueryType::StreamingByteCount, false);
 }
 
 void RasterizerVulkan::Draw(bool is_indexed, u32 instance_count) {
@@ -363,7 +400,7 @@ void RasterizerVulkan::Clear(u32 layer_count) {
     texture_cache.UpdateRenderTargets(true);
     const Framebuffer* const framebuffer = texture_cache.GetFramebuffer();
     const VkExtent2D render_area = framebuffer->RenderArea();
-    scheduler.RequestRenderpass(framebuffer);
+    scheduler.RequestRenderpass(framebuffer, 0, false);
 
     query_cache.NotifySegment(true);
     query_cache.CounterEnable(VideoCommon::QueryType::ZPassPixelCount64,

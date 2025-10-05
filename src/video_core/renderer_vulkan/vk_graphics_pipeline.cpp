@@ -501,7 +501,6 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
 
 void GraphicsPipeline::ConfigureDraw(const RescalingPushConstant& rescaling,
                                      const RenderAreaPushConstant& render_area) {
-    scheduler.RequestRenderpass(texture_cache.GetFramebuffer());
     if (!is_built.load(std::memory_order::relaxed)) {
         // Wait for the pipeline to be built
         scheduler.Record([this](vk::CommandBuffer) {
@@ -900,6 +899,14 @@ void GraphicsPipeline::MakePipeline(VkRenderPass render_pass) {
     VkPipelineCreateFlags flags{};
     if (device.IsKhrPipelineExecutablePropertiesEnabled() && Settings::values.renderer_debug.GetValue()) {
         flags |= VK_PIPELINE_CREATE_CAPTURE_STATISTICS_BIT_KHR;
+    }
+    if (device.IsAttachmentFeedbackLoopLayoutSupported()) {
+        if (key.state.AttachmentFeedbackMask() != 0) {
+            flags |= VK_PIPELINE_CREATE_COLOR_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+        }
+        if (key.state.HasDepthAttachmentFeedback()) {
+            flags |= VK_PIPELINE_CREATE_DEPTH_STENCIL_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+        }
     }
 
     pipeline = device.GetLogical().CreateGraphicsPipeline(

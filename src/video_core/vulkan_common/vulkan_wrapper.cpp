@@ -300,7 +300,8 @@ bool Load(VkInstance instance, InstanceDispatch& dld) noexcept {
 
     return X(vkCreateDevice) && X(vkDestroyDevice) && X(vkDestroyDevice) &&
            X(vkEnumerateDeviceExtensionProperties) && X(vkEnumeratePhysicalDevices) &&
-           X(vkGetDeviceProcAddr) && X(vkGetPhysicalDeviceFormatProperties) &&
+           X(vkGetDeviceProcAddr) && X(vkGetPhysicalDeviceFormatProperties2) &&
+           X(vkGetPhysicalDeviceFormatProperties) &&
            X(vkGetPhysicalDeviceMemoryProperties) && X(vkGetPhysicalDeviceMemoryProperties2) &&
            X(vkGetPhysicalDeviceProperties) && X(vkGetPhysicalDeviceQueueFamilyProperties);
 #undef X
@@ -903,6 +904,28 @@ VkFormatProperties PhysicalDevice::GetFormatProperties(VkFormat format) const no
     VkFormatProperties properties;
     dld->vkGetPhysicalDeviceFormatProperties(physical_device, format, &properties);
     return properties;
+}
+
+void PhysicalDevice::GetFormatProperties2(VkFormat format, VkFormatProperties2& properties) const noexcept {
+    if (dld->vkGetPhysicalDeviceFormatProperties2) {
+        dld->vkGetPhysicalDeviceFormatProperties2(physical_device, format, &properties);
+        return;
+    }
+
+    dld->vkGetPhysicalDeviceFormatProperties(physical_device, format, &properties.formatProperties);
+
+    if (!properties.pNext) {
+        return;
+    }
+
+    for (VkBaseOutStructure* next = reinterpret_cast<VkBaseOutStructure*>(properties.pNext); next; next = next->pNext) {
+        if (next->sType == VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_3) {
+            auto* props3 = reinterpret_cast<VkFormatProperties3*>(next);
+            props3->linearTilingFeatures = 0;
+            props3->optimalTilingFeatures = 0;
+            props3->bufferFeatures = 0;
+        }
+    }
 }
 
 std::vector<VkExtensionProperties> PhysicalDevice::EnumerateDeviceExtensionProperties() const {

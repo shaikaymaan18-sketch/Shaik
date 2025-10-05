@@ -58,6 +58,8 @@ VK_DEFINE_HANDLE(VmaAllocator)
     FEATURE(EXT, Robustness2, ROBUSTNESS_2, robustness2)                                           \
     FEATURE(EXT, TransformFeedback, TRANSFORM_FEEDBACK, transform_feedback)                        \
     FEATURE(EXT, VertexInputDynamicState, VERTEX_INPUT_DYNAMIC_STATE, vertex_input_dynamic_state)  \
+    FEATURE(EXT, AttachmentFeedbackLoopLayout, ATTACHMENT_FEEDBACK_LOOP_LAYOUT,                    \
+            attachment_feedback_loop_layout)                                                       \
     FEATURE(KHR, PipelineExecutableProperties, PIPELINE_EXECUTABLE_PROPERTIES,                     \
             pipeline_executable_properties)                                                        \
     FEATURE(KHR, WorkgroupMemoryExplicitLayout, WORKGROUP_MEMORY_EXPLICIT_LAYOUT,                  \
@@ -515,6 +517,10 @@ public:
     }
 
     /// Returns true if the device supports VK_EXT_custom_border_color.
+    bool IsAttachmentFeedbackLoopLayoutSupported() const {
+        return supports_attachment_feedback_loop_layout;
+    }
+
     bool IsExtCustomBorderColorSupported() const {
         return extensions.custom_border_color;
     }
@@ -693,6 +699,9 @@ public:
         return supports_conditional_barriers;
     }
 
+    bool SupportsAttachmentFeedbackLoop(VkFormat format,
+                                        FormatType type = FormatType::Optimal) const noexcept;
+
     bool SupportsMultiViewport() const {
         return features2.features.multiViewport;
     }
@@ -734,13 +743,13 @@ private:
     void RemoveUnsuitableExtensions();
 
     void RemoveExtension(bool& extension, const std::string& extension_name);
-    void RemoveExtensionIfUnsuitable(bool is_suitable, const std::string& extension_name);
+    void RemoveExtensionIfUnsuitable(bool& extension, const std::string& extension_name);
 
     template <typename Feature>
     void RemoveExtensionFeature(bool& extension, Feature& feature,
                                 const std::string& extension_name);
     template <typename Feature>
-    void RemoveExtensionFeatureIfUnsuitable(bool is_suitable, Feature& feature,
+    void RemoveExtensionFeatureIfUnsuitable(bool& extension, Feature& feature,
                                             const std::string& extension_name);
 
     /// Sets up queue families.
@@ -842,6 +851,7 @@ private:
     bool must_emulate_bgr565{};                ///< Emulates BGR565 by swizzling RGB565 format.
     bool dynamic_state3_blending{};            ///< Has all blending features of dynamic_state3.
     bool dynamic_state3_enables{};             ///< Has all enables features of dynamic_state3.
+    bool supports_attachment_feedback_loop_layout{}; ///< Has attachment feedback loop layout support
     bool supports_conditional_barriers{};      ///< Allows barriers in conditional control flow.
     u64 device_access_memory{};                ///< Total size of device local memory in bytes.
     u32 sets_per_pool{};                       ///< Sets per Description Pool

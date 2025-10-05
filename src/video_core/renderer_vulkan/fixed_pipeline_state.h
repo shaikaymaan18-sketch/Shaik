@@ -214,6 +214,8 @@ struct FixedPipelineState {
         BitField<15, 1, u32> alpha_to_coverage_enabled;
         BitField<16, 1, u32> alpha_to_one_enabled;
         BitField<17, 3, Tegra::Engines::Maxwell3D::EngineHint> app_stage;
+        BitField<20, 8, u32> color_feedback_mask;
+        BitField<28, 1, u32> depth_feedback;
     };
     std::array<u8, Maxwell::NumRenderTargets> color_formats;
 
@@ -240,6 +242,19 @@ struct FixedPipelineState {
 
     u32 line_stipple_factor;
     u32 line_stipple_pattern;
+
+    void SetAttachmentFeedback(u8 mask, bool depth) noexcept {
+        color_feedback_mask.Assign(mask);
+        depth_feedback.Assign(depth ? 1u : 0u);
+    }
+
+    [[nodiscard]] u8 AttachmentFeedbackMask() const noexcept {
+        return static_cast<u8>(color_feedback_mask.Value());
+    }
+
+    [[nodiscard]] bool HasDepthAttachmentFeedback() const noexcept {
+        return depth_feedback != 0;
+    }
 
     void Refresh(Tegra::Engines::Maxwell3D& maxwell3d, DynamicFeatures& features);
 

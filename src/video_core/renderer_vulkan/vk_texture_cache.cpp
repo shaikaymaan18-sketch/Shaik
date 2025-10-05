@@ -137,7 +137,7 @@ constexpr VkBorderColor ConvertBorderColor(const std::array<float, 4>& color) {
         flags |= VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT;
     }
     const auto [samples_x, samples_y] = VideoCommon::SamplesLog2(info.num_samples);
-    return VkImageCreateInfo{
+    VkImageCreateInfo image_ci{
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .pNext = nullptr,
         .flags = flags,
@@ -158,6 +158,13 @@ constexpr VkBorderColor ConvertBorderColor(const std::array<float, 4>& color) {
         .pQueueFamilyIndices = nullptr,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
     };
+    if (device.IsAttachmentFeedbackLoopLayoutSupported() && format_info.attachable &&
+        (image_ci.usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) != 0) {
+        if (device.SupportsAttachmentFeedbackLoop(format_info.format, FormatType::Optimal)) {
+            image_ci.usage |= VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+        }
+    }
+    return image_ci;
 }
 
 [[nodiscard]] vk::Image MakeImage(const Device& device, const MemoryAllocator& allocator,
@@ -943,6 +950,19 @@ void TextureCacheRuntime::BarrierFeedbackLoop() {
     scheduler.RequestOutsideRenderPassOperationContext();
 }
 
+void TextureCacheRuntime::SetFeedbackLoopRequest(u8 color_mask, bool depth, bool supported) {
+    pending_feedback_request.active = (color_mask != 0) || depth;
+    pending_feedback_request.color_mask = color_mask;
+    pending_feedback_request.depth = depth;
+    pending_feedback_request.supported = supported;
+}
+
+TextureCacheRuntime::FeedbackLoopRequest TextureCacheRuntime::ConsumeFeedbackLoopRequest() {
+    FeedbackLoopRequest request = pending_feedback_request;
+    pending_feedback_request = {};
+    return request;
+}
+
 void TextureCacheRuntime::ReinterpretImage(Image& dst, Image& src,
                                            std::span<const VideoCommon::ImageCopy> copies) {
     boost::container::small_vector<VkBufferImageCopy, 16> vk_in_copies(copies.size());
@@ -1204,7 +1224,7 @@ void TextureCacheRuntime::BlitImage(Framebuffer* dst_framebuffer, ImageView& dst
 }
 
 void TextureCacheRuntime::ConvertImage(Framebuffer* dst, ImageView& dst_view, ImageView& src_view) {
-    if (!dst->RenderPass()) {
+    if (!dst->RenderPass(0, false)) {
         return;
     }
 
@@ -1345,6 +1365,20 @@ VkFormat TextureCacheRuntime::GetSupportedFormat(VkFormat requested_format,
         return VK_FORMAT_D24_UNORM_S8_UINT;
     }
     return requested_format;
+}
+
+bool TextureCacheRuntime::SupportsAttachmentFeedbackLoopFormat(VideoCore::Surface::PixelFormat format,
+                                                              bool is_depth) const {
+    if (!device.IsAttachmentFeedbackLoopLayoutSupported()) {
+        return false;
+    }
+    const bool wants_srgb = !is_depth && VideoCore::Surface::IsPixelFormatSRGB(format);
+    const auto format_info =
+        MaxwellToVK::SurfaceFormat(device, FormatType::Optimal, wants_srgb, format);
+    if (!format_info.attachable) {
+        return false;
+    }
+    return device.SupportsAttachmentFeedbackLoop(format_info.format, FormatType::Optimal);
 }
 
 // Helper functions for format compatibility checks
@@ -2340,6 +2374,8 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
     }
     renderpass_key.samples = samples;
 
+    base_key = renderpass_key;
+    render_pass_cache = &runtime.render_pass_cache;
     renderpass = runtime.render_pass_cache.Get(renderpass_key);
     render_area.width = (std::min)(render_area.width, width);
     render_area.height = (std::min)(render_area.height, height);
@@ -2356,6 +2392,16 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
         .height = render_area.height,
         .layers = static_cast<u32>((std::max)(num_layers, 1)),
     });
+}
+
+VkRenderPass Framebuffer::RenderPass(std::uint8_t color_feedback_mask, bool depth_feedback) const noexcept {
+    if (color_feedback_mask == 0 && !depth_feedback) {
+        return renderpass;
+    }
+    RenderPassKey key = base_key;
+    key.color_feedback_mask = color_feedback_mask;
+    key.depth_feedback = depth_feedback;
+    return render_pass_cache->Get(key);
 }
 
 void TextureCacheRuntime::AccelerateImageUpload(

@@ -4,11 +4,14 @@
 #pragma once
 
 #include <span>
+#include <cstdint>
 
+#include "common/common_types.h"
 #include "video_core/texture_cache/texture_cache_base.h"
 
 #include "shader_recompiler/shader_info.h"
 #include "video_core/renderer_vulkan/vk_compute_pass.h"
+#include "video_core/renderer_vulkan/vk_render_pass_cache.h"
 #include "video_core/renderer_vulkan/vk_staging_buffer_pool.h"
 #include "video_core/texture_cache/image_view_base.h"
 #include "video_core/vulkan_common/vulkan_memory_allocator.h"
@@ -38,6 +41,13 @@ class Scheduler;
 
 class TextureCacheRuntime {
 public:
+    struct FeedbackLoopRequest {
+        bool active{};
+        u8 color_mask{};
+        bool depth{};
+        bool supported{};
+    };
+
     explicit TextureCacheRuntime(const Device& device_, Scheduler& scheduler_,
                                  MemoryAllocator& memory_allocator_,
                                  StagingBufferPool& staging_buffer_pool_,
@@ -109,11 +119,14 @@ public:
     }
 
     void BarrierFeedbackLoop();
+    void SetFeedbackLoopRequest(u8 color_mask, bool depth, bool supported);
+    FeedbackLoopRequest ConsumeFeedbackLoopRequest();
 
     bool IsFormatDitherable(VideoCore::Surface::PixelFormat format);
     bool IsFormatScalable(VideoCore::Surface::PixelFormat format);
 
     VkFormat GetSupportedFormat(VkFormat requested_format, VkFormatFeatureFlags required_features) const;
+    bool SupportsAttachmentFeedbackLoopFormat(VideoCore::Surface::PixelFormat format, bool is_depth) const;
 
     const Device& device;
     Scheduler& scheduler;
@@ -125,6 +138,8 @@ public:
     std::unique_ptr<MSAACopyPass> msaa_copy_pass;
     const Settings::ResolutionScalingInfo& resolution;
     std::array<std::vector<VkFormat>, VideoCore::Surface::MaxPixelFormat> view_formats;
+
+    FeedbackLoopRequest pending_feedback_request{};
 
     static constexpr size_t indexing_slots = 8 * sizeof(size_t);
     std::array<vk::Buffer, indexing_slots> buffers{};
@@ -332,9 +347,8 @@ public:
         return *framebuffer;
     }
 
-    [[nodiscard]] VkRenderPass RenderPass() const noexcept {
-        return renderpass;
-    }
+    [[nodiscard]] VkRenderPass RenderPass(std::uint8_t color_feedback_mask,
+                                          bool depth_feedback) const noexcept;
 
     [[nodiscard]] VkExtent2D RenderArea() const noexcept {
         return render_area;
@@ -379,6 +393,8 @@ public:
 private:
     vk::Framebuffer framebuffer;
     VkRenderPass renderpass{};
+    RenderPassKey base_key{};
+    RenderPassCache* render_pass_cache{};
     VkExtent2D render_area{};
     VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
     u32 num_color_buffers = 0;

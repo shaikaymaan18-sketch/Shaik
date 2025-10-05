@@ -195,6 +195,9 @@ public:
     /// UpdateRenderTargets should be called before this
     Framebuffer* GetFramebuffer();
 
+    /// Consume pending attachment feedback loop request
+    typename Runtime::FeedbackLoopRequest ConsumeFeedbackLoopRequest();
+
     /// Mark images in a range as modified from the CPU
     void WriteMemory(DAddr cpu_addr, size_t size);
 
