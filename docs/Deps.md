@@ -195,7 +195,7 @@ Run the usual update + install of essential toolings: `sudo pkg update && sudo p
 - **gcc**: `sudo pkg install developer/gcc-14`.
 - **clang**: Version 20 is broken, use `sudo pkg install developer/clang-19`.
 
-Then install the libraries: `sudo pkg install qt6 boost glslang libzip library/lz4 nlohmann-json openssl opus sdl2 zlib compress/zstd unzip pkg-config nasm autoconf mesa library/libdrm header-drm developer/fmt`.
+Then install the libraries: `sudo pkg install qt6 boost glslang libzip library/lz4 libusb-1 nlohmann-json openssl opus sdl2 zlib compress/zstd unzip pkg-config nasm autoconf mesa library/libdrm header-drm developer/fmt`.
 </details>
 
 <details>
