@@ -1113,6 +1113,17 @@ JNIEXPORT void JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_updatePowerState(
     g_has_battery.store(hasBattery, std::memory_order_relaxed);
 }
 
+//  return #ifdef ENABLE_UPDATE_CHECKER
+JNIEXPORT jboolean JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_isUpdateCheckerEnabled(
+        JNIEnv* env,
+        jobject obj) {
+#ifdef ENABLE_UPDATE_CHECKER
+    return JNI_TRUE;
+#else
+    return JNI_FALSE;
+#endif
+    }
+
 #ifdef ENABLE_UPDATE_CHECKER
 JNIEXPORT void JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_setCACertificatePath(
         JNIEnv* env,

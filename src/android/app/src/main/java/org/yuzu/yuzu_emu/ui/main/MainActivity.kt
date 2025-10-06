@@ -156,7 +156,8 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
 
         val firstTimeSetup = PreferenceManager.getDefaultSharedPreferences(applicationContext)
                 .getBoolean(Settings.PREF_FIRST_APP_LAUNCH, true)
-            if (!firstTimeSetup) {
+
+        if (!firstTimeSetup && NativeLibrary.isUpdateCheckerEnabled()) {
              checkForUpdates()
         }
         setInsets()

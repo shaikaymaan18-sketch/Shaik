@@ -65,7 +65,9 @@ class YuzuApplication : Application() {
         Log.logDeviceInfo()
 
         // Initialize CA certificates for HTTPS
-        initializeCACertificates()
+        if (NativeLibrary.isUpdateCheckerEnabled()) {
+            initializeCACertificates()
+        }
 
         createNotificationChannels()
     }

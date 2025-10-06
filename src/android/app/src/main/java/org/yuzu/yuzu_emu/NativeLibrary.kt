@@ -215,6 +215,11 @@ object NativeLibrary {
      */
     external fun getUpdateUrl(version: String): String
 
+    /**
+     * Returns whether the update checker is enabled through CMAKE options.
+     */
+    external fun isUpdateCheckerEnabled(): Boolean
+
     enum class CoreError {
         ErrorSystemFiles,
         ErrorSavestate,
