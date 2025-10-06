@@ -31,7 +31,7 @@ if (ENABLE_OPENSSL OR ENABLE_WEB_SERVICE)
 endif()
 
 if (ENABLE_UPDATE_CHECKER)
-    target_compile_definitions(yuzu-android PRIVATE ENABLE_UPDATE_CHECKER)
+    target_compile_definitions(yuzu-android PUBLIC ENABLE_UPDATE_CHECKER)
 endif()
 
 set(CPACK_PACKAGE_EXECUTABLES ${CPACK_PACKAGE_EXECUTABLES} yuzu-android)
