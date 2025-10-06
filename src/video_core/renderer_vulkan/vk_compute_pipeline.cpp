@@ -102,7 +102,16 @@ ComputePipeline::ComputePipeline(const Device& device_, vk::PipelineCache& pipel
 void ComputePipeline::Configure(Tegra::Engines::KeplerCompute& kepler_compute,
                                 Tegra::MemoryManager& gpu_memory, Scheduler& scheduler,
                                 BufferCache& buffer_cache, TextureCache& texture_cache) {
-    guest_descriptor_queue.Acquire();
+    {
+        size_t required_entries = 0;
+        required_entries += Shader::NumDescriptors(info.constant_buffer_descriptors);
+        required_entries += Shader::NumDescriptors(info.storage_buffers_descriptors);
+        required_entries += Shader::NumDescriptors(info.texture_buffer_descriptors);
+        required_entries += Shader::NumDescriptors(info.image_buffer_descriptors);
+        required_entries += Shader::NumDescriptors(info.texture_descriptors);
+        required_entries += Shader::NumDescriptors(info.image_descriptors);
+        guest_descriptor_queue.Acquire(required_entries);
+    }
 
     buffer_cache.SetComputeUniformBufferState(info.constant_buffer_mask, &uniform_buffer_sizes);
     buffer_cache.UnbindComputeStorageBuffers();

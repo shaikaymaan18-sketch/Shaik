@@ -28,17 +28,21 @@ void UpdateDescriptorQueue::TickFrame() {
     payload_cursor = payload_start;
 }
 
-void UpdateDescriptorQueue::Acquire() {
-    // Minimum number of entries required.
-    // This is the maximum number of entries a single draw call might use.
-    static constexpr size_t MIN_ENTRIES = 0x400;
-
-    if (std::distance(payload_start, payload_cursor) + MIN_ENTRIES >= FRAME_PAYLOAD_SIZE) {
-        LOG_WARNING(Render_Vulkan, "Payload overflow, waiting for worker thread");
+void UpdateDescriptorQueue::Acquire(size_t required_entries) {
+    const size_t used = static_cast<size_t>(std::distance(payload_start, payload_cursor));
+    if (used + required_entries > FRAME_PAYLOAD_SIZE) {
+        LOG_WARNING(Render_Vulkan, "Descriptor payload near overflow (used={} req={}), waiting",
+                    used, required_entries);
         scheduler.WaitWorker();
         payload_cursor = payload_start;
     }
     upload_start = payload_cursor;
+}
+
+void UpdateDescriptorQueue::Acquire() {
+    // Conservative legacy reservation for backward callers.
+    static constexpr size_t MIN_ENTRIES = 0x400;
+    Acquire(MIN_ENTRIES);
 }
 
 } // namespace Vulkan

@@ -4,6 +4,7 @@
 #pragma once
 
 #include <array>
+#include "common/assert.h"
 
 #include "video_core/vulkan_common/vulkan_wrapper.h"
 
@@ -41,6 +42,11 @@ public:
 
     void TickFrame();
 
+    // Ensure the queue has at least 'required_entries' free slots for this draw/dispatch.
+    // Prefer using this overload to avoid underestimations that can cause overflows.
+    void Acquire(size_t required_entries);
+
+    // Legacy fallback that reserves a conservative number of entries.
     void Acquire();
 
     const DescriptorUpdateEntry* UpdateData() const noexcept {
@@ -48,6 +54,8 @@ public:
     }
 
     void AddSampledImage(VkImageView image_view, VkSampler sampler) {
+        ASSERT(static_cast<size_t>(std::distance(payload_start, payload_cursor)) <
+               FRAME_PAYLOAD_SIZE);
         *(payload_cursor++) = VkDescriptorImageInfo{
             .sampler = sampler,
             .imageView = image_view,
@@ -56,6 +64,8 @@ public:
     }
 
     void AddImage(VkImageView image_view) {
+        ASSERT(static_cast<size_t>(std::distance(payload_start, payload_cursor)) <
+               FRAME_PAYLOAD_SIZE);
         *(payload_cursor++) = VkDescriptorImageInfo{
             .sampler = VK_NULL_HANDLE,
             .imageView = image_view,
@@ -64,6 +74,8 @@ public:
     }
 
     void AddBuffer(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize size) {
+        ASSERT(static_cast<size_t>(std::distance(payload_start, payload_cursor)) <
+               FRAME_PAYLOAD_SIZE);
         *(payload_cursor++) = VkDescriptorBufferInfo{
             .buffer = buffer,
             .offset = offset,
@@ -72,6 +84,8 @@ public:
     }
 
     void AddTexelBuffer(VkBufferView texel_buffer) {
+        ASSERT(static_cast<size_t>(std::distance(payload_start, payload_cursor)) <
+               FRAME_PAYLOAD_SIZE);
         *(payload_cursor++) = texel_buffer;
     }
 

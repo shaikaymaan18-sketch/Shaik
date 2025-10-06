@@ -460,7 +460,25 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
     buffer_cache.UpdateGraphicsBuffers(is_indexed);
     buffer_cache.BindHostGeometryBuffers(is_indexed);
 
-    guest_descriptor_queue.Acquire();
+    // Compute exact number of descriptor entries required for this draw.
+    size_t required_entries = 0;
+    const auto acc_descriptors = [](const Shader::Info& info) -> size_t {
+        size_t n = 0;
+        n += Shader::NumDescriptors(info.constant_buffer_descriptors);
+        n += Shader::NumDescriptors(info.storage_buffers_descriptors);
+        n += Shader::NumDescriptors(info.texture_buffer_descriptors);
+        n += Shader::NumDescriptors(info.image_buffer_descriptors);
+        n += Shader::NumDescriptors(info.texture_descriptors);
+        n += Shader::NumDescriptors(info.image_descriptors);
+        return n;
+    };
+    if constexpr (Spec::enabled_stages[0]) required_entries += acc_descriptors(stage_infos[0]);
+    if constexpr (Spec::enabled_stages[1]) required_entries += acc_descriptors(stage_infos[1]);
+    if constexpr (Spec::enabled_stages[2]) required_entries += acc_descriptors(stage_infos[2]);
+    if constexpr (Spec::enabled_stages[3]) required_entries += acc_descriptors(stage_infos[3]);
+    if constexpr (Spec::enabled_stages[4]) required_entries += acc_descriptors(stage_infos[4]);
+
+    guest_descriptor_queue.Acquire(required_entries);
 
     RescalingPushConstant rescaling;
     RenderAreaPushConstant render_area;
