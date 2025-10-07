@@ -98,12 +98,57 @@ Id ImageType(EmitContext& ctx, const ImageDescriptor& desc, Id sampled_type) {
     throw InvalidArgument("Invalid texture type {}", desc.type);
 }
 
+bool MatchesVectorType(const VectorTypes& vectors, Id type) {
+    for (std::size_t components = 1; components <= 4; ++components) {
+        const Id candidate{vectors[components]};
+        if (candidate.value != 0 && candidate.value == type.value) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool HasIntegerOrDoubleComponent(const EmitContext& ctx, Id type) {
+    if (MatchesVectorType(ctx.U32, type) || MatchesVectorType(ctx.S32, type)) {
+        return true;
+    }
+    if (MatchesVectorType(ctx.F64, type)) {
+        return true;
+    }
+    if (ctx.profile.support_int8) {
+        if ((ctx.U8.value != 0 && ctx.U8.value == type.value) ||
+            (ctx.S8.value != 0 && ctx.S8.value == type.value)) {
+            return true;
+        }
+    }
+    if (ctx.profile.support_int16) {
+        if ((ctx.U16.value != 0 && ctx.U16.value == type.value) ||
+            (ctx.S16.value != 0 && ctx.S16.value == type.value)) {
+            return true;
+        }
+    }
+    if (ctx.profile.support_int64) {
+        if (ctx.U64.value != 0 && ctx.U64.value == type.value) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool RequiresFlatDecoration(const EmitContext& ctx, Id type, spv::StorageClass storage_class) {
+    return ctx.stage == Stage::Fragment && storage_class == spv::StorageClass::Input &&
+           HasIntegerOrDoubleComponent(ctx, type);
+}
+
 Id DefineVariable(EmitContext& ctx, Id type, std::optional<spv::BuiltIn> builtin,
                   spv::StorageClass storage_class, std::optional<Id> initializer = std::nullopt) {
     const Id pointer_type{ctx.TypePointer(storage_class, type)};
     const Id id{ctx.AddGlobalVariable(pointer_type, storage_class, initializer)};
     if (builtin) {
         ctx.Decorate(id, spv::Decoration::BuiltIn, *builtin);
+    }
+    if (RequiresFlatDecoration(ctx, type, storage_class)) {
+        ctx.Decorate(id, spv::Decoration::Flat);
     }
     ctx.interfaces.push_back(id);
     return id;
@@ -1552,6 +1597,9 @@ void EmitContext::DefineInputs(const IR::Program& program) {
         if (stage != Stage::Fragment) {
             continue;
         }
+        if (RequiresFlatDecoration(*this, type, spv::StorageClass::Input)) {
+            continue;
+        }
         switch (info.interpolation[index]) {
         case Interpolation::Smooth:
             // Default
@@ -1678,3 +1726,4 @@ void EmitContext::DefineOutputs(const IR::Program& program) {
 }
 
 } // namespace Shader::Backend::SPIRV
+
