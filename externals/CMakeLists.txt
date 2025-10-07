@@ -134,6 +134,9 @@ if (ENABLE_SDL3)
         endif()
 
         AddJsonPackage(sdl3)
+
+        # annoying
+        target_include_directories(SDL3_Headers INTERFACE ${SDL3_SOURCE_DIR}/include/SDL3)
     elseif (YUZU_USE_BUNDLED_SDL3)
         message(STATUS "Using bundled SDL3")
         AddJsonPackage(sdl3-ci)

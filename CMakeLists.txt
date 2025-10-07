@@ -391,9 +391,6 @@ if (PLATFORM_LINUX OR CXX_CLANG)
     endif()
 endif()
 
-# Other presets, e.g. steamdeck
-set(YUZU_SYSTEM_PROFILE "generic" CACHE STRING "CMake and Externals profile to use. One of: generic, steamdeck")
-
 # Configure C++ standard
 # ===========================
 
@@ -586,8 +583,8 @@ if (ARCHITECTURE_arm64 OR DYNARMIC_TESTS)
     find_package(oaknut)
 endif()
 
-if (ENABLE_SDL2)
-    find_package(SDL2)
+if (ENABLE_SDL3)
+    find_package(SDL3)
 endif()
 
 if (USE_DISCORD_PRESENCE)

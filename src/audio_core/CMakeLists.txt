@@ -254,6 +254,10 @@ if (ENABLE_SDL3)
     )
 
     target_link_libraries(audio_core PRIVATE SDL3::SDL3)
+    if (TARGET SDL3::Headers)
+        target_link_libraries(audio_core PRIVATE SDL3::Headers)
+    endif()
+
     target_compile_definitions(audio_core PRIVATE HAVE_SDL3)
 endif()
 

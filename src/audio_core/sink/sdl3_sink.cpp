@@ -60,8 +60,8 @@ public:
 
             if (devices) {
                 for (int i = 0; i < count; ++i) {
-                    const char* name = SDL_GetAudioDeviceName(devices[i]);
-                    if (name && device_name == name) {
+                    const char* devname = SDL_GetAudioDeviceName(devices[i]);
+                    if (devname && device_name == devname) {
                         device_id = devices[i];
                         break;
                     }

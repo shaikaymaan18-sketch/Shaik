@@ -159,10 +159,12 @@
         "ci": true,
         "package": "SDL3",
         "name": "SDL3",
-        "repo": "libsdl-org/SDL3",
-        "version": "3.2.22",
+        "repo": "crueter-ci/SDL3",
+        "version": "3.2.24",
         "min_version": "3.2.12",
-        "cmake_filename": "sdl3"
+        "disabled_platforms": [
+            "macos-universal"
+        ]
     },
     "catch2": {
         "package": "Catch2",
