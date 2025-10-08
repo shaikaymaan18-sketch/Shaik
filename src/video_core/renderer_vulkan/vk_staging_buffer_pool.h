@@ -102,6 +102,7 @@ private:
     MemoryAllocator& memory_allocator;
     Scheduler& scheduler;
 
+    VkDeviceSize stream_alignment;
     vk::Buffer stream_buffer;
     std::span<u8> stream_pointer;
     VkDeviceSize stream_buffer_size;

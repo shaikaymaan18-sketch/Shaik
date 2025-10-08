@@ -386,11 +386,10 @@ void BufferCache<P>::BindHostComputeBuffers() {
 template <class P>
 void BufferCache<P>::SetUniformBuffersState(const std::array<u32, NUM_STAGES>& mask,
                                             const UniformBufferSizes* sizes) {
-    if constexpr (HAS_PERSISTENT_UNIFORM_BUFFER_BINDINGS) {
-        if (channel_state->enabled_uniform_buffer_masks != mask) {
-            if constexpr (IS_OPENGL) {
-                channel_state->fast_bound_uniform_buffers.fill(0);
-            }
+    const bool mask_changed = channel_state->enabled_uniform_buffer_masks != mask;
+    if (mask_changed) {
+        channel_state->fast_bound_uniform_buffers.fill(0);
+        if constexpr (HAS_PERSISTENT_UNIFORM_BUFFER_BINDINGS) {
             channel_state->dirty_uniform_buffers.fill(~u32{0});
             channel_state->uniform_buffer_binding_sizes.fill({});
         }
