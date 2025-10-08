@@ -109,6 +109,9 @@ public:
 
     void ReadBlock(DAddr address, void* dest_pointer, size_t size);
     void ReadBlockUnsafe(DAddr address, void* dest_pointer, size_t size);
+#ifdef YUZU_DEBUG
+    bool ReadBlockFastChecked(DAddr address, void* dest_pointer, size_t size);
+#endif
     void WriteBlock(DAddr address, const void* src_pointer, size_t size);
     void WriteBlockUnsafe(DAddr address, const void* src_pointer, size_t size);
 
