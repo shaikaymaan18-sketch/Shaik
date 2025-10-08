@@ -4,6 +4,11 @@
 #pragma once
 
 #include <array>
+#include <bitset>
+#include <optional>
+#include <span>
+#include <unordered_map>
+#include <vector>
 
 #include <sirit/sirit.h>
 
@@ -18,6 +23,23 @@ namespace Shader::Backend::SPIRV {
 static std::bitset<8> clip_distance_written;
 
 using Sirit::Id;
+
+struct DecorationRecord {
+    spv::Decoration decoration;
+    std::optional<u32> literal;
+};
+
+struct IdHash {
+    std::size_t operator()(const Id& id) const noexcept {
+        return std::hash<u32>{}(id.value);
+    }
+};
+
+struct IdEqual {
+    bool operator()(const Id& lhs, const Id& rhs) const noexcept {
+        return lhs.value == rhs.value;
+    }
+};
 
 class VectorTypes {
 public:
@@ -204,6 +226,23 @@ public:
         return Constant(F32[1], value);
     }
 
+    Id TypeArray(Id element_type, Id length);
+    Id TypeStruct(Id member);
+    Id TypeStruct(std::span<const Id> members);
+    Id TypeVector(Id element_type, u32 components);
+
+    template <typename... Members>
+    Id TypeStruct(Id first, Members... rest) {
+        const std::array<Id, sizeof...(rest) + 1> members{first, rest...};
+        return TypeStruct(std::span<const Id>(members));
+    }
+
+    [[nodiscard]] bool HasDecoration(Id id, spv::Decoration decoration,
+                                     std::optional<u32> literal = std::nullopt) const;
+    void DecorateUnique(Id id, spv::Decoration decoration,
+                        std::optional<u32> literal = std::nullopt);
+    bool IsIntegerOrBoolType(Id type);
+
     const Profile& profile;
     const RuntimeInfo& runtime_info;
     Stage stage{};
@@ -360,6 +399,11 @@ public:
     Id load_const_func_f32{};
     Id load_const_func_u32x2{};
     Id load_const_func_u32x4{};
+
+    std::unordered_map<Id, std::vector<DecorationRecord>, IdHash, IdEqual> decorations;
+    std::unordered_map<Id, bool, IdHash, IdEqual> type_integer_or_bool_cache;
+    std::unordered_map<Id, Id, IdHash, IdEqual> array_element_types;
+    std::unordered_map<Id, std::vector<Id>, IdHash, IdEqual> struct_member_types;
 
 private:
     void DefineCommonTypes(const Info& info);
