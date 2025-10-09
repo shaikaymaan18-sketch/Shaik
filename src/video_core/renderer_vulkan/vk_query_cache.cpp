@@ -850,6 +850,10 @@ public:
             pending_flush_sets.pop_front();
         }
 
+        const VkDeviceSize read_size =
+            static_cast<VkDeviceSize>(flushed_queries.size() * TFBQueryBank::QUERY_SIZE);
+        staging_ref.InvalidateRange(staging_ref.offset, read_size);
+
         size_t offset_base = staging_ref.offset;
         for (auto q : flushed_queries) {
             auto* query = GetQuery(q);
@@ -1577,6 +1581,7 @@ void QueryCacheRuntime::SyncValues(std::span<SyncValuesType> values, VkBuffer ba
                         values[i].size);
             accumulated_size += values[i].size;
         }
+        ref.FlushRange(ref.offset, static_cast<VkDeviceSize>(accumulated_size));
         src_buffer = ref.buffer;
     } else {
         for (size_t i = 0; i < values.size(); i++) {

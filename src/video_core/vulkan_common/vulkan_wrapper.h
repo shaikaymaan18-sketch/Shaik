@@ -783,6 +783,8 @@ public:
 
     void Invalidate() const;
 
+    void InvalidateRange(VkDeviceSize offset, VkDeviceSize size) const;
+
     void SetObjectNameEXT(const char* name) const;
 
 private:

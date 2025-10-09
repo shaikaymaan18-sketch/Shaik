@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <algorithm>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -187,9 +188,12 @@ StagingBufferRef StagingBufferPool::GetStreamBuffer(size_t size) {
         .buffer = *stream_buffer,
         .offset = static_cast<VkDeviceSize>(offset),
         .mapped_span = stream_pointer.subspan(offset, size),
-        .usage{},
-        .log2_level{},
-        .index{},
+        .usage = MemoryUsage::Upload,
+        .log2_level = 0,
+        .index = 0,
+        .owner = &stream_buffer,
+        .atom_size = non_coherent_atom_size,
+        .is_coherent = stream_is_coherent,
     };
 }
 
@@ -301,15 +305,19 @@ StagingBufferRef StagingBufferPool::CreateStagingBuffer(size_t size, MemoryUsage
         ++buffer_index;
         buffer.SetObjectNameEXT(fmt::format("Staging Buffer {}", buffer_index).c_str());
     }
+    const bool is_coherent = buffer.IsHostCoherent();
     const std::span<u8> mapped_span = buffer.Mapped();
+    auto buffer_ptr = std::make_unique<vk::Buffer>(std::move(buffer));
     StagingBuffer& entry = GetCache(usage)[log2].entries.emplace_back(StagingBuffer{
-        .buffer = std::move(buffer),
+        .buffer = std::move(buffer_ptr),
         .mapped_span = mapped_span,
         .usage = usage,
         .log2_level = log2,
         .index = unique_ids++,
         .tick = deferred ? (std::numeric_limits<u64>::max)() : scheduler.CurrentTick(),
         .deferred = deferred,
+        .is_coherent = is_coherent,
+        .atom_size = is_coherent ? 1 : non_coherent_atom_size,
     });
     return entry.Ref();
 }

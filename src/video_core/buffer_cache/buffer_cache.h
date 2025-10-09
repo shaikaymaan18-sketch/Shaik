@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <memory>
 #include <numeric>
+#include <type_traits>
+#include <utility>
 
 #include "common/range_sets.inc"
 #include "video_core/buffer_cache/buffer_cache_base.h"
@@ -18,6 +20,43 @@
 namespace VideoCommon {
 
 using Core::DEVICE_PAGESIZE;
+
+namespace staging_detail {
+template <typename T, typename = void>
+struct has_flush_range : std::false_type {};
+template <typename T>
+struct has_flush_range<
+    T, std::void_t<decltype(std::declval<T&>().FlushRange(size_t{}, size_t{}))>> : std::true_type {};
+
+template <typename T, typename = void>
+struct has_invalidate_range : std::false_type {};
+template <typename T>
+struct has_invalidate_range<
+    T, std::void_t<decltype(std::declval<T&>().InvalidateRange(size_t{}, size_t{}))>>
+    : std::true_type {};
+} // namespace staging_detail
+
+template <typename Ref>
+inline void StagingFlushRange(Ref& ref, size_t offset, size_t size) {
+    if constexpr (staging_detail::has_flush_range<Ref>::value) {
+        ref.FlushRange(offset, size);
+    } else {
+        (void)ref;
+        (void)offset;
+        (void)size;
+    }
+}
+
+template <typename Ref>
+inline void StagingInvalidateRange(Ref& ref, size_t offset, size_t size) {
+    if constexpr (staging_detail::has_invalidate_range<Ref>::value) {
+        ref.InvalidateRange(offset, size);
+    } else {
+        (void)ref;
+        (void)offset;
+        (void)size;
+    }
+}
 
 template <class P>
 BufferCache<P>::BufferCache(Tegra::MaxwellDeviceMemoryManager& device_memory_, Runtime& runtime_)
@@ -633,6 +672,7 @@ void BufferCache<P>::PopAsyncBuffers() {
     u8* base = async_buffer->mapped_span.data();
     const size_t base_offset = async_buffer->offset;
     for (const auto& copy : downloads) {
+        StagingInvalidateRange(*async_buffer, copy.dst_offset, copy.size);
         const DAddr device_addr = static_cast<DAddr>(copy.src_offset);
         const u64 dst_offset = copy.dst_offset - base_offset;
         const u8* read_mapped_memory = base + dst_offset;
@@ -696,6 +736,7 @@ void BufferCache<P>::BindHostIndexBuffer() {
                 {BufferCopy{.src_offset = upload_staging.offset, .dst_offset = 0, .size = size}}};
             std::memcpy(upload_staging.mapped_span.data(),
                         draw_state.inline_index_draw_indexes.data(), size);
+            StagingFlushRange(upload_staging, upload_staging.offset, size);
             runtime.CopyBuffer(buffer, upload_staging.buffer, copies, true);
         } else {
             buffer.ImmediateUpload(0, draw_state.inline_index_draw_indexes);
@@ -1519,7 +1560,7 @@ template <class P>
 void BufferCache<P>::MappedUploadMemory([[maybe_unused]] Buffer& buffer,
                                         [[maybe_unused]] u64 total_size_bytes,
                                         [[maybe_unused]] std::span<BufferCopy> copies) {
-    if constexpr (USE_MEMORY_MAPS) {
+        if constexpr (USE_MEMORY_MAPS) {
         auto upload_staging = runtime.UploadStagingBuffer(total_size_bytes);
         const std::span<u8> staging_pointer = upload_staging.mapped_span;
         for (BufferCopy& copy : copies) {
@@ -1530,6 +1571,7 @@ void BufferCache<P>::MappedUploadMemory([[maybe_unused]] Buffer& buffer,
             // Apply the staging offset
             copy.src_offset += upload_staging.offset;
         }
+        StagingFlushRange(upload_staging, upload_staging.offset, total_size_bytes);
         const bool can_reorder = runtime.CanReorderUpload(buffer, copies);
         runtime.CopyBuffer(buffer, upload_staging.buffer, copies, true, can_reorder);
     }
@@ -1572,6 +1614,7 @@ void BufferCache<P>::InlineMemoryImplementation(DAddr dest_address, size_t copy_
         }};
         u8* const src_pointer = upload_staging.mapped_span.data();
         std::memcpy(src_pointer, inlined_buffer.data(), copy_size);
+        StagingFlushRange(upload_staging, upload_staging.offset, copy_size);
         const bool can_reorder = runtime.CanReorderUpload(buffer, copies);
         runtime.CopyBuffer(buffer, upload_staging.buffer, copies, true, can_reorder);
     } else {
@@ -1626,6 +1669,7 @@ void BufferCache<P>::DownloadBufferMemory(Buffer& buffer, DAddr device_addr, u64
         }
         runtime.CopyBuffer(download_staging.buffer, buffer, copies_span, true);
         runtime.Finish();
+        StagingInvalidateRange(download_staging, download_staging.offset, total_size_bytes);
         for (const BufferCopy& copy : copies) {
             const DAddr copy_device_addr = buffer.CpuAddr() + copy.src_offset;
             // Undo the modified offset

@@ -509,8 +509,12 @@ void Buffer::FlushRange(VkDeviceSize offset, VkDeviceSize size) const {
 }
 
 void Buffer::Invalidate() const {
+    InvalidateRange(0, VK_WHOLE_SIZE);
+}
+
+void Buffer::InvalidateRange(VkDeviceSize offset, VkDeviceSize size) const {
     if (!is_coherent) {
-        vmaInvalidateAllocation(allocator, allocation, 0, VK_WHOLE_SIZE);
+        vmaInvalidateAllocation(allocator, allocation, offset, size);
     }
 }
 

@@ -194,6 +194,7 @@ public:
         }
 
         if (!host_visible) {
+            staging.FlushRange(staging.offset, static_cast<VkDeviceSize>(size_bytes));
             scheduler.RequestOutsideRenderPassOperationContext();
             scheduler.Record([src_buffer = staging.buffer, src_offset = staging.offset,
                               dst_buffer = *buffer, size_bytes](vk::CommandBuffer cmdbuf) {

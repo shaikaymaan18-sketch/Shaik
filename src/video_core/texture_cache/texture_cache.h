@@ -7,6 +7,8 @@
 #pragma once
 
 #include <unordered_set>
+#include <type_traits>
+#include <utility>
 #include <boost/container/small_vector.hpp>
 
 #include "common/alignment.h"
@@ -29,6 +31,42 @@ using VideoCore::Surface::GetFormatType;
 using VideoCore::Surface::PixelFormat;
 using VideoCore::Surface::SurfaceType;
 using namespace Common::Literals;
+
+namespace staging_detail {
+template <typename T, typename = void>
+struct has_flush_range : std::false_type {};
+template <typename T>
+struct has_flush_range<
+    T, std::void_t<decltype(std::declval<T&>().FlushRange(size_t{}, size_t{}))>> : std::true_type {};
+template <typename T, typename = void>
+struct has_invalidate_range : std::false_type {};
+template <typename T>
+struct has_invalidate_range<
+    T, std::void_t<decltype(std::declval<T&>().InvalidateRange(size_t{}, size_t{}))>>
+    : std::true_type {};
+} // namespace staging_detail
+
+template <typename Ref>
+inline void StagingFlushRange(Ref& ref, size_t offset, size_t size) {
+    if constexpr (staging_detail::has_flush_range<Ref>::value) {
+        ref.FlushRange(offset, size);
+    } else {
+        (void)ref;
+        (void)offset;
+        (void)size;
+    }
+}
+
+template <typename Ref>
+inline void StagingInvalidateRange(Ref& ref, size_t offset, size_t size) {
+    if constexpr (staging_detail::has_invalidate_range<Ref>::value) {
+        ref.InvalidateRange(offset, size);
+    } else {
+        (void)ref;
+        (void)offset;
+        (void)size;
+    }
+}
 
 template <class P>
 TextureCache<P>::TextureCache(Runtime& runtime_, Tegra::MaxwellDeviceMemoryManager& device_memory_)
@@ -111,6 +149,7 @@ void TextureCache<P>::RunGarbageCollector() {
             const auto copies = FullDownloadCopies(image.info);
             image.DownloadMemory(map, copies);
             runtime.Finish();
+            StagingInvalidateRange(map, map.offset, image.unswizzled_size_bytes);
             SwizzleImage(*gpu_memory, image.gpu_addr, image.info, copies, map.mapped_span,
                          swizzle_data_buffer);
         }
@@ -567,6 +606,7 @@ void TextureCache<P>::DownloadMemory(DAddr cpu_addr, size_t size) {
         const auto copies = FullDownloadCopies(image.info);
         image.DownloadMemory(map, copies);
         runtime.Finish();
+        StagingInvalidateRange(map, map.offset, image.unswizzled_size_bytes);
         SwizzleImage(*gpu_memory, image.gpu_addr, image.info, copies, map.mapped_span,
                      swizzle_data_buffer);
     }
@@ -863,13 +903,17 @@ void TextureCache<P>::PopAsyncFlushes() {
             if (download_info.is_swizzle) {
                 const ImageBase& image = slot_images[download_info.object_id];
                 const auto copies = FullDownloadCopies(image.info);
-                download_buffer.offset -= Common::AlignUp(image.unswizzled_size_bytes, 64);
+                const size_t aligned_size =
+                    Common::AlignUp(image.unswizzled_size_bytes, static_cast<size_t>(64));
+                download_buffer.offset -= aligned_size;
+                StagingInvalidateRange(download_buffer, download_buffer.offset, aligned_size);
                 std::span<u8> download_span =
                     download_buffer.mapped_span.subspan(download_buffer.offset);
                 SwizzleImage(*gpu_memory, image.gpu_addr, image.info, copies, download_span,
                              swizzle_data_buffer);
             } else {
                 const BufferDownload& buffer_info = slot_buffer_downloads[download_info.object_id];
+                StagingInvalidateRange(download_buffer, download_buffer.offset, buffer_info.size);
                 std::span<u8> download_span =
                     download_buffer.mapped_span.subspan(download_buffer.offset);
                 gpu_memory->WriteBlockUnsafe(buffer_info.address, download_span.data(),
@@ -907,6 +951,7 @@ void TextureCache<P>::PopAsyncFlushes() {
         }
         // Wait for downloads to finish
         runtime.Finish();
+        StagingInvalidateRange(download_map, original_offset, total_size_bytes);
         download_map.offset = original_offset;
         std::span<u8> download_span = download_map.mapped_span;
         for (const PendingDownload& download_info : download_ids) {
@@ -1081,6 +1126,7 @@ void TextureCache<P>::UploadImageContents(Image& image, StagingBuffer& staging) 
     if (True(image.flags & ImageFlagBits::AcceleratedUpload)) {
         gpu_memory->ReadBlock(gpu_addr, mapped_span.data(), mapped_span.size_bytes(),
                               VideoCommon::CacheType::NoTextureCache);
+        StagingFlushRange(staging, staging.offset, mapped_span.size_bytes());
         const auto uploads = FullUploadSwizzles(image.info);
         runtime.AccelerateImageUpload(image, staging, uploads);
         return;
@@ -1094,10 +1140,12 @@ void TextureCache<P>::UploadImageContents(Image& image, StagingBuffer& staging) 
         auto copies =
             UnswizzleImage(*gpu_memory, gpu_addr, image.info, swizzle_data, unswizzle_data_buffer);
         ConvertImage(unswizzle_data_buffer, image.info, mapped_span, copies);
+        StagingFlushRange(staging, staging.offset, mapped_span.size_bytes());
         image.UploadMemory(staging, copies);
     } else {
         const auto copies =
             UnswizzleImage(*gpu_memory, gpu_addr, image.info, swizzle_data, mapped_span);
+        StagingFlushRange(staging, staging.offset, mapped_span.size_bytes());
         image.UploadMemory(staging, copies);
     }
 }
@@ -1329,6 +1377,7 @@ void TextureCache<P>::TickAsyncDecode() {
         auto staging = runtime.UploadStagingBuffer(MapSizeBytes(image));
         std::memcpy(staging.mapped_span.data(), async_decode->decoded_data.data(),
                     async_decode->decoded_data.size());
+        StagingFlushRange(staging, staging.offset, async_decode->decoded_data.size());
         image.UploadMemory(staging, async_decode->copies);
         image.flags &= ~ImageFlagBits::IsDecoding;
         has_uploads = true;

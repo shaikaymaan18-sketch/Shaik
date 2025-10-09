@@ -8,9 +8,11 @@
 
 #include <climits>
 #include <mutex>
+#include <memory>
 #include <vector>
 
 #include "common/common_types.h"
+#include "common/alignment.h"
 
 #include "video_core/vulkan_common/vulkan_memory_allocator.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
@@ -27,6 +29,47 @@ struct StagingBufferRef {
     MemoryUsage usage;
     u32 log2_level;
     u64 index;
+    const vk::Buffer* owner = nullptr;
+    VkDeviceSize atom_size = 1;
+    bool is_coherent = true;
+
+    void FlushRange(VkDeviceSize range_offset, VkDeviceSize size) const {
+        if (!owner || is_coherent || size == 0) {
+            return;
+        }
+        if (size == VK_WHOLE_SIZE) {
+            owner->FlushRange(range_offset, size);
+            return;
+        }
+        const VkDeviceSize atom = atom_size ? atom_size : 1;
+        const VkDeviceSize range_end = range_offset + size;
+        if (range_end < range_offset) {
+            owner->FlushRange(range_offset, size);
+            return;
+        }
+        const VkDeviceSize aligned_begin = Common::AlignDown(range_offset, atom);
+        const VkDeviceSize aligned_end = Common::AlignUp(range_end, atom);
+        owner->FlushRange(aligned_begin, aligned_end - aligned_begin);
+    }
+
+    void InvalidateRange(VkDeviceSize range_offset, VkDeviceSize size) const {
+        if (!owner || is_coherent || size == 0) {
+            return;
+        }
+        if (size == VK_WHOLE_SIZE) {
+            owner->InvalidateRange(range_offset, size);
+            return;
+        }
+        const VkDeviceSize atom = atom_size ? atom_size : 1;
+        const VkDeviceSize range_end = range_offset + size;
+        if (range_end < range_offset) {
+            owner->InvalidateRange(range_offset, size);
+            return;
+        }
+        const VkDeviceSize aligned_begin = Common::AlignDown(range_offset, atom);
+        const VkDeviceSize aligned_end = Common::AlignUp(range_end, atom);
+        owner->InvalidateRange(aligned_begin, aligned_end - aligned_begin);
+    }
 };
 
 class StagingBufferPool {
@@ -55,22 +98,27 @@ private:
     };
 
     struct StagingBuffer {
-        vk::Buffer buffer;
+        std::unique_ptr<vk::Buffer> buffer;
         std::span<u8> mapped_span;
         MemoryUsage usage;
         u32 log2_level;
         u64 index;
         u64 tick = 0;
         bool deferred{};
+        bool is_coherent = true;
+        VkDeviceSize atom_size = 1;
 
         StagingBufferRef Ref() const noexcept {
             return {
-                .buffer = *buffer,
+                .buffer = buffer ? **buffer : VkBuffer{},
                 .offset = 0,
                 .mapped_span = mapped_span,
                 .usage = usage,
                 .log2_level = log2_level,
                 .index = index,
+                .owner = buffer.get(),
+                .atom_size = atom_size,
+                .is_coherent = is_coherent,
             };
         }
     };
