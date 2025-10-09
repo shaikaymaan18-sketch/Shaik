@@ -772,7 +772,14 @@ public:
         return !mapped.empty();
     }
 
+    /// Returns true if the buffer memory is host coherent.
+    bool IsHostCoherent() const noexcept {
+        return is_coherent;
+    }
+
     void Flush() const;
+
+    void FlushRange(VkDeviceSize offset, VkDeviceSize size) const;
 
     void Invalidate() const;
 

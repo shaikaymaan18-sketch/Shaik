@@ -128,20 +128,37 @@ public:
                                           [[maybe_unused]] u32 binding_index, u32 size) {
         const StagingBufferRef ref = staging_pool.Request(size, MemoryUsage::Upload);
         BindBuffer(ref.buffer, static_cast<u32>(ref.offset), size);
+#ifdef YUZU_DEBUG
+        ASSERT(ref.mapped_span.size() >= size);
+        const VkDeviceSize ubo_align = device.GetUniformBufferAlignment();
+        ASSERT(ubo_align == 0 || (ref.offset % ubo_align) == 0);
+#endif
         return ref.mapped_span;
     }
 
     void BindUniformBuffer(VkBuffer buffer, u32 offset, u32 size) {
+#ifdef YUZU_DEBUG
+        const VkDeviceSize ubo_align = device.GetUniformBufferAlignment();
+        ASSERT(ubo_align == 0 || (offset % ubo_align) == 0);
+#endif
         BindBuffer(buffer, offset, size);
     }
 
     void BindStorageBuffer(VkBuffer buffer, u32 offset, u32 size,
                            [[maybe_unused]] bool is_written) {
+#ifdef YUZU_DEBUG
+        const VkDeviceSize ssbo_align = device.GetStorageBufferAlignment();
+        ASSERT(ssbo_align == 0 || (offset % ssbo_align) == 0);
+#endif
         BindBuffer(buffer, offset, size);
     }
 
     void BindTextureBuffer(Buffer& buffer, u32 offset, u32 size,
                            VideoCore::Surface::PixelFormat format) {
+#ifdef YUZU_DEBUG
+        const VkDeviceSize texel_align = device.GetTexelBufferAlignment();
+        ASSERT(texel_align == 0 || (offset % texel_align) == 0);
+#endif
         guest_descriptor_queue.AddTexelBuffer(buffer.View(offset, size, format));
     }
 

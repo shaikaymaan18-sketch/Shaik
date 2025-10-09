@@ -166,7 +166,7 @@ try
 
     if (Settings::values.renderer_force_max_clock.GetValue() && device.ShouldBoostClocks()) {
         turbo_mode.emplace(instance, dld);
-        scheduler.RegisterOnSubmit([this] { turbo_mode->QueueSubmitted(); });
+        scheduler.AddOnSubmit([this] { turbo_mode->QueueSubmitted(); });
     }
 
     Report();
@@ -176,7 +176,7 @@ try
 }
 
 RendererVulkan::~RendererVulkan() {
-    scheduler.RegisterOnSubmit([] {});
+    scheduler.RegisterOnSubmit(std::function<void()>{});
     void(device.GetLogical().WaitIdle());
 }
 

@@ -15,6 +15,7 @@
 #include "video_core/renderer_vulkan/vk_command_pool.h"
 #include "video_core/renderer_vulkan/vk_master_semaphore.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
+#include "video_core/renderer_vulkan/vk_staging_buffer_pool.h"
 #include "video_core/renderer_vulkan/vk_state_tracker.h"
 #include "video_core/renderer_vulkan/vk_texture_cache.h"
 #include "video_core/vulkan_common/vulkan_device.h"
@@ -233,8 +234,14 @@ u64 Scheduler::SubmitExecution(VkSemaphore signal_semaphore, VkSemaphore wait_se
         upload_cmdbuf.End();
         cmdbuf.End();
 
-        if (on_submit) {
-            on_submit();
+        if (staging_buffer_pool) {
+            staging_buffer_pool->FlushStream();
+        }
+
+        for (const auto& callback : on_submit_callbacks) {
+            if (callback) {
+                callback();
+            }
         }
 
         std::scoped_lock lock{submit_mutex};

@@ -10,6 +10,7 @@
 #include <thread>
 #include <utility>
 #include <queue>
+#include <vector>
 
 #include "common/alignment.h"
 #include "common/common_types.h"
@@ -29,6 +30,7 @@ class Device;
 class Framebuffer;
 class GraphicsPipeline;
 class StateTracker;
+class StagingBufferPool;
 
 struct QueryCacheParams;
 
@@ -73,9 +75,23 @@ public:
         query_cache = &query_cache_;
     }
 
-    // Registers a callback to perform on queue submission.
+    void SetStagingBufferPool(StagingBufferPool* pool) {
+        staging_buffer_pool = pool;
+    }
+
+    // Registers a callback to perform on queue submission, replacing existing callbacks.
     void RegisterOnSubmit(std::function<void()>&& func) {
-        on_submit = std::move(func);
+        on_submit_callbacks.clear();
+        if (func) {
+            on_submit_callbacks.emplace_back(std::move(func));
+        }
+    }
+
+    // Adds an additional callback to perform on queue submission.
+    void AddOnSubmit(std::function<void()>&& func) {
+        if (func) {
+            on_submit_callbacks.emplace_back(std::move(func));
+        }
     }
 
     /// Send work to a separate thread.
@@ -237,12 +253,13 @@ private:
     std::unique_ptr<CommandPool> command_pool;
 
     VideoCommon::QueryCacheBase<QueryCacheParams>* query_cache = nullptr;
+    StagingBufferPool* staging_buffer_pool = nullptr;
 
     vk::CommandBuffer current_cmdbuf;
     vk::CommandBuffer current_upload_cmdbuf;
 
     std::unique_ptr<CommandChunk> chunk;
-    std::function<void()> on_submit;
+    std::vector<std::function<void()>> on_submit_callbacks;
 
     State state;
 

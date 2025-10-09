@@ -179,6 +179,11 @@ public:
         }();
 
         u8* staging_data = host_visible ? buffer.Mapped().data() : staging.mapped_span.data();
+#ifdef YUZU_DEBUG
+        if (!host_visible) {
+            ASSERT(staging.mapped_span.size() >= size_bytes);
+        }
+#endif
         const size_t quad_size = bytes_per_index * 6;
 
         for (u32 first = 0; first < num_first_offset_copies; ++first) {
@@ -514,6 +519,10 @@ void BufferCacheRuntime::BindIndexBuffer(PrimitiveTopology topology, IndexFormat
         ReserveNullBuffer();
         vk_buffer = *null_buffer;
     }
+#ifdef YUZU_DEBUG
+    const size_t bytes_per_index = BytesPerIndex(vk_index_type);
+    ASSERT(bytes_per_index == 0 || (vk_offset % bytes_per_index) == 0);
+#endif
     scheduler.Record([vk_buffer, vk_offset, vk_index_type](vk::CommandBuffer cmdbuf) {
         cmdbuf.BindIndexBuffer(vk_buffer, vk_offset, vk_index_type);
     });

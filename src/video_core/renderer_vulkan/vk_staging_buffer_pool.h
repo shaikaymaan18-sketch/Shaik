@@ -7,6 +7,7 @@
 #pragma once
 
 #include <climits>
+#include <mutex>
 #include <vector>
 
 #include "common/common_types.h"
@@ -30,6 +31,8 @@ struct StagingBufferRef {
 
 class StagingBufferPool {
 public:
+    friend class Scheduler;
+
     static constexpr size_t NUM_SYNCS = 16;
 
     explicit StagingBufferPool(const Device& device, MemoryAllocator& memory_allocator,
@@ -83,6 +86,9 @@ private:
 
     StagingBufferRef GetStreamBuffer(size_t size);
 
+    void TrackStreamWrite(VkDeviceSize offset, VkDeviceSize size);
+    void FlushStream();
+
     bool AreRegionsActive(size_t region_begin, size_t region_end) const;
 
     StagingBufferRef GetStagingBuffer(size_t size, MemoryUsage usage, bool deferred = false);
@@ -110,6 +116,12 @@ private:
     std::span<u8> stream_pointer;
     VkDeviceSize stream_buffer_size;
     VkDeviceSize region_size;
+    bool stream_is_coherent = true;
+    VkDeviceSize non_coherent_atom_size = 1;
+    VkDeviceSize dirty_begin = 0;
+    VkDeviceSize dirty_end = 0;
+    bool stream_dirty = false;
+    std::mutex stream_mutex;
 
     size_t iterator = 0;
     size_t used_iterator = 0;

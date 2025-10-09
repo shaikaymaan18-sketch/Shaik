@@ -30,6 +30,11 @@ constexpr VkDeviceSize MIN_STREAM_ALIGNMENT = 256;
 // Stream buffer size in bytes
 constexpr VkDeviceSize MAX_STREAM_BUFFER_SIZE = 128_MiB;
 
+VkDeviceSize GetStreamAlignment(const Device& device) {
+    return (std::max)({device.GetUniformBufferAlignment(), device.GetStorageBufferAlignment(),
+                       device.GetTexelBufferAlignment(), MIN_STREAM_ALIGNMENT});
+}
+
 size_t GetStreamBufferSize(const Device& device, VkDeviceSize alignment) {
     VkDeviceSize size{0};
     if (device.HasDebuggingToolAttached()) {
@@ -63,8 +68,7 @@ size_t GetStreamBufferSize(const Device& device, VkDeviceSize alignment) {
 StagingBufferPool::StagingBufferPool(const Device& device_, MemoryAllocator& memory_allocator_,
                                      Scheduler& scheduler_)
     : device{device_}, memory_allocator{memory_allocator_}, scheduler{scheduler_},
-      stream_alignment{std::max<VkDeviceSize>(device_.GetUniformBufferAlignment(),
-                                              MIN_STREAM_ALIGNMENT)},
+      stream_alignment{GetStreamAlignment(device_)},
       stream_buffer_size{GetStreamBufferSize(device_, stream_alignment)},
       region_size{stream_buffer_size / StagingBufferPool::NUM_SYNCS} {
     VkBufferCreateInfo stream_ci = {
@@ -87,9 +91,18 @@ StagingBufferPool::StagingBufferPool(const Device& device_, MemoryAllocator& mem
     }
     stream_pointer = stream_buffer.Mapped();
     ASSERT_MSG(!stream_pointer.empty(), "Stream buffer must be host visible!");
+    stream_is_coherent = stream_buffer.IsHostCoherent();
+    non_coherent_atom_size = std::max<VkDeviceSize>(device.GetNonCoherentAtomSize(),
+                                                    static_cast<VkDeviceSize>(1));
+    dirty_begin = stream_buffer_size;
+    dirty_end = 0;
+    stream_dirty = false;
+    scheduler.SetStagingBufferPool(this);
 }
 
-StagingBufferPool::~StagingBufferPool() = default;
+StagingBufferPool::~StagingBufferPool() {
+    scheduler.SetStagingBufferPool(nullptr);
+}
 
 StagingBufferRef StagingBufferPool::Request(size_t size, MemoryUsage usage, bool deferred) {
     if (!deferred && usage == MemoryUsage::Upload && size <= region_size) {
@@ -121,9 +134,10 @@ void StagingBufferPool::TickFrame() {
 StagingBufferRef StagingBufferPool::GetStreamBuffer(size_t size) {
     const size_t alignment = static_cast<size_t>(stream_alignment);
     const size_t aligned_size = Common::AlignUp(size, alignment);
-    const bool wraps = iterator + size >= stream_buffer_size;
+    const size_t capacity = static_cast<size_t>(stream_buffer_size);
+    const bool wraps = iterator + aligned_size > capacity;
     const size_t new_iterator =
-        wraps ? aligned_size : Common::AlignUp(iterator + size, alignment);
+        wraps ? aligned_size : Common::AlignUp(iterator + aligned_size, alignment);
     const size_t begin_region = wraps ? 0 : Region(iterator);
     const size_t last_byte = new_iterator == 0 ? 0 : new_iterator - 1;
     const size_t end_region = (std::min)(Region(last_byte) + 1, NUM_SYNCS);
@@ -167,6 +181,8 @@ StagingBufferRef StagingBufferPool::GetStreamBuffer(size_t size) {
         free_iterator = (std::max)(free_iterator, offset + aligned_size);
     }
 
+    TrackStreamWrite(static_cast<VkDeviceSize>(offset), static_cast<VkDeviceSize>(aligned_size));
+
     return StagingBufferRef{
         .buffer = *stream_buffer,
         .offset = static_cast<VkDeviceSize>(offset),
@@ -175,6 +191,53 @@ StagingBufferRef StagingBufferPool::GetStreamBuffer(size_t size) {
         .log2_level{},
         .index{},
     };
+}
+
+void StagingBufferPool::TrackStreamWrite(VkDeviceSize offset, VkDeviceSize size) {
+    if (stream_is_coherent || size == 0) {
+        return;
+    }
+    const VkDeviceSize clamped_offset = (std::min)(offset, stream_buffer_size);
+    const VkDeviceSize clamped_end = (std::min)(clamped_offset + size, stream_buffer_size);
+    std::scoped_lock lock{stream_mutex};
+    if (!stream_dirty) {
+        dirty_begin = clamped_offset;
+        dirty_end = clamped_end;
+        stream_dirty = true;
+        return;
+    }
+    dirty_begin = (std::min)(dirty_begin, clamped_offset);
+    dirty_end = (std::max)(dirty_end, clamped_end);
+}
+
+void StagingBufferPool::FlushStream() {
+    if (stream_is_coherent) {
+        return;
+    }
+
+    VkDeviceSize flush_begin = 0;
+    VkDeviceSize flush_end = 0;
+    {
+        std::scoped_lock lock{stream_mutex};
+        if (!stream_dirty) {
+            return;
+        }
+        flush_begin = dirty_begin;
+        flush_end = dirty_end;
+        stream_dirty = false;
+        dirty_begin = stream_buffer_size;
+        dirty_end = 0;
+    }
+
+    if (flush_begin >= flush_end) {
+        return;
+    }
+
+    const VkDeviceSize atom = non_coherent_atom_size;
+    const VkDeviceSize aligned_begin = Common::AlignDown(flush_begin, atom);
+    const VkDeviceSize aligned_end = Common::AlignUp(flush_end, atom);
+    const VkDeviceSize flush_size = aligned_end - aligned_begin;
+    stream_buffer.FlushRange(aligned_begin, flush_size);
 }
 
 bool StagingBufferPool::AreRegionsActive(size_t region_begin, size_t region_end) const {

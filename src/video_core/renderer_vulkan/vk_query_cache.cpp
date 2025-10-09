@@ -854,6 +854,9 @@ public:
         for (auto q : flushed_queries) {
             auto* query = GetQuery(q);
             u32 result = 0;
+#ifdef YUZU_DEBUG
+            ASSERT(staging_ref.mapped_span.size() >= offset_base + sizeof(u32));
+#endif
             std::memcpy(&result, staging_ref.mapped_span.data() + offset_base, sizeof(u32));
             query->value = static_cast<u64>(result);
             query->flags |= VideoCommon::QueryFlagBits::IsFinalValueSynced;
@@ -1567,6 +1570,9 @@ void QueryCacheRuntime::SyncValues(std::span<SyncValuesType> values, VkBuffer ba
                              impl->little_cache[which_copy].first,
                 .size = values[i].size,
             });
+#ifdef YUZU_DEBUG
+            ASSERT(ref.mapped_span.size() >= accumulated_size + values[i].size);
+#endif
             std::memcpy(ref.mapped_span.data() + accumulated_size, &values[i].value,
                         values[i].size);
             accumulated_size += values[i].size;
