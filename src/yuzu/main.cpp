@@ -1576,6 +1576,8 @@ void GMainWindow::ConnectWidgetEvents() {
     connect(game_list, &GameList::RemoveFileRequested, this, &GMainWindow::OnGameListRemoveFile);
     connect(game_list, &GameList::RemovePlayTimeRequested, this,
             &GMainWindow::OnGameListRemovePlayTimeData);
+    connect(game_list, &GameList::SetPlayTimeRequested, this,
+            &GMainWindow::OnGameListSetPlayTime);
     connect(game_list, &GameList::DumpRomFSRequested, this, &GMainWindow::OnGameListDumpRomFS);
     connect(game_list, &GameList::VerifyIntegrityRequested, this,
             &GMainWindow::OnGameListVerifyIntegrity);
@@ -2635,6 +2637,85 @@ void GMainWindow::OnGameListRemoveFile(u64 program_id, QtCommon::Game::GameListR
         break;
     }
 }
+
+void GMainWindow::OnGameListSetPlayTime(u64 program_id) {
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Set Play Time Data"));
+    dialog.setModal(true);
+
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* input_layout = new QHBoxLayout();
+    auto* hours_edit = new QLineEdit(&dialog);
+    auto* minutes_edit = new QLineEdit(&dialog);
+    auto* seconds_edit = new QLineEdit(&dialog);
+
+    hours_edit->setValidator(new QIntValidator(0, 9999, hours_edit));
+    minutes_edit->setValidator(new QIntValidator(0, 59, minutes_edit));
+    seconds_edit->setValidator(new QIntValidator(0, 59, seconds_edit));
+
+    using QtCommon::PlayTimeManager::TimeUnit;
+    const u64 current_play_time = play_time_manager->GetPlayTime(program_id);
+    auto getTimeUnit = [current_play_time](TimeUnit unit) {
+        return QtCommon::PlayTimeManager::GetPlayTimeUnit(current_play_time, unit);
+    };
+
+    hours_edit->setText(getTimeUnit(TimeUnit::Hours));
+    minutes_edit->setText(getTimeUnit(TimeUnit::Minutes));
+    seconds_edit->setText(getTimeUnit(TimeUnit::Seconds));
+
+    input_layout->addWidget(new QLabel(tr("Hours:"), &dialog));
+    input_layout->addWidget(hours_edit);
+    input_layout->addWidget(new QLabel(tr("Minutes:"), &dialog));
+    input_layout->addWidget(minutes_edit);
+    input_layout->addWidget(new QLabel(tr("Seconds:"), &dialog));
+    input_layout->addWidget(seconds_edit);
+
+    layout->addLayout(input_layout);
+
+    auto* error_label = new QLabel(&dialog);
+    error_label->setStyleSheet(QStringLiteral("QLabel { color : red; }"));
+    error_label->setVisible(false);
+    layout->addWidget(error_label);
+
+    auto* button_box = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    layout->addWidget(button_box);
+
+    connect(button_box, &QDialogButtonBox::accepted, [&]() {
+        const int hours = hours_edit->text().toInt();
+        const int minutes = minutes_edit->text().toInt();
+        const int seconds = seconds_edit->text().toInt();
+
+        if (hours < 0 || hours > 9999) {
+            error_label->setText(tr("Hours must be between 0 and 9999."));
+            error_label->setVisible(true);
+            return;
+        }
+
+        if (minutes < 0 || minutes > 59) {
+            error_label->setText(tr("Minutes must be between 0 and 59."));
+            error_label->setVisible(true);
+            return;
+        }
+
+        if (seconds < 0 || seconds > 59) {
+            error_label->setText(tr("Seconds must be between 0 and 59."));
+            error_label->setVisible(true);
+            return;
+        }
+
+        u64 total_seconds = static_cast<u64>(hours) * 3600 + static_cast<u64>(minutes) * 60 + static_cast<u64>(seconds);
+        play_time_manager->SetPlayTime(program_id, total_seconds);
+        game_list->PopulateAsync(UISettings::values.game_dirs);
+
+        dialog.accept();
+    });
+
+    connect(button_box, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+    dialog.exec();
+}
+
+
 
 void GMainWindow::OnGameListRemovePlayTimeData(u64 program_id) {
     if (QMessageBox::question(this, tr("Remove Play Time Data"), tr("Reset play time?"),

@@ -3,6 +3,8 @@
 
 #include "qt_playtime_manager.h"
 
+namespace QtCommon::PlayTimeManager {
+
 QString ReadablePlayTime(qulonglong time_seconds) {
     if (time_seconds == 0) {
         return {};
@@ -17,3 +19,24 @@ QString ReadablePlayTime(qulonglong time_seconds) {
             .arg(value, 0, 'f', !is_minutes && time_seconds % 60 != 0)
             .arg(QString::fromUtf8(unit));
 }
+
+QString GetPlayTimeUnit(qulonglong time_seconds, TimeUnit unit) {
+    switch (unit) {
+    case TimeUnit::Hours: {
+        const qulonglong hours = time_seconds / 3600;
+        return QString::number(hours);
+    }
+    case TimeUnit::Minutes: {
+        const qulonglong minutes = (time_seconds % 3600) / 60;
+        return QString::number(minutes);
+    }
+    case TimeUnit::Seconds: {
+        const qulonglong seconds = time_seconds % 60;
+        return QString::number(seconds);
+    }
+    default:
+        return QStringLiteral("0");
+    }
+}
+
+} // namespace QtCommon::PlayTimeManager

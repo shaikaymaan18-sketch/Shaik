@@ -154,6 +154,11 @@ u64 PlayTimeManager::GetPlayTime(u64 program_id) const {
     }
 }
 
+void PlayTimeManager::SetPlayTime(u64 program_id, u64 play_time) {
+    database[program_id] = play_time;
+    Save();
+}
+
 void PlayTimeManager::ResetProgramPlayTime(u64 program_id) {
     database.erase(program_id);
     Save();

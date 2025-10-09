@@ -104,6 +104,7 @@ signals:
     void RemoveFileRequested(u64 program_id, QtCommon::Game::GameListRemoveTarget target,
                              const std::string& game_path);
     void RemovePlayTimeRequested(u64 program_id);
+    void SetPlayTimeRequested(u64 program_id);
     void DumpRomFSRequested(u64 program_id, const std::string& game_path, DumpRomFSTarget target);
     void VerifyIntegrityRequested(const std::string& game_path);
     void CopyTIDRequested(u64 program_id);
