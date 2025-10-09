@@ -779,6 +779,14 @@ void Java_org_yuzu_yuzu_1emu_NativeLibrary_playTimeManagerResetProgramPlayTime(J
     }
 }
 
+void Java_org_yuzu_yuzu_1emu_NativeLibrary_playTimeManagerSetPlayTime(JNIEnv* env, jobject obj,
+                                                                jstring jprogramId, jlong playTimeSeconds) {
+    u64 program_id = EmulationSession::GetProgramId(env, jprogramId);
+    if (play_time_manager) {
+        play_time_manager->SetPlayTime(program_id, static_cast<u64>(playTimeSeconds));
+    }
+}
+
 jstring Java_org_yuzu_yuzu_1emu_NativeLibrary_getAppletLaunchPath(JNIEnv* env, jclass clazz,
                                                                   jlong jid) {
     auto bis_system =

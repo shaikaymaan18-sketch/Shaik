@@ -153,11 +153,95 @@ class GamePropertiesFragment : Fragment() {
                 else -> "${seconds}s"
             }
 
-            append("Playtime: ")
+            append(getString(R.string.playtime))
             append(readablePlayTime)
+        }
+
+        binding.playtime.setOnClickListener {
+            showEditPlaytimeDialog()
         }
     }
 
+    private fun showEditPlaytimeDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_edit_playtime, null)
+        val hoursLayout =
+            dialogView.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.layout_hours)
+        val minutesLayout =
+            dialogView.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.layout_minutes)
+        val secondsLayout =
+            dialogView.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.layout_seconds)
+        val hoursInput =
+            dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.input_hours)
+        val minutesInput =
+            dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.input_minutes)
+        val secondsInput =
+            dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.input_seconds)
+
+        val playTimeSeconds = NativeLibrary.playTimeManagerGetPlayTime(args.game.programId)
+        val hours = playTimeSeconds / 3600
+        val minutes = (playTimeSeconds % 3600) / 60
+        val seconds = playTimeSeconds % 60
+
+        hoursInput.setText(hours.toString())
+        minutesInput.setText(minutes.toString())
+        secondsInput.setText(seconds.toString())
+
+        val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.edit_playtime)
+            .setView(dialogView)
+            .setPositiveButton(android.R.string.ok, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+
+        dialog.setOnShowListener {
+            val positiveButton = dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE)
+            positiveButton.setOnClickListener {
+                hoursLayout.error = null
+                minutesLayout.error = null
+                secondsLayout.error = null
+
+                val hoursText = hoursInput.text.toString()
+                val minutesText = minutesInput.text.toString()
+                val secondsText = secondsInput.text.toString()
+
+                val hoursValue = hoursText.toLongOrNull() ?: 0
+                val minutesValue = minutesText.toLongOrNull() ?: 0
+                val secondsValue = secondsText.toLongOrNull() ?: 0
+
+                var hasError = false
+
+                // normally cant be above 9999
+                if (hoursValue < 0 || hoursValue > 9999) {
+                    hoursLayout.error = getString(R.string.hours_must_be_between_0_and_9999)
+                    hasError = true
+                }
+
+                if (minutesValue < 0 || minutesValue > 59) {
+                    minutesLayout.error = getString(R.string.minutes_must_be_between_0_and_59)
+                    hasError = true
+                }
+
+                if (secondsValue < 0 || secondsValue > 59) {
+                    secondsLayout.error = getString(R.string.seconds_must_be_between_0_and_59)
+                    hasError = true
+                }
+
+                if (!hasError) {
+                    val totalSeconds = hoursValue * 3600 + minutesValue * 60 + secondsValue
+                    NativeLibrary.playTimeManagerSetPlayTime(args.game.programId, totalSeconds)
+                    getPlayTime()
+                    Toast.makeText(
+                        requireContext(),
+                        R.string.playtime_updated_successfully,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    dialog.dismiss()
+                }
+            }
+        }
+
+        dialog.show()
+    }
     private fun reloadList() {
         _binding ?: return
 
@@ -383,6 +467,7 @@ class GamePropertiesFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         driverViewModel.updateDriverNameForGame(args.game)
+        getPlayTime()
         reloadList()
     }
 

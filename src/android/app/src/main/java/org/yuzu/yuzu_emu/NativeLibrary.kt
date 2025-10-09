@@ -215,6 +215,7 @@ object NativeLibrary {
     external fun playTimeManagerGetPlayTime(programId: String): Long
     external fun playTimeManagerGetCurrentTitleId(): Long
     external fun playTimeManagerResetProgramPlayTime(programId: String)
+    external fun playTimeManagerSetPlayTime(programId: String, playTimeSeconds: Long)
 
     var coreErrorAlertResult = false
     val coreErrorAlertLock = Object()
