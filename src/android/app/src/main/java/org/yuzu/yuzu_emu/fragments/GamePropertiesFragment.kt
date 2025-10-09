@@ -31,6 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.yuzu.yuzu_emu.HomeNavigationDirections
+import org.yuzu.yuzu_emu.NativeLibrary
 import org.yuzu.yuzu_emu.R
 import org.yuzu.yuzu_emu.YuzuApplication
 import org.yuzu.yuzu_emu.adapters.GamePropertiesAdapter
@@ -112,6 +113,8 @@ class GamePropertiesFragment : Fragment() {
         binding.title.text = args.game.title
         binding.title.marquee()
 
+        getPlayTime()
+
         binding.buttonStart.setOnClickListener {
             LaunchGameDialogFragment.newInstance(args.game)
                 .show(childFragmentManager, LaunchGameDialogFragment.TAG)
@@ -134,6 +137,25 @@ class GamePropertiesFragment : Fragment() {
     override fun onDestroy() {
         super.onDestroy()
         gamesViewModel.reloadGames(true)
+    }
+
+    private fun getPlayTime() {
+        binding.playtime.text = buildString {
+            val playTimeSeconds = NativeLibrary.playTimeManagerGetPlayTime(args.game.programId)
+
+            val hours = playTimeSeconds / 3600
+            val minutes = (playTimeSeconds % 3600) / 60
+            val seconds = playTimeSeconds % 60
+
+            val readablePlayTime = when {
+                hours > 0 -> "${hours}h ${minutes}m ${seconds}s"
+                minutes > 0 -> "${minutes}m ${seconds}s"
+                else -> "${seconds}s"
+            }
+
+            append("Playtime: ")
+            append(readablePlayTime)
+        }
     }
 
     private fun reloadList() {
@@ -322,6 +344,31 @@ class GamePropertiesFragment : Fragment() {
                                 ).show(parentFragmentManager, MessageDialogFragment.TAG)
                             }
                         )
+                    )
+                }
+                if (NativeLibrary.playTimeManagerGetPlayTime(args.game.programId) > 0) {
+                    add(
+                        SubmenuProperty(
+                            R.string.reset_playtime,
+                            R.string.reset_playtime_description,
+                            R.drawable.ic_delete
+                        ) {
+                            MessageDialogFragment.newInstance(
+                                requireActivity(),
+                                titleId = R.string.reset_playtime,
+                                descriptionId = R.string.reset_playtime_warning_description,
+                                positiveAction = {
+                                    NativeLibrary.playTimeManagerResetProgramPlayTime( args.game.programId)
+                                    Toast.makeText(
+                                        YuzuApplication.appContext,
+                                        R.string.playtime_reset_successfully,
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    getPlayTime()
+                                    homeViewModel.reloadPropertiesList(true)
+                                }
+                            ).show(parentFragmentManager, MessageDialogFragment.TAG)
+                        }
                     )
                 }
             }
