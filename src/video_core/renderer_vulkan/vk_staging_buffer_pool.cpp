@@ -194,6 +194,7 @@ StagingBufferRef StagingBufferPool::GetStreamBuffer(size_t size) {
         .owner = &stream_buffer,
         .atom_size = non_coherent_atom_size,
         .is_coherent = stream_is_coherent,
+        .is_stream_ring = true,
     };
 }
 

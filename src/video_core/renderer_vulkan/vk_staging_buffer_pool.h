@@ -32,9 +32,10 @@ struct StagingBufferRef {
     const vk::Buffer* owner = nullptr;
     VkDeviceSize atom_size = 1;
     bool is_coherent = true;
+    bool is_stream_ring = false;
 
     void FlushRange(VkDeviceSize range_offset, VkDeviceSize size) const {
-        if (!owner || is_coherent || size == 0) {
+        if (!owner || is_coherent || size == 0 || is_stream_ring) {
             return;
         }
         if (size == VK_WHOLE_SIZE) {
@@ -53,7 +54,7 @@ struct StagingBufferRef {
     }
 
     void InvalidateRange(VkDeviceSize range_offset, VkDeviceSize size) const {
-        if (!owner || is_coherent || size == 0) {
+        if (!owner || is_coherent || size == 0 || is_stream_ring) {
             return;
         }
         if (size == VK_WHOLE_SIZE) {
@@ -119,6 +120,7 @@ private:
                 .owner = buffer.get(),
                 .atom_size = atom_size,
                 .is_coherent = is_coherent,
+                .is_stream_ring = false,
             };
         }
     };

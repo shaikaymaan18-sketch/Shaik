@@ -127,7 +127,7 @@ public:
     std::span<u8> BindMappedUniformBuffer([[maybe_unused]] size_t stage,
                                           [[maybe_unused]] u32 binding_index, u32 size) {
         const StagingBufferRef ref = staging_pool.Request(size, MemoryUsage::Upload);
-        BindBuffer(ref.buffer, static_cast<u32>(ref.offset), size);
+        BindBuffer(ref.buffer, ref.offset, static_cast<VkDeviceSize>(size));
 #ifdef YUZU_DEBUG
         ASSERT(ref.mapped_span.size() >= size);
         const VkDeviceSize ubo_align = device.GetUniformBufferAlignment();
@@ -136,7 +136,7 @@ public:
         return ref.mapped_span;
     }
 
-    void BindUniformBuffer(VkBuffer buffer, u32 offset, u32 size) {
+    void BindUniformBuffer(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize size) {
 #ifdef YUZU_DEBUG
         const VkDeviceSize ubo_align = device.GetUniformBufferAlignment();
         ASSERT(ubo_align == 0 || (offset % ubo_align) == 0);
@@ -144,7 +144,7 @@ public:
         BindBuffer(buffer, offset, size);
     }
 
-    void BindStorageBuffer(VkBuffer buffer, u32 offset, u32 size,
+    void BindStorageBuffer(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize size,
                            [[maybe_unused]] bool is_written) {
 #ifdef YUZU_DEBUG
         const VkDeviceSize ssbo_align = device.GetStorageBufferAlignment();
@@ -163,7 +163,7 @@ public:
     }
 
 private:
-    void BindBuffer(VkBuffer buffer, u32 offset, u32 size) {
+    void BindBuffer(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize size) {
         guest_descriptor_queue.AddBuffer(buffer, offset, size);
     }
 
