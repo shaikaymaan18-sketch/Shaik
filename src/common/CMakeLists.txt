@@ -104,8 +104,6 @@ add_library(
   parent_of_member.h
   point.h
   precompiled_headers.h
-  play_time_manager.cpp
-  play_time_manager.h
   quaternion.h
   range_map.h
   range_mutex.h

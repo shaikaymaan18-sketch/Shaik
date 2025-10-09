@@ -164,7 +164,7 @@ static FileSys::VirtualFile VfsDirectoryCreateFileWrapper(const FileSys::Virtual
 #include "yuzu/install_dialog.h"
 #include "yuzu/loading_screen.h"
 #include "yuzu/main.h"
-#include "common/play_time_manager.h"
+#include "frontend_common/play_time_manager.h"
 #include "yuzu/startup_checks.h"
 #include "qt_common/config/uisettings.h"
 #include "yuzu/util/clickable_label.h"
