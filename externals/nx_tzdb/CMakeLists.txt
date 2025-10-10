@@ -35,7 +35,6 @@ endif()
 
 if(NOT YUZU_TZDB_PATH STREQUAL "")
     set(NX_TZDB_BASE_DIR "${YUZU_TZDB_PATH}")
-    set(NX_TZDB_TZ_DIR "${NX_TZDB_BASE_DIR}/zoneinfo")
 elseif (OFF) # (MSVC AND NOT CXX_CLANG)
     # TODO(crueter): This is a terrible solution, but MSVC fails to link without it
     # Need to investigate further but I still can't reproduce...
@@ -43,9 +42,8 @@ elseif (OFF) # (MSVC AND NOT CXX_CLANG)
     set(NX_TZDB_ARCHIVE "${CPM_SOURCE_CACHE}/nx_tzdb/${NX_TZDB_VERSION}.zip")
 
     set(NX_TZDB_BASE_DIR "${CPM_SOURCE_CACHE}/nx_tzdb/tz")
-    set(NX_TZDB_TZ_DIR "${NX_TZDB_BASE_DIR}/zoneinfo")
 
-    set(NX_TZDB_DOWNLOAD_URL "https://github.com/crueter/tzdb_to_nx/releases/download/${NX_TZDB_VERSION}/${NX_TZDB_VERSION}.zip")
+    set(NX_TZDB_DOWNLOAD_URL "https://git.crueter.xyz/misc/tzdb_to_nx/releases/download/${NX_TZDB_VERSION}/${NX_TZDB_VERSION}.zip")
 
     message(STATUS "Downloading time zone data from ${NX_TZDB_DOWNLOAD_URL}...")
     file(DOWNLOAD ${NX_TZDB_DOWNLOAD_URL} ${NX_TZDB_ARCHIVE}
@@ -65,9 +63,10 @@ else()
     message(STATUS "Downloading time zone data...")
     AddJsonPackage(tzdb)
 
-    set(NX_TZDB_BASE_DIR "${CPM_SOURCE_CACHE}/nx_tzdb")
-    set(NX_TZDB_TZ_DIR "${nx_tzdb_SOURCE_DIR}")
+    set(NX_TZDB_BASE_DIR "${nx_tzdb_SOURCE_DIR}")
 endif()
+
+set(NX_TZDB_TZ_DIR "${NX_TZDB_BASE_DIR}/zoneinfo")
 
 target_include_directories(nx_tzdb
     INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include
