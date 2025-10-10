@@ -36,7 +36,12 @@ DataDialog::DataDialog(QWidget *parent)
 #undef WIDGET
 
     connect(ui->labels, &QListWidget::itemSelectionChanged, this, [this]() {
-        ui->page->setCurrentIndex(ui->labels->currentRow());
+        const auto items = ui->labels->selectedItems();
+        if (items.isEmpty()) {
+            return;
+        }
+
+        ui->page->setCurrentIndex(ui->labels->row(items[0]));
     });
 }
 
