@@ -324,7 +324,8 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         .support_descriptor_aliasing = device.IsDescriptorAliasingSupported(),
         .support_int8 = device.IsInt8Supported(),
         .support_int16 = device.IsShaderInt16Supported(),
-        .support_int64 = device.IsShaderInt64Supported(),
+        .support_int64 = device.IsShaderInt64Supported() &&
+                         driver_id != VK_DRIVER_ID_QUALCOMM_PROPRIETARY,
         .support_vertex_instance_id = false,
         .support_float_controls = device.IsKhrShaderFloatControlsSupported() &&
                                   driver_id != VK_DRIVER_ID_QUALCOMM_PROPRIETARY,
