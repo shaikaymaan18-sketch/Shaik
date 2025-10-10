@@ -333,18 +333,18 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         .support_separate_rounding_mode =
             float_control.roundingModeIndependence == VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL,
         .support_fp16_denorm_preserve =
-            is_stock_qualcomm_driver && float_control.shaderDenormPreserveFloat16 != VK_FALSE,
-        .support_fp32_denorm_preserve = float_control.shaderDenormPreserveFloat32 != VK_FALSE,
-        .support_fp16_denorm_flush = float_control.shaderDenormFlushToZeroFloat16 != VK_FALSE,
-        .support_fp32_denorm_flush = float_control.shaderDenormFlushToZeroFloat32 != VK_FALSE,
+            is_stock_qualcomm_driver && float_control.shaderDenormPreserveFloat16 == VK_TRUE,
+        .support_fp32_denorm_preserve = float_control.shaderDenormPreserveFloat32 == VK_TRUE,
+        .support_fp16_denorm_flush = float_control.shaderDenormFlushToZeroFloat16 == VK_TRUE,
+        .support_fp32_denorm_flush = float_control.shaderDenormFlushToZeroFloat32 == VK_TRUE,
         .support_fp16_signed_zero_nan_preserve =
             is_stock_qualcomm_driver &&
-            float_control.shaderSignedZeroInfNanPreserveFloat16 != VK_FALSE,
+            float_control.shaderSignedZeroInfNanPreserveFloat16 == VK_TRUE,
         .support_fp32_signed_zero_nan_preserve =
             is_stock_qualcomm_driver &&
-            float_control.shaderSignedZeroInfNanPreserveFloat32 != VK_FALSE,
+            float_control.shaderSignedZeroInfNanPreserveFloat32 == VK_TRUE,
         .support_fp64_signed_zero_nan_preserve =
-            float_control.shaderSignedZeroInfNanPreserveFloat64 != VK_FALSE,
+            float_control.shaderSignedZeroInfNanPreserveFloat64 == VK_TRUE,
         .support_explicit_workgroup_layout = device.IsKhrWorkgroupMemoryExplicitLayoutSupported(),
         .support_vote = device.IsSubgroupFeatureSupported(VK_SUBGROUP_FEATURE_VOTE_BIT),
         .support_viewport_index_layer_non_geometry =
