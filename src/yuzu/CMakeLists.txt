@@ -201,6 +201,8 @@ add_executable(yuzu
     precompiled_headers.h
     startup_checks.cpp
     startup_checks.h
+    set_play_time_dialog.cpp
+    set_play_time_dialog.h
     util/clickable_label.cpp
     util/clickable_label.h
     util/controller_navigation.cpp

@@ -38,6 +38,11 @@ public:
     void Start();
     void Stop();
 
+    static std::string GetReadablePlayTime(u64 time_seconds);
+    static std::string GetPlayTimeHours(u64 time_seconds);
+    static std::string GetPlayTimeMinutes(u64 time_seconds);
+    static std::string GetPlayTimeSeconds(u64 time_seconds);
+
 private:
     void AutoTimestamp(std::stop_token stop_token);
     void Save();
