@@ -326,7 +326,8 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         .support_int16 = device.IsShaderInt16Supported(),
         .support_int64 = device.IsShaderInt64Supported(),
         .support_vertex_instance_id = false,
-        .support_float_controls = device.IsKhrShaderFloatControlsSupported(),
+        .support_float_controls = device.IsKhrShaderFloatControlsSupported() &&
+                                  driver_id != VK_DRIVER_ID_QUALCOMM_PROPRIETARY,
         .support_separate_denorm_behavior =
             float_control.denormBehaviorIndependence == VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL,
         .support_separate_rounding_mode =
