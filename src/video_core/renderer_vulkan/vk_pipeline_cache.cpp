@@ -318,6 +318,7 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
       serialization_thread(1, "VkPipelineSerialization") {
     const auto& float_control{device.FloatControlProperties()};
     const VkDriverId driver_id{device.GetDriverID()};
+    const bool is_stock_qualcomm_driver{driver_id == VK_DRIVER_ID_QUALCOMM_PROPRIETARY};
     profile = Shader::Profile{
         .supported_spirv = device.SupportedSpirvVersion(),
         .unified_descriptor_binding = true,
@@ -331,13 +332,16 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
             float_control.denormBehaviorIndependence == VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL,
         .support_separate_rounding_mode =
             float_control.roundingModeIndependence == VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL,
-        .support_fp16_denorm_preserve = float_control.shaderDenormPreserveFloat16 != VK_FALSE,
+        .support_fp16_denorm_preserve =
+            is_stock_qualcomm_driver && float_control.shaderDenormPreserveFloat16 != VK_FALSE,
         .support_fp32_denorm_preserve = float_control.shaderDenormPreserveFloat32 != VK_FALSE,
         .support_fp16_denorm_flush = float_control.shaderDenormFlushToZeroFloat16 != VK_FALSE,
         .support_fp32_denorm_flush = float_control.shaderDenormFlushToZeroFloat32 != VK_FALSE,
         .support_fp16_signed_zero_nan_preserve =
+            is_stock_qualcomm_driver &&
             float_control.shaderSignedZeroInfNanPreserveFloat16 != VK_FALSE,
         .support_fp32_signed_zero_nan_preserve =
+            is_stock_qualcomm_driver &&
             float_control.shaderSignedZeroInfNanPreserveFloat32 != VK_FALSE,
         .support_fp64_signed_zero_nan_preserve =
             float_control.shaderSignedZeroInfNanPreserveFloat64 != VK_FALSE,
