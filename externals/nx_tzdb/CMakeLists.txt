@@ -36,31 +36,6 @@ endif()
 if(NOT YUZU_TZDB_PATH STREQUAL "")
     set(NX_TZDB_BASE_DIR "${YUZU_TZDB_PATH}")
     set(NX_TZDB_TZ_DIR "${NX_TZDB_BASE_DIR}/zoneinfo")
-elseif (MSVC)
-    # TODO(crueter): This is a terrible solution, but MSVC fails to link without it
-    # Need to investigate further but I still can't reproduce...
-    set(NX_TZDB_VERSION "250725")
-    set(NX_TZDB_ARCHIVE "${CPM_SOURCE_CACHE}/nx_tzdb/${NX_TZDB_VERSION}.zip")
-
-    set(NX_TZDB_BASE_DIR "${CPM_SOURCE_CACHE}/nx_tzdb/tz")
-    set(NX_TZDB_TZ_DIR "${NX_TZDB_BASE_DIR}/zoneinfo")
-
-    set(NX_TZDB_DOWNLOAD_URL "https://github.com/crueter/tzdb_to_nx/releases/download/${NX_TZDB_VERSION}/${NX_TZDB_VERSION}.zip")
-
-    message(STATUS "Downloading time zone data from ${NX_TZDB_DOWNLOAD_URL}...")
-    file(DOWNLOAD ${NX_TZDB_DOWNLOAD_URL} ${NX_TZDB_ARCHIVE}
-        STATUS NX_TZDB_DOWNLOAD_STATUS)
-
-    list(GET NX_TZDB_DOWNLOAD_STATUS 0 NX_TZDB_DOWNLOAD_STATUS_CODE)
-    if (NOT NX_TZDB_DOWNLOAD_STATUS_CODE EQUAL 0)
-        message(FATAL_ERROR "Time zone data download failed (status code ${NX_TZDB_DOWNLOAD_STATUS_CODE})")
-    endif()
-
-    file(ARCHIVE_EXTRACT
-        INPUT
-            ${NX_TZDB_ARCHIVE}
-        DESTINATION
-            ${NX_TZDB_BASE_DIR})
 else()
     message(STATUS "Downloading time zone data...")
     AddJsonPackage(tzdb)
