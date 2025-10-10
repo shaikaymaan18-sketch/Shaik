@@ -46,5 +46,5 @@ if (NOT APPLE AND ENABLE_OPENGL)
 endif()
 
 if (NOT WIN32)
-    target_include_directories(qt_common PRIVATE ${Qt6Gui_PRIVATE_INCLUDE_DIRS})
+    target_link_libraries(qt_common PRIVATE Qt6::GuiPrivate)
 endif()
