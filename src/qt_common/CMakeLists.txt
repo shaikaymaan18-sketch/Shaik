@@ -25,6 +25,7 @@ add_library(qt_common STATIC
     qt_applet_util.h qt_applet_util.cpp
     qt_progress_dialog.h qt_progress_dialog.cpp
     qt_string_lookup.h
+    qt_compress.h qt_compress.cpp
 
 )
 

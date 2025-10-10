@@ -8,6 +8,7 @@
 #include "frontend_common/content_manager.h"
 #include "frontend_common/firmware_manager.h"
 #include "qt_common/qt_common.h"
+#include "qt_common/qt_compress.h"
 #include "qt_common/qt_game_util.h"
 #include "qt_common/qt_progress_dialog.h"
 #include "qt_frontend_util.h"
@@ -385,59 +386,75 @@ void ClearDataDir(FrontendCommon::DataManager::DataDir dir)
 
 void ExportDataDir(FrontendCommon::DataManager::DataDir data_dir, std::function<void()> callback)
 {
+    using namespace QtCommon::Frontend;
     const std::string dir = FrontendCommon::DataManager::GetDataDir(data_dir);
 
     const QString zip_dump_location
-        = QtCommon::Frontend::GetSaveFileName(tr("Select Export Location"),
+        = GetSaveFileName(tr("Select Export Location"),
                                               QStringLiteral("export.zip"),
                                               tr("Zipped Archives (*.zip)"));
 
     if (zip_dump_location.isEmpty())
         return;
 
-    QMetaObject::Connection* connection = new QMetaObject::Connection;
-    *connection = QObject::connect(qApp, &QGuiApplication::aboutToQuit, rootObject, [=]() mutable {
-        QtCommon::Frontend::Warning(tr("Still Exporting"),
-                                    tr("Eden is still exporting some data, and will continue "
-                                       "running in the background until it's done."));
+    QtProgressDialog* progress = new QtProgressDialog(
+        tr("Exporting data. This may take a while..."), tr("Cancel"), 0, 100, rootObject);
+
+    progress->setWindowTitle(tr("Exporting"));
+    progress->setWindowModality(Qt::WindowModal);
+    progress->setMinimumDuration(100);
+    progress->setAutoClose(false);
+    progress->setAutoReset(false);
+    progress->show();
+
+    // Qt's wasCanceled seems to be wonky
+    bool was_cancelled = false;
+
+    QObject::connect(progress, &QtProgressDialog::canceled, rootObject, [=]() mutable {
+        was_cancelled = false;
     });
 
-    QtCommon::Frontend::QtProgressDialog* progress = new QtCommon::Frontend::QtProgressDialog(
-        tr("Compressing, this may take a while..."), tr("Background"), 0, 0, rootObject);
-
-    progress->setWindowModality(Qt::WindowModal);
-    progress->show();
     QGuiApplication::processEvents();
 
-    QFuture<bool> future = QtConcurrent::run([&]() {
-        return JlCompress::compressDir(zip_dump_location,
-                                       QString::fromStdString(dir),
-                                       true,
-                                       QDir::Hidden | QDir::Files | QDir::Dirs);
+    auto progress_callback = [=](size_t total_size, size_t processed_size) {
+        QMetaObject::invokeMethod(progress,
+                                  &QtProgressDialog::setValue,
+                                  static_cast<int>((processed_size * 100) / total_size));
+
+        return !progress->wasCanceled();
+    };
+
+    QFuture<bool> future = QtConcurrent::run([=]() {
+        return QtCommon::Compress::compressDir(zip_dump_location,
+                                               QString::fromStdString(dir),
+                                               JlCompress::Options(),
+                                               progress_callback);
     });
 
     QFutureWatcher<bool>* watcher = new QFutureWatcher<bool>(rootObject);
 
     QObject::connect(watcher, &QFutureWatcher<bool>::finished, rootObject, [=]() {
         progress->close();
-        progress->deleteLater();
-        QObject::disconnect(*connection);
-        delete connection;
 
-        if (watcher->result()) {
-            QtCommon::Frontend::Information(tr("Exported Successfully"),
+        if (was_cancelled) {
+            Information(tr("Export Cancelled"),
+                                            tr("Export was cancelled by the user."));
+        } else if (watcher->result()) {
+            Information(tr("Exported Successfully"),
                                             tr("Data was exported successfully."));
         } else {
-            QtCommon::Frontend::Critical(
+            Critical(
                 tr("Export Failed"),
                 tr("Ensure you have write permissions on the targeted directory and try again."));
         }
 
+        progress->deleteLater();
         watcher->deleteLater();
-        callback();
+        if (callback) callback();
     });
 
     watcher->setFuture(future);
+
 }
 
 void ImportDataDir(FrontendCommon::DataManager::DataDir data_dir, std::function<void()> callback)
@@ -462,39 +479,54 @@ void ImportDataDir(FrontendCommon::DataManager::DataDir data_dir, std::function<
     if (button != QMessageBox::Yes)
         return;
 
-    FrontendCommon::DataManager::ClearDir(data_dir);
-
-    QMetaObject::Connection* connection = new QMetaObject::Connection;
-    *connection = QObject::connect(qApp, &QGuiApplication::aboutToQuit, rootObject, [=]() mutable {
-        Warning(tr("Still Importing"),
-                tr("Eden is still importing some data, and will continue "
-                   "running in the background until it's done."));
-    });
-
-    QtProgressDialog* progress = new QtProgressDialog(tr("Decompressing, this may take a while..."),
-                                                      tr("Background"),
+    QtProgressDialog* progress = new QtProgressDialog(tr("Importing data. This may take a while..."),
+                                                      tr("Cancel"),
                                                       0,
-                                                      0,
+                                                      100,
                                                       rootObject);
 
+    progress->setWindowTitle(tr("Importing"));
     progress->setWindowModality(Qt::WindowModal);
+    progress->setMinimumDuration(100);
+    progress->setAutoClose(false);
+    progress->setAutoReset(false);
     progress->show();
+    progress->setValue(0);
+
+    // Qt's wasCanceled seems to be wonky
+    bool was_cancelled = false;
+
+    QObject::connect(progress, &QtProgressDialog::canceled, rootObject, [=]() mutable {
+        was_cancelled = false;
+    });
+
     QGuiApplication::processEvents();
 
+    FrontendCommon::DataManager::ClearDir(data_dir);
+
+    auto progress_callback = [=](size_t total_size, size_t processed_size) {
+        QMetaObject::invokeMethod(progress,
+                                  &QtProgressDialog::setValue,
+                                  static_cast<int>((processed_size * 100) / total_size));
+
+        return !progress->wasCanceled();
+    };
+
     QFuture<bool> future = QtConcurrent::run([=]() {
-        return !JlCompress::extractDir(zip_dump_location,
-                                       QString::fromStdString(dir)).empty();
+        return !QtCommon::Compress::extractDir(zip_dump_location,
+                                               QString::fromStdString(dir),
+                                               progress_callback)
+                    .empty();
     });
 
     QFutureWatcher<bool>* watcher = new QFutureWatcher<bool>(rootObject);
 
     QObject::connect(watcher, &QFutureWatcher<bool>::finished, rootObject, [=]() {
         progress->close();
-        progress->deleteLater();
-        QObject::disconnect(*connection);
-        delete connection;
 
-        if (watcher->result()) {
+        if (was_cancelled) {
+            Information(tr("Import Cancelled"), tr("Import was cancelled by the user."));
+        } else if (watcher->result()) {
             Information(tr("Imported Successfully"), tr("Data was imported successfully."));
         } else {
             Critical(
@@ -502,8 +534,9 @@ void ImportDataDir(FrontendCommon::DataManager::DataDir data_dir, std::function<
                 tr("Ensure you have read permissions on the targeted directory and try again."));
         }
 
+        progress->deleteLater();
         watcher->deleteLater();
-        callback();
+        if (callback) callback();
     });
 
     watcher->setFuture(future);
