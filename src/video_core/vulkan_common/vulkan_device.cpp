@@ -506,6 +506,20 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
                     "Qualcomm drivers have a slow VK_KHR_push_descriptor implementation");
         //RemoveExtension(extensions.push_descriptor, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
 
+        if (extensions.shader_float_controls) {
+            LOG_WARNING(Render_Vulkan,
+                        "Qualcomm drivers have broken VK_KHR_shader_float_controls; disabling it");
+            RemoveExtension(extensions.shader_float_controls,
+                            VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
+        }
+
+        if (extensions.shader_atomic_int64) {
+            LOG_WARNING(Render_Vulkan,
+                        "Qualcomm drivers have broken VK_KHR_shader_atomic_int64; disabling it");
+            RemoveExtensionFeature(extensions.shader_atomic_int64, features.shader_atomic_int64,
+                                   VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME);
+        }
+
 #if defined(ANDROID) && defined(ARCHITECTURE_arm64)
         // Patch the driver to enable BCn textures.
         const auto major = (properties.properties.driverVersion >> 24) << 2;
