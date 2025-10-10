@@ -564,7 +564,7 @@ void GameList::AddGamePopup(QMenu& context_menu, u64 program_id, const std::stri
     QAction* remove_shader_cache = remove_menu->addAction(tr("Remove All Pipeline Caches"));
     QAction* remove_all_content = remove_menu->addAction(tr("Remove All Installed Contents"));
     QMenu* play_time_menu = context_menu.addMenu(tr("Manage Play Time"));
-    QAction* set_play_time = play_time_menu->addAction(tr("Set Play Time Data"));
+    QAction* set_play_time = play_time_menu->addAction(tr("Edit Play Time Data"));
     QAction* remove_play_time_data = play_time_menu->addAction(tr("Remove Play Time Data"));
     QMenu* dump_romfs_menu = context_menu.addMenu(tr("Dump RomFS"));
     QAction* dump_romfs = dump_romfs_menu->addAction(tr("Dump RomFS"));
