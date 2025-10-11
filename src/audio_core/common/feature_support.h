@@ -16,7 +16,7 @@
 #include <ranges>
 
 namespace AudioCore {
-constexpr u32 CurrentRevision = 16;
+constexpr u32 CurrentRevision = 15;
 
 enum class SupportTags {
     CommandProcessingTimeEstimatorVersion4,
@@ -47,6 +47,9 @@ enum class SupportTags {
     DelayChannelMappingChange,
     ReverbChannelMappingChange,
     I3dl2ReverbChannelMappingChange,
+    SplitterPrevVolumeReset,
+    SplitterDestinationV2b,
+    VoiceInParameterV2,
 
     // Not a real tag, just here to get the count.
     Size
@@ -91,6 +94,9 @@ constexpr bool CheckFeatureSupported(SupportTags tag, u32 user_revision) {
             {SupportTags::DelayChannelMappingChange, 11},
             {SupportTags::ReverbChannelMappingChange, 11},
             {SupportTags::I3dl2ReverbChannelMappingChange, 11},
+            {SupportTags::SplitterPrevVolumeReset, 13},
+            {SupportTags::SplitterDestinationV2b, 15},
+            {SupportTags::VoiceInParameterV2, 15},
         }};
 
     const auto& feature =
