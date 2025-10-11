@@ -84,4 +84,14 @@ void SplitterDestinationData::SetNext(SplitterDestinationData* next_) {
     next = next_;
 }
 
+std::span<SplitterDestinationData::BiquadFilterParameter2>
+SplitterDestinationData::GetBiquadFilters() {
+    return biquad_filters;
+}
+
+std::span<const SplitterDestinationData::BiquadFilterParameter2>
+SplitterDestinationData::GetBiquadFilters() const {
+    return biquad_filters;
+}
+
 } // namespace AudioCore::Renderer
