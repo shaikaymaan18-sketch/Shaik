@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <optional>
+
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/vulkan_common/vulkan_memory_allocator.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
@@ -18,7 +20,8 @@ vk::Buffer CreateWrappedBuffer(MemoryAllocator& allocator, VkDeviceSize size, Me
 
 vk::Image CreateWrappedImage(MemoryAllocator& allocator, VkExtent2D dimensions, VkFormat format);
 void TransitionImageLayout(vk::CommandBuffer& cmdbuf, VkImage image, VkImageLayout target_layout,
-                           VkImageLayout source_layout = VK_IMAGE_LAYOUT_GENERAL);
+                           VkImageLayout source_layout = VK_IMAGE_LAYOUT_GENERAL,
+                           std::optional<VkImageAspectFlags> aspect_mask_override = std::nullopt);
 void UploadImage(const Device& device, MemoryAllocator& allocator, Scheduler& scheduler,
                  vk::Image& image, VkExtent2D dimensions, VkFormat format,
                  std::span<const u8> initial_contents = {});

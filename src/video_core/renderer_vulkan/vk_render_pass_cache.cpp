@@ -84,7 +84,7 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
         const bool is_valid{format != PixelFormat::Invalid};
         references[index] = VkAttachmentReference{
             .attachment = is_valid ? num_colors : VK_ATTACHMENT_UNUSED,
-            .layout = VK_IMAGE_LAYOUT_GENERAL,
+            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         };
         if (is_valid) {
             descriptions.push_back(AttachmentDescription(*device, format, key.samples));
@@ -97,7 +97,7 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
     if (key.depth_format != PixelFormat::Invalid) {
         depth_reference = VkAttachmentReference{
             .attachment = num_colors,
-            .layout = VK_IMAGE_LAYOUT_GENERAL,
+            .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         };
         descriptions.push_back(AttachmentDescription(*device, key.depth_format, key.samples));
     }
@@ -113,9 +113,38 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
         .preserveAttachmentCount = 0,
         .pPreserveAttachments = nullptr,
     };
-    const VkSubpassDependency dependency{
-            .srcSubpass = 0,  // Current subpass
-            .dstSubpass = 0,  // Same subpass (self-dependency)
+    boost::container::static_vector<VkSubpassDependency, 3> dependencies;
+    if (num_colors > 0) {
+        dependencies.push_back({
+            .srcSubpass = VK_SUBPASS_EXTERNAL,
+            .dstSubpass = 0,
+            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .srcAccessMask = 0,
+            .dstAccessMask =
+                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
+            .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
+        });
+    }
+    if (has_depth) {
+        dependencies.push_back({
+            .srcSubpass = VK_SUBPASS_EXTERNAL,
+            .dstSubpass = 0,
+            .srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+            .srcAccessMask = 0,
+            .dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                             VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
+        });
+    }
+    if (num_colors > 0 || has_depth) {
+        // Preserve existing self dependency to maintain implicit ordering for drivers
+        dependencies.push_back({
+            .srcSubpass = 0,
+            .dstSubpass = 0,
             .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
                             VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
                             VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
@@ -123,8 +152,9 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
             .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
                              VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-            .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT
-    };
+            .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
+        });
+    }
     pair->second = device->GetLogical().CreateRenderPass({
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
         .pNext = nullptr,
@@ -133,8 +163,8 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
         .pAttachments = descriptions.empty() ? nullptr : descriptions.data(),
         .subpassCount = 1,
         .pSubpasses = &subpass,
-        .dependencyCount = 1,
-        .pDependencies = &dependency,
+        .dependencyCount = static_cast<u32>(dependencies.size()),
+        .pDependencies = dependencies.data(),
     });
     return *pair->second;
 }

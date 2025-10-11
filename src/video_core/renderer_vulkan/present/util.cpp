@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "common/assert.h"
+#include <optional>
 #include <ranges>
 #include "video_core/renderer_vulkan/present/util.h"
 
@@ -46,30 +47,203 @@ vk::Image CreateWrappedImage(MemoryAllocator& allocator, VkExtent2D dimensions, 
     return allocator.CreateImage(image_ci);
 }
 
+namespace {
+
+constexpr VkAccessFlags AccessMaskForLayout(VkImageLayout layout) {
+    switch (layout) {
+    case VK_IMAGE_LAYOUT_UNDEFINED:
+    case VK_IMAGE_LAYOUT_PREINITIALIZED:
+        return 0;
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+        return VK_ACCESS_TRANSFER_WRITE_BIT;
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+        return VK_ACCESS_TRANSFER_READ_BIT;
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+        return VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+        return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+               VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
+        return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+#ifdef VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL
+    case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL:
+        return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+               VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+#endif
+#ifdef VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL
+    case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL:
+        return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+#endif
+#ifdef VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL
+    case VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL:
+        return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+               VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+#endif
+#ifdef VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL
+    case VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL:
+        return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+#endif
+#ifdef VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL
+    case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL:
+        return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+               VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+#endif
+#ifdef VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL
+    case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL:
+        return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+               VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+#endif
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+        return VK_ACCESS_SHADER_READ_BIT;
+    case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+        return 0;
+    case VK_IMAGE_LAYOUT_GENERAL:
+        return VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    default:
+        return VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    }
+}
+
+constexpr VkPipelineStageFlags StageMaskForLayout(VkImageLayout layout) {
+    switch (layout) {
+    case VK_IMAGE_LAYOUT_UNDEFINED:
+    case VK_IMAGE_LAYOUT_PREINITIALIZED:
+        return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+        return VK_PIPELINE_STAGE_TRANSFER_BIT;
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+        return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+        return VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+               VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
+        return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+               VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+               VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+#ifdef VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL
+    case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL:
+        return VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+               VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+#endif
+#ifdef VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL
+    case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL:
+        return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+               VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+               VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+#endif
+#ifdef VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL
+    case VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL:
+        return VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+               VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+#endif
+#ifdef VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL
+    case VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL:
+        return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+               VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+               VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+#endif
+#ifdef VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL
+    case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL:
+        return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+               VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+               VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+#endif
+#ifdef VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL
+    case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL:
+        return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+               VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+               VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+#endif
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+        return VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+        return VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    case VK_IMAGE_LAYOUT_GENERAL:
+        return VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    default:
+        return VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    }
+}
+
+constexpr VkImageAspectFlags AspectMaskForLayout(VkImageLayout layout) {
+    switch (layout) {
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
+        return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+#ifdef VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL
+    case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL:
+        return VK_IMAGE_ASPECT_DEPTH_BIT;
+#endif
+#ifdef VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL
+    case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL:
+        return VK_IMAGE_ASPECT_DEPTH_BIT;
+#endif
+#ifdef VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL
+    case VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL:
+        return VK_IMAGE_ASPECT_STENCIL_BIT;
+#endif
+#ifdef VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL
+    case VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL:
+        return VK_IMAGE_ASPECT_STENCIL_BIT;
+#endif
+#ifdef VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL
+    case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL:
+        return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+#endif
+#ifdef VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL
+    case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL:
+        return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+#endif
+    default:
+        return VK_IMAGE_ASPECT_COLOR_BIT;
+    }
+}
+
+constexpr VkImageAspectFlags AspectMaskForTransition(VkImageLayout old_layout,
+                                                     VkImageLayout new_layout) {
+    const VkImageAspectFlags new_aspect = AspectMaskForLayout(new_layout);
+    if (new_aspect != VK_IMAGE_ASPECT_COLOR_BIT) {
+        return new_aspect;
+    }
+    const VkImageAspectFlags old_aspect = AspectMaskForLayout(old_layout);
+    if (old_aspect != VK_IMAGE_ASPECT_COLOR_BIT) {
+        return old_aspect;
+    }
+    return VK_IMAGE_ASPECT_COLOR_BIT;
+}
+
+} // Anonymous namespace
+
 void TransitionImageLayout(vk::CommandBuffer& cmdbuf, VkImage image, VkImageLayout target_layout,
-                           VkImageLayout source_layout) {
-    constexpr VkFlags flags{VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT};
+                           VkImageLayout source_layout,
+                           std::optional<VkImageAspectFlags> aspect_mask_override) {
+    const VkAccessFlags src_access = AccessMaskForLayout(source_layout);
+    const VkAccessFlags dst_access = AccessMaskForLayout(target_layout);
+    const VkPipelineStageFlags src_stage = StageMaskForLayout(source_layout);
+    const VkPipelineStageFlags dst_stage = StageMaskForLayout(target_layout);
+    const VkImageAspectFlags aspect_mask =
+        aspect_mask_override.value_or(AspectMaskForTransition(source_layout, target_layout));
+
     const VkImageMemoryBarrier barrier{
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .pNext = nullptr,
-        .srcAccessMask = flags,
-        .dstAccessMask = flags,
+        .srcAccessMask = src_access,
+        .dstAccessMask = dst_access,
         .oldLayout = source_layout,
         .newLayout = target_layout,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .image = image,
         .subresourceRange{
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .aspectMask = aspect_mask,
             .baseMipLevel = 0,
             .levelCount = 1,
             .baseArrayLayer = 0,
             .layerCount = 1,
         },
     };
-    cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                           0, barrier);
+    cmdbuf.PipelineBarrier(src_stage, dst_stage, 0, barrier);
 }
 
 void UploadImage(const Device& device, MemoryAllocator& allocator, Scheduler& scheduler,
@@ -211,7 +385,7 @@ vk::RenderPass CreateWrappedRenderPass(const Device& device, VkFormat format,
 
     constexpr VkAttachmentReference color_attachment_ref{
         .attachment = 0,
-        .layout = VK_IMAGE_LAYOUT_GENERAL,
+        .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     };
 
     const VkSubpassDescription subpass_description{
@@ -234,7 +408,7 @@ vk::RenderPass CreateWrappedRenderPass(const Device& device, VkFormat format,
         .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         .srcAccessMask = 0,
         .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        .dependencyFlags = 0,
+        .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
     };
 
     return device.GetLogical().CreateRenderPass(VkRenderPassCreateInfo{
