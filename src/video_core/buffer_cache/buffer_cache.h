@@ -790,9 +790,10 @@ void BufferCache<P>::BindHostGraphicsUniformBuffer(size_t stage, u32 index, u32 
     const Binding& binding = channel_state->uniform_buffers[stage][index];
     const DAddr device_addr = binding.device_addr;
     const u32 size = (std::min)(binding.size, (*channel_state->uniform_buffer_sizes)[stage][index]);
+    const bool force_old_ubo = ForceOldUBOMethod();
     Buffer& buffer = slot_buffers[binding.buffer_id];
     TouchBuffer(buffer, binding.buffer_id);
-    const bool use_fast_buffer = binding.buffer_id != NULL_BUFFER_ID &&
+    const bool use_fast_buffer = !force_old_ubo && binding.buffer_id != NULL_BUFFER_ID &&
                                  size <= channel_state->uniform_buffer_skip_cache_size &&
                                  !memory_tracker.IsRegionGpuModified(device_addr, size);
     if (use_fast_buffer) {
@@ -848,7 +849,9 @@ void BufferCache<P>::BindHostGraphicsUniformBuffer(size_t stage, u32 index, u32 
     } else {
         runtime.BindUniformBuffer(buffer, offset, size);
     }
-    channel_state->fast_bound_uniform_buffers[stage] &= ~(1u << binding_index);
+    if (!force_old_ubo) {
+        channel_state->fast_bound_uniform_buffers[stage] &= ~(1u << binding_index);
+    }
 }
 
 template <class P>
@@ -1782,7 +1785,18 @@ std::span<u8> BufferCache<P>::ImmediateBuffer(size_t wanted_capacity) {
 }
 
 template <class P>
+bool BufferCache<P>::ForceOldUBOMethod() const noexcept {
+    if constexpr (requires(const Runtime& r) { r.ForceOldUniformBufferMethod(); }) {
+        return runtime.ForceOldUniformBufferMethod();
+    }
+    return false;
+}
+
+template <class P>
 bool BufferCache<P>::HasFastUniformBufferBound(size_t stage, u32 binding_index) const noexcept {
+    if (ForceOldUBOMethod()) {
+        return false;
+    }
     return ((channel_state->fast_bound_uniform_buffers[stage] >> binding_index) & 1u) != 0;
 }
 

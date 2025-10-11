@@ -449,6 +449,8 @@ private:
 
     [[nodiscard]] bool HasFastUniformBufferBound(size_t stage, u32 binding_index) const noexcept;
 
+    [[nodiscard]] bool ForceOldUBOMethod() const noexcept;
+
     void ClearDownload(DAddr base_addr, u64 size);
 
     void InlineMemoryImplementation(DAddr dest_address, size_t copy_size,
