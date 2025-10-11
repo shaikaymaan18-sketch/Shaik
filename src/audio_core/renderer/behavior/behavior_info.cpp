@@ -205,4 +205,8 @@ bool BehaviorInfo::IsVoiceInParameterV2Supported() const {
     return CheckFeatureSupported(SupportTags::VoiceInParameterV2, user_revision);
 }
 
+bool BehaviorInfo::IsBiquadFilterParameterForSplitterEnabled() const {
+    return CheckFeatureSupported(SupportTags::SplitterBiquadFilterParameter, user_revision);
+}
+
 } // namespace AudioCore::Renderer

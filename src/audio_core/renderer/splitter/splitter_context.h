@@ -189,6 +189,8 @@ private:
     bool splitter_bug_fixed{};
     /// Is explicit previous mix volume reset supported?
     bool splitter_prev_volume_reset_supported{};
+    /// Is biquad filter parameter for splitter (REV12) supported?
+    bool splitter_biquad_param_supported{};
     /// Is float coefficient/biquad filter v2b parameter supported?
     bool splitter_float_coeff_supported{};
 };

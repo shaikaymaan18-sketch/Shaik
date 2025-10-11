@@ -389,6 +389,13 @@ public:
      */
     bool IsVoiceInParameterV2Supported() const;
 
+    /**
+     * Check if splitter destinations can carry biquad filter parameters (revision 12+).
+     *
+     * @return True if supported, otherwise false.
+     */
+    bool IsBiquadFilterParameterForSplitterEnabled() const;
+
     /// Host version
     u32 process_revision;
     /// User version
