@@ -835,6 +835,20 @@ void BufferCache<P>::BindHostGraphicsUniformBuffer(size_t stage, u32 index, u32 
         return;
     }
     const u32 offset = buffer.Offset(device_addr);
+    
+    if constexpr (!IS_OPENGL) {
+        if constexpr (requires(const Runtime& r) { r.GetUniformBufferAlignment(); }) {
+            const u32 ubo_align = runtime.GetUniformBufferAlignment();
+            if (ubo_align != 0 && (offset % ubo_align) != 0) {
+                if constexpr (HAS_PERSISTENT_UNIFORM_BUFFER_BINDINGS) {
+                    channel_state->uniform_buffer_binding_sizes[stage][binding_index] = size;
+                }
+                const std::span<u8> span = runtime.BindMappedUniformBuffer(stage, binding_index, size);
+                device_memory.ReadBlockUnsafe(device_addr, span.data(), size);
+                return;
+            }
+        }
+    }
     if constexpr (IS_OPENGL) {
         // Mark the index as dirty if offset doesn't match
         const bool is_copy_bind = offset != 0 && !runtime.SupportsNonZeroUniformOffset();

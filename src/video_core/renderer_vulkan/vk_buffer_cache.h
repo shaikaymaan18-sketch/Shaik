@@ -98,6 +98,10 @@ public:
         return device.GetDriverID() == VK_DRIVER_ID_QUALCOMM_PROPRIETARY;
     }
 
+    u32 GetUniformBufferAlignment() const {
+        return static_cast<u32>(device.GetUniformBufferAlignment());
+    }
+
     u32 GetStorageBufferAlignment() const;
 
     [[nodiscard]] StagingBufferRef UploadStagingBuffer(size_t size);
