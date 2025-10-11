@@ -45,6 +45,8 @@ public slots:
 private:
     std::unique_ptr<Ui::DataWidget> ui;
     FrontendCommon::DataManager::DataDir m_dir;
+
+    std::string selectProfile();
 };
 
 #endif // DATA_DIALOG_H

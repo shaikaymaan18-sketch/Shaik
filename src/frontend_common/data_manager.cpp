@@ -11,13 +11,13 @@ namespace FrontendCommon::DataManager {
 
 namespace fs = std::filesystem;
 
-const std::string GetDataDir(DataDir dir)
+const std::string GetDataDir(DataDir dir, const std::string &user_id)
 {
     const fs::path nand_dir = Common::FS::GetEdenPath(Common::FS::EdenPath::NANDDir);
 
     switch (dir) {
     case DataDir::Saves:
-        return (nand_dir / "user" / "save" / "0000000000000000").string();
+        return (nand_dir / "user" / "save" / "0000000000000000" / user_id).string();
     case DataDir::UserNand:
         return (nand_dir / "user" / "Contents" / "registered").string();
     case DataDir::SysNand:
@@ -35,9 +35,9 @@ const std::string GetDataDir(DataDir dir)
     return "";
 }
 
-u64 ClearDir(DataDir dir)
+u64 ClearDir(DataDir dir, const std::string &user_id)
 {
-    fs::path data_dir = GetDataDir(dir);
+    fs::path data_dir = GetDataDir(dir, user_id);
     u64 result = fs::remove_all(data_dir);
 
     // mkpath at the end just so it actually exists

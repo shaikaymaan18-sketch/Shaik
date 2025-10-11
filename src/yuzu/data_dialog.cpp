@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "data_dialog.h"
+#include "core/hle/service/acc/profile_manager.h"
 #include "frontend_common/data_manager.h"
 #include "qt_common/qt_content_util.h"
 #include "qt_common/qt_frontend_util.h"
@@ -14,6 +15,10 @@
 #include <QFutureWatcher>
 #include <QProgressDialog>
 #include <QtConcurrentRun>
+
+#include <core/frontend/applets/profile_select.h>
+
+#include <applets/qt_profile_select.h>
 
 DataDialog::DataDialog(QWidget *parent)
     : QDialog(parent)
@@ -73,24 +78,40 @@ DataWidget::DataWidget(FrontendCommon::DataManager::DataDir data_dir,
 
 void DataWidget::clear()
 {
-    QtCommon::Content::ClearDataDir(m_dir);
+    std::string user_id{};
+    if (m_dir == FrontendCommon::DataManager::DataDir::Saves) {
+        user_id = selectProfile();
+    }
+    QtCommon::Content::ClearDataDir(m_dir, user_id);
     scan();
 }
 
 void DataWidget::open()
 {
+    std::string user_id{};
+    if (m_dir == FrontendCommon::DataManager::DataDir::Saves) {
+        user_id = selectProfile();
+    }
     QDesktopServices::openUrl(QUrl::fromLocalFile(
-        QString::fromStdString(FrontendCommon::DataManager::GetDataDir(m_dir))));
+        QString::fromStdString(FrontendCommon::DataManager::GetDataDir(m_dir, user_id))));
 }
 
 void DataWidget::upload()
 {
-    QtCommon::Content::ExportDataDir(m_dir);
+    std::string user_id{};
+    if (m_dir == FrontendCommon::DataManager::DataDir::Saves) {
+        user_id = selectProfile();
+    }
+    QtCommon::Content::ExportDataDir(m_dir, user_id);
 }
 
 void DataWidget::download()
 {
-    QtCommon::Content::ImportDataDir(m_dir, std::bind(&DataWidget::scan, this));
+    std::string user_id{};
+    if (m_dir == FrontendCommon::DataManager::DataDir::Saves) {
+        user_id = selectProfile();
+    }
+    QtCommon::Content::ImportDataDir(m_dir, user_id, std::bind(&DataWidget::scan, this));
 }
 
 void DataWidget::scan() {
@@ -107,4 +128,38 @@ void DataWidget::scan() {
 
     watcher->setFuture(
         QtConcurrent::run([this]() { return FrontendCommon::DataManager::DataDirSize(m_dir); }));
+}
+
+std::string DataWidget::selectProfile()
+{
+    const auto select_profile = [this] {
+        const Core::Frontend::ProfileSelectParameters parameters{
+            .mode = Service::AM::Frontend::UiMode::UserSelector,
+            .invalid_uid_list = {},
+            .display_options = {},
+            .purpose = Service::AM::Frontend::UserSelectionPurpose::General,
+        };
+        QtProfileSelectionDialog dialog(*QtCommon::system, this, parameters);
+        dialog.setWindowFlags(Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint
+                              | Qt::WindowSystemMenuHint | Qt::WindowCloseButtonHint);
+        dialog.setWindowModality(Qt::WindowModal);
+
+        if (dialog.exec() == QDialog::Rejected) {
+            return -1;
+        }
+
+        return dialog.GetIndex();
+    };
+
+    const auto index = select_profile();
+    if (index == -1) {
+        return "";
+    }
+
+    const auto uuid = QtCommon::system->GetProfileManager().GetUser(static_cast<std::size_t>(index));
+    ASSERT(uuid);
+
+    const auto user_id = uuid->AsU128();
+
+    return fmt::format("{:016X}{:016X}", user_id[1], user_id[0]);
 }

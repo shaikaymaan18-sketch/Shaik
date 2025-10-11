@@ -2408,7 +2408,6 @@ void GMainWindow::OnGameListOpenFolder(u64 program_id, GameListOpenTarget target
 
     ASSERT_MSG(has_user_save != has_device_save, "Game uses both user and device savedata?");
 
-    // TODO(alekpop): It returns the wrong user
     switch (target) {
     case GameListOpenTarget::SaveData: {
         open_target = tr("Save Data");
@@ -2794,6 +2793,7 @@ void GMainWindow::OnGameListCreateShortcut(u64 program_id, const std::string& ga
 }
 
 void GMainWindow::OnGameListOpenDirectory(const QString& directory) {
+    // TODO(crueter): QtCommon
     std::filesystem::path fs_path;
     if (directory == QStringLiteral("SDMC")) {
         fs_path =

@@ -358,7 +358,7 @@ void FixProfiles()
     QtCommon::Game::OpenSaveFolder();
 }
 
-void ClearDataDir(FrontendCommon::DataManager::DataDir dir)
+void ClearDataDir(FrontendCommon::DataManager::DataDir dir, const std::string& user_id)
 {
     auto result = QtCommon::Frontend::Warning(tr("Really clear data?"),
                                               tr("Important data may be lost!"),
@@ -379,15 +379,17 @@ void ClearDataDir(FrontendCommon::DataManager::DataDir dir)
     QtCommon::Frontend::QtProgressDialog dialog(tr("Clearing..."), QString(), 0, 0);
     dialog.show();
 
-    FrontendCommon::DataManager::ClearDir(dir);
+    FrontendCommon::DataManager::ClearDir(dir, user_id);
 
     dialog.close();
 }
 
-void ExportDataDir(FrontendCommon::DataManager::DataDir data_dir, std::function<void()> callback)
+void ExportDataDir(FrontendCommon::DataManager::DataDir data_dir,
+                   const std::string& user_id,
+                   std::function<void()> callback)
 {
     using namespace QtCommon::Frontend;
-    const std::string dir = FrontendCommon::DataManager::GetDataDir(data_dir);
+    const std::string dir = FrontendCommon::DataManager::GetDataDir(data_dir, user_id);
 
     const QString zip_dump_location = GetSaveFileName(tr("Select Export Location"),
                                                       QStringLiteral("export.zip"),
@@ -447,9 +449,11 @@ void ExportDataDir(FrontendCommon::DataManager::DataDir data_dir, std::function<
     watcher->setFuture(future);
 }
 
-void ImportDataDir(FrontendCommon::DataManager::DataDir data_dir, std::function<void()> callback)
+void ImportDataDir(FrontendCommon::DataManager::DataDir data_dir,
+                   const std::string& user_id,
+                   std::function<void()> callback)
 {
-    const std::string dir = FrontendCommon::DataManager::GetDataDir(data_dir);
+    const std::string dir = FrontendCommon::DataManager::GetDataDir(data_dir, user_id);
 
     using namespace QtCommon::Frontend;
 
@@ -484,7 +488,7 @@ void ImportDataDir(FrontendCommon::DataManager::DataDir data_dir, std::function<
 
     // to prevent GUI mangling we have to run this in a thread as well
     QFuture<bool> delete_future = QtConcurrent::run([=]() {
-        FrontendCommon::DataManager::ClearDir(data_dir);
+        FrontendCommon::DataManager::ClearDir(data_dir, user_id);
         return !progress->wasCanceled();
     });
 
