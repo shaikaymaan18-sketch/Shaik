@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // SPDX-FileCopyrightText: 2025 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -39,7 +42,7 @@ import org.yuzu.yuzu_emu.model.GameProperty
 import org.yuzu.yuzu_emu.model.GamesViewModel
 import org.yuzu.yuzu_emu.model.HomeViewModel
 import org.yuzu.yuzu_emu.model.InstallableProperty
-import org.yuzu.yuzu_emu.model.SubMenuProperSecondaryAction
+import org.yuzu.yuzu_emu.model.SubMenuPropertySecondaryAction
 import org.yuzu.yuzu_emu.model.SubmenuProperty
 import org.yuzu.yuzu_emu.model.TaskState
 import org.yuzu.yuzu_emu.utils.DirectoryInitialization
@@ -162,23 +165,45 @@ class GamePropertiesFragment : Fragment() {
                         )
                         binding.root.findNavController().navigate(action)
                     },
-                    secondaryAction = SubMenuProperSecondaryAction(
-                        isShown = File(
+                    secondaryActions = buildList {
+                        val configExists = File(
                             DirectoryInitialization.userDirectory +
                                     "/config/custom/" + args.game.settingsName + ".ini"
-                        ).exists(),
-                        descriptionId = R.string.share_game_settings,
-                        iconId = R.drawable.ic_share,
-                        action = {
-                            val configFile = File(
-                                DirectoryInitialization.userDirectory +
-                                    "/config/custom/" + args.game.settingsName + ".ini"
-                            )
-                            if (configFile.exists()) {
-                                shareConfigFile(configFile)
+                        ).exists()
+
+                        add(SubMenuPropertySecondaryAction(
+                            isShown = configExists,
+                            descriptionId = R.string.import_config,
+                            iconId = R.drawable.ic_import,
+                            action = {
+                                importConfig.launch(arrayOf("text/ini", "application/octet-stream"))
                             }
-                        }
-                    )
+                        ))
+
+                        add(SubMenuPropertySecondaryAction(
+                            isShown = configExists,
+                            descriptionId = R.string.export_config,
+                            iconId = R.drawable.ic_export,
+                            action = {
+                                exportConfig.launch(args.game.settingsName + ".ini")
+                            }
+                        ))
+
+                        add(SubMenuPropertySecondaryAction(
+                            isShown = configExists,
+                            descriptionId = R.string.share_game_settings,
+                            iconId = R.drawable.ic_share,
+                            action = {
+                                val configFile = File(
+                                    DirectoryInitialization.userDirectory +
+                                            "/config/custom/" + args.game.settingsName + ".ini"
+                                )
+                                if (configFile.exists()) {
+                                    shareConfigFile(configFile)
+                                }
+                            }
+                        ))
+                    }
                 )
             )
 
@@ -443,6 +468,67 @@ class GamePropertiesFragment : Fragment() {
                 compression = false
             )
             return@newInstance when (zipResult) {
+                TaskState.Completed -> getString(R.string.export_success)
+                TaskState.Cancelled, TaskState.Failed -> getString(R.string.export_failed)
+            }
+        }.show(parentFragmentManager, ProgressDialogFragment.TAG)
+    }
+
+    /**
+     * Imports an ini file from external storage to internal app directory and override per-game config
+     */
+    private val importConfig = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { result ->
+        if (result == null) {
+            return@registerForActivityResult
+        }
+
+        val iniResult = FileUtil.copyUriToInternalStorage(
+            sourceUri = result,
+            destinationParentPath =
+                DirectoryInitialization.userDirectory + "/config/custom/",
+            destinationFilename = args.game.settingsName + ".ini"
+        )
+            if (iniResult?.exists() == true) {
+                Toast.makeText(
+                    requireContext(),
+                    getString(R.string.import_success),
+                    Toast.LENGTH_SHORT
+                ).show()
+                homeViewModel.reloadPropertiesList(true)
+            } else {
+                Toast.makeText(
+                    requireContext(),
+                    getString(R.string.import_failed),
+                    Toast.LENGTH_SHORT
+                ).show()
+        }
+    }
+
+    /**
+     * Exports game's config ini to the specified location in external storage
+     */
+    private val exportConfig = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("text/ini")
+    ) { result ->
+        if (result == null) {
+            return@registerForActivityResult
+        }
+
+        ProgressDialogFragment.newInstance(
+            requireActivity(),
+            R.string.save_files_exporting,
+            false
+        ) { _, _ ->
+            val configLocation = DirectoryInitialization.userDirectory +
+                "/config/custom/" + args.game.settingsName + ".ini"
+
+            val iniResult = FileUtil.copyToExternalStorage(
+                sourcePath = configLocation,
+                destUri = result
+            )
+            return@newInstance when (iniResult) {
                 TaskState.Completed -> getString(R.string.export_success)
                 TaskState.Cancelled, TaskState.Failed -> getString(R.string.export_failed)
             }

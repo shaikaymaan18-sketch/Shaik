@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // SPDX-FileCopyrightText: 2023 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -84,15 +87,32 @@ class GamePropertiesAdapter(
                 binding.details.setVisible(false)
             }
 
-            if (submenuProperty.secondaryAction != null) {
-                binding.buttonSecondaryAction.setVisible(submenuProperty.secondaryAction.isShown)
-                binding.buttonSecondaryAction.setIconResource(submenuProperty.secondaryAction.iconId)
-                binding.buttonSecondaryAction.contentDescription = binding.buttonSecondaryAction.context.getString(submenuProperty.secondaryAction.descriptionId)
-                binding.buttonSecondaryAction.setOnClickListener {
-                    submenuProperty.secondaryAction.action.invoke()
+
+            val hasVisibleActions = submenuProperty.secondaryActions?.any { it.isShown } == true
+
+            if (hasVisibleActions) {
+                binding.dividerSecondaryActions.setVisible(true)
+                binding.layoutSecondaryActions.setVisible(true)
+
+                submenuProperty.secondaryActions!!.forEach { secondaryAction ->
+                    if (secondaryAction.isShown) {
+                        val button = com.google.android.material.button.MaterialButton(
+                            binding.root.context,
+                            null,
+                            com.google.android.material.R.attr.materialButtonOutlinedStyle
+                        ).apply {
+                            setIconResource(secondaryAction.iconId)
+                            iconSize = (18 * binding.root.context.resources.displayMetrics.density).toInt()
+                            text = binding.root.context.getString(secondaryAction.descriptionId)
+                            contentDescription = binding.root.context.getString(secondaryAction.descriptionId)
+                            setOnClickListener { secondaryAction.action.invoke() }
+                        }
+                        binding.layoutSecondaryActions.addView(button)
+                    }
                 }
             } else {
-                binding.buttonSecondaryAction.setVisible(false)
+                binding.dividerSecondaryActions.setVisible(false)
+                binding.layoutSecondaryActions.setVisible(false)
             }
         }
     }
