@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "common/string_util.h"
 #include "video_core/buffer_cache/buffer_cache_base.h"
 #include "video_core/buffer_cache/memory_tracker_base.h"
 #include "video_core/buffer_cache/usage_tracker.h"
@@ -95,7 +96,12 @@ public:
     bool CanReportMemoryUsage() const;
 
     [[nodiscard]] bool ForceOldUniformBufferMethod() const noexcept {
-        return device.GetDriverID() == VK_DRIVER_ID_QUALCOMM_PROPRIETARY;
+        const VkDriverIdKHR driver_id = device.GetDriverID();
+        if (driver_id == VK_DRIVER_ID_QUALCOMM_PROPRIETARY) {
+            return true;
+        }
+        const std::string driver_name = Common::ToLower(std::string{device.GetDriverName()});
+        return driver_name.find("qualcomm") != std::string::npos;
     }
 
     u32 GetUniformBufferAlignment() const {
