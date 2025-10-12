@@ -94,6 +94,14 @@ public:
 
     bool CanReportMemoryUsage() const;
 
+    u32 GetUniformBufferAlignment() const {
+        return static_cast<u32>(device.GetUniformBufferAlignment());
+    }
+
+    u32 GetMaxUniformBufferRange() const {
+        return static_cast<u32>(device.GetMaxUniformBufferRange());
+    }
+
     u32 GetStorageBufferAlignment() const;
 
     [[nodiscard]] StagingBufferRef UploadStagingBuffer(size_t size);

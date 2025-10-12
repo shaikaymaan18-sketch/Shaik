@@ -305,6 +305,11 @@ public:
         return properties.properties.limits.maxPushConstantsSize;
     }
 
+    /// Returns the maximum range for uniform buffers.
+    VkDeviceSize GetMaxUniformBufferRange() const {
+        return properties.properties.limits.maxUniformBufferRange;
+    }
+
     /// Returns the maximum size for shared memory.
     u32 GetMaxComputeSharedMemorySize() const {
         return properties.properties.limits.maxComputeSharedMemorySize;

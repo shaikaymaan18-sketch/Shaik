@@ -790,6 +790,12 @@ void BufferCache<P>::BindHostGraphicsUniformBuffer(size_t stage, u32 index, u32 
     const Binding& binding = channel_state->uniform_buffers[stage][index];
     const DAddr device_addr = binding.device_addr;
     const u32 size = (std::min)(binding.size, (*channel_state->uniform_buffer_sizes)[stage][index]);
+    u32 size_for_bind = size;
+    if constexpr (!IS_OPENGL) {
+        if constexpr (requires(const Runtime& r) { r.GetMaxUniformBufferRange(); }) {
+            size_for_bind = (std::min)(size_for_bind, runtime.GetMaxUniformBufferRange());
+        }
+    }
     Buffer& buffer = slot_buffers[binding.buffer_id];
     TouchBuffer(buffer, binding.buffer_id);
     const bool use_fast_buffer = binding.buffer_id != NULL_BUFFER_ID &&
@@ -814,10 +820,10 @@ void BufferCache<P>::BindHostGraphicsUniformBuffer(size_t stage, u32 index, u32 
             }
         }
         channel_state->fast_bound_uniform_buffers[stage] |= 1u << binding_index;
-        channel_state->uniform_buffer_binding_sizes[stage][binding_index] = size;
+        channel_state->uniform_buffer_binding_sizes[stage][binding_index] = size_for_bind;
         // Stream buffer path to avoid stalling on non-Nvidia drivers or Vulkan
-        const std::span<u8> span = runtime.BindMappedUniformBuffer(stage, binding_index, size);
-        device_memory.ReadBlockUnsafe(device_addr, span.data(), size);
+        const std::span<u8> span = runtime.BindMappedUniformBuffer(stage, binding_index, size_for_bind);
+        device_memory.ReadBlockUnsafe(device_addr, span.data(), size_for_bind);
         return;
     }
     // Classic cached path
@@ -828,25 +834,39 @@ void BufferCache<P>::BindHostGraphicsUniformBuffer(size_t stage, u32 index, u32 
     // This exists to avoid instances where the fast buffer is bound and a GPU write happens
     needs_bind |= HasFastUniformBufferBound(stage, binding_index);
     if constexpr (HAS_PERSISTENT_UNIFORM_BUFFER_BINDINGS) {
-        needs_bind |= channel_state->uniform_buffer_binding_sizes[stage][binding_index] != size;
+        needs_bind |= channel_state->uniform_buffer_binding_sizes[stage][binding_index] != size_for_bind;
     }
     if (!needs_bind) {
         return;
     }
     const u32 offset = buffer.Offset(device_addr);
-    if constexpr (IS_OPENGL) {
+    if constexpr (!IS_OPENGL) {
+        // Vulkan requires aligned uniform buffer offsets. If unaligned, stream into the
+        // aligned uniform ring as a correctness fallback (stock Qualcomm)
+        if constexpr (requires(const Runtime& r) { r.GetUniformBufferAlignment(); }) {
+            const u32 ubo_align = runtime.GetUniformBufferAlignment();
+            if (ubo_align != 0 && (offset % ubo_align) != 0) {
+                if constexpr (HAS_PERSISTENT_UNIFORM_BUFFER_BINDINGS) {
+                    channel_state->uniform_buffer_binding_sizes[stage][binding_index] = size_for_bind;
+                }
+                const std::span<u8> span = runtime.BindMappedUniformBuffer(stage, binding_index, size_for_bind);
+                device_memory.ReadBlockUnsafe(device_addr, span.data(), size_for_bind);
+                return;
+            }
+        }
+    } else {
         // Mark the index as dirty if offset doesn't match
         const bool is_copy_bind = offset != 0 && !runtime.SupportsNonZeroUniformOffset();
         channel_state->dirty_uniform_buffers[stage] |= (is_copy_bind ? 1U : 0U) << index;
     }
     if constexpr (HAS_PERSISTENT_UNIFORM_BUFFER_BINDINGS) {
-        channel_state->uniform_buffer_binding_sizes[stage][binding_index] = size;
+        channel_state->uniform_buffer_binding_sizes[stage][binding_index] = size_for_bind;
     }
-    buffer.MarkUsage(offset, size);
+    buffer.MarkUsage(offset, size_for_bind);
     if constexpr (NEEDS_BIND_UNIFORM_INDEX) {
-        runtime.BindUniformBuffer(stage, binding_index, buffer, offset, size);
+        runtime.BindUniformBuffer(stage, binding_index, buffer, offset, size_for_bind);
     } else {
-        runtime.BindUniformBuffer(buffer, offset, size);
+        runtime.BindUniformBuffer(buffer, offset, size_for_bind);
     }
     channel_state->fast_bound_uniform_buffers[stage] &= ~(1u << binding_index);
 }
@@ -950,15 +970,34 @@ void BufferCache<P>::BindHostComputeUniformBuffers() {
         TouchBuffer(buffer, binding.buffer_id);
         const u32 size =
             (std::min)(binding.size, (*channel_state->compute_uniform_buffer_sizes)[index]);
+        u32 size_for_bind = size;
+        if constexpr (!IS_OPENGL) {
+            if constexpr (requires(const Runtime& r) { r.GetMaxUniformBufferRange(); }) {
+                size_for_bind = (std::min)(size_for_bind, runtime.GetMaxUniformBufferRange());
+            }
+        }
         SynchronizeBuffer(buffer, binding.device_addr, size);
 
         const u32 offset = buffer.Offset(binding.device_addr);
-        buffer.MarkUsage(offset, size);
+        if constexpr (!IS_OPENGL) {
+            if constexpr (requires(const Runtime& r) { r.GetUniformBufferAlignment(); }) {
+                const u32 ubo_align = runtime.GetUniformBufferAlignment();
+                if (ubo_align != 0 && (offset % ubo_align) != 0) {
+                    const std::span<u8> span = runtime.BindMappedUniformBuffer(0, binding_index, size_for_bind);
+                    device_memory.ReadBlockUnsafe(binding.device_addr, span.data(), size_for_bind);
+                    if constexpr (NEEDS_BIND_UNIFORM_INDEX) {
+                        ++binding_index;
+                    }
+                    return;
+                }
+            }
+        }
+        buffer.MarkUsage(offset, size_for_bind);
         if constexpr (NEEDS_BIND_UNIFORM_INDEX) {
-            runtime.BindComputeUniformBuffer(binding_index, buffer, offset, size);
+            runtime.BindComputeUniformBuffer(binding_index, buffer, offset, size_for_bind);
             ++binding_index;
         } else {
-            runtime.BindUniformBuffer(buffer, offset, size);
+            runtime.BindUniformBuffer(buffer, offset, size_for_bind);
         }
     });
 }
