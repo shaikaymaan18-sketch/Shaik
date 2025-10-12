@@ -102,6 +102,10 @@ public:
         return true;
     }
 
+    [[nodiscard]] Scheduler& GetScheduler() const noexcept {
+        return scheduler;
+    }
+
     [[nodiscard]] VkBuffer GetTemporaryBuffer(size_t needed_size);
 
     std::span<const VkFormat> ViewFormats(PixelFormat format) {
@@ -115,6 +119,10 @@ public:
 
     VkFormat GetSupportedFormat(VkFormat requested_format, VkFormatFeatureFlags required_features) const;
 
+private:
+    void TrimTemporaryBuffers();
+
+public:
     const Device& device;
     Scheduler& scheduler;
     MemoryAllocator& memory_allocator;
@@ -126,8 +134,21 @@ public:
     const Settings::ResolutionScalingInfo& resolution;
     std::array<std::vector<VkFormat>, VideoCore::Surface::MaxPixelFormat> view_formats;
 
+private:
+    struct TemporaryBufferEntry {
+        vk::Buffer buffer{};
+        size_t size{};
+        u64 last_frame_used{};
+        u64 last_tick_used{};
+    };
+
     static constexpr size_t indexing_slots = 8 * sizeof(size_t);
-    std::array<vk::Buffer, indexing_slots> buffers{};
+    static constexpr u64 temp_buffer_retirement_frames = 120;
+    static constexpr u64 temp_buffer_budget_bytes = 256ULL * 1024ULL * 1024ULL;
+    static constexpr u64 temp_buffer_min_lifetime_frames = 2;
+
+    std::array<TemporaryBufferEntry, indexing_slots> temporary_buffers{};
+    u64 temp_buffer_frame_index{};
 };
 
 class Image : public VideoCommon::ImageBase {

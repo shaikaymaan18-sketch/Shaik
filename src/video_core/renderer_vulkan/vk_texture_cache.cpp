@@ -917,14 +917,29 @@ bool TextureCacheRuntime::ShouldReinterpret(Image& dst, Image& src) {
 }
 
 VkBuffer TextureCacheRuntime::GetTemporaryBuffer(size_t needed_size) {
-    const auto level = (8 * sizeof(size_t)) - std::countl_zero(needed_size - 1ULL);
-    if (buffers[level]) {
-        return *buffers[level];
+    const size_t safe_size = needed_size == 0 ? 1 : needed_size;
+    size_t level = 0;
+    if (safe_size > 1) {
+        level =
+            (8 * sizeof(size_t)) - std::countl_zero(static_cast<unsigned long long>(safe_size - 1));
     }
-    const auto new_size = Common::NextPow2(needed_size);
+    level = std::min(level, indexing_slots - 1);
+
+    auto& entry = temporary_buffers[level];
+    const size_t new_size = Common::NextPow2(safe_size);
+    auto& master_semaphore = scheduler.GetMasterSemaphore();
+    const u64 current_tick = master_semaphore.CurrentTick();
+
+    if (entry.buffer && entry.size >= new_size) {
+        entry.last_frame_used = temp_buffer_frame_index;
+        entry.last_tick_used = current_tick;
+        return *entry.buffer;
+    }
+
     static constexpr VkBufferUsageFlags flags =
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
         VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
+
     const VkBufferCreateInfo temp_ci = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
         .pNext = nullptr,
@@ -935,8 +950,14 @@ VkBuffer TextureCacheRuntime::GetTemporaryBuffer(size_t needed_size) {
         .queueFamilyIndexCount = 0,
         .pQueueFamilyIndices = nullptr,
     };
-    buffers[level] = memory_allocator.CreateBuffer(temp_ci, MemoryUsage::DeviceLocal);
-    return *buffers[level];
+
+    entry.buffer = memory_allocator.CreateBuffer(temp_ci, MemoryUsage::DeviceLocal);
+    entry.size = new_size;
+    entry.last_frame_used = temp_buffer_frame_index;
+    entry.last_tick_used = current_tick;
+
+    TrimTemporaryBuffers();
+    return *entry.buffer;
 }
 
 void TextureCacheRuntime::BarrierFeedbackLoop() {
@@ -1501,11 +1522,85 @@ bool TextureCacheRuntime::CanReportMemoryUsage() const {
     return device.CanReportMemoryUsage();
 }
 
-void TextureCacheRuntime::TickFrame() {}
+void TextureCacheRuntime::TickFrame() {
+    ++temp_buffer_frame_index;
+
+    auto& master_semaphore = scheduler.GetMasterSemaphore();
+    master_semaphore.Refresh();
+    const u64 gpu_tick = master_semaphore.KnownGpuTick();
+
+    for (auto& entry : temporary_buffers) {
+        if (!entry.buffer) {
+            continue;
+        }
+        if (gpu_tick < entry.last_tick_used) {
+            continue;
+        }
+        const u64 age = temp_buffer_frame_index >= entry.last_frame_used
+                            ? temp_buffer_frame_index - entry.last_frame_used
+                            : 0;
+        if (age > temp_buffer_retirement_frames) {
+            entry.buffer = {};
+            entry.size = 0;
+            entry.last_frame_used = 0;
+            entry.last_tick_used = 0;
+        }
+    }
+
+    TrimTemporaryBuffers();
+}
+
+void TextureCacheRuntime::TrimTemporaryBuffers() {
+    auto& master_semaphore = scheduler.GetMasterSemaphore();
+    master_semaphore.Refresh();
+    const u64 gpu_tick = master_semaphore.KnownGpuTick();
+
+    u64 total_size = 0;
+    for (const auto& entry : temporary_buffers) {
+        total_size += entry.size;
+    }
+    if (total_size <= temp_buffer_budget_bytes) {
+        return;
+    }
+
+    while (total_size > temp_buffer_budget_bytes) {
+        TemporaryBufferEntry* oldest = nullptr;
+        for (auto& entry : temporary_buffers) {
+            if (!entry.buffer) {
+                continue;
+            }
+            if (entry.last_frame_used == temp_buffer_frame_index) {
+                continue;
+            }
+            if (gpu_tick < entry.last_tick_used) {
+                continue;
+            }
+            const u64 age = temp_buffer_frame_index >= entry.last_frame_used
+                                ? temp_buffer_frame_index - entry.last_frame_used
+                                : 0;
+            if (age < temp_buffer_min_lifetime_frames) {
+                continue;
+            }
+            if (!oldest || entry.last_frame_used < oldest->last_frame_used) {
+                oldest = &entry;
+            }
+        }
+
+        if (oldest == nullptr) {
+            break;
+        }
+
+        total_size -= static_cast<u64>(oldest->size);
+        oldest->buffer = {};
+        oldest->size = 0;
+        oldest->last_frame_used = 0;
+        oldest->last_tick_used = 0;
+    }
+}
 
 Image::Image(TextureCacheRuntime& runtime_, const ImageInfo& info_, GPUVAddr gpu_addr_,
              VAddr cpu_addr_)
-    : VideoCommon::ImageBase(info_, gpu_addr_, cpu_addr_), scheduler{&runtime_.scheduler},
+    : VideoCommon::ImageBase(info_, gpu_addr_, cpu_addr_), scheduler{&runtime_.GetScheduler()},
       runtime{&runtime_}, original_image(MakeImage(runtime_.device, runtime_.memory_allocator, info,
                                                    runtime->ViewFormats(info.format))),
       aspect_mask(ImageAspectMask(info.format)) {
