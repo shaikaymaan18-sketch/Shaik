@@ -81,10 +81,11 @@ static_assert(sizeof(PromotionInfo) == 0x20, "PromotionInfo has incorrect size."
 
 /// NsApplicationViewWithPromotionInfo
 struct ApplicationViewWithPromotionInfo {
-    ApplicationView view;    ///< \ref NsApplicationView
-    PromotionInfo promotion; ///< \ref NsPromotionInfo
+    ApplicationView view;           ///< \ref NsApplicationView
+    PromotionInfo promotion;        ///< \ref NsPromotionInfo
+    std::array<u8, 0x8> padding{};  ///< Extra padding for newer HOS versions
 };
-static_assert(sizeof(ApplicationViewWithPromotionInfo) == 0x70,
+static_assert(sizeof(ApplicationViewWithPromotionInfo) == 0x78,
               "ApplicationViewWithPromotionInfo has incorrect size.");
 
 struct ApplicationOccupiedSizeEntity {
@@ -112,5 +113,11 @@ struct Uid {
     alignas(8) Common::UUID uuid;
 };
 static_assert(sizeof(Uid) == 0x10, "Uid has incorrect size.");
+
+struct ApplicationDisplayData {
+    std::array<char, 0x200> application_name;
+    std::array<char, 0x100> developer_name;
+};
+static_assert(sizeof(ApplicationDisplayData) == 0x300, "ApplicationDisplayData has incorrect size.");
 
 } // namespace Service::NS
