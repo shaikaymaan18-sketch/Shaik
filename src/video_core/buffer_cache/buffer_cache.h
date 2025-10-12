@@ -11,6 +11,7 @@
 #include <memory>
 #include <numeric>
 
+#include "common/logging/log.h"
 #include "common/range_sets.inc"
 #include "video_core/buffer_cache/buffer_cache_base.h"
 #include "video_core/guest_memory.h"
@@ -34,6 +35,12 @@ BufferCache<P>::BufferCache(Tegra::MaxwellDeviceMemoryManager& device_memory_, R
         minimum_memory = DEFAULT_EXPECTED_MEMORY;
         critical_memory = DEFAULT_CRITICAL_MEMORY;
         return;
+    }
+
+    if constexpr (!IS_OPENGL) {
+        if (ForceOldUBOMethod()) {
+            LOG_INFO(Render_Vulkan, "Vulkan BufferCache using legacy uniform binding path");
+        }
     }
 
     const s64 device_local_memory = static_cast<s64>(runtime.GetDeviceLocalMemory());
@@ -797,7 +804,7 @@ void BufferCache<P>::BindHostGraphicsUniformBuffer(size_t stage, u32 index, u32 
     if constexpr (!IS_OPENGL) {
         if constexpr (requires(const Runtime& r) { r.GetMaxUniformBufferRange(); }) {
             max_range = runtime.GetMaxUniformBufferRange();
-            if (max_range != 0) {
+            if (!force_old_ubo && max_range != 0) {
                 size_for_bind = (std::min)(size_for_bind, max_range);
             }
         }
@@ -983,7 +990,7 @@ void BufferCache<P>::BindHostComputeUniformBuffers() {
         if constexpr (!IS_OPENGL) {
             if constexpr (requires(const Runtime& r) { r.GetMaxUniformBufferRange(); }) {
                 max_range = runtime.GetMaxUniformBufferRange();
-                if (max_range != 0) {
+                if (!force_old_ubo && max_range != 0) {
                     size_for_bind = (std::min)(size_for_bind, max_range);
                 }
             }
