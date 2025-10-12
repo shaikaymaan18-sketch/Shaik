@@ -447,6 +447,8 @@ private:
 
     [[nodiscard]] std::span<u8> ImmediateBuffer(size_t wanted_capacity);
 
+    [[nodiscard]] bool ForceOldUBOMethod() const noexcept;
+
     [[nodiscard]] bool HasFastUniformBufferBound(size_t stage, u32 binding_index) const noexcept;
 
     void ClearDownload(DAddr base_addr, u64 size);
