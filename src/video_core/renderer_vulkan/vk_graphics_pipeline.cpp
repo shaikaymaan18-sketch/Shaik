@@ -6,7 +6,9 @@
 
 #include <algorithm>
 #include <iostream>
+#include <optional>
 #include <span>
+#include <utility>
 
 #include <boost/container/small_vector.hpp>
 #include <boost/container/static_vector.hpp>
@@ -805,98 +807,377 @@ void GraphicsPipeline::MakePipeline(VkRenderPass render_pass) {
         .pAttachments = cb_attachments.data(),
         .blendConstants = {}
     };
-    static_vector<VkDynamicState, 34> dynamic_states{
-        VK_DYNAMIC_STATE_VIEWPORT,           VK_DYNAMIC_STATE_SCISSOR,
-        VK_DYNAMIC_STATE_DEPTH_BIAS,         VK_DYNAMIC_STATE_BLEND_CONSTANTS,
-        VK_DYNAMIC_STATE_DEPTH_BOUNDS,       VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK,
-        VK_DYNAMIC_STATE_STENCIL_WRITE_MASK, VK_DYNAMIC_STATE_STENCIL_REFERENCE,
-        VK_DYNAMIC_STATE_LINE_WIDTH,
+    enum class DynamicStateSubset : u8 {
+        VertexInput,
+        PreRaster,
+        FragmentOutput,
     };
+
+    static_vector<VkDynamicState, 34> dynamic_states;
+    static_vector<VkDynamicState, 8> vertex_input_dynamic_states;
+    static_vector<VkDynamicState, 24> pre_raster_dynamic_states;
+    static_vector<VkDynamicState, 24> fragment_output_dynamic_states;
+
+    const auto add_dynamic_state = [&](VkDynamicState state, DynamicStateSubset subset) {
+        dynamic_states.push_back(state);
+        switch (subset) {
+        case DynamicStateSubset::VertexInput:
+            vertex_input_dynamic_states.push_back(state);
+            break;
+        case DynamicStateSubset::PreRaster:
+            pre_raster_dynamic_states.push_back(state);
+            break;
+        case DynamicStateSubset::FragmentOutput:
+            fragment_output_dynamic_states.push_back(state);
+            break;
+        }
+    };
+
+    add_dynamic_state(VK_DYNAMIC_STATE_VIEWPORT, DynamicStateSubset::PreRaster);
+    add_dynamic_state(VK_DYNAMIC_STATE_SCISSOR, DynamicStateSubset::PreRaster);
+    add_dynamic_state(VK_DYNAMIC_STATE_DEPTH_BIAS, DynamicStateSubset::PreRaster);
+    add_dynamic_state(VK_DYNAMIC_STATE_BLEND_CONSTANTS, DynamicStateSubset::FragmentOutput);
+    add_dynamic_state(VK_DYNAMIC_STATE_DEPTH_BOUNDS, DynamicStateSubset::FragmentOutput);
+    add_dynamic_state(VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK, DynamicStateSubset::FragmentOutput);
+    add_dynamic_state(VK_DYNAMIC_STATE_STENCIL_WRITE_MASK, DynamicStateSubset::FragmentOutput);
+    add_dynamic_state(VK_DYNAMIC_STATE_STENCIL_REFERENCE, DynamicStateSubset::FragmentOutput);
+    add_dynamic_state(VK_DYNAMIC_STATE_LINE_WIDTH, DynamicStateSubset::PreRaster);
+
     if (key.state.extended_dynamic_state) {
         static constexpr std::array extended{
-            VK_DYNAMIC_STATE_CULL_MODE_EXT,
-            VK_DYNAMIC_STATE_FRONT_FACE_EXT,
-          //VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE_EXT, //Disabled for VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME
-            VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE_EXT,
-            VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE_EXT,
-            VK_DYNAMIC_STATE_DEPTH_COMPARE_OP_EXT,
-            VK_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE_EXT,
-            VK_DYNAMIC_STATE_STENCIL_TEST_ENABLE_EXT,
-            VK_DYNAMIC_STATE_STENCIL_OP_EXT,
+            std::pair{VK_DYNAMIC_STATE_CULL_MODE_EXT, DynamicStateSubset::PreRaster},
+            std::pair{VK_DYNAMIC_STATE_FRONT_FACE_EXT, DynamicStateSubset::PreRaster},
+            std::pair{VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE_EXT, DynamicStateSubset::FragmentOutput},
+            std::pair{VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE_EXT, DynamicStateSubset::FragmentOutput},
+            std::pair{VK_DYNAMIC_STATE_DEPTH_COMPARE_OP_EXT, DynamicStateSubset::FragmentOutput},
+            std::pair{VK_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE_EXT,
+                      DynamicStateSubset::FragmentOutput},
+            std::pair{VK_DYNAMIC_STATE_STENCIL_TEST_ENABLE_EXT, DynamicStateSubset::FragmentOutput},
+            std::pair{VK_DYNAMIC_STATE_STENCIL_OP_EXT, DynamicStateSubset::FragmentOutput},
         };
         if (key.state.dynamic_vertex_input) {
-            dynamic_states.push_back(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
+            add_dynamic_state(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT, DynamicStateSubset::VertexInput);
         }
-        dynamic_states.insert(dynamic_states.end(), extended.begin(), extended.end());
+        for (const auto& [state, subset] : extended) {
+            add_dynamic_state(state, subset);
+        }
         if (key.state.extended_dynamic_state_2) {
             static constexpr std::array extended2{
-                VK_DYNAMIC_STATE_DEPTH_BIAS_ENABLE_EXT,
-                VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE_EXT,
-                VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE_EXT,
+                std::pair{VK_DYNAMIC_STATE_DEPTH_BIAS_ENABLE_EXT, DynamicStateSubset::PreRaster},
+                std::pair{VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE_EXT,
+                          DynamicStateSubset::VertexInput},
+                std::pair{VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE_EXT,
+                          DynamicStateSubset::PreRaster},
             };
-            dynamic_states.insert(dynamic_states.end(), extended2.begin(), extended2.end());
+            for (const auto& [state, subset] : extended2) {
+                add_dynamic_state(state, subset);
+            }
         }
         if (key.state.extended_dynamic_state_2_extra) {
-            dynamic_states.push_back(VK_DYNAMIC_STATE_LOGIC_OP_EXT);
+            add_dynamic_state(VK_DYNAMIC_STATE_LOGIC_OP_EXT, DynamicStateSubset::FragmentOutput);
         }
         if (key.state.extended_dynamic_state_3_blend) {
             static constexpr std::array extended3{
-                VK_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT,
-                VK_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT,
-                VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT,
-
-                // VK_DYNAMIC_STATE_COLOR_BLEND_ADVANCED_EXT,
+                std::pair{VK_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT,
+                          DynamicStateSubset::FragmentOutput},
+                std::pair{VK_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT,
+                          DynamicStateSubset::FragmentOutput},
+                std::pair{VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT,
+                          DynamicStateSubset::FragmentOutput},
             };
-            dynamic_states.insert(dynamic_states.end(), extended3.begin(), extended3.end());
+            for (const auto& [state, subset] : extended3) {
+                add_dynamic_state(state, subset);
+            }
         }
         if (key.state.extended_dynamic_state_3_enables) {
             static constexpr std::array extended3{
-                VK_DYNAMIC_STATE_DEPTH_CLAMP_ENABLE_EXT,
-                VK_DYNAMIC_STATE_LOGIC_OP_ENABLE_EXT,
-
-                // additional state3 extensions
-                VK_DYNAMIC_STATE_LINE_RASTERIZATION_MODE_EXT,
-
-                VK_DYNAMIC_STATE_CONSERVATIVE_RASTERIZATION_MODE_EXT,
-
-                VK_DYNAMIC_STATE_LINE_STIPPLE_ENABLE_EXT,
-                VK_DYNAMIC_STATE_ALPHA_TO_COVERAGE_ENABLE_EXT,
-                VK_DYNAMIC_STATE_ALPHA_TO_ONE_ENABLE_EXT,
-                VK_DYNAMIC_STATE_DEPTH_CLIP_ENABLE_EXT,
-                VK_DYNAMIC_STATE_PROVOKING_VERTEX_MODE_EXT,
+                std::pair{VK_DYNAMIC_STATE_DEPTH_CLAMP_ENABLE_EXT, DynamicStateSubset::PreRaster},
+                std::pair{VK_DYNAMIC_STATE_LOGIC_OP_ENABLE_EXT,
+                          DynamicStateSubset::FragmentOutput},
+                std::pair{VK_DYNAMIC_STATE_LINE_RASTERIZATION_MODE_EXT,
+                          DynamicStateSubset::PreRaster},
+                std::pair{VK_DYNAMIC_STATE_CONSERVATIVE_RASTERIZATION_MODE_EXT,
+                          DynamicStateSubset::PreRaster},
+                std::pair{VK_DYNAMIC_STATE_LINE_STIPPLE_ENABLE_EXT,
+                          DynamicStateSubset::PreRaster},
+                std::pair{VK_DYNAMIC_STATE_ALPHA_TO_COVERAGE_ENABLE_EXT,
+                          DynamicStateSubset::FragmentOutput},
+                std::pair{VK_DYNAMIC_STATE_ALPHA_TO_ONE_ENABLE_EXT,
+                          DynamicStateSubset::FragmentOutput},
+                std::pair{VK_DYNAMIC_STATE_DEPTH_CLIP_ENABLE_EXT, DynamicStateSubset::PreRaster},
+                std::pair{VK_DYNAMIC_STATE_PROVOKING_VERTEX_MODE_EXT,
+                          DynamicStateSubset::PreRaster},
             };
-            dynamic_states.insert(dynamic_states.end(), extended3.begin(), extended3.end());
+            for (const auto& [state, subset] : extended3) {
+                add_dynamic_state(state, subset);
+            }
         }
     }
 
-    const VkPipelineDynamicStateCreateInfo dynamic_state_ci{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .dynamicStateCount = static_cast<u32>(dynamic_states.size()),
-        .pDynamicStates = dynamic_states.data(),
+    const auto make_dynamic_ci = [](const auto& states) -> VkPipelineDynamicStateCreateInfo {
+        return VkPipelineDynamicStateCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .dynamicStateCount = static_cast<u32>(states.size()),
+            .pDynamicStates = states.empty() ? nullptr : states.data(),
+        };
     };
+
+    const VkPipelineDynamicStateCreateInfo dynamic_state_ci = make_dynamic_ci(dynamic_states);
+    [[maybe_unused]] const VkPipelineDynamicStateCreateInfo vertex_input_dynamic_state_ci =
+        make_dynamic_ci(vertex_input_dynamic_states);
+    [[maybe_unused]] const VkPipelineDynamicStateCreateInfo pre_raster_dynamic_state_ci =
+        make_dynamic_ci(pre_raster_dynamic_states);
+    [[maybe_unused]] const VkPipelineDynamicStateCreateInfo fragment_output_dynamic_state_ci =
+        make_dynamic_ci(fragment_output_dynamic_states);
+
+    [[maybe_unused]] const VkPipelineDynamicStateCreateInfo* vertex_input_dynamic_state_ci_ptr =
+        vertex_input_dynamic_states.empty() ? nullptr : &vertex_input_dynamic_state_ci;
+    [[maybe_unused]] const VkPipelineDynamicStateCreateInfo* pre_raster_dynamic_state_ci_ptr =
+        pre_raster_dynamic_states.empty() ? nullptr : &pre_raster_dynamic_state_ci;
+    [[maybe_unused]] const VkPipelineDynamicStateCreateInfo* fragment_output_dynamic_state_ci_ptr =
+        fragment_output_dynamic_states.empty() ? nullptr : &fragment_output_dynamic_state_ci;
     [[maybe_unused]] const VkPipelineShaderStageRequiredSubgroupSizeCreateInfoEXT subgroup_size_ci{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO_EXT,
         .pNext = nullptr,
         .requiredSubgroupSize = GuestWarpSize,
     };
     static_vector<VkPipelineShaderStageCreateInfo, 5> shader_stages;
+    [[maybe_unused]] static_vector<VkPipelineShaderStageCreateInfo, 4> preraster_shader_stages;
+    [[maybe_unused]] std::optional<VkPipelineShaderStageCreateInfo> fragment_shader_stage;
     for (size_t stage = 0; stage < Maxwell::MaxShaderStage; ++stage) {
         if (!spv_modules[stage]) {
             continue;
         }
-        [[maybe_unused]] auto& stage_ci =
-            shader_stages.emplace_back(VkPipelineShaderStageCreateInfo{
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                .pNext = nullptr,
-                .flags = 0,
-                .stage = MaxwellToVK::ShaderStage(Shader::StageFromIndex(stage)),
-                .module = *spv_modules[stage],
-                .pName = "main",
-                .pSpecializationInfo = nullptr,
-            });
+        VkPipelineShaderStageCreateInfo stage_ci{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .stage = MaxwellToVK::ShaderStage(Shader::StageFromIndex(stage)),
+            .module = *spv_modules[stage],
+            .pName = "main",
+            .pSpecializationInfo = nullptr,
+        };
+        shader_stages.push_back(stage_ci);
+        if (stage_ci.stage == VK_SHADER_STAGE_FRAGMENT_BIT) {
+            fragment_shader_stage = stage_ci;
+        } else {
+            preraster_shader_stages.push_back(stage_ci);
+        }
     }
+    
+#if defined(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME) && defined(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME)
+    if (device.UseGraphicsPipelineLibrary()) {
+        for (auto& library : pipeline_libraries) {
+            library.reset();
+        }
+        const bool capture_stats =
+            device.IsKhrPipelineExecutablePropertiesEnabled() &&
+            Settings::values.renderer_debug.GetValue();
+        const auto build_with_gpl = [&]() -> bool {
+            try {
+                VkPipelineCreateFlags library_flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
+                if (capture_stats) {
+                    library_flags |= VK_PIPELINE_CREATE_CAPTURE_STATISTICS_BIT_KHR;
+                }
+#if defined(VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT)
+                if (device.ShouldRetainLinkTimeOptimizationInfo()) {
+                    library_flags |=
+                        VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT;
+                }
+#endif
+                const VkGraphicsPipelineLibraryCreateInfoEXT vertex_input_library_info{
+                    .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_LIBRARY_CREATE_INFO_EXT,
+                    .pNext = nullptr,
+                    .flags = VK_GRAPHICS_PIPELINE_LIBRARY_VERTEX_INPUT_INTERFACE_BIT_EXT,
+                };
+                VkGraphicsPipelineCreateInfo vertex_input_library_ci{
+                    .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+                    .pNext = &vertex_input_library_info,
+                    .flags = library_flags,
+                    .stageCount = 0,
+                    .pStages = nullptr,
+                    .pVertexInputState = &vertex_input_ci,
+                    .pInputAssemblyState = &input_assembly_ci,
+                    .pTessellationState = nullptr,
+                    .pViewportState = nullptr,
+                    .pRasterizationState = nullptr,
+                    .pMultisampleState = nullptr,
+                    .pDepthStencilState = nullptr,
+                    .pColorBlendState = nullptr,
+                    .pDynamicState = vertex_input_dynamic_state_ci_ptr,
+                    .layout = VK_NULL_HANDLE,
+                    .renderPass = VK_NULL_HANDLE,
+                    .subpass = 0,
+                    .basePipelineHandle = nullptr,
+                    .basePipelineIndex = 0,
+                };
+                pipeline_libraries[0] = device.GetLogical().CreateGraphicsPipeline(
+                    vertex_input_library_ci, *pipeline_cache);
+
+                const VkGraphicsPipelineLibraryCreateInfoEXT pre_raster_library_info{
+                    .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_LIBRARY_CREATE_INFO_EXT,
+                    .pNext = nullptr,
+                    .flags = VK_GRAPHICS_PIPELINE_LIBRARY_PRE_RASTERIZATION_SHADERS_BIT_EXT,
+                };
+                VkGraphicsPipelineCreateInfo pre_raster_library_ci{
+                    .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+                    .pNext = &pre_raster_library_info,
+                    .flags = library_flags,
+                    .stageCount = static_cast<u32>(preraster_shader_stages.size()),
+                    .pStages = preraster_shader_stages.empty() ? nullptr
+                                                              : preraster_shader_stages.data(),
+                    .pVertexInputState = nullptr,
+                    .pInputAssemblyState = nullptr,
+                    .pTessellationState = &tessellation_ci,
+                    .pViewportState = &viewport_ci,
+                    .pRasterizationState = &rasterization_ci,
+                    .pMultisampleState = nullptr,
+                    .pDepthStencilState = nullptr,
+                    .pColorBlendState = nullptr,
+                    .pDynamicState = pre_raster_dynamic_state_ci_ptr,
+                    .layout = *pipeline_layout,
+                    .renderPass = render_pass,
+                    .subpass = 0,
+                    .basePipelineHandle = nullptr,
+                    .basePipelineIndex = 0,
+                };
+                pipeline_libraries[1] = device.GetLogical().CreateGraphicsPipeline(
+                    pre_raster_library_ci, *pipeline_cache);
+
+                pipeline_libraries[2].reset();
+                if (fragment_shader_stage) {
+                    const VkGraphicsPipelineLibraryCreateInfoEXT fragment_shader_library_info{
+                        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_LIBRARY_CREATE_INFO_EXT,
+                        .pNext = nullptr,
+                        .flags = VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_SHADER_BIT_EXT,
+                    };
+                    VkPipelineShaderStageCreateInfo fragment_stage_ci = *fragment_shader_stage;
+                    VkGraphicsPipelineCreateInfo fragment_shader_library_ci{
+                        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+                        .pNext = &fragment_shader_library_info,
+                        .flags = library_flags,
+                        .stageCount = 1,
+                        .pStages = &fragment_stage_ci,
+                        .pVertexInputState = nullptr,
+                        .pInputAssemblyState = nullptr,
+                        .pTessellationState = nullptr,
+                        .pViewportState = nullptr,
+                        .pRasterizationState = nullptr,
+                        .pMultisampleState = nullptr,
+                        .pDepthStencilState = nullptr,
+                        .pColorBlendState = nullptr,
+                        .pDynamicState = nullptr,
+                        .layout = *pipeline_layout,
+                        .renderPass = render_pass,
+                        .subpass = 0,
+                        .basePipelineHandle = nullptr,
+                        .basePipelineIndex = 0,
+                    };
+                    pipeline_libraries[2] = device.GetLogical().CreateGraphicsPipeline(
+                        fragment_shader_library_ci, *pipeline_cache);
+                }
+
+                const VkGraphicsPipelineLibraryCreateInfoEXT fragment_output_library_info{
+                    .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_LIBRARY_CREATE_INFO_EXT,
+                    .pNext = nullptr,
+                    .flags = VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_OUTPUT_INTERFACE_BIT_EXT,
+                };
+                VkGraphicsPipelineCreateInfo fragment_output_library_ci{
+                    .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+                    .pNext = &fragment_output_library_info,
+                    .flags = library_flags,
+                    .stageCount = 0,
+                    .pStages = nullptr,
+                    .pVertexInputState = nullptr,
+                    .pInputAssemblyState = nullptr,
+                    .pTessellationState = nullptr,
+                    .pViewportState = nullptr,
+                    .pRasterizationState = nullptr,
+                    .pMultisampleState = &multisample_ci,
+                    .pDepthStencilState = &depth_stencil_ci,
+                    .pColorBlendState = &color_blend_ci,
+                    .pDynamicState = fragment_output_dynamic_state_ci_ptr,
+                    .layout = VK_NULL_HANDLE,
+                    .renderPass = render_pass,
+                    .subpass = 0,
+                    .basePipelineHandle = nullptr,
+                    .basePipelineIndex = 0,
+                };
+                pipeline_libraries[3] = device.GetLogical().CreateGraphicsPipeline(
+                    fragment_output_library_ci, *pipeline_cache);
+
+                std::array<VkPipeline, 4> linked_libraries{};
+                u32 linked_count = 0;
+                for (const auto& library : pipeline_libraries) {
+                    if (library) {
+                        linked_libraries[linked_count++] = *library;
+                    }
+                }
+                if (linked_count == 0) {
+                    return false;
+                }
+
+                VkPipelineLibraryCreateInfoKHR link_info{
+                    .sType = VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR,
+                    .pNext = nullptr,
+                    .libraryCount = linked_count,
+                    .pLibraries = linked_libraries.data(),
+                };
+                VkGraphicsPipelineLibraryCreateInfoEXT executable_library_info{
+                    .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_LIBRARY_CREATE_INFO_EXT,
+                    .pNext = &link_info,
+                    .flags = 0,
+                };
+                VkPipelineCreateFlags executable_flags = capture_stats
+                                                             ? VK_PIPELINE_CREATE_CAPTURE_STATISTICS_BIT_KHR
+                                                             : 0;
+#if defined(VK_PIPELINE_CREATE_LINK_TIME_OPTIMIZATION_BIT_EXT)
+                if (device.ShouldEnableLinkTimeOptimization()) {
+                    executable_flags |= VK_PIPELINE_CREATE_LINK_TIME_OPTIMIZATION_BIT_EXT;
+                }
+#endif
+                VkGraphicsPipelineCreateInfo executable_ci{
+                    .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+                    .pNext = &executable_library_info,
+                    .flags = executable_flags,
+                    .stageCount = 0,
+                    .pStages = nullptr,
+                    .pVertexInputState = nullptr,
+                    .pInputAssemblyState = nullptr,
+                    .pTessellationState = nullptr,
+                    .pViewportState = nullptr,
+                    .pRasterizationState = nullptr,
+                    .pMultisampleState = nullptr,
+                    .pDepthStencilState = nullptr,
+                    .pColorBlendState = nullptr,
+                    .pDynamicState = nullptr,
+                    .layout = *pipeline_layout,
+                    .renderPass = render_pass,
+                    .subpass = 0,
+                    .basePipelineHandle = nullptr,
+                    .basePipelineIndex = 0,
+                };
+                pipeline = device.GetLogical().CreateGraphicsPipeline(executable_ci, *pipeline_cache);
+                return true;
+            } catch (const vk::Exception& exception) {
+                LOG_WARNING(Render_Vulkan,
+                            "VK_EXT_graphics_pipeline_library pipeline creation failed: {}",
+                            exception.what());
+                for (auto& library : pipeline_libraries) {
+                    library.reset();
+                }
+                device.DisableGraphicsPipelineLibrary(exception.what());
+                return false;
+            }
+        };
+        if (build_with_gpl()) {
+            return;
+        }
+    }
+#endif
+
     VkPipelineCreateFlags flags{};
     if (device.IsKhrPipelineExecutablePropertiesEnabled() && Settings::values.renderer_debug.GetValue()) {
         flags |= VK_PIPELINE_CREATE_CAPTURE_STATISTICS_BIT_KHR;

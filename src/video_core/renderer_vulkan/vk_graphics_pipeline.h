@@ -154,6 +154,7 @@ private:
     DescriptorAllocator descriptor_allocator;
     vk::PipelineLayout pipeline_layout;
     vk::DescriptorUpdateTemplate descriptor_update_template;
+    std::array<vk::Pipeline, 4> pipeline_libraries{};
     vk::Pipeline pipeline;
 
     std::condition_variable build_condvar;

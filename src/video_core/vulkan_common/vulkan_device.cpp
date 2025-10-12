@@ -974,6 +974,8 @@ bool Device::HasTimelineSemaphore() const {
 bool Device::GetSuitability(bool requires_swapchain) {
     // Assume we will be suitable.
     bool suitable = true;
+    use_graphics_pipeline_library = false;
+    graphics_pipeline_library_disable_reason.clear();
 
     // Configure properties.
     VkPhysicalDeviceVulkan12Features features_1_2{};
@@ -1023,6 +1025,19 @@ bool Device::GetSuitability(bool requires_swapchain) {
 
 #undef FEATURE_EXTENSION
 #undef EXTENSION
+
+#if defined(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME)
+    if (supported_extensions.contains(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME)) {
+        loaded_extensions.insert(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
+        extensions.pipeline_library = true;
+    }
+#endif
+#if defined(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME)
+    if (supported_extensions.contains(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME)) {
+        loaded_extensions.insert(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+        extensions.graphics_pipeline_library = true;
+    }
+#endif
 
 // Some extensions are mandatory. Check those.
 #define CHECK_EXTENSION(extension_name)                                                            \
@@ -1088,6 +1103,14 @@ bool Device::GetSuitability(bool requires_swapchain) {
     } else {
         FOR_EACH_VK_FEATURE_1_3(EXT_FEATURE);
     }
+
+#if (defined(VK_EXT_graphics_pipeline_library) || defined(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME)) && defined(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME)
+    if (extensions.graphics_pipeline_library) {
+        features.graphics_pipeline_library.sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_FEATURES_EXT;
+        SetNext(next, features.graphics_pipeline_library);
+    }
+#endif
 
 #undef EXT_FEATURE
 #undef FEATURE
@@ -1158,6 +1181,13 @@ bool Device::GetSuitability(bool requires_swapchain) {
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TRANSFORM_FEEDBACK_PROPERTIES_EXT;
         SetNext(next, properties.transform_feedback);
     }
+#if (defined(VK_EXT_graphics_pipeline_library) || defined(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME)) && defined(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME)
+    if (extensions.graphics_pipeline_library) {
+        properties.graphics_pipeline_library.sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_PROPERTIES_EXT;
+        SetNext(next, properties.graphics_pipeline_library);
+    }
+#endif
 
     // Perform the property fetch.
     physical.GetProperties2(properties2);
@@ -1167,6 +1197,31 @@ bool Device::GetSuitability(bool requires_swapchain) {
 
     // Unload extensions if feature support is insufficient.
     RemoveUnsuitableExtensions();
+
+#if (defined(VK_EXT_graphics_pipeline_library) || defined(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME)) && defined(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME)
+    const bool gpl_extensions_supported =
+        extensions.pipeline_library && extensions.graphics_pipeline_library;
+    const bool gpl_feature_supported =
+        extensions.graphics_pipeline_library &&
+        features.graphics_pipeline_library.graphicsPipelineLibrary == VK_TRUE;
+    const bool gpl_supported = gpl_extensions_supported && gpl_feature_supported;
+
+    const bool gpl_enabled = gpl_supported;
+    if (!gpl_supported) {
+        graphics_pipeline_library_disable_reason = gpl_extensions_supported
+                                                       ? "VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT not reported"
+                                                       : "Required pipeline library extensions missing";
+    } else {
+        graphics_pipeline_library_disable_reason.clear();
+        LOG_INFO(Render_Vulkan, "VK_EXT_graphics_pipeline_library enabled by default");
+    }
+
+    use_graphics_pipeline_library = gpl_enabled;
+    if (!use_graphics_pipeline_library && !graphics_pipeline_library_disable_reason.empty()) {
+        LOG_DEBUG(Render_Vulkan, "VK_EXT_graphics_pipeline_library disabled: {}",
+                  graphics_pipeline_library_disable_reason);
+    }
+#endif
 
     // Check limits.
     struct Limit {
@@ -1193,6 +1248,46 @@ bool Device::GetSuitability(bool requires_swapchain) {
     // Return whether we were suitable.
     return suitable;
 }
+
+#if (defined(VK_EXT_graphics_pipeline_library) || defined(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME)) && defined(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME)
+bool Device::UseGraphicsPipelineLibrary() const noexcept {
+    return use_graphics_pipeline_library;
+}
+
+bool Device::ShouldRetainLinkTimeOptimizationInfo() const noexcept {
+    return use_graphics_pipeline_library &&
+           properties.graphics_pipeline_library.graphicsPipelineLibraryFastLinking == VK_TRUE;
+}
+
+bool Device::ShouldEnableLinkTimeOptimization() const noexcept {
+    return use_graphics_pipeline_library &&
+           properties.graphics_pipeline_library.graphicsPipelineLibraryFastLinking == VK_TRUE;
+}
+
+void Device::DisableGraphicsPipelineLibrary(std::string_view reason) const noexcept {
+    if (!use_graphics_pipeline_library) {
+        return;
+    }
+    use_graphics_pipeline_library = false;
+    graphics_pipeline_library_disable_reason.assign(reason.begin(), reason.end());
+    LOG_WARNING(Render_Vulkan,
+                "Disabling VK_EXT_graphics_pipeline_library for this session: {}", reason);
+}
+#else
+bool Device::UseGraphicsPipelineLibrary() const noexcept {
+    return false;
+}
+
+bool Device::ShouldRetainLinkTimeOptimizationInfo() const noexcept {
+    return false;
+}
+
+bool Device::ShouldEnableLinkTimeOptimization() const noexcept {
+    return false;
+}
+
+void Device::DisableGraphicsPipelineLibrary(std::string_view) const noexcept {}
+#endif
 
 void Device::RemoveUnsuitableExtensions() {
     // VK_EXT_custom_border_color
@@ -1318,6 +1413,14 @@ void Device::RemoveUnsuitableExtensions() {
     RemoveExtensionFeatureIfUnsuitable(extensions.workgroup_memory_explicit_layout,
                                        features.workgroup_memory_explicit_layout,
                                        VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_EXTENSION_NAME);
+#if (defined(VK_EXT_graphics_pipeline_library) || defined(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME)) && defined(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME)
+    if (!(extensions.pipeline_library && extensions.graphics_pipeline_library &&
+          features.graphics_pipeline_library.graphicsPipelineLibrary)) {
+        RemoveExtensionFeature(extensions.graphics_pipeline_library,
+                               features.graphics_pipeline_library,
+                               VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+    }
+#endif
 }
 
 void Device::SetupFamilies(VkSurfaceKHR surface) {

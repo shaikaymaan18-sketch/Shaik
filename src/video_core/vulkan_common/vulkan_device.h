@@ -9,6 +9,7 @@
 #include <set>
 #include <span>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -435,6 +436,11 @@ public:
         return extensions.pipeline_executable_properties;
     }
 
+    bool UseGraphicsPipelineLibrary() const noexcept;
+    bool ShouldRetainLinkTimeOptimizationInfo() const noexcept;
+    bool ShouldEnableLinkTimeOptimization() const noexcept;
+    void DisableGraphicsPipelineLibrary(std::string_view reason) const noexcept;
+
     /// Returns true if VK_KHR_swapchain_mutable_format is enabled.
     bool IsKhrSwapchainMutableFormatEnabled() const {
         return extensions.swapchain_mutable_format;
@@ -789,6 +795,13 @@ private:
         FOR_EACH_VK_FEATURE_EXT(FEATURE);
         FOR_EACH_VK_EXTENSION(EXTENSION);
 
+#if defined(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME)
+        bool pipeline_library{};
+#endif
+#if defined(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME)
+        bool graphics_pipeline_library{};
+#endif
+
 #undef EXTENSION
 #undef FEATURE
     };
@@ -804,6 +817,10 @@ private:
         FOR_EACH_VK_FEATURE_1_3(FEATURE_CORE);
         FOR_EACH_VK_FEATURE_EXT(FEATURE_EXT);
 
+#if defined(VK_EXT_graphics_pipeline_library) || defined(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME)
+        VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT graphics_pipeline_library{};
+#endif
+
 #undef FEATURE_CORE
 #undef FEATURE_EXT
 
@@ -817,6 +834,9 @@ private:
         VkPhysicalDevicePushDescriptorPropertiesKHR push_descriptor{};
         VkPhysicalDeviceSubgroupSizeControlProperties subgroup_size_control{};
         VkPhysicalDeviceTransformFeedbackPropertiesEXT transform_feedback{};
+#if defined(VK_EXT_graphics_pipeline_library) || defined(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME)
+        VkPhysicalDeviceGraphicsPipelineLibraryPropertiesEXT graphics_pipeline_library{};
+#endif
 
         VkPhysicalDeviceProperties properties{};
     };
@@ -849,6 +869,8 @@ private:
     bool dynamic_state3_blending{};            ///< Has all blending features of dynamic_state3.
     bool dynamic_state3_enables{};             ///< Has all enables features of dynamic_state3.
     bool supports_conditional_barriers{};      ///< Allows barriers in conditional control flow.
+    mutable bool use_graphics_pipeline_library{}; ///< Runtime flag for VK_EXT_graphics_pipeline_library usage
+    mutable std::string graphics_pipeline_library_disable_reason;
     u64 device_access_memory{};                ///< Total size of device local memory in bytes.
     u32 sets_per_pool{};                       ///< Sets per Description Pool
     NvidiaArchitecture nvidia_arch{NvidiaArchitecture::Arch_AmpereOrNewer};
