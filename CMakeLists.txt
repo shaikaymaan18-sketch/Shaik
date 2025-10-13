@@ -132,7 +132,9 @@ if (CXX_CLANG_CL)
     endif()
 endif()
 
-set(CPM_SOURCE_CACHE ${CMAKE_SOURCE_DIR}/.cache/cpm)
+if(NOT DEFINED CPM_SOURCE_CACHE)
+    set(CPM_SOURCE_CACHE "${CMAKE_SOURCE_DIR}/.cache/cpm")
+endif()
 
 include(DownloadExternals)
 include(CMakeDependentOption)
