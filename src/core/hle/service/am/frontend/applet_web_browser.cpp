@@ -6,6 +6,7 @@
 #include "common/fs/fs.h"
 #include "common/fs/path_util.h"
 #include "common/logging/log.h"
+#include "common/settings.h"
 #include "common/string_util.h"
 #include "core/core.h"
 #include "core/file_sys/content_archive.h"
@@ -232,6 +233,11 @@ WebBrowser::WebBrowser(Core::System& system_, std::shared_ptr<Applet> applet_,
 WebBrowser::~WebBrowser() = default;
 
 void WebBrowser::Initialize() {
+    if (Settings::values.disable_web_applet) {
+        LOG_INFO(Service_AM, "Web Browser Applet disabled, skipping.");
+        return;
+    }
+
     FrontendApplet::Initialize();
 
     LOG_INFO(Service_AM, "Initializing Web Browser Applet.");
@@ -295,6 +301,11 @@ void WebBrowser::ExecuteInteractive() {
 }
 
 void WebBrowser::Execute() {
+    if (Settings::values.disable_web_applet) {
+        WebBrowserExit(WebExitReason::EndButtonPressed);
+        return;
+    }
+
     switch (web_arg_header.shim_kind) {
     case ShimKind::Shop:
         ExecuteShop();
