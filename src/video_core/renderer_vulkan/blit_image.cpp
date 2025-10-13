@@ -1061,7 +1061,7 @@ void BlitImageHelper::ConvertDepthToColorPipeline(vk::Pipeline& pipeline, VkRend
         .pViewportState = &PIPELINE_VIEWPORT_STATE_CREATE_INFO,
         .pRasterizationState = &PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .pMultisampleState = &PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-        .pDepthStencilState = &nullptr,
+        .pDepthStencilState = nullptr,
         .pColorBlendState = &PIPELINE_COLOR_BLEND_STATE_GENERIC_CREATE_INFO,
         .pDynamicState = &PIPELINE_DYNAMIC_STATE_CREATE_INFO,
         .layout = *one_texture_pipeline_layout,
