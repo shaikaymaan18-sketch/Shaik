@@ -1046,7 +1046,7 @@ void BlitImageHelper::ConvertDepthToColorPipeline(vk::Pipeline& pipeline, VkRend
     if (pipeline) {
         return;
     }
-    VkShaderModule frag_shader = *convert_float_to_depth_frag;
+    VkShaderModule frag_shader = *convert_depth_to_float_frag;
     const std::array stages = MakeStages(*full_screen_vert, frag_shader);
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_ci = GetPipelineInputAssemblyStateCreateInfo(device);
     pipeline = device.GetLogical().CreateGraphicsPipeline({
@@ -1076,7 +1076,7 @@ void BlitImageHelper::ConvertColorToDepthPipeline(vk::Pipeline& pipeline, VkRend
     if (pipeline) {
         return;
     }
-    VkShaderModule frag_shader = *convert_depth_to_float_frag;
+    VkShaderModule frag_shader = *convert_float_to_depth_frag;
     const std::array stages = MakeStages(*full_screen_vert, frag_shader);
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_ci = GetPipelineInputAssemblyStateCreateInfo(device);
     pipeline = device.GetLogical().CreateGraphicsPipeline({
