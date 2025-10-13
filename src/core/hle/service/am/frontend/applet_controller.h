@@ -30,7 +30,7 @@ enum class ControllerAppletVersion : u32_le {
     Version5 = 0x5, // 6.0.0 - 7.0.1
     Version7 = 0x7, // 8.0.0 - 10.2.0
     Version8 = 0x8, // 11.0.0+
-    Version8 = 0x9,
+    Version9 = 0x9,
 };
 
 enum class ControllerSupportMode : u8 {
