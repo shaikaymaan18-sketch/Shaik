@@ -2030,6 +2030,8 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
                     "Image view format {} has different usage flags than image format {}", format,
                     image.info.format);
     }
+    supports_linear_filtering = device->IsFormatSupported(
+        format_info.format, VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT, FormatType::Optimal);
     const VkImageViewUsageCreateInfo image_view_usage{
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO,
         .pNext = nullptr,
@@ -2100,7 +2102,8 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
 ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageInfo& info,
                      const VideoCommon::ImageViewInfo& view_info, GPUVAddr gpu_addr_)
     : VideoCommon::ImageViewBase{info, view_info, gpu_addr_},
-      buffer_size{VideoCommon::CalculateGuestSizeInBytes(info)} {}
+      buffer_size{VideoCommon::CalculateGuestSizeInBytes(info)},
+      supports_linear_filtering{false} {}
 
 ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::NullImageViewParams& params)
     : VideoCommon::ImageViewBase{params}, device{&runtime.device} {
@@ -2161,20 +2164,31 @@ VkImageView ImageView::StorageView(Shader::TextureType texture_type,
     if (!image_handle) {
         return VK_NULL_HANDLE;
     }
-    if (image_format == Shader::ImageFormat::Typeless) {
-        return Handle(texture_type);
-    }
-    const bool is_signed{image_format == Shader::ImageFormat::R8_SINT ||
-                         image_format == Shader::ImageFormat::R16_SINT};
     if (!storage_views) {
         storage_views = std::make_unique<StorageViews>();
     }
-    auto& views{is_signed ? storage_views->signeds : storage_views->unsigneds};
-    auto& view{views[static_cast<size_t>(texture_type)]};
-    if (view) {
+
+    // For storage images, Vulkan requires identity-swizzled views regardless of sampling swizzles.
+    // - If the image is typeless in the shader, create an identity-swizzled view using the
+    //   underlying image's format.
+    if (image_format == Shader::ImageFormat::Typeless) {
+        auto& view = storage_views->typeless[static_cast<size_t>(texture_type)];
+        if (!view) {
+            const auto format_info =
+                MaxwellToVK::SurfaceFormat(*device, FormatType::Optimal, true, format);
+            view = MakeView(format_info.format, VK_IMAGE_ASPECT_COLOR_BIT);
+        }
         return *view;
     }
-    view = MakeView(Format(image_format), VK_IMAGE_ASPECT_COLOR_BIT);
+
+    // Otherwise, use a typed storage view with identity swizzle.
+    const bool is_signed{image_format == Shader::ImageFormat::R8_SINT ||
+                         image_format == Shader::ImageFormat::R16_SINT};
+    auto& views{is_signed ? storage_views->signeds : storage_views->unsigneds};
+    auto& view{views[static_cast<size_t>(texture_type)]};
+    if (!view) {
+        view = MakeView(Format(image_format), VK_IMAGE_ASPECT_COLOR_BIT);
+    }
     return *view;
 }
 
@@ -2234,14 +2248,19 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
     // Some games have samplers with garbage. Sanitize them here.
     const f32 max_anisotropy = std::clamp(tsc.MaxAnisotropy(), 1.0f, 16.0f);
 
-    const auto create_sampler = [&](const f32 anisotropy) {
+    const VkFilter mag_filter = MaxwellToVK::Sampler::Filter(tsc.mag_filter);
+    const VkFilter min_filter = MaxwellToVK::Sampler::Filter(tsc.min_filter);
+    const VkSamplerMipmapMode mipmap_mode = MaxwellToVK::Sampler::MipmapMode(tsc.mipmap_filter);
+
+    const auto create_sampler = [&](f32 anisotropy, VkFilter mag, VkFilter min,
+                                    VkSamplerMipmapMode mipmap) {
         return device.GetLogical().CreateSampler(VkSamplerCreateInfo{
             .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
             .pNext = pnext,
             .flags = 0,
-            .magFilter = MaxwellToVK::Sampler::Filter(tsc.mag_filter),
-            .minFilter = MaxwellToVK::Sampler::Filter(tsc.min_filter),
-            .mipmapMode = MaxwellToVK::Sampler::MipmapMode(tsc.mipmap_filter),
+            .magFilter = mag,
+            .minFilter = min,
+            .mipmapMode = mipmap,
             .addressModeU = MaxwellToVK::Sampler::WrapMode(device, tsc.wrap_u, tsc.mag_filter),
             .addressModeV = MaxwellToVK::Sampler::WrapMode(device, tsc.wrap_v, tsc.mag_filter),
             .addressModeW = MaxwellToVK::Sampler::WrapMode(device, tsc.wrap_p, tsc.mag_filter),
@@ -2258,12 +2277,34 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
         });
     };
 
-    sampler = create_sampler(max_anisotropy);
+    sampler = create_sampler(max_anisotropy, mag_filter, min_filter, mipmap_mode);
 
     const f32 max_anisotropy_default = static_cast<f32>(1U << tsc.max_anisotropy);
     if (max_anisotropy > max_anisotropy_default) {
-        sampler_default_anisotropy = create_sampler(max_anisotropy_default);
+        sampler_default_anisotropy =
+            create_sampler(max_anisotropy_default, mag_filter, min_filter, mipmap_mode);
     }
+
+    const bool needs_linear_fallback = (mag_filter == VK_FILTER_LINEAR) ||
+                                       (min_filter == VK_FILTER_LINEAR) ||
+                                       (mipmap_mode == VK_SAMPLER_MIPMAP_MODE_LINEAR) ||
+                                       (max_anisotropy > 1.0f);
+    if (needs_linear_fallback) {
+        sampler_linear_fallback =
+            create_sampler(1.0f, VK_FILTER_NEAREST, VK_FILTER_NEAREST,
+                           VK_SAMPLER_MIPMAP_MODE_NEAREST);
+    }
+}
+
+VkSampler Sampler::HandleForView(bool supports_linear_filter,
+                                 bool supports_anisotropy) const noexcept {
+    if (!supports_linear_filter && sampler_linear_fallback) {
+        return *sampler_linear_fallback;
+    }
+    if (!supports_anisotropy && sampler_default_anisotropy) {
+        return *sampler_default_anisotropy;
+    }
+    return *sampler;
 }
 
 Framebuffer::Framebuffer(TextureCacheRuntime& runtime, std::span<ImageView*, NUM_RT> color_buffers,

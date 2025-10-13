@@ -503,6 +503,8 @@ void QueriesPrefixScanPass::Run(VkBuffer accumulation_buffer, VkBuffer dst_buffe
                                  VK_ACCESS_UNIFORM_READ_BIT |
                                  VK_ACCESS_CONDITIONAL_RENDERING_READ_BIT_EXT,
             };
+            static constexpr VkPipelineStageFlags write_dest_stages =
+                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT; // dstAccessMask spans many stages
             const QueriesPrefixScanPushConstants uniforms{
                 .min_accumulation_base = static_cast<u32>(min_accumulation_limit),
                 .max_accumulation_base = static_cast<u32>(max_accumulation_limit),
@@ -519,8 +521,7 @@ void QueriesPrefixScanPass::Run(VkBuffer accumulation_buffer, VkBuffer dst_buffe
             cmdbuf.PushConstants(*layout, VK_SHADER_STAGE_COMPUTE_BIT, uniforms);
             cmdbuf.Dispatch(1, 1, 1);
             cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                                   VK_PIPELINE_STAGE_CONDITIONAL_RENDERING_BIT_EXT, 0,
-                                   write_barrier);
+                                   write_dest_stages, 0, write_barrier);
         });
     }
 }

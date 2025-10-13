@@ -258,6 +258,10 @@ public:
         return gpu_addr;
     }
 
+    [[nodiscard]] bool SupportsLinearFiltering() const noexcept {
+        return supports_linear_filtering;
+    }
+
     [[nodiscard]] u32 BufferSize() const noexcept {
         return buffer_size;
     }
@@ -266,6 +270,8 @@ private:
     struct StorageViews {
         std::array<vk::ImageView, Shader::NUM_TEXTURE_TYPES> signeds;
         std::array<vk::ImageView, Shader::NUM_TEXTURE_TYPES> unsigneds;
+        // Identity-swizzled views for typeless storage bindings
+        std::array<vk::ImageView, Shader::NUM_TEXTURE_TYPES> typeless;
     };
 
     [[nodiscard]] vk::ImageView MakeView(VkFormat vk_format, VkImageAspectFlags aspect_mask);
@@ -283,6 +289,7 @@ private:
     VkImageView render_target = VK_NULL_HANDLE;
     VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
     u32 buffer_size = 0;
+    bool supports_linear_filtering = true;
 };
 
 class ImageAlloc : public VideoCommon::ImageAllocBase {};
@@ -303,9 +310,13 @@ public:
         return static_cast<bool>(sampler_default_anisotropy);
     }
 
+    [[nodiscard]] VkSampler HandleForView(bool supports_linear_filter,
+                                          bool supports_anisotropy) const noexcept;
+
 private:
     vk::Sampler sampler;
     vk::Sampler sampler_default_anisotropy;
+    vk::Sampler sampler_linear_fallback;
 };
 
 class Framebuffer {
