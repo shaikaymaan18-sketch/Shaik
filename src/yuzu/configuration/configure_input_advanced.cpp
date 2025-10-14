@@ -7,6 +7,7 @@
 #include "hid_core/frontend/emulated_controller.h"
 #include "hid_core/hid_core.h"
 #include "ui_configure_input_advanced.h"
+#include "qt_common/qt_compat.h"
 #include "yuzu/configuration/configure_input_advanced.h"
 
 ConfigureInputAdvanced::ConfigureInputAdvanced(Core::HID::HIDCore& hid_core_, QWidget* parent)
@@ -74,13 +75,13 @@ ConfigureInputAdvanced::ConfigureInputAdvanced(Core::HID::HIDCore& hid_core_, QW
         }
     }
 
-    connect(ui->mouse_enabled, &QCheckBox::stateChanged, this,
+    connect(ui->mouse_enabled, &QCheckBox::STATE_CHANGED, this,
             &ConfigureInputAdvanced::UpdateUIEnabled);
-    connect(ui->debug_enabled, &QCheckBox::stateChanged, this,
+    connect(ui->debug_enabled, &QCheckBox::STATE_CHANGED, this,
             &ConfigureInputAdvanced::UpdateUIEnabled);
-    connect(ui->touchscreen_enabled, &QCheckBox::stateChanged, this,
+    connect(ui->touchscreen_enabled, &QCheckBox::STATE_CHANGED, this,
             &ConfigureInputAdvanced::UpdateUIEnabled);
-    connect(ui->enable_ring_controller, &QCheckBox::stateChanged, this,
+    connect(ui->enable_ring_controller, &QCheckBox::STATE_CHANGED, this,
             &ConfigureInputAdvanced::UpdateUIEnabled);
 
     connect(ui->debug_configure, &QPushButton::clicked, this,

@@ -3,7 +3,9 @@
 
 #pragma once
 
-#include "yuzu/discord.h"
+#include "discord.h"
+
+#include <string>
 
 namespace Core {
 class System;
