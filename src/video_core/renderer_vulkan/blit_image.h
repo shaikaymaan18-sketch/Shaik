@@ -188,6 +188,8 @@ private:
     vk::Pipeline convert_rgba16f_to_rgba8_pipeline;
     vk::Pipeline dither_temporal_pipeline;
     vk::Pipeline dynamic_resolution_scale_pipeline;
+
+    [[maybe_unused]] const bool is_qualcomm_stock;
 };
 
 } // namespace Vulkan

@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <algorithm>
+#include <array>
 
 #include "video_core/renderer_vulkan/vk_texture_cache.h"
 
@@ -46,7 +47,18 @@ namespace Vulkan {
 using VideoCommon::ImageViewType;
 
 namespace {
-    
+
+[[nodiscard]] bool IsQualcommStockDevice(const Device& device) {
+    const VkDriverIdKHR driver_id = device.GetDriverID();
+    if (driver_id == VK_DRIVER_ID_MESA_TURNIP) {
+        return false;
+    }
+    if (driver_id == VK_DRIVER_ID_QUALCOMM_PROPRIETARY) {
+        return true;
+    }
+    return false;
+}
+
 [[nodiscard]] VkImageAspectFlags AspectMaskFromFormat(VideoCore::Surface::PixelFormat format) {
     using VideoCore::Surface::SurfaceType;
     switch (VideoCore::Surface::GetFormatType(format)) {
@@ -546,7 +558,8 @@ BlitImageHelper::BlitImageHelper(const Device& device_, Scheduler& scheduler_,
       dither_temporal_frag(BuildShader(device, DITHER_TEMPORAL_FRAG_SPV)),
       dynamic_resolution_scale_comp(BuildShader(device, DYNAMIC_RESOLUTION_SCALE_COMP_SPV)),
       linear_sampler(device.GetLogical().CreateSampler(SAMPLER_CREATE_INFO<VK_FILTER_LINEAR>)),
-      nearest_sampler(device.GetLogical().CreateSampler(SAMPLER_CREATE_INFO<VK_FILTER_NEAREST>)) {}
+      nearest_sampler(device.GetLogical().CreateSampler(SAMPLER_CREATE_INFO<VK_FILTER_NEAREST>)),
+      is_qualcomm_stock(IsQualcommStockDevice(device)) {}
 
 BlitImageHelper::~BlitImageHelper() = default;
 
@@ -765,7 +778,8 @@ void BlitImageHelper::Convert(VkPipeline pipeline, const Framebuffer* dst_frameb
 
     RecordShaderReadBarrier(scheduler, src_image_view);
     scheduler.RequestRenderpass(dst_framebuffer);
-    scheduler.Record([pipeline, layout, sampler, src_view, extent, this](vk::CommandBuffer cmdbuf) {
+    scheduler.Record([pipeline, layout, sampler, src_view, extent, dst_framebuffer, this](
+                         vk::CommandBuffer cmdbuf) {
         const VkOffset2D offset{
             .x = 0,
             .y = 0,
@@ -776,7 +790,7 @@ void BlitImageHelper::Convert(VkPipeline pipeline, const Framebuffer* dst_frameb
             .width = static_cast<float>(extent.width),
             .height = static_cast<float>(extent.height),
             .minDepth = 0.0f,
-            .maxDepth = 0.0f,
+            .maxDepth = 1.0f,
         };
         const VkRect2D scissor{
             .offset = offset,
@@ -788,6 +802,43 @@ void BlitImageHelper::Convert(VkPipeline pipeline, const Framebuffer* dst_frameb
         };
         const VkDescriptorSet descriptor_set = one_texture_descriptor_allocator.Commit();
         UpdateOneTextureDescriptorSet(device, descriptor_set, sampler, src_view);
+
+        std::array<VkClearAttachment, 9> clear_attachments{};
+        u32 clear_attachment_count = 0;
+        if (dst_framebuffer->NumColorBuffers() > 0) {
+            for (u32 i = 0; i < dst_framebuffer->NumColorBuffers(); ++i) {
+                if (!dst_framebuffer->HasAspectColorBit(i)) {
+                    continue;
+                }
+                VkClearAttachment& color_attachment = clear_attachments.at(clear_attachment_count++);
+                color_attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                color_attachment.colorAttachment = i;
+                color_attachment.clearValue.color = VkClearColorValue{{0.0f, 0.0f, 0.0f, 0.0f}};
+            }
+        }
+        if (dst_framebuffer->HasAspectDepthBit()) {
+            VkClearAttachment& depth_attachment = clear_attachments.at(clear_attachment_count++);
+            depth_attachment.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+            if (dst_framebuffer->HasAspectStencilBit()) {
+                depth_attachment.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+            }
+            depth_attachment.clearValue.depthStencil = VkClearDepthStencilValue{1.0f, 0};
+        }
+        if (clear_attachment_count > 0) {
+            const VkClearRect clear_rect{
+                .rect =
+                    {
+                        .offset = offset,
+                        .extent = extent,
+                    },
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            };
+            const std::array<VkClearRect, 1> clear_rects{clear_rect};
+            cmdbuf.ClearAttachments(vk::Span<VkClearAttachment>(clear_attachments.data(),
+                                                                clear_attachment_count),
+                                    clear_rects);
+        }
 
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, descriptor_set,
@@ -811,7 +862,7 @@ void BlitImageHelper::ConvertDepthStencil(VkPipeline pipeline, const Framebuffer
     RecordShaderReadBarrier(scheduler, src_image_view);
     scheduler.RequestRenderpass(dst_framebuffer);
     scheduler.Record([pipeline, layout, sampler, src_depth_view, src_stencil_view, extent,
-                      this](vk::CommandBuffer cmdbuf) {
+                      dst_framebuffer, this](vk::CommandBuffer cmdbuf) {
         const VkOffset2D offset{
             .x = 0,
             .y = 0,
@@ -822,7 +873,7 @@ void BlitImageHelper::ConvertDepthStencil(VkPipeline pipeline, const Framebuffer
             .width = static_cast<float>(extent.width),
             .height = static_cast<float>(extent.height),
             .minDepth = 0.0f,
-            .maxDepth = 0.0f,
+            .maxDepth = 1.0f,
         };
         const VkRect2D scissor{
             .offset = offset,
@@ -835,6 +886,42 @@ void BlitImageHelper::ConvertDepthStencil(VkPipeline pipeline, const Framebuffer
         const VkDescriptorSet descriptor_set = two_textures_descriptor_allocator.Commit();
         UpdateTwoTexturesDescriptorSet(device, descriptor_set, sampler, src_depth_view,
                                        src_stencil_view);
+        std::array<VkClearAttachment, 9> clear_attachments{};
+        u32 clear_attachment_count = 0;
+        if (dst_framebuffer->NumColorBuffers() > 0) {
+            for (u32 i = 0; i < dst_framebuffer->NumColorBuffers(); ++i) {
+                if (!dst_framebuffer->HasAspectColorBit(i)) {
+                    continue;
+                }
+                VkClearAttachment& color_attachment = clear_attachments[clear_attachment_count++];
+                color_attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                color_attachment.colorAttachment = i;
+                color_attachment.clearValue.color = VkClearColorValue{{0.0f, 0.0f, 0.0f, 0.0f}};
+            }
+        }
+        if (dst_framebuffer->HasAspectDepthBit()) {
+            VkClearAttachment& depth_attachment = clear_attachments[clear_attachment_count++];
+            depth_attachment.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+            if (dst_framebuffer->HasAspectStencilBit()) {
+                depth_attachment.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+            }
+            depth_attachment.clearValue.depthStencil = VkClearDepthStencilValue{1.0f, 0};
+        }
+        if (clear_attachment_count > 0) {
+            const VkClearRect clear_rect{
+                .rect =
+                    {
+                        .offset = offset,
+                        .extent = extent,
+                    },
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            };
+            const std::array<VkClearRect, 1> clear_rects{clear_rect};
+            cmdbuf.ClearAttachments(vk::Span<VkClearAttachment>(clear_attachments.data(),
+                                                                clear_attachment_count),
+                                    clear_rects);
+        }
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, descriptor_set,
                                   nullptr);
@@ -1079,6 +1166,11 @@ void BlitImageHelper::ConvertColorToDepthPipeline(vk::Pipeline& pipeline, VkRend
     VkShaderModule frag_shader = *convert_float_to_depth_frag;
     const std::array stages = MakeStages(*full_screen_vert, frag_shader);
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_ci = GetPipelineInputAssemblyStateCreateInfo(device);
+    VkPipelineDepthStencilStateCreateInfo depth_stencil_ci = PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depth_stencil_ci.depthTestEnable = VK_TRUE;
+    depth_stencil_ci.depthWriteEnable = VK_TRUE;
+    depth_stencil_ci.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+    depth_stencil_ci.stencilTestEnable = VK_FALSE;
     pipeline = device.GetLogical().CreateGraphicsPipeline({
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = nullptr,
@@ -1091,7 +1183,7 @@ void BlitImageHelper::ConvertColorToDepthPipeline(vk::Pipeline& pipeline, VkRend
         .pViewportState = &PIPELINE_VIEWPORT_STATE_CREATE_INFO,
         .pRasterizationState = &PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .pMultisampleState = &PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-        .pDepthStencilState = &PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+        .pDepthStencilState = &depth_stencil_ci,
         .pColorBlendState = &PIPELINE_COLOR_BLEND_STATE_EMPTY_CREATE_INFO,
         .pDynamicState = &PIPELINE_DYNAMIC_STATE_CREATE_INFO,
         .layout = *one_texture_pipeline_layout,
@@ -1152,6 +1244,11 @@ void BlitImageHelper::ConvertPipeline(vk::Pipeline& pipeline, VkRenderPass rende
         is_target_depth ? *convert_float_to_depth_frag : *convert_depth_to_float_frag;
     const std::array stages = MakeStages(*full_screen_vert, frag_shader);
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_ci = GetPipelineInputAssemblyStateCreateInfo(device);
+    VkPipelineDepthStencilStateCreateInfo depth_stencil_ci = PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depth_stencil_ci.depthTestEnable = VK_TRUE;
+    depth_stencil_ci.depthWriteEnable = VK_TRUE;
+    depth_stencil_ci.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+    depth_stencil_ci.stencilTestEnable = VK_FALSE;
     pipeline = device.GetLogical().CreateGraphicsPipeline({
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = nullptr,
@@ -1164,7 +1261,7 @@ void BlitImageHelper::ConvertPipeline(vk::Pipeline& pipeline, VkRenderPass rende
         .pViewportState = &PIPELINE_VIEWPORT_STATE_CREATE_INFO,
         .pRasterizationState = &PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .pMultisampleState = &PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-        .pDepthStencilState = is_target_depth ? &PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO : nullptr,
+        .pDepthStencilState = is_target_depth ? &depth_stencil_ci : nullptr,
         .pColorBlendState = is_target_depth ? &PIPELINE_COLOR_BLEND_STATE_EMPTY_CREATE_INFO
                                           : &PIPELINE_COLOR_BLEND_STATE_GENERIC_CREATE_INFO,
         .pDynamicState = &PIPELINE_DYNAMIC_STATE_CREATE_INFO,
