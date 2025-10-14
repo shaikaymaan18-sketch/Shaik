@@ -6,8 +6,10 @@
 #include "Interface/TitleManager.h"
 #include "Models/GameListModel.h"
 #include "core/core.h"
+#include "qt_common/qt_common.h"
 
 #include <QQuickStyle>
+#include <qwidget.h>
 
 int main(int argc, char *argv[])
 {
@@ -20,14 +22,17 @@ int main(int argc, char *argv[])
     QApplication::setDesktopFileName(QStringLiteral("org.eden-emu.eden"));
     QGuiApplication::setWindowIcon(QIcon(":/icons/eden.svg"));
 
+    /// QtCommon
+    QtCommon::Init(new QWidget);
+
     /// Settings, etc
     Settings::SetConfiguringGlobal(true);
     QMLConfig *config = new QMLConfig;
 
-    // // TODO: Save all values on launch and per game etc
-    // app.connect(&app, &QCoreApplication::aboutToQuit, &app, [config]() {
-    //     config->save();
-    // });
+    // TODO: Save all values on launch and per game etc
+    app.connect(&app, &QCoreApplication::aboutToQuit, &app, [config]() {
+        config->save();
+    });
 
     /// Expose Enums
 
@@ -44,7 +49,7 @@ int main(int argc, char *argv[])
     qmlRegisterUncreatableMetaObject(SettingsCategories::staticMetaObject, "Eden.Interface", 1, 0, "SettingsCategories", QString());
 
     // Directory List
-    GameListModel *gameListModel = new GameListModel(&app);
+    GameListModel *gameListModel = new GameListModel(&app, &engine);
     ctx->setContextProperty(QStringLiteral("EdenGameList"), gameListModel);
 
     // Settings Interface

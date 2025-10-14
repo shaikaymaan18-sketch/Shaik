@@ -61,16 +61,6 @@ Rectangle {
     //     repeat: true
     //     onTriggered: gamepad.pollEvents()
     // }
-    FolderDialog {
-        id: openDir
-        folder: StandardPaths.writableLocation(StandardPaths.HomeLocation)
-        onAccepted: {
-            button.visible = false
-            view.anchors.bottom = root.bottom
-            EdenGameList.addDir(folder)
-        }
-    }
-
     Item {
         id: view
 
@@ -101,27 +91,5 @@ Rectangle {
         //             verticalCenter: view.verticalCenter
         //         }
         //     }
-    }
-
-    Button {
-        id: button
-        font.pixelSize: 25
-
-        anchors {
-            left: parent.left
-            right: parent.right
-
-            bottom: parent.bottom
-
-            margins: 8
-        }
-
-        text: "Add Directory"
-        onClicked: openDir.open()
-
-        background: Rectangle {
-            color: button.pressed ? Constants.accentPressed : Constants.accent
-            radius: 5
-        }
     }
 }

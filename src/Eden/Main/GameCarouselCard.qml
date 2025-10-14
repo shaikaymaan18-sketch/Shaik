@@ -25,7 +25,10 @@ Item {
             id: image
 
             fillMode: Image.PreserveAspectFit
-            source: "file://" + model.path
+            source: "image://games/" + model.name
+
+            sourceSize.width: width
+            sourceSize.height: height
 
             clip: true
 

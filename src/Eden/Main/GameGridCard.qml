@@ -14,8 +14,7 @@ Rectangle {
     Image {
         id: image
 
-        fillMode: Image.PreserveAspectFit
-        source: "file://" + model.path
+        source: "image://games/" + model.name
 
         clip: true
 
@@ -27,6 +26,9 @@ Rectangle {
 
             margins: 10
         }
+
+        sourceSize.width: width
+        sourceSize.height: height
 
         height: parent.height
 
