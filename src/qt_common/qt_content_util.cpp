@@ -386,13 +386,14 @@ void ClearDataDir(FrontendCommon::DataManager::DataDir dir, const std::string& u
 
 void ExportDataDir(FrontendCommon::DataManager::DataDir data_dir,
                    const std::string& user_id,
+                   const QString& name,
                    std::function<void()> callback)
 {
     using namespace QtCommon::Frontend;
     const std::string dir = FrontendCommon::DataManager::GetDataDir(data_dir, user_id);
 
     const QString zip_dump_location = GetSaveFileName(tr("Select Export Location"),
-                                                      QStringLiteral("export.zip"),
+                                                      tr("%1.zip").arg(name),
                                                       tr("Zipped Archives (*.zip)"));
 
     if (zip_dump_location.isEmpty())

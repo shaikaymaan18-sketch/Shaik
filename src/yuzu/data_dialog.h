@@ -32,6 +32,7 @@ class DataWidget : public QWidget
 public:
     explicit DataWidget(FrontendCommon::DataManager::DataDir data_dir,
                         QtCommon::StringLookup::StringKey tooltip,
+                        const QString &exportName,
                         QWidget *parent = nullptr);
 
 public slots:
@@ -45,6 +46,7 @@ public slots:
 private:
     std::unique_ptr<Ui::DataWidget> ui;
     FrontendCommon::DataManager::DataDir m_dir;
+    const QString m_exportName;
 
     std::string selectProfile();
 };

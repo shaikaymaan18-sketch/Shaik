@@ -4,9 +4,8 @@
 #include "data_dialog.h"
 #include "core/hle/service/acc/profile_manager.h"
 #include "frontend_common/data_manager.h"
+#include "qt_common/qt_common.h"
 #include "qt_common/qt_content_util.h"
-#include "qt_common/qt_frontend_util.h"
-#include "qt_common/qt_progress_dialog.h"
 #include "qt_common/qt_string_lookup.h"
 #include "ui_data_dialog.h"
 
@@ -30,6 +29,7 @@ DataDialog::DataDialog(QWidget *parent)
 #define WIDGET(name) \
     ui->page->addWidget(new DataWidget(FrontendCommon::DataManager::DataDir::name, \
                                        QtCommon::StringLookup::name##Tooltip, \
+                                       QStringLiteral(#name), \
                                        this));
 
     WIDGET(Saves)
@@ -54,10 +54,12 @@ DataDialog::~DataDialog() = default;
 
 DataWidget::DataWidget(FrontendCommon::DataManager::DataDir data_dir,
                        QtCommon::StringLookup::StringKey tooltip,
+                       const QString &exportName,
                        QWidget *parent)
     : QWidget(parent)
     , ui(std::make_unique<Ui::DataWidget>())
     , m_dir(data_dir)
+    , m_exportName(exportName)
 {
     ui->setupUi(this);
 
@@ -102,7 +104,7 @@ void DataWidget::upload()
     if (m_dir == FrontendCommon::DataManager::DataDir::Saves) {
         user_id = selectProfile();
     }
-    QtCommon::Content::ExportDataDir(m_dir, user_id);
+    QtCommon::Content::ExportDataDir(m_dir, user_id, m_exportName);
 }
 
 void DataWidget::download()
