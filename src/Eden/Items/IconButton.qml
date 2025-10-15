@@ -1,7 +1,5 @@
 import QtQuick
-import QtQuick.Controls.Material
-
-import Eden.Constants
+import QtQuick.Controls
 
 Button {
     required property string label
@@ -15,9 +13,6 @@ Button {
     height: icon.height
 
     icon.source: "qrc:/icons/" + label.toLowerCase() + ".svg"
-    icon.width: 45
-    icon.height: 45
-    icon.color: Constants.text
 
     background: Item {}
 }

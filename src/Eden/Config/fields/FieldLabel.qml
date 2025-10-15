@@ -2,13 +2,12 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-import Eden.Constants
+import Carboxyl.Base
 
-Text {
+Label {
     property var setting
 
     text: setting.label
-    color: Constants.text
     font.pixelSize: 14
 
     height: 50

@@ -8,7 +8,7 @@ import Eden.Constants
 Rectangle {
     id: wrapper
 
-    color: Constants.dialog
+    color: palette.alternateBase
     radius: 16
 
     Image {
@@ -74,7 +74,7 @@ Rectangle {
         font.family: "Monospace"
 
         color: "lightblue"
-        background: Constants.dialog
+        background: "transparent"
 
         canMarquee: wrapper.GridView.isCurrentItem
     }

@@ -17,3 +17,9 @@ AddJsonPackage(quazip)
 
 # frozen
 AddJsonPackage(frozen)
+
+# Carboxyl
+# TODO
+if (ENABLE_QT)
+    AddJsonPackage(carboxyl)
+endif()

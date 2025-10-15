@@ -1,12 +1,13 @@
 import QtQuick
-import QtQuick.Controls.Material
+import QtQuick.Controls
 import QtQuick.Layouts
 
 import Eden.Interface
 import Eden.Config
 
-ScrollView {
+PageScrollView {
     id: scroll
+
     // TODO: language, theme
     ColumnLayout {
         width: scroll.width - scroll.effectiveScrollBarWidth

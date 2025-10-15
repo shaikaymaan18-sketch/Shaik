@@ -20,6 +20,11 @@ if (YUZU_STATIC_BUILD)
     add_compile_definitions(QT_STATICPLUGIN)
 endif()
 
+# TODO(crueter): GET RID OF THESE
+if (ENABLE_QT)
+    add_compile_definitions(YUZU_QT_WIDGETS YUZU_QT_QML)
+endif()
+
 # Set compilation flags
 if (MSVC)
     set(CMAKE_CONFIGURATION_TYPES Debug Release CACHE STRING "" FORCE)
@@ -231,7 +236,6 @@ if (YUZU_ROOM_STANDALONE)
 endif()
 
 if (ENABLE_QT)
-    add_definitions(-DYUZU_QT_WIDGETS)
     add_subdirectory(qt_common)
     add_subdirectory(Eden)
 endif()

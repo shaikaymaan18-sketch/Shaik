@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls
 
 import Eden.Items
 import Eden.Config
@@ -7,7 +8,7 @@ import Eden.Constants
 
 BaseField {
     id: field
-    contentItem: BetterSpinBox {
+    contentItem: SpinBox {
         enabled: enable
 
         Layout.fillWidth: true
@@ -19,8 +20,8 @@ BaseField {
         font.pixelSize: 15
 
         value: field.value
-        label: setting.suffix
 
+        // label: setting.suffix
         onValueModified: field.value = value
     }
 }

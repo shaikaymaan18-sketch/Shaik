@@ -18,11 +18,12 @@ Item {
     readonly property string typeName: "BaseField"
 
     clip: true
-    height: content.height + (helpText.height + helpText.anchors.topMargin)
+    height: 40 + (helpText.height + helpText.anchors.topMargin)
 
     Component.onCompleted: sync()
 
     function apply() {
+        console.log("Applying value", value, "to", setting.label)
         if (setting.value !== value) {
             setting.value = value
         }
@@ -34,56 +35,65 @@ Item {
         }
     }
 
-    RowLayout {
-        id: content
-        height: 50
+    IconButton {
+        id: help
 
-        spacing: 0
+        label: "help"
+        icon.width: 30
+        icon.height: 30
+
+        onClicked: helpText.toggle()
+        icon.color: palette.text
+        visible: setting.tooltip !== ""
 
         anchors {
             left: parent.left
-            right: parent.right
+            top: parent.top
+            topMargin: 5
         }
 
         z: 2
+    }
 
-        IconButton {
-            label: "help"
-            icon.width: 20
-            icon.height: 20
+    FieldCheckbox {
+        id: enable
+        setting: field.setting
+        z: 2
+        force: field.forceCheckbox
 
-            onClicked: helpText.toggle()
-            icon.color: setting.tooltip !== "" ? Constants.text : Constants.dialog
-            z: 2
-        }
+        height: 40
 
-        FieldCheckbox {
-            id: enable
-            setting: field.setting
-            z: 2
-            force: field.forceCheckbox
-        }
-
-        RowLayout {
-            Layout.fillWidth: true
-            uniformCellSizes: true
-            spacing: 0
-            z: 2
-
-            FieldLabel {
-                z: 2
-                id: label
-                setting: field.setting
-            }
-
-            children: showLabel ? [label, contentItem] : [contentItem]
+        anchors {
+            left: help.right
         }
     }
 
-    Rectangle {
-        color: Constants.dialog
-        anchors.fill: content
-        z: 0
+    FieldLabel {
+        z: 2
+        id: label
+        setting: field.setting
+
+        height: 40
+        verticalAlignment: Text.AlignVCenter
+
+        anchors {
+            left: (enable.visible ? enable : help).right
+            right: parent.horizontalCenter
+        }
+    }
+
+    RowLayout {
+        id: content
+
+        height: 40
+        visible: showLabel
+
+        anchors {
+            left: parent.horizontalCenter
+            right: parent.right
+        }
+
+        children: [contentItem]
     }
 
     Text {
@@ -95,14 +105,14 @@ Item {
             right: parent.right
             rightMargin: 20
 
-            top: content.bottom
+            top: label.bottom
             topMargin: -height
         }
 
         z: -1
 
         text: setting.tooltip
-        color: Constants.subText
+        color: palette.toolTipText
         font.pixelSize: 12
         wrapMode: Text.WordWrap
 

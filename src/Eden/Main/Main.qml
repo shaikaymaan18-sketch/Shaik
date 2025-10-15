@@ -1,9 +1,11 @@
 import QtQuick
-import QtQuick.Controls.Material
+import QtQuick.Controls
 
 import Eden.Config
 import Eden.Items
 import Eden.Constants
+
+import Carboxyl.Base
 
 ApplicationWindow {
     width: Constants.width
@@ -11,10 +13,7 @@ ApplicationWindow {
     visible: true
     title: TitleManager.title
 
-    Material.theme: Material.Dark
-    Material.accent: Material.Red
-
-    Material.roundedScale: Material.NotRounded
+    palette: Palettes.theme
 
     GameList {
         anchors {
@@ -30,8 +29,8 @@ ApplicationWindow {
         id: globalConfig
     }
 
-    menuBar: BetterMenuBar {
-        BetterMenu {
+    menuBar: MenuBar {
+        Menu {
             title: qsTr("&File")
             contentWidth: 225
 
@@ -51,7 +50,7 @@ ApplicationWindow {
 
             MenuSeparator {}
 
-            BetterMenu {
+            Menu {
                 title: "&Recent Files"
             }
 
@@ -75,7 +74,7 @@ ApplicationWindow {
                 shortcut: "Ctrl+Q"
             }
         }
-        BetterMenu {
+        Menu {
             title: qsTr("&Emulation")
             contentWidth: 240
 
@@ -108,7 +107,7 @@ ApplicationWindow {
             }
         }
 
-        BetterMenu {
+        Menu {
             title: qsTr("&View")
             contentWidth: 260
 
@@ -143,7 +142,7 @@ ApplicationWindow {
             MenuSeparator {}
         }
 
-        BetterMenu {
+        Menu {
             title: qsTr("&Tools")
             contentWidth: 225
 
@@ -161,7 +160,7 @@ ApplicationWindow {
 
             MenuSeparator {}
 
-            BetterMenu {
+            Menu {
                 title: qsTr("&Amiibo")
             }
 
@@ -188,7 +187,7 @@ ApplicationWindow {
                 shortcut: "Ctrl+P"
             }
 
-            BetterMenu {
+            Menu {
                 title: "&TAS"
             }
         }

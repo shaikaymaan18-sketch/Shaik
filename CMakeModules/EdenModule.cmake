@@ -44,4 +44,6 @@ function(EdenModule)
     if (DEFINED MODULE_LIBRARIES)
         target_link_libraries(${LIB_NAME} PRIVATE ${MODULE_LIBRARIES})
     endif()
+
+    target_link_libraries(${LIB_NAME} PRIVATE Carboxyl::Base Carboxyl::Styles)
 endfunction()

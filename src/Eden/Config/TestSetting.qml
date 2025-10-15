@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 
-import Eden.Constants
+import Carboxyl.Base
 
 Column {
     topPadding: 5
@@ -9,10 +9,9 @@ Column {
 
     RowLayout {
         uniformCellSizes: true
-        Text {
+        Label {
             Layout.fillWidth: true
             text: model.label
-            color: Constants.text
             font.pixelSize: 16
 
             height: 40

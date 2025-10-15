@@ -1,5 +1,5 @@
 import QtQuick
-import QtQuick.Controls.Material
+import QtQuick.Controls
 import QtQuick.Layouts
 
 import Eden.Constants
@@ -20,7 +20,7 @@ ToolBar {
     implicitHeight: 30
 
     background: Rectangle {
-        color: Constants.bg
+        color: palette.dark
     }
 
     // TODO: reduce duplicate code
@@ -72,7 +72,7 @@ ToolBar {
 
             text: value.toUpperCase()
 
-            textColor: Constants.text
+            textColor: palette.text
 
             onClicked: {
                 if (value === "docked") {

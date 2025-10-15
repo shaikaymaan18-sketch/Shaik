@@ -5,7 +5,7 @@
 #include <QQmlEngine>
 
 #include "QMLSetting.h"
-#include "qt_common/shared_translation.h"
+#include "qt_common/config/shared_translation.h"
 #include "Models/SettingsModel.h"
 
 namespace SettingsCategories {

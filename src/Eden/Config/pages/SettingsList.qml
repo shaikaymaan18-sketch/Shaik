@@ -2,10 +2,9 @@ import QtQuick
 import QtQuick.Layouts
 
 import Eden.Config
-import Eden.Constants
 import Eden.Interface
 
-ColumnLayout {
+ListView {
     required property int category
 
     property bool inset: false
@@ -13,35 +12,28 @@ ColumnLayout {
     property list<string> idInclude: []
     property list<string> idExclude: []
 
-    SectionHeader {
-        text: header
-        visible: header != ""
-    }
+    clip: true
+    boundsBehavior: Flickable.StopAtBounds
 
-    ListView {
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
+    interactive: false
 
-        interactive: false
+    implicitHeight: contentHeight
+    delegate: Setting {}
 
-        implicitHeight: contentHeight
-        delegate: Setting {}
+    Layout.fillHeight: true
+    Layout.fillWidth: true
+    Layout.leftMargin: 5
+    spacing: 0
 
-        Layout.fillHeight: true
-        Layout.fillWidth: true
-        Layout.leftMargin: 5
-        spacing: 8
+    model: SettingsInterface.category(category, idInclude, idExclude)
 
-        model: SettingsInterface.category(category, idInclude, idExclude)
+    Rectangle {
+        anchors.fill: parent
+        color: "transparent"
 
-        Rectangle {
-            anchors.fill: parent
-            color: "transparent"
-
-            border {
-                color: inset ? Constants.text : "transparent"
-                width: 1
-            }
+        border {
+            color: inset ? palette.text : "transparent"
+            width: 1
         }
     }
 }

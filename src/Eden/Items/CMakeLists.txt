@@ -9,14 +9,7 @@ EdenModule(
     URI Eden.Items
     QML_FILES
         StatusBarButton.qml
-        BetterMenu.qml
-        AnimatedDialog.qml
-        BetterMenuBar.qml
-
-        SettingsTabButton.qml
         IconButton.qml
-        VerticalTabBar.qml
-        fields/BetterSpinBox.qml
-        fields/BetterTextField.qml
-        fields/FieldFooter.qml
+
+
 )

@@ -5,7 +5,7 @@
 #include <QObject>
 #include <QQmlEngine>
 #include <QStandardItemModel>
-#include "qt_common/uisettings.h"
+#include "qt_common/config/uisettings.h"
 
 typedef struct Game {
     QString absPath;

@@ -18,7 +18,7 @@ Rectangle {
     readonly property int deadzone: 8000
     readonly property int repeatTimeMs: 125
 
-    color: Constants.bg
+    color: palette.base
 
     // TODO: use the original yuzu backend for dis
     // Gamepad {
@@ -65,7 +65,7 @@ Rectangle {
         id: view
 
         anchors {
-            bottom: button.top
+            bottom: parent.bottom
             left: parent.left
             right: parent.right
             top: parent.top

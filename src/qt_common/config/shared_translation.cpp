@@ -411,6 +411,11 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent)
     // Web Service
 
     // Ui
+    INSERT(UISettings, carboxyl_accent, tr("Accent"), tr("What accent color to use throughout the application."));
+    INSERT(UISettings, carboxyl_theme, tr("Theme"), tr("The palette to use throughout the application."));
+
+    // TODO: brief explanations, link to Carboxyl?
+    INSERT(UISettings, carboxyl_style, tr("Style"), tr("The control style to use throughout the application."));
 
     // Ui General
     INSERT(UISettings,
@@ -761,6 +766,51 @@ std::unique_ptr<ComboboxTranslationMap> ComboboxEnumeration(QObject* parent)
                               PAIR(ExtendedDynamicState, EDS2, tr("ExtendedDynamicState 2")),
                               PAIR(ExtendedDynamicState, EDS3, tr("ExtendedDynamicState 3")),
                           }});
+
+#ifdef YUZU_QT_QML
+
+#define ACCENT(name) PAIR(Accent, name, tr(#name))
+    translations->insert({Settings::EnumMetadata<Settings::Accent>::Index(),
+                          {
+                              ACCENT(System),
+                              ACCENT(Red),
+                              ACCENT(Blue),
+                              ACCENT(Orange),
+                              ACCENT(Gold),
+                              ACCENT(Forest),
+                              ACCENT(Violet),
+                              ACCENT(Pink),
+                              ACCENT(Cyan),
+                              ACCENT(Steel),
+                          }});
+#undef ACCENT
+
+#define THEME(name) PAIR(Theme, name, tr(#name))
+
+    translations->insert({Settings::EnumMetadata<Settings::Theme>::Index(),
+                          {
+                              THEME(System),
+                              THEME(Light),
+                              THEME(Dark),
+                              THEME(Midnight),
+                          }});
+
+#undef THEME
+
+#define STYLE(name) PAIR(Style, name, tr(#name))
+
+    translations->insert({Settings::EnumMetadata<Settings::Style>::Index(),
+                          {
+                              STYLE(Trioxide),
+                              STYLE(Graphide),
+                              STYLE(Basalt),
+                              STYLE(Hydrogen),
+                              STYLE(Helios),
+                          }});
+
+#undef STYLE
+
+#endif
 
 #undef PAIR
 #undef CTX_PAIR

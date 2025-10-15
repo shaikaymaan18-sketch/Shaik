@@ -29,7 +29,7 @@
 #include "core/file_sys/submission_package.h"
 #include "core/loader/loader.h"
 #include "qt_common/qt_common.h"
-#include "qt_common/uisettings.h"
+#include "qt_common/config/uisettings.h"
 
 namespace {
 
@@ -238,7 +238,9 @@ QStandardItem* MakeGameListEntry(const std::string& path,
     item->setData(QString::fromStdString(name), GameListModel::NAME);
     item->setData(QString::fromStdString(path), GameListModel::PATH);
 
-    const u32 pic_size = UISettings::values.game_icon_size.GetValue();
+    // We should always choose 256
+    // Good balance of size and not looking stupid
+    const u32 pic_size = 256;
 
     QPixmap picture;
     if (!picture.loadFromData(icon.data(), static_cast<u32>(icon.size()))) {

@@ -1,9 +1,10 @@
 #ifndef QMLCONFIG_H
 #define QMLCONFIG_H
 
-#include "qt_common/qt_config.h"
+#include "qt_common/config/qt_config.h"
 
 #include <QObject>
+#include <qdebug.h>
 
 class QMLConfig : public QObject {
     Q_OBJECT
@@ -16,9 +17,11 @@ public:
     {}
 
     Q_INVOKABLE inline void reload() {
+        qDebug() << "Reloading";
         m_config->ReloadAllValues();
     }
     Q_INVOKABLE inline void save() {
+        qDebug() << "Saving";
         m_config->SaveAllValues();
     }
 };

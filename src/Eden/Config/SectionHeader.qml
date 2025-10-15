@@ -1,8 +1,7 @@
 import QtQuick
 
-import Eden.Constants
+import Carboxyl.Base
 
-Text {
-    color: Constants.text
+Label {
     font.pixelSize: 16
 }

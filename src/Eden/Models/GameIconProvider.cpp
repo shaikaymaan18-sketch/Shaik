@@ -1,6 +1,6 @@
 #include <qnamespace.h>
 #include "GameIconProvider.h"
-#include "qt_common/uisettings.h"
+#include "qt_common/config/uisettings.h"
 
 /**
  * Gets the default icon (for games without valid title metadata)

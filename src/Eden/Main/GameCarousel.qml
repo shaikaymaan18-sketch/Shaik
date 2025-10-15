@@ -70,7 +70,7 @@ ListView {
             font.family: "Monospace"
 
             color: "lightblue"
-            background: Constants.bg
+            background: "transparent"
         }
     }
 

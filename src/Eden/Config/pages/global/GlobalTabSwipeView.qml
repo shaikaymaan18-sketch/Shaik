@@ -1,9 +1,10 @@
 import QtQuick 2.15
-import QtQuick.Controls.Material
+import QtQuick.Controls
 
 import Eden.Constants
 
 SwipeView {
+    interactive: false
     anchors {
         top: tabBar.bottom
         left: parent.left

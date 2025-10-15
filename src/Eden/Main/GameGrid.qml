@@ -11,6 +11,17 @@ GridView {
     id: grid
 
     property int cellSize: Math.floor(width / setting.value)
+    boundsBehavior: Flickable.StopAtBounds
+
+    WheelHandler {
+        target: grid
+        onWheel: event => {
+                     const sensitivity = 1.0
+                     grid.contentY -= event.angleDelta.y * sensitivity
+                     grid.contentY = Math.min(Math.max(grid.contentY, 0.0),
+                                              grid.contentHeight - grid.height)
+                 }
+    }
 
     highlightFollowsCurrentItem: true
     clip: true

@@ -1,5 +1,5 @@
 import QtQuick
-import QtQuick.Controls.Material
+import QtQuick.Controls
 import QtQuick.Layouts
 
 import Eden.Constants
@@ -7,56 +7,81 @@ import Eden.Items
 import Eden.Interface
 import Eden.Util
 
-AnimatedDialog {
+import Carboxyl.Base
+
+Dialog {
     property list<var> configs
 
-    preferredWidth: 1280
+    popupType: Dialog.Native
 
-    title: "Configuration"
+    anchors.centerIn: Overlay.overlay
+
+    implicitWidth: 1000
+    implicitHeight: 700
+
+    title: qsTr("Configuration")
     standardButtons: Dialog.Ok | Dialog.Cancel
 
     Component.onCompleted: configs = Util.searchItem(swipe, "BaseField")
-
     onAccepted: {
+        console.log("Accepted")
         configs.forEach(config => {
                             config.apply()
-                            // console.log(config.setting.label)
+                            console.log(config.setting.label)
                         })
         QtConfig.save()
     }
     onRejected: {
+        console.log("Rejected")
         configs.forEach(config => config.sync())
-        QtConfig.reload()
+        // QtConfig.reload()
     }
 
-    VerticalTabBar {
+    CarboxylTabBar {
         id: tabBar
+        vertical: true
 
         anchors {
             top: parent.top
             topMargin: 55
 
             left: parent.left
+            leftMargin: 10
             bottom: parent.bottom
         }
         contentWidth: 100
+        contentHeight: 60
+
+        position: TabBar.Footer
 
         currentIndex: swipe.currentIndex
 
-        Repeater {
-            model: ["General", "System", "CPU", "Graphics", "Audio", "Debug", "Controls"]
+        height: contentHeight * count + 20
+        width: contentWidth
 
-            SettingsTabButton {
-                required property string modelData
-                label: modelData
-                onClicked: tabBar.currentIndex = TabBar.index
+        Repeater {
+            model: [qsTr("General"), qsTr("System"), qsTr("CPU"), qsTr(
+                    "Graphics"), qsTr("Audio"), qsTr("Debug"), qsTr("Controls")]
+
+            CarboxylTabButton {
+                text: modelData
+                coloredIcon: true
+                inlineIcon: false // TODO: fix inlineIcon
+
+                icon.source: "qrc:/icons/" + modelData.toLowerCase() + ".svg"
+                icon.width: 20
+                icon.height: 20
             }
         }
     }
-
     SwipeView {
         id: swipe
         currentIndex: tabBar.currentIndex
+
+        width: 1000
+        height: 700
+
+        interactive: false
 
         orientation: Qt.Vertical
         anchors {

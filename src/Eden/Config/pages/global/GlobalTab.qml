@@ -1,13 +1,15 @@
 import QtQuick 2.15
-import QtQuick.Controls.Material
+import QtQuick.Controls
 
 import Eden.Constants
+
+import Carboxyl.Base
 
 Item {
     required property list<string> tabs
     property alias tabBar: tabBar
 
-    TabBar {
+    CarboxylTabBar {
         id: tabBar
         currentIndex: swipe.currentIndex
 
@@ -20,15 +22,10 @@ Item {
         Repeater {
             model: tabs
 
-            TabButton {
+            CarboxylTabButton {
                 font.pixelSize: 16
                 text: modelData
             }
-        }
-
-        background: Rectangle {
-            color: tabBar.Material.backgroundColor
-            radius: 8
         }
     }
 }

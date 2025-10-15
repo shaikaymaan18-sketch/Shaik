@@ -14,6 +14,8 @@ EdenModule(
         SectionHeader.qml
 
         pages/SettingsList.qml
+        pages/PageScrollView.qml
+
         pages/global/GlobalTab.qml
         pages/global/GlobalTabSwipeView.qml
         pages/global/GlobalGeneralPage.qml

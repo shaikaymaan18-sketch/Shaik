@@ -4,17 +4,18 @@ import QtQuick.Layouts
 
 import Eden.Constants
 
+// TODO: ToolButton?
 MouseArea {
     id: button
 
     required property string text
-    property color textColor: Constants.text
+    property color textColor: palette.text
 
     implicitHeight: 20
     implicitWidth: txt.width
 
     hoverEnabled: true
-    onHoveredChanged: rect.color = containsMouse ? Constants.buttonHighlighted : "transparent"
+    onHoveredChanged: rect.color = containsMouse ? palette.alternateBase : "transparent"
 
     Rectangle {
         id: rect

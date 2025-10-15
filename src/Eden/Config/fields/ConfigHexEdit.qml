@@ -1,12 +1,13 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls
 
 import Eden.Items
 import Eden.Config
 import Eden.Constants
 
 BaseField {
-    contentItem: BetterTextField {
+    contentItem: TextField {
         enabled: enable
 
         Layout.fillWidth: true
@@ -19,8 +20,8 @@ BaseField {
         font.pixelSize: 15
 
         text: Number(value).toString(16)
-        suffix: setting.suffix
 
+        // suffix: setting.suffix
         onTextEdited: value = Number("0x" + text)
     }
 }

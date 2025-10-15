@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls
 
 import Eden.Items
 import Eden.Config
@@ -7,7 +8,7 @@ import Eden.Constants
 
 BaseField {
     // TODO: real impl
-    contentItem: BetterTextField {
+    contentItem: TextField {
         enabled: enable
 
         Layout.fillWidth: true
@@ -22,6 +23,6 @@ BaseField {
         font.pixelSize: 15
 
         text: value
-        suffix: setting.suffix
+        // suffix: setting.suffix
     }
 }

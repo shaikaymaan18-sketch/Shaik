@@ -1,26 +1,27 @@
 #include <QApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include "CarboxylApplication.h"
 #include "Interface/QMLConfig.h"
 #include "Interface/SettingsInterface.h"
 #include "Interface/TitleManager.h"
 #include "Models/GameListModel.h"
-#include "core/core.h"
+#include "common/settings_enums.h"
+#include "qt_common/config/uisettings.h"
 #include "qt_common/qt_common.h"
 
 #include <QQuickStyle>
-#include <qwidget.h>
+#include <QWidget>
 
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
-
-    QQuickStyle::setStyle(QObject::tr("Material"));
+    QQmlApplicationEngine engine;
 
     QCoreApplication::setOrganizationName(QStringLiteral("eden-emu"));
     QCoreApplication::setApplicationName(QStringLiteral("eden"));
-    QApplication::setDesktopFileName(QStringLiteral("org.eden-emu.eden"));
-    QGuiApplication::setWindowIcon(QIcon(":/icons/eden.svg"));
+    QApplication::setDesktopFileName(QStringLiteral("dev.eden-emu.eden"));
+    QGuiApplication::setWindowIcon(QIcon(QStringLiteral(":/icons/eden.svg")));
 
     /// QtCommon
     QtCommon::Init(new QWidget);
@@ -34,13 +35,21 @@ int main(int argc, char *argv[])
         config->save();
     });
 
-    /// Expose Enums
+    // carboxyl setup
+    auto translations = ConfigurationShared::ComboboxEnumeration(&app);
 
-    // Core
-    std::unique_ptr<Core::System> system = std::make_unique<Core::System>();
+    const auto enumeration = &translations->at(Settings::EnumMetadata<Settings::Style>::Index());
+    QString style;
+    for (const auto &[idx, name] : *enumeration) {
+        if (idx == (u32) UISettings::values.carboxyl_style.GetValue()) {
+            style = name;
+        }
+    }
+
+    CarboxylApplication *carboxylApp = new CarboxylApplication(app, &engine, style, QStringLiteral("Trioxide"));
+    carboxylApp->setParent(&app);
 
     /// CONTEXT
-    QQmlApplicationEngine engine;
     auto ctx = engine.rootContext();
 
     ctx->setContextProperty(QStringLiteral("QtConfig"), QVariant::fromValue(config));

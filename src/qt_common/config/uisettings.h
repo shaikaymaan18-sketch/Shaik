@@ -150,9 +150,17 @@ struct Values {
         false,
 #endif
         "enable_gamemode", Category::UiGeneral};
+
 #ifdef __unix__
     SwitchableSetting<bool> gui_force_x11{linkage, false, "gui_force_x11", Category::UiGeneral};
     Setting<bool> gui_hide_backend_warning{linkage, false, "gui_hide_backend_warning", Category::UiGeneral};
+#endif
+
+#ifdef YUZU_QT_QML
+    // TODO: native-like style default
+    Setting<Settings::Theme> carboxyl_theme{linkage, Settings::Theme::System, "carboyl_theme", Category::UiLayout};
+    Setting<Settings::Style> carboxyl_style{linkage, Settings::Style::Trioxide, "carboyl_style", Category::UiLayout};
+    Setting<Settings::Accent> carboxyl_accent{linkage, Settings::Accent::System, "carboyl_accent", Category::UiLayout};
 #endif
 
     // Discord RPC

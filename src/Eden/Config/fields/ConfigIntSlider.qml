@@ -1,10 +1,10 @@
 import QtQuick
-import QtQuick.Controls.Material
+import QtQuick.Controls
 import QtQuick.Layouts
 
 import Eden.Items
 import Eden.Config
-import Eden.Constants
+import Carboxyl.Base
 
 // Lots of cancer but idrc
 BaseField {
@@ -28,9 +28,8 @@ BaseField {
             snapMode: Slider.SnapAlways
         }
 
-        Text {
+        Label {
             font.pixelSize: 14
-            color: Constants.text
 
             text: field.value + setting.suffix
 

@@ -32,6 +32,8 @@ target_link_libraries(eden
     Qt6::Quick
     Qt6::QuickControls2
 
+    Carboxyl::Base
+
     ${MODULES}
 )
 

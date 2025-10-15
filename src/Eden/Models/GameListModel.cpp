@@ -10,7 +10,7 @@
 #include "core/hle/service/filesystem/filesystem.h"
 #include "hid_core/hid_core.h"
 #include "qt_common/qt_common.h"
-#include "qt_common/qt_meta.h"
+#include "qt_common/util/meta.h"
 
 GameListModel::GameListModel(QObject *parent, QQmlEngine *engine) {
     QHash<int, QByteArray> rez = QStandardItemModel::roleNames();
@@ -85,7 +85,6 @@ void GameListModel::addEntry(QStandardItem *entry, const UISettings::GameDir &pa
     QString text = entry->data(GLMRoleTypes::NAME).toString();
     QPixmap pixmap = entry->data(GLMRoleTypes::ICON).value<QPixmap>();
 
-    qDebug() << "Adding pixmap" << text;
     m_provider->addPixmap(text, pixmap);
     invisibleRootItem()->appendRow(entry);
 }

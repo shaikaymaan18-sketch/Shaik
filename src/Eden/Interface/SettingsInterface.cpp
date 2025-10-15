@@ -1,7 +1,7 @@
 #include "SettingsInterface.h"
 #include "common/settings.h"
 #include "common/logging/log.h"
-#include "qt_common/uisettings.h"
+#include "qt_common/config/uisettings.h"
 
 SettingsInterface::SettingsInterface(QObject* parent)
     : QObject{parent}

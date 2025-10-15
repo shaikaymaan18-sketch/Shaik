@@ -1,23 +1,35 @@
 import QtQuick
-import QtQuick.Controls.Material
+import QtQuick.Controls
 import QtQuick.Layouts
 
 import Eden.Interface
 import Eden.Config
 
-ScrollView {
+PageScrollView {
     id: scroll
     ColumnLayout {
         width: scroll.width - scroll.effectiveScrollBarWidth
 
         SettingsList {
             category: SettingsCategories.UiGeneral
-            // onContentHeightChanged: console.log(height, parent.height)
+        }
+
+        SectionHeader {
+            text: qsTr("Linux")
+            visible: Qt.platform.os === "linux"
         }
 
         SettingsList {
             category: SettingsCategories.Linux
             visible: Qt.platform.os === "linux"
         }
+
+        SectionHeader {
+            text: qsTr("Theming")
+        }
+
+        // SettingsList {
+        //     category: SettingsCategories.UiLayout
+        // }
     }
 }

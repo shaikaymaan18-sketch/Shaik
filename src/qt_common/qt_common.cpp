@@ -36,8 +36,14 @@ std::unique_ptr<Core::System> system = nullptr;
 std::shared_ptr<FileSys::RealVfsFilesystem> vfs = nullptr;
 std::unique_ptr<FileSys::ManualContentProvider> provider = nullptr;
 
-Core::Frontend::WindowSystemType GetWindowSystemType()
-{
+const QStringList supported_file_extensions = {QStringLiteral("nro"),
+                                               QStringLiteral("nso"),
+                                               QStringLiteral("nca"),
+                                               QStringLiteral("xci"),
+                                               QStringLiteral("nsp"),
+                                               QStringLiteral("kip")};
+
+Core::Frontend::WindowSystemType GetWindowSystemType() {
     // Determine WSI type based on Qt platform.
     QString platform_name = QGuiApplication::platformName();
     if (platform_name == QStringLiteral("windows"))

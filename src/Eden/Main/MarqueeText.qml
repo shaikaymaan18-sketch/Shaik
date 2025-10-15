@@ -24,7 +24,7 @@ Item {
                                            step) + combined.substring(
                                            0, step) : text
     property int step: 0
-    property bool animate: canMarquee && txt.contentWidth > parent.width
+    property bool animate: canMarquee && txt.contentWidth > width
 
     property bool canMarquee: false
 
