@@ -35,9 +35,8 @@ endif()
 
 if(NOT YUZU_TZDB_PATH STREQUAL "")
     set(NX_TZDB_BASE_DIR "${YUZU_TZDB_PATH}")
-elseif (OFF) # (MSVC AND NOT CXX_CLANG)
-    # TODO(crueter): This is a terrible solution, but MSVC fails to link without it
-    # Need to investigate further but I still can't reproduce...
+elseif (MSVC AND NOT CXX_CLANG AND YUZU_ENABLE_LTO)
+    # TODO(crueter): boot up the windows vm
     set(NX_TZDB_VERSION "250725")
     set(NX_TZDB_ARCHIVE "${CPM_SOURCE_CACHE}/nx_tzdb/${NX_TZDB_VERSION}.zip")
 
