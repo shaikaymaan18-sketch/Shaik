@@ -229,6 +229,10 @@ android {
     defaultConfig {
         externalNativeBuild {
             cmake {
+                val enableUpdater = when (System.getenv("DEVEL")) {
+                    "false" -> "ON"
+                    else -> "OFF"
+                }
                 arguments(
                     "-DENABLE_QT=0", // Don't use QT
                     "-DENABLE_SDL2=0", // Don't use SDL
@@ -241,7 +245,8 @@ android {
                     "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
                     "-DBUILD_TESTING=OFF",
                     "-DYUZU_TESTS=OFF",
-                    "-DDYNARMIC_TESTS=OFF"
+                    "-DDYNARMIC_TESTS=OFF",
+                    "-DENABLE_UPDATE_CHECKER=$enableUpdater"
                 )
 
                 abiFilters("arm64-v8a")
