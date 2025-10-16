@@ -52,6 +52,7 @@ import androidx.core.content.edit
 import org.yuzu.yuzu_emu.activities.EmulationActivity
 import kotlin.text.compareTo
 import androidx.core.net.toUri
+import org.yuzu.yuzu_emu.features.settings.model.BooleanSetting
 
 class MainActivity : AppCompatActivity(), ThemeProvider {
     private lateinit var binding: ActivityMainBinding
@@ -157,7 +158,7 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
         val firstTimeSetup = PreferenceManager.getDefaultSharedPreferences(applicationContext)
                 .getBoolean(Settings.PREF_FIRST_APP_LAUNCH, true)
 
-        if (!firstTimeSetup && NativeLibrary.isUpdateCheckerEnabled()) {
+        if (!firstTimeSetup && NativeLibrary.isUpdateCheckerEnabled() && BooleanSetting.ENABLE_UPDATE_CHECKS.getBoolean()) {
              checkForUpdates()
         }
         setInsets()
@@ -183,7 +184,14 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
                 val intent = Intent(Intent.ACTION_VIEW, url.toUri())
                 startActivity(intent)
             }
-            .setNegativeButton(android.R.string.cancel, null)
+            .setNeutralButton(R.string.cancel) { dialog, _ ->
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.dont_show_again) { dialog, _ ->
+                BooleanSetting.ENABLE_UPDATE_CHECKS.setBoolean(false)
+                NativeConfig.saveGlobalConfig()
+                dialog.dismiss()
+            }
             .show()
     }
 

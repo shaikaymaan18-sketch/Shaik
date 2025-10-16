@@ -1030,6 +1030,14 @@ class SettingsFragmentPresenter(
                 override fun reset() = IntSetting.THEME.setInt(defaultValue)
             }
 
+            if (NativeLibrary.isUpdateCheckerEnabled()) {
+                add(HeaderSetting(R.string.app_settings))
+                add(BooleanSetting.ENABLE_UPDATE_CHECKS.key)
+            }
+
+            add(HeaderSetting(R.string.theme_and_color))
+
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 add(
                     SingleChoiceSetting(
