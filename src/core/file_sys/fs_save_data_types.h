@@ -68,6 +68,11 @@ enum class SaveDataMetaType : u8 {
     ExtensionContext = 2,
 };
 
+enum class SaveDataFormatType : u8 {
+    Normal = 0,
+    NoJournal = 1,
+};
+
 struct SaveDataMetaInfo {
     u32 size;
     SaveDataMetaType type;
@@ -184,5 +189,32 @@ struct HashSalt {
 };
 static_assert(std::is_trivially_copyable_v<HashSalt>, "Data type must be trivially copyable.");
 static_assert(sizeof(HashSalt) == HashSalt::Size);
+
+struct SaveDataCreationInfo2 {
+
+    static constexpr u32 SaveDataCreationInfo2Version = 0x00010000;
+
+    u32 version;
+    SaveDataAttribute attribute;
+    s64 size;
+    s64 journal_size;
+    s64 block_size;
+    u64 owner_id;
+    u32 flags;
+    SaveDataSpaceId space_id;
+    SaveDataFormatType format_type;
+    bool pseudo;
+    u8 reserved1;
+    bool is_hash_salt_enabled;
+    u8 reserved2;
+    HashSalt hash_salt;
+    SaveDataMetaType meta_type;
+    u8 reserved3;
+    s32 meta_size;
+    u8 reserved4;
+};
+static_assert(std::is_trivially_copyable_v<SaveDataCreationInfo2>,
+              "Data type must be trivially copyable.");
+static_assert(sizeof(SaveDataCreationInfo2) == 0xA0, "SaveDataCreationInfo has invalid size.");
 
 } // namespace FileSys

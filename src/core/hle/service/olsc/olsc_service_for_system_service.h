@@ -10,6 +10,11 @@ class IDaemonController;
 class IRemoteStorageController;
 class ITransferTaskListController;
 
+struct DataTransferPolicy {
+    u8 upload_policy;
+    u8 download_policy;
+};
+
 class IOlscServiceForSystemService final : public ServiceFramework<IOlscServiceForSystemService> {
 public:
     explicit IOlscServiceForSystemService(Core::System& system_);
@@ -20,7 +25,7 @@ private:
         Out<SharedPointer<ITransferTaskListController>> out_interface);
     Result OpenRemoteStorageController(Out<SharedPointer<IRemoteStorageController>> out_interface);
     Result OpenDaemonController(Out<SharedPointer<IDaemonController>> out_interface);
-    Result GetDataTransferPolicyInfo(Out<u16> out_policy_info, u64 application_id);
+    Result GetDataTransferPolicyInfo(Out<DataTransferPolicy> out_policy_info, u64 application_id);
     Result CloneService(Out<SharedPointer<IOlscServiceForSystemService>> out_interface);
 };
 

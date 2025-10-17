@@ -19,7 +19,7 @@ IDaemonController::IDaemonController(Core::System& system_)
         {6, nullptr, "SetGlobalDownloadEnabledForAccount"},
         {10, nullptr, "GetForbiddenSaveDataIndication"},
         {11, nullptr, "GetStopperObject"},
-        {12, nullptr, "GetState"},
+        {12, D<&IDaemonController::GetState>, "GetState"},
     };
     // clang-format on
 
@@ -34,6 +34,13 @@ Result IDaemonController::GetAutoTransferEnabledForAccountAndApplication(Out<boo
     LOG_WARNING(Service_OLSC, "(STUBBED) called, user_id={} application_id={:016X}",
                 user_id.FormattedString(), application_id);
     *out_is_enabled = false;
+    R_SUCCEED();
+}
+
+Result IDaemonController::GetState(Out<u8> state, Common::UUID user_id,  u64 application_id) {
+    LOG_WARNING(Service_OLSC, "(STUBBED) called, user_id={} application_id={:016X}",
+                user_id.FormattedString(), application_id);
+    *state = 0;
     R_SUCCEED();
 }
 

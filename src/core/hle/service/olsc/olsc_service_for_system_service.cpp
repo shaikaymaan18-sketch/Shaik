@@ -100,10 +100,13 @@ Result IOlscServiceForSystemService::OpenDaemonController(
     R_SUCCEED();
 }
 
-Result IOlscServiceForSystemService::GetDataTransferPolicyInfo(Out<u16> out_policy_info,
-                                                               u64 application_id) {
+Result IOlscServiceForSystemService::GetDataTransferPolicyInfo(
+    Out<DataTransferPolicy> out_policy_info, u64 application_id) {
     LOG_WARNING(Service_OLSC, "(STUBBED) called");
-    *out_policy_info = 0;
+    DataTransferPolicy policy{};
+    policy.upload_policy = 0;
+    policy.download_policy = 0;
+    *out_policy_info = policy;
     R_SUCCEED();
 }
 

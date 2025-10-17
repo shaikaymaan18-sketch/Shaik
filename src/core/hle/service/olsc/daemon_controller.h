@@ -15,6 +15,7 @@ public:
 private:
     Result GetAutoTransferEnabledForAccountAndApplication(Out<bool> out_is_enabled,
                                                           Common::UUID user_id, u64 application_id);
+    Result GetState(Out<u8> state, Common::UUID user_id, u64 application_id);
 };
 
 } // namespace Service::OLSC
