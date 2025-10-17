@@ -432,24 +432,30 @@ class GamePropertiesFragment : Fragment() {
                         SubmenuProperty(
                             R.string.reset_playtime,
                             R.string.reset_playtime_description,
-                            R.drawable.ic_delete
-                        ) {
-                            MessageDialogFragment.newInstance(
-                                requireActivity(),
-                                titleId = R.string.reset_playtime,
-                                descriptionId = R.string.reset_playtime_warning_description,
-                                positiveAction = {
-                                    NativeLibrary.playTimeManagerResetProgramPlayTime( args.game.programId)
-                                    Toast.makeText(
-                                        YuzuApplication.appContext,
-                                        R.string.playtime_reset_successfully,
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                    getPlayTime()
-                                    homeViewModel.reloadPropertiesList(true)
+                            R.drawable.ic_delete,
+                            actions = listOf(
+                                SubMenuPropertySecondaryAction(
+                                    R.string.reset_playtime,
+                                    R.drawable.ic_delete
+                                ) {
+                                    MessageDialogFragment.newInstance(
+                                        requireActivity(),
+                                        titleId = R.string.reset_playtime,
+                                        descriptionId = R.string.reset_playtime_warning_description,
+                                        positiveAction = {
+                                            NativeLibrary.playTimeManagerResetProgramPlayTime(args.game.programId)
+                                            Toast.makeText(
+                                                YuzuApplication.appContext,
+                                                R.string.playtime_reset_successfully,
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                            getPlayTime()
+                                            homeViewModel.reloadPropertiesList(true)
+                                        }
+                                    ).show(parentFragmentManager, MessageDialogFragment.TAG)
                                 }
-                            ).show(parentFragmentManager, MessageDialogFragment.TAG)
-                        }
+                            )
+                        )
                     )
                 }
             }
