@@ -2025,6 +2025,7 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
         }
     }
     const auto format_info = MaxwellToVK::SurfaceFormat(*device, FormatType::Optimal, true, format);
+    vk_format = format_info.format;
     if (ImageUsageFlags(format_info, format) != image.UsageFlags()) {
         LOG_WARNING(Render_Vulkan,
                     "Image view format {} has different usage flags than image format {}", format,
@@ -2099,8 +2100,11 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
 
 ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageInfo& info,
                      const VideoCommon::ImageViewInfo& view_info, GPUVAddr gpu_addr_)
-    : VideoCommon::ImageViewBase{info, view_info, gpu_addr_},
-      buffer_size{VideoCommon::CalculateGuestSizeInBytes(info)} {}
+    : VideoCommon::ImageViewBase{info, view_info, gpu_addr_}, device{&runtime.device},
+      buffer_size{VideoCommon::CalculateGuestSizeInBytes(info)} {
+    const auto format_info = MaxwellToVK::SurfaceFormat(*device, FormatType::Optimal, true, format);
+    vk_format = format_info.format;
+}
 
 ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::NullImageViewParams& params)
     : VideoCommon::ImageViewBase{params}, device{&runtime.device} {
@@ -2117,6 +2121,7 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::NullImageV
     for (u32 i = 0; i < Shader::NUM_TEXTURE_TYPES; i++) {
         image_views[i] = MakeView(VK_FORMAT_A8B8G8R8_UNORM_PACK32, VK_IMAGE_ASPECT_COLOR_BIT);
     }
+    vk_format = VK_FORMAT_A8B8G8R8_UNORM_PACK32;
 }
 
 ImageView::~ImageView() = default;
@@ -2185,6 +2190,19 @@ bool ImageView::IsRescaled() const noexcept {
     const auto& slots = *slot_images;
     const auto& src_image = slots[image_id];
     return src_image.IsRescaled();
+}
+
+bool ImageView::SupportsLinearFiltering() const noexcept {
+    if (!device) {
+        return false;
+    }
+    if (VideoCore::Surface::IsPixelFormatInteger(format)) {
+        return false;
+    }
+    if (vk_format == VK_FORMAT_UNDEFINED) {
+        return false;
+    }
+    return device->SupportsLinearFiltering(vk_format, FormatType::Optimal);
 }
 
 vk::ImageView ImageView::MakeView(VkFormat vk_format, VkImageAspectFlags aspect_mask) {

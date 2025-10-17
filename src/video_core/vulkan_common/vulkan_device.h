@@ -214,6 +214,9 @@ public:
     bool IsFormatSupported(VkFormat wanted_format, VkFormatFeatureFlags wanted_usage,
                            FormatType format_type) const;
 
+    /// Returns true if the format supports linear filtering for sampled image usage.
+    bool SupportsLinearFiltering(VkFormat format, FormatType format_type) const;
+
     /// Reports a device loss.
     void ReportLoss() const;
 

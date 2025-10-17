@@ -895,6 +895,16 @@ bool Device::IsFormatSupported(VkFormat wanted_format, VkFormatFeatureFlags want
     return (supported_usage & wanted_usage) == wanted_usage;
 }
 
+bool Device::SupportsLinearFiltering(VkFormat format, FormatType format_type) const {
+    const auto it = format_properties.find(format);
+    if (it == format_properties.end()) {
+        UNIMPLEMENTED_MSG("Unimplemented format query={}", format);
+        return false;
+    }
+    const auto supported_usage = GetFormatFeatures(it->second, format_type);
+    return (supported_usage & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) != 0;
+}
+
 std::string Device::GetDriverName() const {
     switch (properties.driver.driverID) {
     case VK_DRIVER_ID_AMD_PROPRIETARY:

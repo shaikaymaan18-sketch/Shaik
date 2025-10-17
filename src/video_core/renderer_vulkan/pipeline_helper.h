@@ -200,8 +200,8 @@ inline void PushImageDescriptors(TextureCache& texture_cache,
                 format_type == VideoCore::Surface::SurfaceType::DepthStencil;
             const bool force_disable_compare =
                 sampler.DepthCompareEnabled() && !view_supports_depth_compare;
-            const bool is_integer_format = VideoCore::Surface::IsPixelFormatInteger(image_view.format);
-            const bool needs_nearest = is_integer_format && sampler.HasLinearFiltering();
+            const bool needs_nearest =
+                sampler.HasLinearFiltering() && !image_view.SupportsLinearFiltering();
             VkSampler vk_sampler{};
             if (use_fallback_sampler) {
                 if (needs_nearest) {

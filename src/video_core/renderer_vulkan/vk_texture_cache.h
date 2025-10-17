@@ -238,6 +238,8 @@ public:
 
     [[nodiscard]] bool IsRescaled() const noexcept;
 
+    [[nodiscard]] bool SupportsLinearFiltering() const noexcept;
+
     [[nodiscard]] VkImageView Handle(Shader::TextureType texture_type) const noexcept {
         return *image_views[static_cast<size_t>(texture_type)];
     }
@@ -279,6 +281,7 @@ private:
     vk::ImageView stencil_view;
     vk::ImageView color_view;
     vk::Image null_image;
+    VkFormat vk_format{VK_FORMAT_UNDEFINED};
     VkImage image_handle = VK_NULL_HANDLE;
     VkImageView render_target = VK_NULL_HANDLE;
     VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
