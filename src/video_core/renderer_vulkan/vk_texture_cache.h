@@ -299,13 +299,76 @@ public:
         return *sampler_default_anisotropy;
     }
 
+    [[nodiscard]] VkSampler HandleNoCompare() const noexcept {
+        if (compare_enabled && sampler_no_compare) {
+            return *sampler_no_compare;
+        }
+        return *sampler;
+    }
+
+    [[nodiscard]] VkSampler HandleWithDefaultAnisotropyNoCompare() const noexcept {
+        if (compare_enabled && sampler_default_anisotropy_no_compare) {
+            return *sampler_default_anisotropy_no_compare;
+        }
+        if (sampler_default_anisotropy) {
+            return *sampler_default_anisotropy;
+        }
+        return HandleNoCompare();
+    }
+
+    // Forced-nearest variants used when sampling integer formats that cannot be linearly filtered.
+    [[nodiscard]] VkSampler HandleNearest() const noexcept {
+        if (sampler_nearest) {
+            return *sampler_nearest;
+        }
+        return Handle();
+    }
+
+    [[nodiscard]] VkSampler HandleNearestNoCompare() const noexcept {
+        if (compare_enabled && sampler_nearest_no_compare) {
+            return *sampler_nearest_no_compare;
+        }
+        return HandleNearest();
+    }
+
+    [[nodiscard]] VkSampler HandleNearestWithDefaultAnisotropy() const noexcept {
+        if (sampler_nearest_default_anisotropy) {
+            return *sampler_nearest_default_anisotropy;
+        }
+        return HandleNearest();
+    }
+
+    [[nodiscard]] VkSampler HandleNearestWithDefaultAnisotropyNoCompare() const noexcept {
+        if (compare_enabled && sampler_nearest_default_anisotropy_no_compare) {
+            return *sampler_nearest_default_anisotropy_no_compare;
+        }
+        return HandleNearestWithDefaultAnisotropy();
+    }
+
     [[nodiscard]] bool HasAddedAnisotropy() const noexcept {
         return static_cast<bool>(sampler_default_anisotropy);
+    }
+
+    [[nodiscard]] bool DepthCompareEnabled() const noexcept {
+        return compare_enabled;
+    }
+
+    // Whether the original sampler requested any linear filtering (min/mag/mipmap)
+    [[nodiscard]] bool HasLinearFiltering() const noexcept {
+        return has_linear_filtering;
     }
 
 private:
     vk::Sampler sampler;
     vk::Sampler sampler_default_anisotropy;
+    vk::Sampler sampler_no_compare;
+    vk::Sampler sampler_default_anisotropy_no_compare;
+    vk::Sampler sampler_nearest;
+    vk::Sampler sampler_nearest_default_anisotropy;
+    vk::Sampler sampler_nearest_no_compare;
+    vk::Sampler sampler_nearest_default_anisotropy_no_compare;
+    bool compare_enabled{};
+    bool has_linear_filtering{};
 };
 
 class Framebuffer {

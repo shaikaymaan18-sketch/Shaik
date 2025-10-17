@@ -13,6 +13,7 @@
 #include "video_core/renderer_vulkan/vk_texture_cache.h"
 #include "video_core/renderer_vulkan/vk_update_descriptor.h"
 #include "video_core/texture_cache/types.h"
+#include "video_core/surface.h"
 #include "video_core/vulkan_common/vulkan_device.h"
 
 namespace Vulkan {
@@ -193,8 +194,33 @@ inline void PushImageDescriptors(TextureCache& texture_cache,
             const Sampler& sampler{texture_cache.GetSampler(sampler_id)};
             const bool use_fallback_sampler{sampler.HasAddedAnisotropy() &&
                                             !image_view.SupportsAnisotropy()};
-            const VkSampler vk_sampler{use_fallback_sampler ? sampler.HandleWithDefaultAnisotropy()
-                                                            : sampler.Handle()};
+            const auto format_type = VideoCore::Surface::GetFormatType(image_view.format);
+            const bool view_supports_depth_compare =
+                format_type == VideoCore::Surface::SurfaceType::Depth ||
+                format_type == VideoCore::Surface::SurfaceType::DepthStencil;
+            const bool force_disable_compare =
+                sampler.DepthCompareEnabled() && !view_supports_depth_compare;
+            const bool is_integer_format = VideoCore::Surface::IsPixelFormatInteger(image_view.format);
+            const bool needs_nearest = is_integer_format && sampler.HasLinearFiltering();
+            VkSampler vk_sampler{};
+            if (use_fallback_sampler) {
+                if (needs_nearest) {
+                    vk_sampler = force_disable_compare
+                                     ? sampler.HandleNearestWithDefaultAnisotropyNoCompare()
+                                     : sampler.HandleNearestWithDefaultAnisotropy();
+                } else {
+                    vk_sampler = force_disable_compare
+                                     ? sampler.HandleWithDefaultAnisotropyNoCompare()
+                                     : sampler.HandleWithDefaultAnisotropy();
+                }
+            } else {
+                if (needs_nearest) {
+                    vk_sampler = force_disable_compare ? sampler.HandleNearestNoCompare()
+                                                       : sampler.HandleNearest();
+                } else {
+                    vk_sampler = force_disable_compare ? sampler.HandleNoCompare() : sampler.Handle();
+                }
+            }
             guest_descriptor_queue.AddSampledImage(vk_image_view, vk_sampler);
             rescaling.PushTexture(texture_cache.IsRescaling(image_view));
         }
