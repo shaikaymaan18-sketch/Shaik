@@ -77,10 +77,6 @@ android {
                 val extraCMakeArgs =
                     (project.findProperty("YUZU_ANDROID_ARGS") as String?)?.split("\\s+".toRegex())
                         ?: emptyList()
-                val enableUpdater = when (System.getenv("DEVEL")) {
-                    "false" -> "ON"
-                    else -> "OFF"
-                }
                 arguments.addAll(
                     listOf(
                         "-DENABLE_QT=0", // Don't use QT
@@ -95,7 +91,6 @@ android {
                         "-DBUILD_TESTING=OFF",
                         "-DYUZU_TESTS=OFF",
                         "-DDYNARMIC_TESTS=OFF",
-                        "-DENABLE_UPDATE_CHECKER=$enableUpdater",
                         *extraCMakeArgs.toTypedArray()
                 ))
 
