@@ -388,7 +388,7 @@ void CollectStorageBuffers(IR::Block& block, IR::Inst& inst, StorageInfo& info,
                   .offset_begin = nvn_buffer_base,
                   .offset_end = static_cast<u32>(nvn_buffer_base +
                                                  nvn_descriptor_size * nvn_buffer_count),
-                  .alignment = 16,
+                  .alignment = 32,
               }}
             : std::nullopt;
     bool used_relaxed_bias{false};
