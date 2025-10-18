@@ -74,26 +74,29 @@ android {
 
         externalNativeBuild {
             cmake {
-                val extraCMakeArgs = (project.findProperty("YUZU_ANDROID_ARGS") as String?)?.split("\\s+".toRegex()) ?: emptyList()
+                val extraCMakeArgs =
+                    (project.findProperty("YUZU_ANDROID_ARGS") as String?)?.split("\\s+".toRegex())
+                        ?: emptyList()
                 val enableUpdater = when (System.getenv("DEVEL")) {
-                                    "false" -> "ON"
-                                    else -> "OFF"
-                                }
-                arguments.addAll(listOf(
-                    "-DENABLE_QT=0", // Don't use QT
-                    "-DENABLE_SDL2=0", // Don't use SDL
-                    "-DENABLE_WEB_SERVICE=1", // Enable web service
-                    "-DENABLE_OPENSSL=ON",
-                    "-DANDROID_ARM_NEON=true", // cryptopp requires Neon to work
-                    "-DYUZU_USE_CPM=ON",
-                    "-DCPMUTIL_FORCE_BUNDLED=ON",
-                    "-DYUZU_USE_BUNDLED_FFMPEG=ON",
-                    "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-                    "-DBUILD_TESTING=OFF",
-                    "-DYUZU_TESTS=OFF",
-                    "-DDYNARMIC_TESTS=OFF",
-                    "-DENABLE_UPDATE_CHECKER=$enableUpdater"
-                    *extraCMakeArgs.toTypedArray()
+                    "false" -> "ON"
+                    else -> "OFF"
+                }
+                arguments.addAll(
+                    listOf(
+                        "-DENABLE_QT=0", // Don't use QT
+                        "-DENABLE_SDL2=0", // Don't use SDL
+                        "-DENABLE_WEB_SERVICE=1", // Enable web service
+                        "-DENABLE_OPENSSL=ON",
+                        "-DANDROID_ARM_NEON=true", // cryptopp requires Neon to work
+                        "-DYUZU_USE_CPM=ON",
+                        "-DCPMUTIL_FORCE_BUNDLED=ON",
+                        "-DYUZU_USE_BUNDLED_FFMPEG=ON",
+                        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+                        "-DBUILD_TESTING=OFF",
+                        "-DYUZU_TESTS=OFF",
+                        "-DDYNARMIC_TESTS=OFF",
+                        "-DENABLE_UPDATE_CHECKER=$enableUpdater",
+                        *extraCMakeArgs.toTypedArray()
                 ))
 
                 abiFilters("arm64-v8a")
@@ -229,6 +232,7 @@ android {
             path = file("../../../CMakeLists.txt")
         }
     }
+}
 
 
 tasks.register<Delete>("ktlintReset", fun Delete.() {
