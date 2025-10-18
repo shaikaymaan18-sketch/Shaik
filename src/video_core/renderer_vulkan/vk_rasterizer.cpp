@@ -926,20 +926,16 @@ bool AccelerateDMA::BufferToImage(const Tegra::DMA::ImageCopy& copy_info,
 }
 
 void RasterizerVulkan::UpdateDynamicStates(DynamicStateScope scope) {
+    if (scope == DynamicStateScope::Blit) {
+        return;
+    }
+
     auto& regs = maxwell3d->regs;
 
     UpdateViewportsState(regs);
     UpdateScissorsState(regs);
-
-    const bool is_blit_scope = scope == DynamicStateScope::Blit;
-    if (!is_blit_scope) {
-        UpdateDepthBias(regs);
-    }
+    UpdateDepthBias(regs);
     UpdateBlendConstants(regs);
-
-    if (is_blit_scope) {
-        return;
-    }
 
     UpdateDepthBounds(regs);
     UpdateStencilFaces(regs);
