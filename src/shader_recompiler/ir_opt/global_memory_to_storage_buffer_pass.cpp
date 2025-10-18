@@ -370,15 +370,28 @@ std::optional<StorageBufferAddr> Track(const IR::Value& value, const Bias* bias)
 }
 
 /// Collects the storage buffer used by a global memory instruction and the instruction itself
-void CollectStorageBuffers(IR::Block& block, IR::Inst& inst, StorageInfo& info) {
-    // NVN puts storage buffers in a specific range, we have to bias towards these addresses to
-    // avoid getting false positives
-    static constexpr Bias nvn_bias{
+void CollectStorageBuffers(IR::Block& block, IR::Inst& inst, StorageInfo& info,
+                           u32 nvn_buffer_base) {
+    // NVN exposes up to 16 SSBO descriptors per stage, each occupying 0x10 bytes.
+    static constexpr u32 nvn_descriptor_size{0x10};
+    static constexpr u32 nvn_buffer_count{16};
+    static constexpr Bias legacy_bias{
         .index = 0,
         .offset_begin = 0x110,
         .offset_end = 0x800,
-        .alignment = 32,
+        .alignment = 16,
     };
+    const std::optional<Bias> stage_bias =
+        nvn_buffer_base != 0
+            ? std::optional<Bias>{Bias{
+                  .index = 0,
+                  .offset_begin = nvn_buffer_base,
+                  .offset_end = static_cast<u32>(nvn_buffer_base +
+                                                 nvn_descriptor_size * nvn_buffer_count),
+                  .alignment = 16,
+              }}
+            : std::nullopt;
+    bool used_relaxed_bias{false};
     // Track the low address of the instruction
     const std::optional<LowAddrInfo> low_addr_info{TrackLowAddress(&inst)};
     if (!low_addr_info) {
@@ -387,7 +400,17 @@ void CollectStorageBuffers(IR::Block& block, IR::Inst& inst, StorageInfo& info) 
     }
     // First try to find storage buffers in the NVN address
     const IR::U32 low_addr{low_addr_info->value};
-    std::optional<StorageBufferAddr> storage_buffer{Track(low_addr, &nvn_bias)};
+    std::optional<StorageBufferAddr> storage_buffer;
+    if (stage_bias) {
+        storage_buffer = Track(low_addr, &*stage_bias);
+        if (!storage_buffer) {
+            storage_buffer = Track(low_addr, &legacy_bias);
+            used_relaxed_bias = storage_buffer.has_value();
+        }
+    } else {
+        storage_buffer = Track(low_addr, &legacy_bias);
+        used_relaxed_bias = storage_buffer.has_value();
+    }
     if (!storage_buffer) {
         // If it fails, track without a bias
         storage_buffer = Track(low_addr, nullptr);
@@ -398,6 +421,10 @@ void CollectStorageBuffers(IR::Block& block, IR::Inst& inst, StorageInfo& info) 
         }
         LOG_WARNING(Shader, "Storage buffer tracked without bias, index {} offset {}",
                     storage_buffer->index, storage_buffer->offset);
+    } else if (used_relaxed_bias && stage_bias) {
+        LOG_DEBUG(Shader,
+                  "Storage buffer matched outside stage-specific NVN range, index {} offset {}",
+                  storage_buffer->index, storage_buffer->offset);
     }
     // Collect storage buffer and the instruction
     if (IsGlobalMemoryWrite(inst)) {
@@ -533,7 +560,7 @@ void GlobalMemoryToStorageBufferPass(IR::Program& program, const HostTranslateIn
             if (!IsGlobalMemory(inst)) {
                 continue;
             }
-            CollectStorageBuffers(*block, inst, info);
+            CollectStorageBuffers(*block, inst, info, program.info.nvn_buffer_base);
         }
     }
     for (const StorageBufferAddr& storage_buffer : info.set) {
