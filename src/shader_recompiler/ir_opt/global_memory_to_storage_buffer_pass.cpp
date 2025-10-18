@@ -377,7 +377,7 @@ void CollectStorageBuffers(IR::Block& block, IR::Inst& inst, StorageInfo& info,
     static constexpr u32 nvn_buffer_count{16};
     static constexpr Bias legacy_bias{
         .index = 0,
-        .offset_begin = 0x110,
+        .offset_begin = 0x100,
         .offset_end = 0x800,
         .alignment = 16,
     };
