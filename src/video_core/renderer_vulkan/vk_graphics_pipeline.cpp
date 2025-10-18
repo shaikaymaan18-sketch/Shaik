@@ -14,6 +14,7 @@
 #include "video_core/renderer_vulkan/pipeline_helper.h"
 
 #include "common/bit_field.h"
+#include "shader_recompiler/stage.h"
 #include "video_core/renderer_vulkan/maxwell_to_vk.h"
 #include "video_core/renderer_vulkan/pipeline_statistics.h"
 #include "video_core/renderer_vulkan/vk_buffer_cache.h"
@@ -739,7 +740,7 @@ void GraphicsPipeline::MakePipeline(VkRenderPass render_pass) {
         provoking_vertex.pNext = std::exchange(rasterization_ci.pNext, &provoking_vertex);
     }
 
-    const VkPipelineMultisampleStateCreateInfo multisample_ci{
+    VkPipelineMultisampleStateCreateInfo multisample_ci{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
         .pNext = nullptr,
         .flags = 0,
@@ -750,6 +751,15 @@ void GraphicsPipeline::MakePipeline(VkRenderPass render_pass) {
         .alphaToCoverageEnable = key.state.alpha_to_coverage_enabled != 0 ? VK_TRUE : VK_FALSE,
         .alphaToOneEnable = key.state.alpha_to_one_enabled != 0 ? VK_TRUE : VK_FALSE,
     };
+    if (multisample_ci.alphaToCoverageEnable == VK_TRUE) {
+        constexpr size_t fragment_stage_index{static_cast<size_t>(Shader::Stage::Fragment)};
+        const bool has_fragment_shader = static_cast<bool>(spv_modules[fragment_stage_index]);
+        const bool declares_alpha =
+            has_fragment_shader && stage_infos[fragment_stage_index].stores_frag_color[0];
+        if (!declares_alpha) {
+            multisample_ci.alphaToCoverageEnable = VK_FALSE;
+        }
+    }
     const VkPipelineDepthStencilStateCreateInfo depth_stencil_ci{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
         .pNext = nullptr,
