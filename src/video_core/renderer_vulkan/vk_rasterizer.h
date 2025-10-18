@@ -157,7 +157,12 @@ private:
 
     void FlushWork();
 
-    void UpdateDynamicStates();
+    enum class DynamicStateScope {
+        Full,
+        Blit,
+    };
+
+    void UpdateDynamicStates(DynamicStateScope scope = DynamicStateScope::Full);
 
     void HandleTransformFeedback();
 
