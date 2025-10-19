@@ -21,7 +21,7 @@ public:
 
     void Allocate(size_t begin, size_t end) override;
 
-    VkCommandBuffer Commit();
+    vk::CommandBuffer Commit();
 
 private:
     struct Pool;

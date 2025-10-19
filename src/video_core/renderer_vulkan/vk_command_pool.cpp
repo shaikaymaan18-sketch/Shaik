@@ -35,11 +35,11 @@ void CommandPool::Allocate(size_t begin, size_t end) {
     pool.cmdbufs = pool.handle.Allocate(COMMAND_BUFFER_POOL_SIZE);
 }
 
-VkCommandBuffer CommandPool::Commit() {
+vk::CommandBuffer CommandPool::Commit() {
     const size_t index = CommitResource();
     const auto pool_index = index / COMMAND_BUFFER_POOL_SIZE;
     const auto sub_index = index % COMMAND_BUFFER_POOL_SIZE;
-    return pools[pool_index].cmdbufs[sub_index];
+    return vk::CommandBuffer(pools[pool_index].cmdbufs[sub_index], device.GetDispatchLoader());
 }
 
 } // namespace Vulkan
