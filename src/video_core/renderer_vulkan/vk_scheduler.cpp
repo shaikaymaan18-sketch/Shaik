@@ -179,8 +179,10 @@ void Scheduler::RequestRenderpass(const Framebuffer* framebuffer) {
 
         if (barrier_count > 0) {
             cmdbuf.PipelineBarrier(
-                src_stage_mask != 0 ? src_stage_mask : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                dst_stage_mask != 0 ? dst_stage_mask : VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                src_stage_mask != 0 ? src_stage_mask
+                                    : static_cast<VkPipelineStageFlags>(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
+                dst_stage_mask != 0 ? dst_stage_mask
+                                    : static_cast<VkPipelineStageFlags>(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT),
                 0, {}, {}, {barriers.data(), barrier_count});
         }
 
