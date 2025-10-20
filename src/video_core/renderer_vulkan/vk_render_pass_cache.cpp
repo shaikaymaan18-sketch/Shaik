@@ -50,6 +50,9 @@ using VideoCore::Surface::SurfaceType;
             const SurfaceType surface_type = GetSurfaceType(format);
             const bool has_stencil = surface_type == SurfaceType::DepthStencil ||
                                      surface_type == SurfaceType::Stencil;
+            const VkImageLayout attachment_layout =
+                surface_type == SurfaceType::ColorTexture ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+                                                          : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
             return {
                 .flags = {},
                 .format = SurfaceFormat(device, FormatType::Optimal, true, format).format,
@@ -60,8 +63,8 @@ using VideoCore::Surface::SurfaceType;
                                                  : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
                 .stencilStoreOp = has_stencil ? VK_ATTACHMENT_STORE_OP_STORE
                                                   : VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                .initialLayout = VK_IMAGE_LAYOUT_GENERAL,
-                .finalLayout = VK_IMAGE_LAYOUT_GENERAL,
+                .initialLayout = attachment_layout,
+                .finalLayout = attachment_layout,
             };
         }
     } // Anonymous namespace
