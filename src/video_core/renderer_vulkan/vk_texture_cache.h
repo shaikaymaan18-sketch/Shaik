@@ -360,6 +360,10 @@ public:
         return image_ranges;
     }
 
+    [[nodiscard]] const std::array<VkImageLayout, 9>& ImageLayouts() const noexcept {
+        return image_layouts;
+    }
+
     [[nodiscard]] bool HasAspectColorBit(size_t index) const noexcept {
         return (image_ranges.at(rt_map[index]).aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) != 0;
     }
@@ -385,6 +389,7 @@ private:
     u32 num_images = 0;
     std::array<VkImage, 9> images{};
     std::array<VkImageSubresourceRange, 9> image_ranges{};
+    std::array<VkImageLayout, 9> image_layouts{};
     std::array<size_t, NUM_RT> rt_map{};
     bool has_depth{};
     bool has_stencil{};

@@ -2298,6 +2298,7 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
 
     is_rescaled = is_rescaled_;
     const auto& resolution = runtime.resolution;
+    image_layouts.fill(VK_IMAGE_LAYOUT_GENERAL);
 
     u32 width = (std::numeric_limits<u32>::max)();
     u32 height = (std::numeric_limits<u32>::max)();
@@ -2316,6 +2317,7 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
         num_layers = (std::max)(num_layers, color_buffer->range.extent.layers);
         images[num_images] = color_buffer->ImageHandle();
         image_ranges[num_images] = MakeSubresourceRange(color_buffer);
+        image_layouts[num_images] = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         rt_map[index] = num_images;
         samples = color_buffer->Samples();
         ++num_images;
@@ -2332,6 +2334,7 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
         images[num_images] = depth_buffer->ImageHandle();
         const VkImageSubresourceRange subresource_range = MakeSubresourceRange(depth_buffer);
         image_ranges[num_images] = subresource_range;
+        image_layouts[num_images] = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         samples = depth_buffer->Samples();
         ++num_images;
         has_depth = (subresource_range.aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
@@ -2393,6 +2396,7 @@ void TextureCacheRuntime::TransitionImageLayout(Image& image) {
             cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                                    VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, barrier);
         });
+        scheduler.TrackImageLayout(image.Handle(), VK_IMAGE_LAYOUT_GENERAL);
     }
 }
 

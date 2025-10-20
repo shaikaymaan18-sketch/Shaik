@@ -4,6 +4,7 @@
 // SPDX-FileCopyrightText: Copyright 2019 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <array>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -98,12 +99,86 @@ void Scheduler::RequestRenderpass(const Framebuffer* framebuffer) {
         render_area.height == state.render_area.height) {
         return;
     }
-    EndRenderPass();
+    EndRenderPass(false);
     state.renderpass = renderpass;
     state.framebuffer = framebuffer_handle;
     state.render_area = render_area;
 
-    Record([renderpass, framebuffer_handle, render_area](vk::CommandBuffer cmdbuf) {
+    const u32 framebuffer_image_count = framebuffer->NumImages();
+    const auto framebuffer_images = framebuffer->Images();
+    const auto framebuffer_ranges = framebuffer->ImageRanges();
+    const auto framebuffer_layouts = framebuffer->ImageLayouts();
+    std::array<VkImageLayout, 9> previous_layouts{};
+    previous_layouts.fill(VK_IMAGE_LAYOUT_GENERAL);
+    for (size_t i = 0; i < framebuffer_image_count; ++i) {
+        const VkImage image = framebuffer_images[i];
+        previous_layouts[i] = GetTrackedLayout(image);
+        SetTrackedLayout(image, framebuffer_layouts[i]);
+    }
+
+    Record([renderpass, framebuffer_handle, render_area, framebuffer_image_count,
+            framebuffer_images, framebuffer_ranges, framebuffer_layouts,
+            previous_layouts](vk::CommandBuffer cmdbuf) {
+        std::array<VkImageMemoryBarrier, 9> barriers{};
+        VkPipelineStageFlags src_stage_mask = 0;
+        VkPipelineStageFlags dst_stage_mask = 0;
+        size_t barrier_count = 0;
+        for (size_t i = 0; i < framebuffer_image_count; ++i) {
+            const VkImageLayout target_layout = framebuffer_layouts[i];
+            if (target_layout == VK_IMAGE_LAYOUT_GENERAL || target_layout == VK_IMAGE_LAYOUT_UNDEFINED) {
+                continue;
+            }
+
+            const VkImageSubresourceRange& range = framebuffer_ranges[i];
+            const VkImageLayout old_layout = previous_layouts[i];
+            if (old_layout == target_layout) {
+                continue;
+            }
+
+            VkAccessFlags dst_access = 0;
+            VkPipelineStageFlags dst_stage = 0;
+
+            if (range.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) {
+                dst_access |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                dst_stage |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            }
+            if (range.aspectMask & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) {
+                dst_access |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                              VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                dst_stage |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                             VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            }
+
+            VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            VkAccessFlags src_access = 0;
+            if (old_layout != VK_IMAGE_LAYOUT_UNDEFINED) {
+                src_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+                src_access = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+            }
+
+            barriers[barrier_count++] = VkImageMemoryBarrier{
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = nullptr,
+                .srcAccessMask = src_access,
+                .dstAccessMask = dst_access,
+                .oldLayout = old_layout,
+                .newLayout = target_layout,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = framebuffer_images[i],
+                .subresourceRange = range,
+            };
+            src_stage_mask |= src_stage;
+            dst_stage_mask |= dst_stage;
+        }
+
+        if (barrier_count > 0) {
+            cmdbuf.PipelineBarrier(
+                src_stage_mask != 0 ? src_stage_mask : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                dst_stage_mask != 0 ? dst_stage_mask : VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                0, {}, {}, {barriers.data(), barrier_count});
+        }
+
         const VkRenderPassBeginInfo renderpass_bi{
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
             .pNext = nullptr,
@@ -119,13 +194,14 @@ void Scheduler::RequestRenderpass(const Framebuffer* framebuffer) {
         };
         cmdbuf.BeginRenderPass(renderpass_bi, VK_SUBPASS_CONTENTS_INLINE);
     });
-    num_renderpass_images = framebuffer->NumImages();
-    renderpass_images = framebuffer->Images();
-    renderpass_image_ranges = framebuffer->ImageRanges();
+    num_renderpass_images = framebuffer_image_count;
+    renderpass_images = framebuffer_images;
+    renderpass_image_ranges = framebuffer_ranges;
+    renderpass_image_layouts = framebuffer_layouts;
 }
 
 void Scheduler::RequestOutsideRenderPassOperationContext() {
-    EndRenderPass();
+    EndRenderPass(true);
 }
 
 bool Scheduler::UpdateGraphicsPipeline(GraphicsPipeline* pipeline) {
@@ -267,21 +343,23 @@ void Scheduler::InvalidateState() {
 
 void Scheduler::EndPendingOperations() {
     query_cache->CounterReset(VideoCommon::QueryType::ZPassPixelCount64);
-    EndRenderPass();
+    EndRenderPass(true);
 }
 
-void Scheduler::EndRenderPass()
-    {
-        if (!state.renderpass) {
-            return;
-        }
+void Scheduler::EndRenderPass(bool force_general)
+{
+    if (!state.renderpass) {
+        return;
+    }
 
-        query_cache->CounterEnable(VideoCommon::QueryType::ZPassPixelCount64, false);
-        query_cache->NotifySegment(false);
+    query_cache->CounterEnable(VideoCommon::QueryType::ZPassPixelCount64, false);
+    query_cache->NotifySegment(false);
 
+    if (force_general) {
         Record([num_images = num_renderpass_images,
                        images = renderpass_images,
-                       ranges = renderpass_image_ranges](vk::CommandBuffer cmdbuf) {
+                       ranges = renderpass_image_ranges,
+                       layouts = renderpass_image_layouts](vk::CommandBuffer cmdbuf) {
             std::array<VkImageMemoryBarrier, 9> barriers;
             VkPipelineStageFlags src_stages = 0;
 
@@ -308,6 +386,9 @@ void Scheduler::EndRenderPass()
 
                 src_stages |= this_stage;
 
+                const VkImageLayout render_layout =
+                    layouts[i] != VK_IMAGE_LAYOUT_UNDEFINED ? layouts[i] : VK_IMAGE_LAYOUT_GENERAL;
+
                 barriers[i] = VkImageMemoryBarrier{
                         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
                         .pNext = nullptr,
@@ -317,7 +398,7 @@ void Scheduler::EndRenderPass()
                                          | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
                                          | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
                                          | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-                        .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+                        .oldLayout = render_layout,
                         .newLayout = VK_IMAGE_LAYOUT_GENERAL,
                         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -337,9 +418,25 @@ void Scheduler::EndRenderPass()
             );
         });
 
-        state.renderpass = nullptr;
-        num_renderpass_images = 0;
+        for (size_t i = 0; i < num_renderpass_images; ++i) {
+            SetTrackedLayout(renderpass_images[i], VK_IMAGE_LAYOUT_GENERAL);
+        }
+    } else {
+        Record([](vk::CommandBuffer cmdbuf) {
+            cmdbuf.EndRenderPass();
+        });
+        for (size_t i = 0; i < num_renderpass_images; ++i) {
+            const VkImageLayout render_layout =
+                renderpass_image_layouts[i] != VK_IMAGE_LAYOUT_UNDEFINED
+                    ? renderpass_image_layouts[i]
+                    : VK_IMAGE_LAYOUT_GENERAL;
+            SetTrackedLayout(renderpass_images[i], render_layout);
+        }
     }
+
+    state.renderpass = nullptr;
+    num_renderpass_images = 0;
+}
 
 
 void Scheduler::AcquireNewChunk() {

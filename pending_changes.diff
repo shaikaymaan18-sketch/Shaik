@@ -1,0 +1,395 @@
+diff --git a/src/video_core/renderer_vulkan/vk_render_pass_cache.cpp b/src/video_core/renderer_vulkan/vk_render_pass_cache.cpp
+index 80ff75e3b9..5c8c41cf01 100644
+--- a/src/video_core/renderer_vulkan/vk_render_pass_cache.cpp
++++ b/src/video_core/renderer_vulkan/vk_render_pass_cache.cpp
+@@ -43,6 +43,18 @@ using VideoCore::Surface::SurfaceType;
+             }
+         }
+ 
++        VkImageLayout AttachmentLayout(SurfaceType type) {
++            switch (type) {
++            case SurfaceType::ColorTexture:
++                return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
++            case SurfaceType::Depth:
++            case SurfaceType::Stencil:
++            case SurfaceType::DepthStencil:
++                return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
++            }
++            return VK_IMAGE_LAYOUT_GENERAL;
++        }
++
+         VkAttachmentDescription AttachmentDescription(const Device& device, PixelFormat format,
+                                                       VkSampleCountFlagBits samples) {
+             using MaxwellToVK::SurfaceFormat;
+@@ -50,6 +62,7 @@ using VideoCore::Surface::SurfaceType;
+             const SurfaceType surface_type = GetSurfaceType(format);
+             const bool has_stencil = surface_type == SurfaceType::DepthStencil ||
+                                      surface_type == SurfaceType::Stencil;
++            const VkImageLayout attachment_layout = AttachmentLayout(surface_type);
+ 
+             return {
+                 .flags = {},
+@@ -61,8 +74,8 @@ using VideoCore::Surface::SurfaceType;
+                                                  : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                 .stencilStoreOp = has_stencil ? VK_ATTACHMENT_STORE_OP_STORE
+                                                   : VK_ATTACHMENT_STORE_OP_DONT_CARE,
+-                .initialLayout = VK_IMAGE_LAYOUT_GENERAL,
+-                .finalLayout = VK_IMAGE_LAYOUT_GENERAL,
++                .initialLayout = attachment_layout,
++                .finalLayout = attachment_layout,
+             };
+         }
+     } // Anonymous namespace
+@@ -84,7 +97,7 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
+         const bool is_valid{format != PixelFormat::Invalid};
+         references[index] = VkAttachmentReference{
+             .attachment = is_valid ? num_colors : VK_ATTACHMENT_UNUSED,
+-            .layout = VK_IMAGE_LAYOUT_GENERAL,
++            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+         };
+         if (is_valid) {
+             descriptions.push_back(AttachmentDescription(*device, format, key.samples));
+@@ -97,7 +110,7 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
+     if (key.depth_format != PixelFormat::Invalid) {
+         depth_reference = VkAttachmentReference{
+             .attachment = num_colors,
+-            .layout = VK_IMAGE_LAYOUT_GENERAL,
++            .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+         };
+         descriptions.push_back(AttachmentDescription(*device, key.depth_format, key.samples));
+     }
+diff --git a/src/video_core/renderer_vulkan/vk_scheduler.cpp b/src/video_core/renderer_vulkan/vk_scheduler.cpp
+index d109d22cab..8edabfb87a 100644
+--- a/src/video_core/renderer_vulkan/vk_scheduler.cpp
++++ b/src/video_core/renderer_vulkan/vk_scheduler.cpp
+@@ -4,6 +4,7 @@
+ // SPDX-FileCopyrightText: Copyright 2019 yuzu Emulator Project
+ // SPDX-License-Identifier: GPL-2.0-or-later
+ 
++#include <array>
+ #include <memory>
+ #include <mutex>
+ #include <thread>
+@@ -98,12 +99,86 @@ void Scheduler::RequestRenderpass(const Framebuffer* framebuffer) {
+         render_area.height == state.render_area.height) {
+         return;
+     }
+-    EndRenderPass();
++    EndRenderPass(false);
+     state.renderpass = renderpass;
+     state.framebuffer = framebuffer_handle;
+     state.render_area = render_area;
+ 
+-    Record([renderpass, framebuffer_handle, render_area](vk::CommandBuffer cmdbuf) {
++    const u32 framebuffer_image_count = framebuffer->NumImages();
++    const auto framebuffer_images = framebuffer->Images();
++    const auto framebuffer_ranges = framebuffer->ImageRanges();
++    const auto framebuffer_layouts = framebuffer->ImageLayouts();
++    std::array<VkImageLayout, 9> previous_layouts{};
++    previous_layouts.fill(VK_IMAGE_LAYOUT_GENERAL);
++    for (size_t i = 0; i < framebuffer_image_count; ++i) {
++        const VkImage image = framebuffer_images[i];
++        previous_layouts[i] = GetTrackedLayout(image);
++        SetTrackedLayout(image, framebuffer_layouts[i]);
++    }
++
++    Record([renderpass, framebuffer_handle, render_area, framebuffer_image_count,
++            framebuffer_images, framebuffer_ranges, framebuffer_layouts,
++            previous_layouts](vk::CommandBuffer cmdbuf) {
++        std::array<VkImageMemoryBarrier, 9> barriers{};
++        VkPipelineStageFlags src_stage_mask = 0;
++        VkPipelineStageFlags dst_stage_mask = 0;
++        size_t barrier_count = 0;
++        for (size_t i = 0; i < framebuffer_image_count; ++i) {
++            const VkImageLayout target_layout = framebuffer_layouts[i];
++            if (target_layout == VK_IMAGE_LAYOUT_GENERAL || target_layout == VK_IMAGE_LAYOUT_UNDEFINED) {
++                continue;
++            }
++
++            const VkImageSubresourceRange& range = framebuffer_ranges[i];
++            const VkImageLayout old_layout = previous_layouts[i];
++            if (old_layout == target_layout) {
++                continue;
++            }
++
++            VkAccessFlags dst_access = 0;
++            VkPipelineStageFlags dst_stage = 0;
++
++            if (range.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) {
++                dst_access |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
++                dst_stage |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
++            }
++            if (range.aspectMask & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) {
++                dst_access |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
++                              VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
++                dst_stage |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
++                             VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
++            }
++
++            VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
++            VkAccessFlags src_access = 0;
++            if (old_layout != VK_IMAGE_LAYOUT_UNDEFINED) {
++                src_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
++                src_access = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
++            }
++
++            barriers[barrier_count++] = VkImageMemoryBarrier{
++                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
++                .pNext = nullptr,
++                .srcAccessMask = src_access,
++                .dstAccessMask = dst_access,
++                .oldLayout = old_layout,
++                .newLayout = target_layout,
++                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
++                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
++                .image = framebuffer_images[i],
++                .subresourceRange = range,
++            };
++            src_stage_mask |= src_stage;
++            dst_stage_mask |= dst_stage;
++        }
++
++        if (barrier_count > 0) {
++            cmdbuf.PipelineBarrier(
++                src_stage_mask != 0 ? src_stage_mask : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
++                dst_stage_mask != 0 ? dst_stage_mask : VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
++                0, {}, {}, {barriers.data(), barrier_count});
++        }
++
+         const VkRenderPassBeginInfo renderpass_bi{
+             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+             .pNext = nullptr,
+@@ -119,13 +194,14 @@ void Scheduler::RequestRenderpass(const Framebuffer* framebuffer) {
+         };
+         cmdbuf.BeginRenderPass(renderpass_bi, VK_SUBPASS_CONTENTS_INLINE);
+     });
+-    num_renderpass_images = framebuffer->NumImages();
+-    renderpass_images = framebuffer->Images();
+-    renderpass_image_ranges = framebuffer->ImageRanges();
++    num_renderpass_images = framebuffer_image_count;
++    renderpass_images = framebuffer_images;
++    renderpass_image_ranges = framebuffer_ranges;
++    renderpass_image_layouts = framebuffer_layouts;
+ }
+ 
+ void Scheduler::RequestOutsideRenderPassOperationContext() {
+-    EndRenderPass();
++    EndRenderPass(true);
+ }
+ 
+ bool Scheduler::UpdateGraphicsPipeline(GraphicsPipeline* pipeline) {
+@@ -267,21 +343,23 @@ void Scheduler::InvalidateState() {
+ 
+ void Scheduler::EndPendingOperations() {
+     query_cache->CounterReset(VideoCommon::QueryType::ZPassPixelCount64);
+-    EndRenderPass();
++    EndRenderPass(true);
+ }
+ 
+-void Scheduler::EndRenderPass()
+-    {
+-        if (!state.renderpass) {
+-            return;
+-        }
++void Scheduler::EndRenderPass(bool force_general)
++{
++    if (!state.renderpass) {
++        return;
++    }
+ 
+-        query_cache->CounterEnable(VideoCommon::QueryType::ZPassPixelCount64, false);
+-        query_cache->NotifySegment(false);
++    query_cache->CounterEnable(VideoCommon::QueryType::ZPassPixelCount64, false);
++    query_cache->NotifySegment(false);
+ 
++    if (force_general) {
+         Record([num_images = num_renderpass_images,
+                        images = renderpass_images,
+-                       ranges = renderpass_image_ranges](vk::CommandBuffer cmdbuf) {
++                       ranges = renderpass_image_ranges,
++                       layouts = renderpass_image_layouts](vk::CommandBuffer cmdbuf) {
+             std::array<VkImageMemoryBarrier, 9> barriers;
+             VkPipelineStageFlags src_stages = 0;
+ 
+@@ -308,6 +386,9 @@ void Scheduler::EndRenderPass()
+ 
+                 src_stages |= this_stage;
+ 
++                const VkImageLayout render_layout =
++                    layouts[i] != VK_IMAGE_LAYOUT_UNDEFINED ? layouts[i] : VK_IMAGE_LAYOUT_GENERAL;
++
+                 barriers[i] = VkImageMemoryBarrier{
+                         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                         .pNext = nullptr,
+@@ -317,7 +398,7 @@ void Scheduler::EndRenderPass()
+                                          | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                                          | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+                                          | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+-                        .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
++                        .oldLayout = render_layout,
+                         .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+                         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+@@ -337,10 +418,26 @@ void Scheduler::EndRenderPass()
+             );
+         });
+ 
+-        state.renderpass = nullptr;
+-        num_renderpass_images = 0;
++        for (size_t i = 0; i < num_renderpass_images; ++i) {
++            SetTrackedLayout(renderpass_images[i], VK_IMAGE_LAYOUT_GENERAL);
++        }
++    } else {
++        Record([](vk::CommandBuffer cmdbuf) {
++            cmdbuf.EndRenderPass();
++        });
++        for (size_t i = 0; i < num_renderpass_images; ++i) {
++            const VkImageLayout render_layout =
++                renderpass_image_layouts[i] != VK_IMAGE_LAYOUT_UNDEFINED
++                    ? renderpass_image_layouts[i]
++                    : VK_IMAGE_LAYOUT_GENERAL;
++            SetTrackedLayout(renderpass_images[i], render_layout);
++        }
+     }
+ 
++    state.renderpass = nullptr;
++    num_renderpass_images = 0;
++}
++
+ 
+ void Scheduler::AcquireNewChunk() {
+     std::scoped_lock rl{reserve_mutex};
+diff --git a/src/video_core/renderer_vulkan/vk_scheduler.h b/src/video_core/renderer_vulkan/vk_scheduler.h
+index 54ab8ba52b..2e0bbb24b1 100644
+--- a/src/video_core/renderer_vulkan/vk_scheduler.h
++++ b/src/video_core/renderer_vulkan/vk_scheduler.h
+@@ -3,6 +3,7 @@
+ 
+ #pragma once
+ 
++#include <array>
+ #include <condition_variable>
+ #include <cstddef>
+ #include <functional>
+@@ -10,6 +11,7 @@
+ #include <thread>
+ #include <utility>
+ #include <queue>
++#include <unordered_map>
+ 
+ #include "common/alignment.h"
+ #include "common/common_types.h"
+@@ -122,6 +124,10 @@ public:
+         return *master_semaphore;
+     }
+ 
++    void TrackImageLayout(VkImage image, VkImageLayout layout) noexcept {
++        SetTrackedLayout(image, layout);
++    }
++
+     std::mutex submit_mutex;
+ 
+ private:
+@@ -226,10 +232,26 @@ private:
+ 
+     void EndPendingOperations();
+ 
+-    void EndRenderPass();
++    void EndRenderPass(bool force_general = true);
+ 
+     void AcquireNewChunk();
+ 
++    [[nodiscard]] static constexpr u64 ImageKey(VkImage image) noexcept {
++        return static_cast<u64>(reinterpret_cast<uintptr_t>(image));
++    }
++
++    [[nodiscard]] VkImageLayout GetTrackedLayout(VkImage image) const noexcept {
++        const auto it = image_layout_cache.find(ImageKey(image));
++        if (it == image_layout_cache.end()) {
++            return VK_IMAGE_LAYOUT_GENERAL;
++        }
++        return it->second;
++    }
++
++    void SetTrackedLayout(VkImage image, VkImageLayout layout) noexcept {
++        image_layout_cache[ImageKey(image)] = layout;
++    }
++
+     const Device& device;
+     StateTracker& state_tracker;
+ 
+@@ -249,6 +271,7 @@ private:
+     u32 num_renderpass_images = 0;
+     std::array<VkImage, 9> renderpass_images{};
+     std::array<VkImageSubresourceRange, 9> renderpass_image_ranges{};
++    std::array<VkImageLayout, 9> renderpass_image_layouts{};
+ 
+     std::queue<std::unique_ptr<CommandChunk>> work_queue;
+     std::vector<std::unique_ptr<CommandChunk>> chunk_reserve;
+@@ -257,6 +280,7 @@ private:
+     std::mutex queue_mutex;
+     std::condition_variable_any event_cv;
+     std::jthread worker_thread;
++    std::unordered_map<u64, VkImageLayout> image_layout_cache;
+ };
+ 
+ } // namespace Vulkan
+diff --git a/src/video_core/renderer_vulkan/vk_texture_cache.cpp b/src/video_core/renderer_vulkan/vk_texture_cache.cpp
+index 9b6d1704c3..b31eab5d72 100644
+--- a/src/video_core/renderer_vulkan/vk_texture_cache.cpp
++++ b/src/video_core/renderer_vulkan/vk_texture_cache.cpp
+@@ -2298,6 +2298,7 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
+ 
+     is_rescaled = is_rescaled_;
+     const auto& resolution = runtime.resolution;
++    image_layouts.fill(VK_IMAGE_LAYOUT_GENERAL);
+ 
+     u32 width = (std::numeric_limits<u32>::max)();
+     u32 height = (std::numeric_limits<u32>::max)();
+@@ -2316,6 +2317,7 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
+         num_layers = (std::max)(num_layers, color_buffer->range.extent.layers);
+         images[num_images] = color_buffer->ImageHandle();
+         image_ranges[num_images] = MakeSubresourceRange(color_buffer);
++        image_layouts[num_images] = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+         rt_map[index] = num_images;
+         samples = color_buffer->Samples();
+         ++num_images;
+@@ -2332,6 +2334,7 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
+         images[num_images] = depth_buffer->ImageHandle();
+         const VkImageSubresourceRange subresource_range = MakeSubresourceRange(depth_buffer);
+         image_ranges[num_images] = subresource_range;
++        image_layouts[num_images] = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+         samples = depth_buffer->Samples();
+         ++num_images;
+         has_depth = (subresource_range.aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
+@@ -2393,6 +2396,7 @@ void TextureCacheRuntime::TransitionImageLayout(Image& image) {
+             cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                                    VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, barrier);
+         });
++        scheduler.TrackImageLayout(image.Handle(), VK_IMAGE_LAYOUT_GENERAL);
+     }
+ }
+ 
+diff --git a/src/video_core/renderer_vulkan/vk_texture_cache.h b/src/video_core/renderer_vulkan/vk_texture_cache.h
+index cd11cc8fc7..68937f9e2b 100644
+--- a/src/video_core/renderer_vulkan/vk_texture_cache.h
++++ b/src/video_core/renderer_vulkan/vk_texture_cache.h
+@@ -360,6 +360,10 @@ public:
+         return image_ranges;
+     }
+ 
++    [[nodiscard]] const std::array<VkImageLayout, 9>& ImageLayouts() const noexcept {
++        return image_layouts;
++    }
++
+     [[nodiscard]] bool HasAspectColorBit(size_t index) const noexcept {
+         return (image_ranges.at(rt_map[index]).aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) != 0;
+     }
+@@ -385,6 +389,7 @@ private:
+     u32 num_images = 0;
+     std::array<VkImage, 9> images{};
+     std::array<VkImageSubresourceRange, 9> image_ranges{};
++    std::array<VkImageLayout, 9> image_layouts{};
+     std::array<size_t, NUM_RT> rt_map{};
+     bool has_depth{};
+     bool has_stencil{};

@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <array>
 #include <condition_variable>
 #include <cstddef>
 #include <functional>
@@ -10,6 +11,7 @@
 #include <thread>
 #include <utility>
 #include <queue>
+#include <unordered_map>
 
 #include "common/alignment.h"
 #include "common/common_types.h"
@@ -122,6 +124,10 @@ public:
         return *master_semaphore;
     }
 
+    void TrackImageLayout(VkImage image, VkImageLayout layout) noexcept {
+        SetTrackedLayout(image, layout);
+    }
+
     std::mutex submit_mutex;
 
 private:
@@ -226,9 +232,25 @@ private:
 
     void EndPendingOperations();
 
-    void EndRenderPass();
+    void EndRenderPass(bool force_general = true);
 
     void AcquireNewChunk();
+
+    [[nodiscard]] static u64 ImageKey(VkImage image) noexcept {
+        return static_cast<u64>(reinterpret_cast<uintptr_t>(image));
+    }
+
+    [[nodiscard]] VkImageLayout GetTrackedLayout(VkImage image) const noexcept {
+        const auto it = image_layout_cache.find(ImageKey(image));
+        if (it == image_layout_cache.end()) {
+            return VK_IMAGE_LAYOUT_GENERAL;
+        }
+        return it->second;
+    }
+
+    void SetTrackedLayout(VkImage image, VkImageLayout layout) noexcept {
+        image_layout_cache[ImageKey(image)] = layout;
+    }
 
     const Device& device;
     StateTracker& state_tracker;
@@ -249,6 +271,7 @@ private:
     u32 num_renderpass_images = 0;
     std::array<VkImage, 9> renderpass_images{};
     std::array<VkImageSubresourceRange, 9> renderpass_image_ranges{};
+    std::array<VkImageLayout, 9> renderpass_image_layouts{};
 
     std::queue<std::unique_ptr<CommandChunk>> work_queue;
     std::vector<std::unique_ptr<CommandChunk>> chunk_reserve;
@@ -257,6 +280,7 @@ private:
     std::mutex queue_mutex;
     std::condition_variable_any event_cv;
     std::jthread worker_thread;
+    std::unordered_map<u64, VkImageLayout> image_layout_cache;
 };
 
 } // namespace Vulkan
