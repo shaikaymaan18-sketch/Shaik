@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // SPDX-FileCopyrightText: Copyright 2019 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -125,7 +128,7 @@ public:
     }
 
     void TrackImageLayout(VkImage image, VkImageLayout layout) noexcept {
-        SetTrackedLayout(image, layout);
+        image_layout_cache[ImageKey(image)] = layout;
     }
 
     std::mutex submit_mutex;
@@ -238,18 +241,6 @@ private:
 
     [[nodiscard]] static u64 ImageKey(VkImage image) noexcept {
         return static_cast<u64>(reinterpret_cast<uintptr_t>(image));
-    }
-
-    [[nodiscard]] VkImageLayout GetTrackedLayout(VkImage image) const noexcept {
-        const auto it = image_layout_cache.find(ImageKey(image));
-        if (it == image_layout_cache.end()) {
-            return VK_IMAGE_LAYOUT_GENERAL;
-        }
-        return it->second;
-    }
-
-    void SetTrackedLayout(VkImage image, VkImageLayout layout) noexcept {
-        image_layout_cache[ImageKey(image)] = layout;
     }
 
     const Device& device;

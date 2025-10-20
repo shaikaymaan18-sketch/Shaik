@@ -112,8 +112,13 @@ void Scheduler::RequestRenderpass(const Framebuffer* framebuffer) {
     previous_layouts.fill(VK_IMAGE_LAYOUT_GENERAL);
     for (size_t i = 0; i < framebuffer_image_count; ++i) {
         const VkImage image = framebuffer_images[i];
-        previous_layouts[i] = GetTrackedLayout(image);
-        SetTrackedLayout(image, framebuffer_layouts[i]);
+        const u64 key = ImageKey(image);
+        if (const auto it = image_layout_cache.find(key); it != image_layout_cache.end()) {
+            previous_layouts[i] = it->second;
+        } else {
+            previous_layouts[i] = VK_IMAGE_LAYOUT_GENERAL;
+        }
+        image_layout_cache[key] = framebuffer_layouts[i];
     }
 
     Record([renderpass, framebuffer_handle, render_area, framebuffer_image_count,
@@ -419,7 +424,7 @@ void Scheduler::EndRenderPass(bool force_general)
         });
 
         for (size_t i = 0; i < num_renderpass_images; ++i) {
-            SetTrackedLayout(renderpass_images[i], VK_IMAGE_LAYOUT_GENERAL);
+            image_layout_cache[ImageKey(renderpass_images[i])] = VK_IMAGE_LAYOUT_GENERAL;
         }
     } else {
         Record([](vk::CommandBuffer cmdbuf) {
@@ -430,7 +435,7 @@ void Scheduler::EndRenderPass(bool force_general)
                 renderpass_image_layouts[i] != VK_IMAGE_LAYOUT_UNDEFINED
                     ? renderpass_image_layouts[i]
                     : VK_IMAGE_LAYOUT_GENERAL;
-            SetTrackedLayout(renderpass_images[i], render_layout);
+            image_layout_cache[ImageKey(renderpass_images[i])] = render_layout;
         }
     }
 
