@@ -96,8 +96,6 @@ check_header() {
 BASE=$(git merge-base master HEAD)
 FILES=$(git diff --name-only "$BASE")
 
-echo "$EXCLUDE_FILES"
-
 for file in $FILES; do
     [ -f "$file" ] || continue
 
