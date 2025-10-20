@@ -4,6 +4,11 @@ These are supplemental shell scripts for CPMUtil aiming to ease maintenance burd
 
 All scripts are POSIX-compliant. If something doesn't work on your shell, ensure it's POSIX-compliant.
 * If your shell doesn't support `$(...)` syntax, you've got bigger problems to worry about.
+<!-- TOC -->
+- [Meta](#meta)
+- [Simple Utilities](#simple-utilities)
+- [Functional Utilities](#functional-utilities)
+<!-- /TOC -->
 
 ## Meta
 

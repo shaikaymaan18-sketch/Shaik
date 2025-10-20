@@ -131,13 +131,13 @@ elif [ "$REPO" != "null" ]; then
 			DOWNLOAD="${GIT_URL}/archive/refs/tags/${TAG}.tar.gz"
 		fi
 	elif [ "$SHA" != "null" ]; then
-		DOWNLOAD="${GIT_URL}/archive/${SHA}.zip"
+		DOWNLOAD="${GIT_URL}/archive/${SHA}.tar.gz"
 	else
 		if [ "$BRANCH" = null ]; then
 			BRANCH=master
 		fi
 
-		DOWNLOAD="${GIT_URL}/archive/refs/heads/${BRANCH}.zip"
+		DOWNLOAD="${GIT_URL}/archive/refs/heads/${BRANCH}.tar.gz"
 	fi
 else
 	echo "!! No repo or URL defined for $PACKAGE"
