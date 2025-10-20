@@ -43,19 +43,6 @@ using VideoCore::Surface::SurfaceType;
             }
         }
 
-        VkImageLayout AttachmentLayout(SurfaceType type) {
-            switch (type) {
-            case SurfaceType::ColorTexture:
-                return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            case SurfaceType::Depth:
-            case SurfaceType::Stencil:
-            case SurfaceType::DepthStencil:
-                return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-            default:
-                return VK_IMAGE_LAYOUT_GENERAL;
-            }
-        }
-
         VkAttachmentDescription AttachmentDescription(const Device& device, PixelFormat format,
                                                       VkSampleCountFlagBits samples) {
             using MaxwellToVK::SurfaceFormat;
@@ -63,7 +50,10 @@ using VideoCore::Surface::SurfaceType;
             const SurfaceType surface_type = GetSurfaceType(format);
             const bool has_stencil = surface_type == SurfaceType::DepthStencil ||
                                      surface_type == SurfaceType::Stencil;
-            const VkImageLayout attachment_layout = AttachmentLayout(surface_type);
+            const VkImageLayout attachment_layout =
+                surface_type == SurfaceType::ColorTexture
+                    ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+                    : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
             return {
                 .flags = {},
@@ -75,8 +65,8 @@ using VideoCore::Surface::SurfaceType;
                                                  : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
                 .stencilStoreOp = has_stencil ? VK_ATTACHMENT_STORE_OP_STORE
                                                   : VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                .initialLayout = attachment_layout,
-                .finalLayout = attachment_layout,
+                .initialLayout = VK_IMAGE_LAYOUT_GENERAL,
+                .finalLayout = VK_IMAGE_LAYOUT_GENERAL,
             };
         }
     } // Anonymous namespace
