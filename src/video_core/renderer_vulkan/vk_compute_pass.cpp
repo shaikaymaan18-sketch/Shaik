@@ -586,7 +586,8 @@ void ASTCDecoderPass::Assemble(Image& image, const StagingBufferRef& map,
         compute_pass_descriptor_queue.Acquire();
         compute_pass_descriptor_queue.AddBuffer(map.buffer, input_offset,
                                                 image.guest_size_bytes - swizzle.buffer_offset);
-        compute_pass_descriptor_queue.AddImage(image.StorageImageView(swizzle.level));
+        compute_pass_descriptor_queue.AddImage(image.Handle(), image.StorageImageView(swizzle.level),
+                                               VK_IMAGE_LAYOUT_GENERAL);
         const void* const descriptor_data{compute_pass_descriptor_queue.UpdateData()};
 
         // To unswizzle the ASTC data
@@ -690,9 +691,11 @@ void MSAACopyPass::CopyImage(Image& dst_image, Image& src_image,
 
         compute_pass_descriptor_queue.Acquire();
         compute_pass_descriptor_queue.AddImage(
-            src_image.StorageImageView(copy.src_subresource.base_level));
+            src_image.Handle(), src_image.StorageImageView(copy.src_subresource.base_level),
+            VK_IMAGE_LAYOUT_GENERAL);
         compute_pass_descriptor_queue.AddImage(
-            dst_image.StorageImageView(copy.dst_subresource.base_level));
+            dst_image.Handle(), dst_image.StorageImageView(copy.dst_subresource.base_level),
+            VK_IMAGE_LAYOUT_GENERAL);
         const void* const descriptor_data{compute_pass_descriptor_queue.UpdateData()};
 
         const Common::Vec3<u32> num_dispatches = {

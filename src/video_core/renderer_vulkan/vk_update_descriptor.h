@@ -47,21 +47,11 @@ public:
         return upload_start;
     }
 
-    void AddSampledImage(VkImageView image_view, VkSampler sampler) {
-        *(payload_cursor++) = VkDescriptorImageInfo{
-            .sampler = sampler,
-            .imageView = image_view,
-            .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
-        };
-    }
+    void AddSampledImage(VkImage image, VkImageView image_view, VkSampler sampler,
+                         VkImageLayout fallback_layout = VK_IMAGE_LAYOUT_GENERAL);
 
-    void AddImage(VkImageView image_view) {
-        *(payload_cursor++) = VkDescriptorImageInfo{
-            .sampler = VK_NULL_HANDLE,
-            .imageView = image_view,
-            .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
-        };
-    }
+    void AddImage(VkImage image, VkImageView image_view,
+                  VkImageLayout fallback_layout = VK_IMAGE_LAYOUT_GENERAL);
 
     void AddBuffer(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize size) {
         *(payload_cursor++) = VkDescriptorBufferInfo{
@@ -84,6 +74,9 @@ private:
     DescriptorUpdateEntry* payload_start = nullptr;
     const DescriptorUpdateEntry* upload_start = nullptr;
     std::array<DescriptorUpdateEntry, PAYLOAD_SIZE> payload;
+
+    [[nodiscard]] VkImageLayout ResolveImageLayout(VkImage image,
+                                                   VkImageLayout fallback) noexcept;
 };
 
 // TODO: should these be separate classes instead?

@@ -23,6 +23,17 @@
 
 namespace Vulkan {
 
+VkImageLayout Scheduler::GetImageLayout(VkImage image) const noexcept {
+    if (image == VK_NULL_HANDLE) {
+        return VK_IMAGE_LAYOUT_GENERAL;
+    }
+    const auto it = image_layout_cache.find(ImageKey(image));
+    if (it != image_layout_cache.end()) {
+        return it->second;
+    }
+    return VK_IMAGE_LAYOUT_GENERAL;
+}
+
 namespace {
 struct StageAccessInfo {
     VkPipelineStageFlags stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;

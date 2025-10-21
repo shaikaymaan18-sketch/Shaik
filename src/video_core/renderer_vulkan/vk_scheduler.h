@@ -135,6 +135,8 @@ public:
         image_layout_cache.erase(ImageKey(image));
     }
 
+    [[nodiscard]] VkImageLayout GetImageLayout(VkImage image) const noexcept;
+
     std::mutex submit_mutex;
 
 private:

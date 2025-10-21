@@ -195,7 +195,8 @@ inline void PushImageDescriptors(TextureCache& texture_cache,
                                             !image_view.SupportsAnisotropy()};
             const VkSampler vk_sampler{use_fallback_sampler ? sampler.HandleWithDefaultAnisotropy()
                                                             : sampler.Handle()};
-            guest_descriptor_queue.AddSampledImage(vk_image_view, vk_sampler);
+            guest_descriptor_queue.AddSampledImage(image_view.ImageHandle(), vk_image_view,
+                                                   vk_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             rescaling.PushTexture(texture_cache.IsRescaling(image_view));
         }
     }
@@ -206,7 +207,8 @@ inline void PushImageDescriptors(TextureCache& texture_cache,
                 texture_cache.MarkModification(image_view.image_id);
             }
             const VkImageView vk_image_view{image_view.StorageView(desc.type, desc.format)};
-            guest_descriptor_queue.AddImage(vk_image_view);
+            guest_descriptor_queue.AddImage(image_view.ImageHandle(), vk_image_view,
+                                            VK_IMAGE_LAYOUT_GENERAL);
             rescaling.PushImage(texture_cache.IsRescaling(image_view));
         }
     }

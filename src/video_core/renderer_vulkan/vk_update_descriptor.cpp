@@ -41,4 +41,47 @@ void UpdateDescriptorQueue::Acquire() {
     upload_start = payload_cursor;
 }
 
+VkImageLayout UpdateDescriptorQueue::ResolveImageLayout(VkImage image,
+                                                        VkImageLayout fallback) noexcept {
+    if (image == VK_NULL_HANDLE) {
+        return fallback;
+    }
+    VkImageLayout layout = scheduler.GetImageLayout(image);
+
+    if (layout == fallback) {
+        return layout;
+    }
+    
+    const bool requires_attachment_to_general =
+        fallback == VK_IMAGE_LAYOUT_GENERAL &&
+        (layout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL ||
+         layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+    if (requires_attachment_to_general) {
+        scheduler.RequestOutsideRenderPassOperationContext();
+        scheduler.TrackImageLayout(image, VK_IMAGE_LAYOUT_GENERAL);
+        layout = VK_IMAGE_LAYOUT_GENERAL;
+    }
+
+    return layout;
+}
+
+void UpdateDescriptorQueue::AddSampledImage(VkImage image, VkImageView image_view,
+                                            VkSampler sampler, VkImageLayout fallback_layout) {
+    *(payload_cursor++) = VkDescriptorImageInfo{
+        .sampler = sampler,
+        .imageView = image_view,
+        .imageLayout = ResolveImageLayout(image, fallback_layout),
+    };
+}
+
+void UpdateDescriptorQueue::AddImage(VkImage image, VkImageView image_view,
+                                     VkImageLayout fallback_layout) {
+    *(payload_cursor++) = VkDescriptorImageInfo{
+        .sampler = VK_NULL_HANDLE,
+        .imageView = image_view,
+        .imageLayout = ResolveImageLayout(image, fallback_layout),
+    };
+}
+
 } // namespace Vulkan
