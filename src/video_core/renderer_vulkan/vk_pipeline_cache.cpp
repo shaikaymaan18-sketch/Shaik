@@ -318,6 +318,9 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
       serialization_thread(1, "VkPipelineSerialization") {
     const auto& float_control{device.FloatControlProperties()};
     const VkDriverId driver_id{device.GetDriverID()};
+    const bool is_qualcomm = driver_id == VK_DRIVER_ID_QUALCOMM_PROPRIETARY;
+    const bool allow_float_controls =
+        device.IsKhrShaderFloatControlsSupported() && !is_qualcomm;
     profile = Shader::Profile{
         .supported_spirv = device.SupportedSpirvVersion(),
         .unified_descriptor_binding = true,
@@ -326,21 +329,27 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         .support_int16 = device.IsShaderInt16Supported(),
         .support_int64 = device.IsShaderInt64Supported(),
         .support_vertex_instance_id = false,
-        .support_float_controls = device.IsKhrShaderFloatControlsSupported(),
+        .support_float_controls = allow_float_controls,
         .support_separate_denorm_behavior =
-            float_control.denormBehaviorIndependence == VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL,
+            allow_float_controls && float_control.denormBehaviorIndependence ==
+                                        VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL,
         .support_separate_rounding_mode =
-            float_control.roundingModeIndependence == VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL,
-        .support_fp16_denorm_preserve = float_control.shaderDenormPreserveFloat16 != VK_FALSE,
-        .support_fp32_denorm_preserve = float_control.shaderDenormPreserveFloat32 != VK_FALSE,
-        .support_fp16_denorm_flush = float_control.shaderDenormFlushToZeroFloat16 != VK_FALSE,
-        .support_fp32_denorm_flush = float_control.shaderDenormFlushToZeroFloat32 != VK_FALSE,
+            allow_float_controls && float_control.roundingModeIndependence ==
+                                        VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL,
+        .support_fp16_denorm_preserve =
+            allow_float_controls && float_control.shaderDenormPreserveFloat16 != VK_FALSE,
+        .support_fp32_denorm_preserve =
+            allow_float_controls && float_control.shaderDenormPreserveFloat32 != VK_FALSE,
+        .support_fp16_denorm_flush =
+            allow_float_controls && float_control.shaderDenormFlushToZeroFloat16 != VK_FALSE,
+        .support_fp32_denorm_flush =
+            allow_float_controls && float_control.shaderDenormFlushToZeroFloat32 != VK_FALSE,
         .support_fp16_signed_zero_nan_preserve =
-            float_control.shaderSignedZeroInfNanPreserveFloat16 != VK_FALSE,
+            allow_float_controls && float_control.shaderSignedZeroInfNanPreserveFloat16 != VK_FALSE,
         .support_fp32_signed_zero_nan_preserve =
-            float_control.shaderSignedZeroInfNanPreserveFloat32 != VK_FALSE,
+            allow_float_controls && float_control.shaderSignedZeroInfNanPreserveFloat32 != VK_FALSE,
         .support_fp64_signed_zero_nan_preserve =
-            float_control.shaderSignedZeroInfNanPreserveFloat64 != VK_FALSE,
+            allow_float_controls && float_control.shaderSignedZeroInfNanPreserveFloat64 != VK_FALSE,
         .support_explicit_workgroup_layout = device.IsKhrWorkgroupMemoryExplicitLayoutSupported(),
         .support_vote = device.IsSubgroupFeatureSupported(VK_SUBGROUP_FEATURE_VOTE_BIT),
         .support_viewport_index_layer_non_geometry =
@@ -371,7 +380,8 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         .has_broken_spirv_position_input = driver_id == VK_DRIVER_ID_QUALCOMM_PROPRIETARY,
         .has_broken_unsigned_image_offsets = false,
         .has_broken_signed_operations = false,
-        .has_broken_fp16_float_controls = driver_id == VK_DRIVER_ID_NVIDIA_PROPRIETARY,
+        .has_broken_fp16_float_controls = driver_id == VK_DRIVER_ID_NVIDIA_PROPRIETARY ||
+                                          driver_id == VK_DRIVER_ID_QUALCOMM_PROPRIETARY,
         .ignore_nan_fp_comparisons = false,
         .has_broken_spirv_subgroup_mask_vector_extract_dynamic =
             driver_id == VK_DRIVER_ID_QUALCOMM_PROPRIETARY,
