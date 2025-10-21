@@ -131,6 +131,10 @@ public:
         image_layout_cache[ImageKey(image)] = layout;
     }
 
+    void ClearImageLayoutTracking(VkImage image) noexcept {
+        image_layout_cache.erase(ImageKey(image));
+    }
+
     std::mutex submit_mutex;
 
 private:

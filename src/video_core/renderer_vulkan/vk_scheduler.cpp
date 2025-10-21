@@ -23,6 +23,50 @@
 
 namespace Vulkan {
 
+namespace {
+struct StageAccessInfo {
+    VkPipelineStageFlags stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    VkAccessFlags access = 0;
+};
+
+[[nodiscard]] StageAccessInfo StageAccessForLayout(VkImageLayout layout,
+                                                   [[maybe_unused]] VkImageAspectFlags aspect_mask) noexcept {
+    switch (layout) {
+    case VK_IMAGE_LAYOUT_UNDEFINED:
+        return {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0};
+    case VK_IMAGE_LAYOUT_GENERAL:
+        return {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT};
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+        return {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT};
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL: {
+        constexpr VkPipelineStageFlags depth_stages =
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        return {depth_stages,
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT};
+    }
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+        return {VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT};
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+        return {VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT};
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+        return {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_SHADER_READ_BIT};
+    default:
+        // Fallback to a conservative barrier when encountering uncommon layouts.
+        return {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT};
+    }
+}
+
+[[nodiscard]] VkImageLayout OptimalLayoutForRange(const VkImageSubresourceRange& range) noexcept {
+    if ((range.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) != 0) {
+        return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    }
+    return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+}
+} // Anonymous namespace
+
 
 void Scheduler::CommandChunk::ExecuteAll(vk::CommandBuffer cmdbuf,
                                          vk::CommandBuffer upload_cmdbuf) {
@@ -118,7 +162,6 @@ void Scheduler::RequestRenderpass(const Framebuffer* framebuffer) {
         } else {
             previous_layouts[i] = VK_IMAGE_LAYOUT_GENERAL;
         }
-        image_layout_cache[key] = framebuffer_layouts[i];
     }
 
     Record([renderpass, framebuffer_handle, render_area, framebuffer_image_count,
@@ -129,43 +172,24 @@ void Scheduler::RequestRenderpass(const Framebuffer* framebuffer) {
         VkPipelineStageFlags dst_stage_mask = 0;
         size_t barrier_count = 0;
         for (size_t i = 0; i < framebuffer_image_count; ++i) {
-            const VkImageLayout target_layout = framebuffer_layouts[i];
-            if (target_layout == VK_IMAGE_LAYOUT_GENERAL || target_layout == VK_IMAGE_LAYOUT_UNDEFINED) {
-                continue;
-            }
-
             const VkImageSubresourceRange& range = framebuffer_ranges[i];
+            VkImageLayout target_layout = framebuffer_layouts[i];
+            if (target_layout == VK_IMAGE_LAYOUT_UNDEFINED) {
+                target_layout = OptimalLayoutForRange(range);
+            }
             const VkImageLayout old_layout = previous_layouts[i];
             if (old_layout == target_layout) {
                 continue;
             }
 
-            VkAccessFlags dst_access = 0;
-            VkPipelineStageFlags dst_stage = 0;
-
-            if (range.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) {
-                dst_access |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-                dst_stage |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-            }
-            if (range.aspectMask & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) {
-                dst_access |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                              VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-                dst_stage |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
-                             VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-            }
-
-            VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-            VkAccessFlags src_access = 0;
-            if (old_layout != VK_IMAGE_LAYOUT_UNDEFINED) {
-                src_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-                src_access = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-            }
+            const StageAccessInfo src_info = StageAccessForLayout(old_layout, range.aspectMask);
+            const StageAccessInfo dst_info = StageAccessForLayout(target_layout, range.aspectMask);
 
             barriers[barrier_count++] = VkImageMemoryBarrier{
                 .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
                 .pNext = nullptr,
-                .srcAccessMask = src_access,
-                .dstAccessMask = dst_access,
+                .srcAccessMask = src_info.access,
+                .dstAccessMask = dst_info.access,
                 .oldLayout = old_layout,
                 .newLayout = target_layout,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -173,8 +197,8 @@ void Scheduler::RequestRenderpass(const Framebuffer* framebuffer) {
                 .image = framebuffer_images[i],
                 .subresourceRange = range,
             };
-            src_stage_mask |= src_stage;
-            dst_stage_mask |= dst_stage;
+            src_stage_mask |= src_info.stage;
+            dst_stage_mask |= dst_info.stage;
         }
 
         if (barrier_count > 0) {
@@ -205,6 +229,15 @@ void Scheduler::RequestRenderpass(const Framebuffer* framebuffer) {
     renderpass_images = framebuffer_images;
     renderpass_image_ranges = framebuffer_ranges;
     renderpass_image_layouts = framebuffer_layouts;
+
+    for (size_t i = 0; i < framebuffer_image_count; ++i) {
+        VkImageLayout target_layout = framebuffer_layouts[i];
+        if (target_layout == VK_IMAGE_LAYOUT_UNDEFINED) {
+            target_layout = OptimalLayoutForRange(framebuffer_ranges[i]);
+        }
+        image_layout_cache[ImageKey(framebuffer_images[i])] = target_layout;
+        renderpass_image_layouts[i] = target_layout;
+    }
 }
 
 void Scheduler::RequestOutsideRenderPassOperationContext() {
@@ -367,62 +400,51 @@ void Scheduler::EndRenderPass(bool force_general)
                        images = renderpass_images,
                        ranges = renderpass_image_ranges,
                        layouts = renderpass_image_layouts](vk::CommandBuffer cmdbuf) {
-            std::array<VkImageMemoryBarrier, 9> barriers;
+            cmdbuf.EndRenderPass();
+
+            if (num_images == 0) {
+                return;
+            }
+
+            std::array<VkImageMemoryBarrier, 9> barriers{};
             VkPipelineStageFlags src_stages = 0;
+            VkPipelineStageFlags dst_stages = 0;
 
             for (size_t i = 0; i < num_images; ++i) {
                 const VkImageSubresourceRange& range = ranges[i];
-                const bool is_color = range.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT;
-                const bool is_depth_stencil = range.aspectMask
-                                              & (VK_IMAGE_ASPECT_DEPTH_BIT
-                                                 | VK_IMAGE_ASPECT_STENCIL_BIT);
-
-                VkAccessFlags src_access = 0;
-                VkPipelineStageFlags this_stage = 0;
-
-                if (is_color) {
-                    src_access |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-                    this_stage |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                VkImageLayout old_layout = layouts[i];
+                if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED) {
+                    old_layout = OptimalLayoutForRange(range);
                 }
+                constexpr VkImageLayout new_layout = VK_IMAGE_LAYOUT_GENERAL;
 
-                if (is_depth_stencil) {
-                    src_access |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-                    this_stage |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
-                                  | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-                }
-
-                src_stages |= this_stage;
-
-                const VkImageLayout render_layout =
-                    layouts[i] != VK_IMAGE_LAYOUT_UNDEFINED ? layouts[i] : VK_IMAGE_LAYOUT_GENERAL;
+                const StageAccessInfo src_info = StageAccessForLayout(old_layout, range.aspectMask);
+                const StageAccessInfo dst_info = StageAccessForLayout(new_layout, range.aspectMask);
 
                 barriers[i] = VkImageMemoryBarrier{
-                        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                        .pNext = nullptr,
-                        .srcAccessMask = src_access,
-                        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
-                                         | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT
-                                         | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                                         | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
-                                         | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-                        .oldLayout = render_layout,
-                        .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                        .image = images[i],
-                        .subresourceRange = range,
+                    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                    .pNext = nullptr,
+                    .srcAccessMask = src_info.access,
+                    .dstAccessMask = dst_info.access,
+                    .oldLayout = old_layout,
+                    .newLayout = new_layout,
+                    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .image = images[i],
+                    .subresourceRange = range,
                 };
+                src_stages |= src_info.stage;
+                dst_stages |= dst_info.stage;
             }
 
-            cmdbuf.EndRenderPass();
-
-            cmdbuf.PipelineBarrier(src_stages,
-                                   VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            cmdbuf.PipelineBarrier(src_stages != 0 ? src_stages
+                                                   : static_cast<VkPipelineStageFlags>(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT),
+                                   dst_stages != 0 ? dst_stages
+                                                   : static_cast<VkPipelineStageFlags>(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT),
                                    0,
                                    {},
                                    {},
-                                   {barriers.data(), num_images} // Batched image barriers
-            );
+                                   {barriers.data(), num_images});
         });
 
         for (size_t i = 0; i < num_renderpass_images; ++i) {
@@ -433,11 +455,11 @@ void Scheduler::EndRenderPass(bool force_general)
             cmdbuf.EndRenderPass();
         });
         for (size_t i = 0; i < num_renderpass_images; ++i) {
-            const VkImageLayout render_layout =
-                renderpass_image_layouts[i] != VK_IMAGE_LAYOUT_UNDEFINED
-                    ? renderpass_image_layouts[i]
-                    : VK_IMAGE_LAYOUT_GENERAL;
-            image_layout_cache[ImageKey(renderpass_images[i])] = render_layout;
+            VkImageLayout layout = renderpass_image_layouts[i];
+            if (layout == VK_IMAGE_LAYOUT_UNDEFINED) {
+                layout = OptimalLayoutForRange(renderpass_image_ranges[i]);
+            }
+            image_layout_cache[ImageKey(renderpass_images[i])] = layout;
         }
     }
 

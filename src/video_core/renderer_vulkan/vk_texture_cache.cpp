@@ -840,6 +840,8 @@ void BlitScale(Scheduler& scheduler, VkImage src_image, VkImage dst_image, const
         cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                                0, nullptr, nullptr, write_barriers);
     });
+    scheduler.TrackImageLayout(src_image, VK_IMAGE_LAYOUT_GENERAL);
+    scheduler.TrackImageLayout(dst_image, VK_IMAGE_LAYOUT_GENERAL);
 }
 } // Anonymous namespace
 
@@ -1072,6 +1074,8 @@ void TextureCacheRuntime::ReinterpretImage(Image& dst, Image& src,
         cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                                0, {}, {}, post_barriers);
     });
+    scheduler.TrackImageLayout(src_image, VK_IMAGE_LAYOUT_GENERAL);
+    scheduler.TrackImageLayout(dst_image, VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void TextureCacheRuntime::BlitImage(Framebuffer* dst_framebuffer, ImageView& dst, ImageView& src,
@@ -1480,6 +1484,8 @@ void TextureCacheRuntime::CopyImage(Image& dst, Image& src,
                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
                 0, nullptr, nullptr, post_barriers);
     });
+    scheduler.TrackImageLayout(src_image, VK_IMAGE_LAYOUT_GENERAL);
+    scheduler.TrackImageLayout(dst_image, VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void TextureCacheRuntime::CopyImageMSAA(Image& dst, Image& src,
@@ -1551,7 +1557,21 @@ Image::Image(TextureCacheRuntime& runtime_, const ImageInfo& info_, GPUVAddr gpu
 
 Image::Image(const VideoCommon::NullImageParams& params) : VideoCommon::ImageBase{params} {}
 
-Image::~Image() = default;
+Image::~Image() {
+    if (!scheduler) {
+        return;
+    }
+
+    const auto drop_image = [this](const vk::Image& wrapper) {
+        if (!wrapper) {
+            return;
+        }
+        scheduler->ClearImageLayoutTracking(*wrapper);
+    };
+
+    drop_image(original_image);
+    drop_image(scaled_image);
+}
 
 void Image::UploadMemory(VkBuffer buffer, VkDeviceSize offset,
                          std::span<const VideoCommon::BufferImageCopy> copies) {
@@ -1604,6 +1624,7 @@ void Image::UploadMemory(VkBuffer buffer, VkDeviceSize offset,
                            keep = temp_wrapper](vk::CommandBuffer cmdbuf) {
             CopyBufferToImage(cmdbuf, src_buffer, temp_vk_image, vk_aspect_mask, false, VideoCommon::FixSmallVectorADL(vk_copies));
         });
+        scheduler->TrackImageLayout(temp_vk_image, VK_IMAGE_LAYOUT_GENERAL);
 
         // Use MSAACopyPass to convert from non-MSAA to MSAA
         std::vector<VideoCommon::ImageCopy> image_copies;
@@ -1643,6 +1664,7 @@ void Image::UploadMemory(VkBuffer buffer, VkDeviceSize offset,
                        vk_copies](vk::CommandBuffer cmdbuf) {
         CopyBufferToImage(cmdbuf, src_buffer, vk_image, vk_aspect_mask, was_initialized, VideoCommon::FixSmallVectorADL(vk_copies));
     });
+    scheduler->TrackImageLayout(vk_image, VK_IMAGE_LAYOUT_GENERAL);
 
     if (is_rescaled) {
         ScaleUp();
@@ -1766,6 +1788,7 @@ void Image::DownloadMemory(std::span<VkBuffer> buffers_span, std::span<size_t> o
                 cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                                        0, memory_write_barrier, nullptr, image_write_barrier);
             });
+            scheduler->TrackImageLayout(*temp_wrapper.original_image, VK_IMAGE_LAYOUT_GENERAL);
             return;
         }
     } else {
@@ -1833,6 +1856,7 @@ void Image::DownloadMemory(std::span<VkBuffer> buffers_span, std::span<size_t> o
             cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                                    0, memory_write_barrier, nullptr, image_write_barrier);
         });
+        scheduler->TrackImageLayout(*original_image, VK_IMAGE_LAYOUT_GENERAL);
     }
 
     if (is_rescaled) {
