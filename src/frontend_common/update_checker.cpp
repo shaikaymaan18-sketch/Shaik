@@ -137,5 +137,3 @@ std::optional<std::string> UpdateChecker::GetLatestRelease(bool include_prerelea
         return {};
     }
 }
-
-} // namespace UpdateChecker
