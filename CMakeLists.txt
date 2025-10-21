@@ -533,6 +533,7 @@ else()
 
     # wow
     if (PLATFORM_LINUX)
+        cmake_policy(SET CMP0167 NEW)
         find_package(Boost 1.57.0 REQUIRED COMPONENTS headers context system fiber)
     else()
         find_package(Boost 1.57.0 CONFIG REQUIRED)
