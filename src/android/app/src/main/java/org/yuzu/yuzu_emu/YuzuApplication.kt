@@ -64,53 +64,7 @@ class YuzuApplication : Application() {
         PowerStateUpdater.start()
         Log.logDeviceInfo()
 
-        // Initialize CA certificates for HTTPS
-        if (NativeLibrary.isUpdateCheckerEnabled()) {
-            initializeCACertificates()
-        }
-
         createNotificationChannels()
-    }
-
-    // required for httplib and update checker
-    private fun initializeCACertificates() {
-        try {
-            val trustManagerFactory = TrustManagerFactory.getInstance(
-                TrustManagerFactory.getDefaultAlgorithm()
-            )
-            trustManagerFactory.init(null as KeyStore?)
-
-            val trustManagers = trustManagerFactory.trustManagers
-            if (trustManagers.isEmpty()) {
-                Log.error("[SSL] No trust managers found")
-                return
-            }
-            val x509TrustManager = trustManagers[0] as X509TrustManager
-            val acceptedIssuers = x509TrustManager.acceptedIssuers
-
-            if (acceptedIssuers.isEmpty()) {
-                Log.error("[SSL] No CA certificates found")
-                return
-            }
-
-            val certFile = File(filesDir, "cacert.pem")
-            FileOutputStream(certFile).use { outputStream ->
-                for (cert in acceptedIssuers) {
-                    outputStream.write("-----BEGIN CERTIFICATE-----\n".toByteArray())
-                    val encoded = android.util.Base64.encodeToString(
-                        cert.encoded,
-                        android.util.Base64.DEFAULT
-                    )
-                    outputStream.write(encoded.toByteArray())
-                    outputStream.write("-----END CERTIFICATE-----\n".toByteArray())
-                }
-            }
-
-            NativeLibrary.setCACertificatePath(certFile.absolutePath)
-            Log.info("[SSL] Initialized ${acceptedIssuers.size} CA certificates at: ${certFile.absolutePath}")
-        } catch (e: Exception) {
-            Log.error("[SSL] Failed to initialize CA certificates: ${e.message}")
-        }
     }
 
     companion object {

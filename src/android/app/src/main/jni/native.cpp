@@ -91,8 +91,6 @@ std::atomic<bool> g_has_battery = {true};
 
 // playtime
 std::unique_ptr<PlayTime::PlayTimeManager> play_time_manager;
-// SSL Certificate path for HTTPS requests
-std::string g_ca_cert_path;
 
 EmulationSession::EmulationSession() {
     m_vfs = std::make_shared<FileSys::RealVfsFilesystem>();
@@ -1125,14 +1123,6 @@ JNIEXPORT jboolean JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_isUpdateChecker
     }
 
 #ifdef ENABLE_UPDATE_CHECKER
-JNIEXPORT void JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_setCACertificatePath(
-        JNIEnv* env,
-        jobject obj,
-        jstring path) {
-    const char* path_str = env->GetStringUTFChars(path, nullptr);
-    g_ca_cert_path = std::string(path_str);
-    env->ReleaseStringUTFChars(path, path_str);
-}
 
 JNIEXPORT jstring JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_checkForUpdate(
         JNIEnv* env,

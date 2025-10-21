@@ -201,11 +201,6 @@ object NativeLibrary {
     external fun logSettings()
 
     /**
-     * Sets the path to CA certificates for SSL/TLS verification.
-     */
-    external fun setCACertificatePath(path: String)
-
-    /**
      * Checks for available updates.
      */
     external fun checkForUpdate(): String?
