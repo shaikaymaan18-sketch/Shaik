@@ -533,7 +533,7 @@ else()
 
     # wow
     if (PLATFORM_LINUX)
-        find_package(Boost 1.57.0 CONFIG REQUIRED headers context system fiber)
+        find_package(Boost 1.57.0 REQUIRED COMPONENTS headers context system fiber)
     else()
         find_package(Boost 1.57.0 CONFIG REQUIRED)
     endif()
