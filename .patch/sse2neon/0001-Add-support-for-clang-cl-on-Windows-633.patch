@@ -18,13 +18,13 @@ Known failures in test suite:
 
 Co-authored-by: Anthony Roberts <anthony.roberts@linaro.org>
 ---
- externals/sse2neon/sse2neon.h | 22 +++++++++++-----------
+ sse2neon.h | 22 +++++++++++-----------
  1 file changed, 11 insertions(+), 11 deletions(-)
 
-diff --git a/externals/sse2neon/sse2neon.h b/externals/sse2neon/sse2neon.h
+diff --git a/sse2neon.h b/sse2neon.h
 index 56254b5..76cf8e3 100644
---- a/externals/sse2neon/sse2neon.h
-+++ b/externals/sse2neon/sse2neon.h
+--- a/sse2neon.h
++++ b/sse2neon.h
 @@ -180,7 +180,7 @@
      }
  
