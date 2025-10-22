@@ -1,4 +1,4 @@
-From 303885bc70490e155d23690e39a73ff9bcd940e2 Mon Sep 17 00:00:00 2001
+From d765ebed3598ddfd7167fc546474626ac5ef9498 Mon Sep 17 00:00:00 2001
 From: Anthony Roberts <anthony.roberts@linaro.org>
 Date: Fri, 2 Aug 2024 16:55:57 +0100
 Subject: [PATCH] Add support for clang-cl on Windows (#633)
@@ -22,7 +22,7 @@ Co-authored-by: Anthony Roberts <anthony.roberts@linaro.org>
  1 file changed, 11 insertions(+), 11 deletions(-)
 
 diff --git a/externals/sse2neon/sse2neon.h b/externals/sse2neon/sse2neon.h
-index 56254b5f99..76cf8e31ea 100755
+index 56254b5..76cf8e3 100644
 --- a/externals/sse2neon/sse2neon.h
 +++ b/externals/sse2neon/sse2neon.h
 @@ -180,7 +180,7 @@
