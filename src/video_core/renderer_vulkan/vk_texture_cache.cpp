@@ -2288,15 +2288,15 @@ VkImageView ImageView::ColorView() {
 }
 
 VkImageView ImageView::StorageView(Shader::TextureType texture_type,
-                                   Shader::ImageFormat image_format) {
+                                   Shader::ImageFormat requested_format) {
     if (!image_handle) {
         return VK_NULL_HANDLE;
     }
-    if (image_format == Shader::ImageFormat::Typeless) {
+    if (requested_format == Shader::ImageFormat::Typeless) {
         return Handle(texture_type);
     }
-    const bool is_signed{image_format == Shader::ImageFormat::R8_SINT ||
-                         image_format == Shader::ImageFormat::R16_SINT};
+    const bool is_signed{requested_format == Shader::ImageFormat::R8_SINT ||
+                         requested_format == Shader::ImageFormat::R16_SINT};
     if (!storage_views) {
         storage_views = std::make_unique<StorageViews>();
     }
@@ -2305,7 +2305,7 @@ VkImageView ImageView::StorageView(Shader::TextureType texture_type,
     if (view) {
         return *view;
     }
-    view = MakeView(Format(image_format), VK_IMAGE_ASPECT_COLOR_BIT);
+    view = MakeView(Format(requested_format), VK_IMAGE_ASPECT_COLOR_BIT);
     return *view;
 }
 
