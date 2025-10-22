@@ -930,8 +930,8 @@ bool Device::SupportsDepthCompare(VkFormat format, FormatType format_type) const
         }
         UNREACHABLE_MSG("Invalid format type={}", static_cast<int>(format_type));
     };
-    const VkFormatFeatureFlags2 features2 = select_features();
-    return (features2 & VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT) != 0;
+    const VkFormatFeatureFlags2 selected_features = select_features();
+    return (selected_features & VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT) != 0;
 }
 
 std::string Device::GetDriverName() const {
