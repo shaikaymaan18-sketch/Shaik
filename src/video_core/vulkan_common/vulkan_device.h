@@ -210,6 +210,9 @@ public:
     VkFormat GetSupportedFormat(VkFormat wanted_format, VkFormatFeatureFlags wanted_usage,
                                 FormatType format_type) const;
 
+    [[nodiscard]] bool SupportsDepthCompare(
+        VkFormat format, FormatType format_type = FormatType::Optimal) const;
+
     /// Returns true if a format is supported.
     bool IsFormatSupported(VkFormat wanted_format, VkFormatFeatureFlags wanted_usage,
                            FormatType format_type) const;

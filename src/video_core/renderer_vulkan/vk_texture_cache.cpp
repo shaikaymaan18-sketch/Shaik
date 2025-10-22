@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <ranges>
 #include <span>
 #include <memory>
 #include <vector>
@@ -861,21 +862,48 @@ TextureCacheRuntime::TextureCacheRuntime(const Device& device_, Scheduler& sched
         msaa_copy_pass = std::make_unique<MSAACopyPass>(
             device, scheduler, descriptor_pool, staging_buffer_pool, compute_pass_descriptor_queue);
     }
-    if (!device.IsKhrImageFormatListSupported()) {
-        return;
-    }
+    const auto add_unique = [](std::vector<VkFormat>& formats, VkFormat format) {
+        if (format == VK_FORMAT_UNDEFINED) {
+            return;
+        }
+        if (std::ranges::find(formats, format) != formats.end()) {
+            return;
+        }
+        formats.push_back(format);
+    };
+    const auto add_pixel_format = [&](std::vector<VkFormat>& formats, PixelFormat image_format,
+                                      PixelFormat view_format) {
+        if (!VideoCore::Surface::IsViewCompatible(image_format, view_format, false, true)) {
+            return;
+        }
+        const auto vk_format =
+            MaxwellToVK::SurfaceFormat(device, FormatType::Optimal, true, view_format).format;
+        add_unique(formats, vk_format);
+    };
     for (size_t index_a = 0; index_a < VideoCore::Surface::MaxPixelFormat; index_a++) {
         const auto image_format = static_cast<PixelFormat>(index_a);
         if (IsPixelFormatASTC(image_format) && !device.IsOptimalAstcSupported()) {
-            view_formats[index_a].push_back(VK_FORMAT_A8B8G8R8_UNORM_PACK32);
+            add_unique(view_formats[index_a], VK_FORMAT_A8B8G8R8_UNORM_PACK32);
         }
         for (size_t index_b = 0; index_b < VideoCore::Surface::MaxPixelFormat; index_b++) {
             const auto view_format = static_cast<PixelFormat>(index_b);
-            if (VideoCore::Surface::IsViewCompatible(image_format, view_format, false, true)) {
-                const auto view_info =
-                    MaxwellToVK::SurfaceFormat(device, FormatType::Optimal, true, view_format);
-                view_formats[index_a].push_back(view_info.format);
+            if (!VideoCore::Surface::IsViewCompatible(image_format, view_format, false, true)) {
+                continue;
             }
+            const auto vk_format =
+                MaxwellToVK::SurfaceFormat(device, FormatType::Optimal, true, view_format).format;
+            add_unique(view_formats[index_a], vk_format);
+        }
+        const auto surface_type = VideoCore::Surface::GetFormatType(image_format);
+        if (surface_type == VideoCore::Surface::SurfaceType::Depth ||
+            surface_type == VideoCore::Surface::SurfaceType::DepthStencil) {
+            add_pixel_format(view_formats[index_a], image_format, PixelFormat::D32_FLOAT);
+            add_pixel_format(view_formats[index_a], image_format, PixelFormat::D32_FLOAT_S8_UINT);
+            add_pixel_format(view_formats[index_a], image_format, PixelFormat::D24_UNORM_S8_UINT);
+            add_pixel_format(view_formats[index_a], image_format, PixelFormat::S8_UINT_D24_UNORM);
+            add_pixel_format(view_formats[index_a], image_format, PixelFormat::X8_D24_UNORM);
+            add_pixel_format(view_formats[index_a], image_format, PixelFormat::D16_UNORM);
+            add_pixel_format(view_formats[index_a], image_format, PixelFormat::R32_FLOAT);
         }
     }
 }
@@ -1511,6 +1539,7 @@ Image::Image(TextureCacheRuntime& runtime_, const ImageInfo& info_, GPUVAddr gpu
       runtime{&runtime_}, original_image(MakeImage(runtime_.device, runtime_.memory_allocator, info,
                                                    runtime->ViewFormats(info.format))),
       aspect_mask(ImageAspectMask(info.format)) {
+    has_mutable_format = runtime->ViewFormats(info.format).size() > 1;
     if (IsPixelFormatASTC(info.format) && !runtime->device.IsOptimalAstcSupported()) {
         switch (Settings::values.accelerate_astc.GetValue()) {
         case Settings::AstcDecodeMode::Gpu:
@@ -2008,7 +2037,8 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
                      ImageId image_id_, Image& image)
     : VideoCommon::ImageViewBase{info, image.info, image_id_, image.gpu_addr},
       device{&runtime.device}, image_handle{image.Handle()},
-      samples(ConvertSampleCount(image.info.num_samples)) {
+      samples(ConvertSampleCount(image.info.num_samples)),
+      image_format{image.info.format}, image_has_mutable_format{image.HasMutableFormat()} {
     using Shader::TextureType;
 
     const VkImageAspectFlags aspect_mask = ImageViewAspectMask(info);
@@ -2102,7 +2132,7 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
 ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageInfo& info,
                      const VideoCommon::ImageViewInfo& view_info, GPUVAddr gpu_addr_)
     : VideoCommon::ImageViewBase{info, view_info, gpu_addr_},
-      buffer_size{VideoCommon::CalculateGuestSizeInBytes(info)} {}
+      buffer_size{VideoCommon::CalculateGuestSizeInBytes(info)}, image_format{info.format} {}
 
 ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::NullImageViewParams& params)
     : VideoCommon::ImageViewBase{params}, device{&runtime.device} {
@@ -2122,6 +2152,105 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::NullImageV
 }
 
 ImageView::~ImageView() = default;
+
+std::optional<ImageView::DepthSampledView> ImageView::AcquireDepthCompareView(
+    Shader::TextureType texture_type) {
+    if (!image_handle || !image_has_mutable_format) {
+        return std::nullopt;
+    }
+    const auto surface_type = VideoCore::Surface::GetFormatType(image_format);
+    if (surface_type != VideoCore::Surface::SurfaceType::Depth &&
+        surface_type != VideoCore::Surface::SurfaceType::DepthStencil) {
+        return std::nullopt;
+    }
+    const size_t index = static_cast<size_t>(texture_type);
+    if (depth_compare_views[index]) {
+        return DepthSampledView{*depth_compare_views[index], depth_compare_formats[index]};
+    }
+
+    std::array<PixelFormat, 6> candidate_formats{};
+    size_t candidate_count = 0;
+    const auto enqueue_candidate = [&](PixelFormat candidate) {
+        if (candidate == PixelFormat::Invalid) {
+            return;
+        }
+        if (std::ranges::find(candidate_formats.begin(),
+                              candidate_formats.begin() + candidate_count,
+                              candidate) != candidate_formats.begin() + candidate_count) {
+            return;
+        }
+        candidate_formats[candidate_count++] = candidate;
+    };
+
+    enqueue_candidate(image_format);
+    switch (image_format) {
+    case PixelFormat::D32_FLOAT_S8_UINT:
+        enqueue_candidate(PixelFormat::D32_FLOAT);
+        break;
+    case PixelFormat::D24_UNORM_S8_UINT:
+    case PixelFormat::S8_UINT_D24_UNORM:
+    case PixelFormat::X8_D24_UNORM:
+        enqueue_candidate(PixelFormat::D24_UNORM_S8_UINT);
+        enqueue_candidate(PixelFormat::X8_D24_UNORM);
+        enqueue_candidate(PixelFormat::D32_FLOAT);
+        enqueue_candidate(PixelFormat::D32_FLOAT_S8_UINT);
+        break;
+    case PixelFormat::D16_UNORM:
+        enqueue_candidate(PixelFormat::D16_UNORM);
+        break;
+    default:
+        break;
+    }
+    enqueue_candidate(PixelFormat::D32_FLOAT);
+
+    const auto try_candidate = [&](PixelFormat candidate)
+        -> std::optional<DepthSampledView> {
+        if (!VideoCore::Surface::IsViewCompatible(image_format, candidate, false, true)) {
+            return std::nullopt;
+        }
+        const auto format_info =
+            MaxwellToVK::SurfaceFormat(*device, FormatType::Optimal, true, candidate);
+        if (!device->SupportsDepthCompare(format_info.format)) {
+            return std::nullopt;
+        }
+        auto subresource_range = MakeSubresourceRange(this);
+        subresource_range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        const VkImageViewUsageCreateInfo image_view_usage{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO,
+            .pNext = nullptr,
+            .usage = ImageUsageFlags(format_info, candidate),
+        };
+        VkImageViewCreateInfo ci{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+            .pNext = &image_view_usage,
+            .flags = 0,
+            .image = image_handle,
+            .viewType = ImageViewType(texture_type),
+            .format = format_info.format,
+            .components{
+                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+            },
+            .subresourceRange = subresource_range,
+        };
+        vk::ImageView view = device->GetLogical().CreateImageView(ci);
+        if (device->HasDebuggingToolAttached()) {
+            view.SetObjectNameEXT(VideoCommon::Name(*this, gpu_addr).c_str());
+        }
+        depth_compare_views[index] = std::move(view);
+        depth_compare_formats[index] = format_info.format;
+        return DepthSampledView{*depth_compare_views[index], depth_compare_formats[index]};
+    };
+
+    for (size_t i = 0; i < candidate_count; ++i) {
+        if (auto sampled_view = try_candidate(candidate_formats[i])) {
+            return sampled_view;
+        }
+    }
+    return std::nullopt;
+}
 
 VkImageView ImageView::DepthView() {
     if (!image_handle) {
@@ -2236,7 +2365,9 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
     // Some games have samplers with garbage. Sanitize them here.
     const f32 max_anisotropy = std::clamp(tsc.MaxAnisotropy(), 1.0f, 16.0f);
 
-    const auto create_sampler = [&](const f32 anisotropy) {
+    compare_enabled = tsc.depth_compare_enabled != 0;
+
+    const auto create_sampler = [&](const f32 anisotropy, VkBool32 compare_enable) {
         return device.GetLogical().CreateSampler(VkSamplerCreateInfo{
             .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
             .pNext = pnext,
@@ -2250,7 +2381,7 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
             .mipLodBias = tsc.LodBias(),
             .anisotropyEnable = static_cast<VkBool32>(anisotropy > 1.0f ? VK_TRUE : VK_FALSE),
             .maxAnisotropy = anisotropy,
-            .compareEnable = tsc.depth_compare_enabled,
+            .compareEnable = compare_enable,
             .compareOp = MaxwellToVK::Sampler::DepthCompareFunction(tsc.depth_compare_func),
             .minLod = tsc.mipmap_filter == TextureMipmapFilter::None ? 0.0f : tsc.MinLod(),
             .maxLod = tsc.mipmap_filter == TextureMipmapFilter::None ? 0.25f : tsc.MaxLod(),
@@ -2260,11 +2391,19 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
         });
     };
 
-    sampler = create_sampler(max_anisotropy);
+    sampler = create_sampler(max_anisotropy, compare_enabled ? VK_TRUE : VK_FALSE);
+    if (compare_enabled) {
+        sampler_no_compare = create_sampler(max_anisotropy, VK_FALSE);
+    }
 
     const f32 max_anisotropy_default = static_cast<f32>(1U << tsc.max_anisotropy);
     if (max_anisotropy > max_anisotropy_default) {
-        sampler_default_anisotropy = create_sampler(max_anisotropy_default);
+        sampler_default_anisotropy =
+            create_sampler(max_anisotropy_default, compare_enabled ? VK_TRUE : VK_FALSE);
+        if (compare_enabled) {
+            sampler_default_anisotropy_no_compare =
+                create_sampler(max_anisotropy_default, VK_FALSE);
+        }
     }
 }
 

@@ -895,6 +895,45 @@ bool Device::IsFormatSupported(VkFormat wanted_format, VkFormatFeatureFlags want
     return (supported_usage & wanted_usage) == wanted_usage;
 }
 
+bool Device::SupportsDepthCompare(VkFormat format, FormatType format_type) const {
+    const auto it = format_properties.find(format);
+    if (it == format_properties.end()) {
+        UNIMPLEMENTED_MSG("Unimplemented depth compare format query={}", format);
+        return false;
+    }
+
+#ifdef VK_FORMAT_FEATURE_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT
+    const auto legacy_usage = GetFormatFeatures(it->second, format_type);
+    if ((legacy_usage & VK_FORMAT_FEATURE_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT) != 0) {
+        return true;
+    }
+#endif
+
+    VkFormatProperties3 props3{
+        .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_3,
+        .pNext = nullptr,
+    };
+    VkFormatProperties2 props2{
+        .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2,
+        .pNext = &props3,
+    };
+    physical.GetFormatProperties2(format, props2);
+
+    const auto select_features = [&]() -> VkFormatFeatureFlags2 {
+        switch (format_type) {
+        case FormatType::Linear:
+            return props3.linearTilingFeatures;
+        case FormatType::Optimal:
+            return props3.optimalTilingFeatures;
+        case FormatType::Buffer:
+            return props3.bufferFeatures;
+        }
+        UNREACHABLE_MSG("Invalid format type={}", static_cast<int>(format_type));
+    };
+    const VkFormatFeatureFlags2 features2 = select_features();
+    return (features2 & VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT) != 0;
+}
+
 std::string Device::GetDriverName() const {
     switch (properties.driver.driverID) {
     case VK_DRIVER_ID_AMD_PROPRIETARY:

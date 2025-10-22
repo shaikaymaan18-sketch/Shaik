@@ -6,6 +6,7 @@
 #include <cstddef>
 
 #include <boost/container/small_vector.hpp>
+#include <optional>
 
 #include "common/common_types.h"
 #include "shader_recompiler/backend/spirv/emit_spirv.h"
@@ -189,13 +190,40 @@ inline void PushImageDescriptors(TextureCache& texture_cache,
             const VideoCommon::ImageViewId image_view_id{(views++)->id};
             const VideoCommon::SamplerId sampler_id{*(samplers++)};
             ImageView& image_view{texture_cache.GetImageView(image_view_id)};
-            const VkImageView vk_image_view{image_view.Handle(desc.type)};
             const Sampler& sampler{texture_cache.GetSampler(sampler_id)};
+            const bool wants_compare{sampler.IsCompareEnabled() || desc.is_depth};
+            const bool image_mutable{image_view.HasMutableImageFormat()};
+            const auto depth_view =
+                wants_compare && image_mutable ? image_view.AcquireDepthCompareView(desc.type)
+                                               : std::optional<ImageView::DepthSampledView>{};
+            const bool use_depth_view = depth_view.has_value();
+            const VkImageView vk_image_view{
+                use_depth_view ? depth_view->view : image_view.Handle(desc.type)};
             const bool use_fallback_sampler{sampler.HasAddedAnisotropy() &&
                                             !image_view.SupportsAnisotropy()};
-            const VkSampler vk_sampler{use_fallback_sampler ? sampler.HandleWithDefaultAnisotropy()
-                                                            : sampler.Handle()};
+            VkSampler vk_sampler{};
+            if (use_fallback_sampler) {
+                if (wants_compare && !use_depth_view) {
+                    vk_sampler = sampler.HandleWithoutCompareDefaultAnisotropy();
+                } else {
+                    vk_sampler = sampler.HandleWithDefaultAnisotropy();
+                }
+            } else if (wants_compare && !use_depth_view) {
+                vk_sampler = sampler.HandleWithoutCompare();
+            } else {
+                vk_sampler = sampler.Handle();
+            }
             guest_descriptor_queue.AddSampledImage(vk_image_view, vk_sampler);
+            if (wants_compare) {
+                if (use_depth_view) {
+                    LOG_DEBUG(Render_Vulkan, "Shadow binding uses view format {}",
+                              static_cast<u32>(depth_view->format));
+                } else {
+                    LOG_DEBUG(Render_Vulkan,
+                              "Shadow binding falling back to manual compare (mutable={} compare_supported={})",
+                              image_mutable ? 1 : 0, sampler.IsCompareEnabled() ? 1 : 0);
+                }
+            }
             rescaling.PushTexture(texture_cache.IsRescaling(image_view));
         }
     }

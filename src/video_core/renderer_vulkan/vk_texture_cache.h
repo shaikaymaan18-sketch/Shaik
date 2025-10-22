@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <array>
+#include <optional>
 #include <span>
 
 #include "video_core/texture_cache/texture_cache_base.h"
@@ -171,6 +173,10 @@ public:
         return (this->*current_image).UsageFlags();
     }
 
+    [[nodiscard]] bool HasMutableFormat() const noexcept {
+        return has_mutable_format;
+    }
+
     /// Returns true when the image is already initialized and mark it as initialized
     [[nodiscard]] bool ExchangeInitialization() noexcept {
         return std::exchange(initialized, true);
@@ -202,6 +208,7 @@ private:
     std::vector<vk::ImageView> storage_image_views;
     VkImageAspectFlags aspect_mask = 0;
     bool initialized = false;
+    bool has_mutable_format = false;
 
     std::unique_ptr<Framebuffer> scale_framebuffer;
     std::unique_ptr<ImageView> scale_view;
@@ -236,10 +243,22 @@ public:
     [[nodiscard]] VkImageView StorageView(Shader::TextureType texture_type,
                                           Shader::ImageFormat image_format);
 
+    struct DepthSampledView {
+        VkImageView view;
+        VkFormat format;
+    };
+
+    [[nodiscard]] std::optional<DepthSampledView> AcquireDepthCompareView(
+        Shader::TextureType texture_type);
+
     [[nodiscard]] bool IsRescaled() const noexcept;
 
     [[nodiscard]] VkImageView Handle(Shader::TextureType texture_type) const noexcept {
         return *image_views[static_cast<size_t>(texture_type)];
+    }
+
+    [[nodiscard]] bool HasMutableImageFormat() const noexcept {
+        return image_has_mutable_format;
     }
 
     [[nodiscard]] VkImage ImageHandle() const noexcept {
@@ -275,6 +294,8 @@ private:
 
     std::array<vk::ImageView, Shader::NUM_TEXTURE_TYPES> image_views;
     std::unique_ptr<StorageViews> storage_views;
+    std::array<vk::ImageView, Shader::NUM_TEXTURE_TYPES> depth_compare_views;
+    std::array<VkFormat, Shader::NUM_TEXTURE_TYPES> depth_compare_formats{};
     vk::ImageView depth_view;
     vk::ImageView stencil_view;
     vk::ImageView color_view;
@@ -283,6 +304,8 @@ private:
     VkImageView render_target = VK_NULL_HANDLE;
     VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
     u32 buffer_size = 0;
+    PixelFormat image_format{};
+    bool image_has_mutable_format = false;
 };
 
 class ImageAlloc : public VideoCommon::ImageAllocBase {};
@@ -296,16 +319,35 @@ public:
     }
 
     [[nodiscard]] VkSampler HandleWithDefaultAnisotropy() const noexcept {
-        return *sampler_default_anisotropy;
+        return sampler_default_anisotropy ? *sampler_default_anisotropy : *sampler;
     }
 
     [[nodiscard]] bool HasAddedAnisotropy() const noexcept {
         return static_cast<bool>(sampler_default_anisotropy);
     }
 
+    [[nodiscard]] bool IsCompareEnabled() const noexcept {
+        return compare_enabled;
+    }
+
+    [[nodiscard]] VkSampler HandleWithoutCompare() const noexcept {
+        return sampler_no_compare ? *sampler_no_compare
+                                  : Handle();
+    }
+
+    [[nodiscard]] VkSampler HandleWithoutCompareDefaultAnisotropy() const noexcept {
+        if (sampler_default_anisotropy_no_compare) {
+            return *sampler_default_anisotropy_no_compare;
+        }
+        return HandleWithoutCompare();
+    }
+
 private:
     vk::Sampler sampler;
     vk::Sampler sampler_default_anisotropy;
+    vk::Sampler sampler_no_compare;
+    vk::Sampler sampler_default_anisotropy_no_compare;
+    bool compare_enabled = false;
 };
 
 class Framebuffer {
