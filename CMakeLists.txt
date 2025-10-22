@@ -590,6 +590,7 @@ find_package(VulkanUtilityLibraries)
 find_package(SimpleIni)
 find_package(SPIRV-Tools)
 find_package(sirit)
+find_package(sse2neon)
 
 if (ARCHITECTURE_x86 OR ARCHITECTURE_x86_64)
     find_package(xbyak)
