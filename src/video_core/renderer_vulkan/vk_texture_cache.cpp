@@ -1378,6 +1378,8 @@ void TextureCacheRuntime::CopyImage(Image& dst, Image& src,
     // these images that aren't size-compatible
     if (BytesPerBlock(src.info.format) != BytesPerBlock(dst.info.format)) {
 #ifdef _WIN32
+        // On Windows, linear images cause device loss when used in image copies.
+        // Tested with TitleID: 0x010067300059A00 (Mario + Rabbids Kingdom Battle)
         if (src.info.type == ImageType::Linear || dst.info.type == ImageType::Linear) {
             return;
         }
