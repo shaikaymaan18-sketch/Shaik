@@ -4,6 +4,7 @@
 #pragma once
 
 #include <array>
+#include <optional>
 
 #include "common/common_types.h"
 #include "shader_recompiler/program_header.h"
@@ -25,6 +26,9 @@ public:
     [[nodiscard]] virtual TexturePixelFormat ReadTexturePixelFormat(u32 raw_handle) = 0;
 
     [[nodiscard]] virtual bool IsTexturePixelFormatInteger(u32 raw_handle) = 0;
+
+    [[nodiscard]] virtual std::optional<CompareFunction> ReadTextureCompareFunction(
+        u32 raw_handle) = 0;
 
     [[nodiscard]] virtual u32 ReadViewportTransformState() = 0;
 

@@ -490,10 +490,12 @@ public:
     explicit Descriptors(TextureBufferDescriptors& texture_buffer_descriptors_,
                          ImageBufferDescriptors& image_buffer_descriptors_,
                          TextureDescriptors& texture_descriptors_,
+                         TextureMetas& texture_metas_,
                          ImageDescriptors& image_descriptors_)
         : texture_buffer_descriptors{texture_buffer_descriptors_},
           image_buffer_descriptors{image_buffer_descriptors_},
-          texture_descriptors{texture_descriptors_}, image_descriptors{image_descriptors_} {}
+          texture_descriptors{texture_descriptors_}, texture_metas{texture_metas_},
+          image_descriptors{image_descriptors_} {}
 
     u32 Add(const TextureBufferDescriptor& desc) {
         return Add(texture_buffer_descriptors, desc, [&desc](const auto& existing) {
@@ -520,7 +522,8 @@ public:
         return index;
     }
 
-    u32 Add(const TextureDescriptor& desc) {
+    u32 Add(const TextureDescriptor& desc, const TextureMeta& meta) {
+        const u32 previous_size = static_cast<u32>(texture_descriptors.size());
         const u32 index{Add(texture_descriptors, desc, [&desc](const auto& existing) {
             return desc.type == existing.type && desc.is_depth == existing.is_depth &&
                    desc.has_secondary == existing.has_secondary &&
@@ -534,6 +537,27 @@ public:
         })};
         // TODO: Read this from TIC
         texture_descriptors[index].is_multisample |= desc.is_multisample;
+        if (index == previous_size) {
+            texture_metas.push_back(meta);
+        } else {
+            if (texture_metas.size() <= index) {
+                texture_metas.resize(texture_descriptors.size());
+            }
+            auto& existing_meta = texture_metas[index];
+            existing_meta.declared_depth |= meta.declared_depth;
+            const bool existing_depth_like = IsDepthLike(existing_meta);
+            const bool incoming_depth_like = IsDepthLike(meta);
+            if (!existing_depth_like || incoming_depth_like) {
+                existing_meta.guest_format = meta.guest_format;
+            }
+            existing_meta.manual_compare |= meta.manual_compare;
+            if (meta.manual_compare) {
+                existing_meta.guest_format = meta.guest_format;
+            }
+            if (meta.compare_func) {
+                existing_meta.compare_func = meta.compare_func;
+            }
+        }
         return index;
     }
 
@@ -565,6 +589,7 @@ private:
     TextureBufferDescriptors& texture_buffer_descriptors;
     ImageBufferDescriptors& image_buffer_descriptors;
     TextureDescriptors& texture_descriptors;
+    TextureMetas& texture_metas;
     ImageDescriptors& image_descriptors;
 };
 
@@ -650,12 +675,11 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
         if (a.cbuf.index != b.cbuf.index) return a.cbuf.index < b.cbuf.index;
         return a.cbuf.offset < b.cbuf.offset;
     });
-    Descriptors descriptors{
-        program.info.texture_buffer_descriptors,
-        program.info.image_buffer_descriptors,
-        program.info.texture_descriptors,
-        program.info.image_descriptors,
-    };
+    Descriptors descriptors{program.info.texture_buffer_descriptors,
+                            program.info.image_buffer_descriptors,
+                            program.info.texture_descriptors,
+                            program.info.texture_metas,
+                            program.info.image_descriptors};
     for (TextureInst& texture_inst : to_replace) {
         // TODO: Handle arrays
         IR::Inst* const inst{texture_inst.inst};
@@ -759,7 +783,11 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
                     .size_shift = DESCRIPTOR_SIZE_SHIFT,
                 });
             } else {
-                index = descriptors.Add(TextureDescriptor{
+                const u32 handle = GetTextureHandleCached(env, cbuf);
+                const TexturePixelFormat pixel_format = env.ReadTexturePixelFormat(handle);
+                const std::optional<CompareFunction> compare_func =
+                    env.ReadTextureCompareFunction(handle);
+                TextureDescriptor desc{
                     .type = flags.type,
                     .is_depth = flags.is_depth != 0,
                     .is_multisample = is_multisample,
@@ -772,7 +800,22 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
                     .secondary_shift_left = cbuf.secondary_shift_left,
                     .count = cbuf.count,
                     .size_shift = DESCRIPTOR_SIZE_SHIFT,
-                });
+                };
+                TextureMeta meta{
+                    .guest_format = pixel_format,
+                    .declared_depth = flags.is_depth != 0,
+                    .manual_compare = false,
+                    .compare_func = compare_func,
+                };
+                const bool supports_native = SupportsNativeDepthCompare(meta);
+                const bool manual_compare =
+                    program.options.amd_depth_compare_workaround && compare_func.has_value() &&
+                    (!supports_native || flags.is_depth == 0);
+                if (manual_compare) {
+                    meta.manual_compare = true;
+                    desc.is_depth = false;
+                }
+                index = descriptors.Add(desc, meta);
             }
             break;
         }
@@ -797,23 +840,24 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
             }
         }
     }
+
+    program.info.texture_metas.resize(program.info.texture_descriptors.size());
 }
 
 void JoinTextureInfo(Info& base, Info& source) {
-    Descriptors descriptors{
-        base.texture_buffer_descriptors,
-        base.image_buffer_descriptors,
-        base.texture_descriptors,
-        base.image_descriptors,
-    };
+    Descriptors descriptors{base.texture_buffer_descriptors,
+                            base.image_buffer_descriptors,
+                            base.texture_descriptors,
+                            base.texture_metas,
+                            base.image_descriptors};
     for (auto& desc : source.texture_buffer_descriptors) {
         descriptors.Add(desc);
     }
     for (auto& desc : source.image_buffer_descriptors) {
         descriptors.Add(desc);
     }
-    for (auto& desc : source.texture_descriptors) {
-        descriptors.Add(desc);
+    for (size_t index = 0; index < source.texture_descriptors.size(); ++index) {
+        descriptors.Add(source.texture_descriptors[index], source.texture_metas[index]);
     }
     for (auto& desc : source.image_descriptors) {
         descriptors.Add(desc);

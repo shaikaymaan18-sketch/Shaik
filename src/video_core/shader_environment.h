@@ -74,6 +74,8 @@ protected:
 
     Tegra::Texture::TICEntry ReadTextureInfo(GPUVAddr tic_addr, u32 tic_limit,
                                              bool via_header_index, u32 raw);
+    Tegra::Texture::TSCEntry ReadSamplerInfo(GPUVAddr tsc_addr, u32 tsc_limit,
+                                             bool via_header_index, u32 raw);
 
     Tegra::MemoryManager* gpu_memory{};
     GPUVAddr program_base{};
@@ -81,6 +83,7 @@ protected:
     std::vector<u64> code;
     std::unordered_map<u32, Shader::TextureType> texture_types;
     std::unordered_map<u32, Shader::TexturePixelFormat> texture_pixel_formats;
+    std::unordered_map<u32, std::optional<Shader::CompareFunction>> texture_compare_funcs;
     std::unordered_map<u64, u32> cbuf_values;
     std::unordered_map<u64, Shader::ReplaceConstant> cbuf_replacements;
 
@@ -120,6 +123,8 @@ public:
 
     bool IsTexturePixelFormatInteger(u32 handle) override;
 
+    std::optional<Shader::CompareFunction> ReadTextureCompareFunction(u32 handle) override;
+
     u32 ReadViewportTransformState() override;
 
     std::optional<Shader::ReplaceConstant> GetReplaceConstBuffer(u32 bank, u32 offset) override;
@@ -145,6 +150,8 @@ public:
     Shader::TexturePixelFormat ReadTexturePixelFormat(u32 handle) override;
 
     bool IsTexturePixelFormatInteger(u32 handle) override;
+
+    std::optional<Shader::CompareFunction> ReadTextureCompareFunction(u32 handle) override;
 
     u32 ReadViewportTransformState() override;
 
@@ -180,6 +187,9 @@ public:
 
     [[nodiscard]] bool IsTexturePixelFormatInteger(u32 handle) override;
 
+    [[nodiscard]] std::optional<Shader::CompareFunction> ReadTextureCompareFunction(
+        u32 handle) override;
+
     [[nodiscard]] u32 ReadViewportTransformState() override;
 
     [[nodiscard]] u32 LocalMemorySize() const override;
@@ -203,6 +213,7 @@ private:
     std::vector<u64> code;
     std::unordered_map<u32, Shader::TextureType> texture_types;
     std::unordered_map<u32, Shader::TexturePixelFormat> texture_pixel_formats;
+    std::unordered_map<u32, std::optional<Shader::CompareFunction>> texture_compare_funcs;
     std::unordered_map<u64, u32> cbuf_values;
     std::unordered_map<u64, Shader::ReplaceConstant> cbuf_replacements;
     std::array<u32, 3> workgroup_size{};

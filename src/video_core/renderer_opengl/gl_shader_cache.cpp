@@ -21,6 +21,7 @@
 #include "shader_recompiler/backend/glasm/emit_glasm.h"
 #include "shader_recompiler/backend/glsl/emit_glsl.h"
 #include "shader_recompiler/backend/spirv/emit_spirv.h"
+#include "shader_recompiler/ir_opt/passes.h"
 #include "shader_recompiler/frontend/ir/program.h"
 #include "shader_recompiler/frontend/maxwell/control_flow.h"
 #include "shader_recompiler/frontend/maxwell/translate_program.h"
@@ -533,6 +534,9 @@ std::unique_ptr<GraphicsPipeline> ShaderCache::CreateGraphicsPipeline(
         switch (device.GetShaderBackend()) {
         case Settings::ShaderBackend::Glsl:
             ConvertLegacyToGeneric(program, runtime_info);
+            if (program.options.amd_fp64_varying_lowering) {
+                Shader::Optimization::AmdFp64VaryingPostProcess(program, runtime_info);
+            }
             sources[stage_index] = EmitGLSL(profile, runtime_info, program, binding);
             break;
         case Settings::ShaderBackend::Glasm:
@@ -540,6 +544,9 @@ std::unique_ptr<GraphicsPipeline> ShaderCache::CreateGraphicsPipeline(
             break;
         case Settings::ShaderBackend::SpirV:
             ConvertLegacyToGeneric(program, runtime_info);
+            if (program.options.amd_fp64_varying_lowering) {
+                Shader::Optimization::AmdFp64VaryingPostProcess(program, runtime_info);
+            }
             sources_spirv[stage_index] =
                 EmitSPIRV(profile, runtime_info, program, binding, this->optimize_spirv_output);
             break;

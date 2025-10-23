@@ -86,6 +86,9 @@ struct RuntimeInfo {
     bool convert_depth_mode{};
     bool force_early_z{};
 
+    std::array<bool, 32> amd_converted_fp64_varyings{};
+    bool amd_converted_fp64_varyings_indexed{};
+
     TessPrimitive tess_primitive{};
     TessSpacing tess_spacing{};
     bool tess_clockwise{};

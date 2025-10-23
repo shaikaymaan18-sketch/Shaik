@@ -36,6 +36,7 @@ struct TextureDefinition {
     Id sampled_type;
     Id pointer_type;
     Id image_type;
+    const TextureMeta* meta;
     u32 count;
     bool is_multisample;
 };
@@ -205,6 +206,7 @@ public:
     }
 
     const Profile& profile;
+    const RecompilerOptions& options;
     const RuntimeInfo& runtime_info;
     Stage stage{};
 

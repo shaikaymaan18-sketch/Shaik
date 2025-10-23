@@ -78,11 +78,13 @@ public:
     DescriptorTable<TICEntry> graphics_image_table{gpu_memory};
     DescriptorTable<TSCEntry> graphics_sampler_table{gpu_memory};
     std::vector<SamplerId> graphics_sampler_ids;
+    std::vector<SamplerId> graphics_manual_sampler_ids;
     std::vector<ImageViewId> graphics_image_view_ids;
 
     DescriptorTable<TICEntry> compute_image_table{gpu_memory};
     DescriptorTable<TSCEntry> compute_sampler_table{gpu_memory};
     std::vector<SamplerId> compute_sampler_ids;
+    std::vector<SamplerId> compute_manual_sampler_ids;
     std::vector<ImageViewId> compute_image_view_ids;
 
     std::unordered_map<TICEntry, ImageViewId> image_views;
@@ -175,6 +177,12 @@ public:
 
     /// Get the sampler id from the compute descriptor table in the specified index
     SamplerId GetComputeSamplerId(u32 index);
+ 
+    /// Get the manual sampler id from the graphics descriptor table in the specified index
+    SamplerId GetGraphicsManualSamplerId(u32 index);
+
+    /// Get the manual sampler id from the compute descriptor table in the specified index
+    SamplerId GetComputeManualSamplerId(u32 index);
 
     /// Return a constant reference to the given sampler id
     [[nodiscard]] const Sampler& GetSampler(SamplerId id) const noexcept;
@@ -347,7 +355,7 @@ private:
         const Tegra::Engines::Fermi2D::Config& copy);
 
     /// Find or create a sampler from a guest descriptor sampler
-    [[nodiscard]] SamplerId FindSampler(const TSCEntry& config);
+    [[nodiscard]] SamplerId FindSampler(TSCEntry config, bool disable_compare);
 
     /// Find or create an image view for the given color buffer index
     [[nodiscard]] ImageViewId FindColorBuffer(size_t index);

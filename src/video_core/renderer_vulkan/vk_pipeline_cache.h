@@ -19,6 +19,7 @@
 #include "shader_recompiler/host_translate_info.h"
 #include "shader_recompiler/object_pool.h"
 #include "shader_recompiler/profile.h"
+#include "shader_recompiler/shader_info.h"
 #include "video_core/engines/maxwell_3d.h"
 #include "video_core/host1x/gpu_device_memory_manager.h"
 #include "video_core/renderer_vulkan/fixed_pipeline_state.h"
@@ -161,6 +162,7 @@ private:
     ShaderPools main_pools;
 
     Shader::Profile profile;
+    Shader::RecompilerOptions recompiler_options;
     Shader::HostTranslateInfo host_info;
 
     std::filesystem::path pipeline_cache_filename;

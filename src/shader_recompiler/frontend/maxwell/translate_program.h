@@ -12,13 +12,23 @@
 
 namespace Shader {
 struct HostTranslateInfo;
+struct RecompilerOptions;
 }
 
 namespace Shader::Maxwell {
 
 [[nodiscard]] IR::Program TranslateProgram(ObjectPool<IR::Inst>& inst_pool,
                                            ObjectPool<IR::Block>& block_pool, Environment& env,
-                                           Flow::CFG& cfg, const HostTranslateInfo& host_info);
+                                           Flow::CFG& cfg, const HostTranslateInfo& host_info,
+                                           const RecompilerOptions& options);
+
+[[nodiscard]] inline IR::Program TranslateProgram(ObjectPool<IR::Inst>& inst_pool,
+                                                  ObjectPool<IR::Block>& block_pool,
+                                                  Environment& env, Flow::CFG& cfg,
+                                                  const HostTranslateInfo& host_info) {
+    Shader::RecompilerOptions options{};
+    return TranslateProgram(inst_pool, block_pool, env, cfg, host_info, options);
+}
 
 [[nodiscard]] IR::Program MergeDualVertexPrograms(IR::Program& vertex_a, IR::Program& vertex_b,
                                                   Environment& env_vertex_b);

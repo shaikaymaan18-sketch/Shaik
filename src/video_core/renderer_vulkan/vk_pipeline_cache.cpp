@@ -19,6 +19,7 @@
 #include "common/thread_worker.h"
 #include "core/core.h"
 #include "shader_recompiler/backend/spirv/emit_spirv.h"
+#include "shader_recompiler/ir_opt/passes.h"
 #include "shader_recompiler/environment.h"
 #include "shader_recompiler/frontend/maxwell/control_flow.h"
 #include "shader_recompiler/frontend/maxwell/translate_program.h"
@@ -151,6 +152,9 @@ Shader::RuntimeInfo MakeRuntimeInfo(std::span<const Shader::IR::Program> program
     if (previous_program) {
         info.previous_stage_stores = previous_program->info.stores;
         info.previous_stage_legacy_stores_mapping = previous_program->info.legacy_stores_mapping;
+        info.amd_converted_fp64_varyings = previous_program->info.amd_converted_fp64_varyings;
+        info.amd_converted_fp64_varyings_indexed =
+            previous_program->info.amd_converted_fp64_varyings_indexed;
         if (previous_program->is_geometry_passthrough) {
             info.previous_stage_stores.mask |= previous_program->info.passthrough.mask;
         }
@@ -380,6 +384,10 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         .min_ssbo_alignment = device.GetStorageBufferAlignment(),
         .max_user_clip_distances = device.GetMaxUserClipDistances(),
     };
+
+    const bool is_amd_vendor = device.IsAmdVendor();
+    recompiler_options.amd_depth_compare_workaround = is_amd_vendor;
+    recompiler_options.amd_fp64_varying_lowering = is_amd_vendor;
 
     host_info = Shader::HostTranslateInfo{
         .support_float64 = device.IsFloat64Supported(),
@@ -646,11 +654,13 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
         Shader::Maxwell::Flow::CFG cfg(env, pools.flow_block, cfg_offset, index == 0);
         if (!uses_vertex_a || index != 1) {
             // Normal path
-            programs[index] = TranslateProgram(pools.inst, pools.block, env, cfg, host_info);
+            programs[index] =
+                TranslateProgram(pools.inst, pools.block, env, cfg, host_info, recompiler_options);
         } else {
             // VertexB path when VertexA is present.
             auto& program_va{programs[0]};
-            auto program_vb{TranslateProgram(pools.inst, pools.block, env, cfg, host_info)};
+            auto program_vb{
+                TranslateProgram(pools.inst, pools.block, env, cfg, host_info, recompiler_options)};
             programs[index] = MergeDualVertexPrograms(program_va, program_vb, env);
         }
 
@@ -682,7 +692,11 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
 
         const auto runtime_info{MakeRuntimeInfo(programs, key, program, previous_stage)};
         ConvertLegacyToGeneric(program, runtime_info);
-        const std::vector<u32> code{EmitSPIRV(profile, runtime_info, program, binding, this->optimize_spirv_output)};
+        if (program.options.amd_fp64_varying_lowering) {
+            Shader::Optimization::AmdFp64VaryingPostProcess(program, runtime_info);
+        }
+        const std::vector<u32> code{
+            EmitSPIRV(profile, runtime_info, program, binding, this->optimize_spirv_output)};
         device.SaveShader(code);
         modules[stage_index] = BuildShader(device, code);
         if (device.HasDebuggingToolAttached()) {
@@ -775,7 +789,8 @@ std::unique_ptr<ComputePipeline> PipelineCache::CreateComputePipeline(
         env.Dump(hash, key.unique_hash);
     }
 
-    auto program{TranslateProgram(pools.inst, pools.block, env, cfg, host_info)};
+    auto program{
+        TranslateProgram(pools.inst, pools.block, env, cfg, host_info, recompiler_options)};
     const std::vector<u32> code{EmitSPIRV(profile, program, this->optimize_spirv_output)};
     device.SaveShader(code);
     vk::ShaderModule spv_module{BuildShader(device, code)};

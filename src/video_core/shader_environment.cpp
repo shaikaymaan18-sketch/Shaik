@@ -20,6 +20,7 @@
 #include "common/logging/log.h"
 #include <ranges>
 #include "shader_recompiler/environment.h"
+#include "shader_recompiler/runtime_info.h"
 #include "video_core/engines/kepler_compute.h"
 #include "video_core/memory_manager.h"
 #include "video_core/shader_environment.h"
@@ -33,6 +34,35 @@ constexpr std::array<char, 8> MAGIC_NUMBER{'y', 'u', 'z', 'u', 'c', 'a', 'c', 'h
 constexpr size_t INST_SIZE = sizeof(u64);
 
 using Maxwell = Tegra::Engines::Maxwell3D::Regs;
+
+namespace {
+
+Shader::CompareFunction ConvertCompareFunction(Tegra::Texture::DepthCompareFunc func) {
+    using TegraFunc = Tegra::Texture::DepthCompareFunc;
+    switch (func) {
+    case TegraFunc::Never:
+        return Shader::CompareFunction::Never;
+    case TegraFunc::Less:
+        return Shader::CompareFunction::Less;
+    case TegraFunc::LessEqual:
+        return Shader::CompareFunction::LessThanEqual;
+    case TegraFunc::Equal:
+        return Shader::CompareFunction::Equal;
+    case TegraFunc::NotEqual:
+        return Shader::CompareFunction::NotEqual;
+    case TegraFunc::Greater:
+        return Shader::CompareFunction::Greater;
+    case TegraFunc::GreaterEqual:
+        return Shader::CompareFunction::GreaterThanEqual;
+    case TegraFunc::Always:
+        return Shader::CompareFunction::Always;
+    default:
+        UNIMPLEMENTED_MSG("Unimplemented depth compare func {}", static_cast<u32>(func));
+        return Shader::CompareFunction::Always;
+    }
+}
+
+} // Anonymous namespace
 
 static u64 MakeCbufKey(u32 index, u32 offset) {
     return (static_cast<u64>(index) << 32) | offset;
@@ -200,6 +230,7 @@ void GenericEnvironment::Serialize(std::ofstream& file) const {
     const u64 code_size{static_cast<u64>(CachedSizeBytes())};
     const u64 num_texture_types{static_cast<u64>(texture_types.size())};
     const u64 num_texture_pixel_formats{static_cast<u64>(texture_pixel_formats.size())};
+    const u64 num_texture_compare_funcs{static_cast<u64>(texture_compare_funcs.size())};
     const u64 num_cbuf_values{static_cast<u64>(cbuf_values.size())};
     const u64 num_cbuf_replacement_values{static_cast<u64>(cbuf_replacements.size())};
 
@@ -207,6 +238,8 @@ void GenericEnvironment::Serialize(std::ofstream& file) const {
         .write(reinterpret_cast<const char*>(&num_texture_types), sizeof(num_texture_types))
         .write(reinterpret_cast<const char*>(&num_texture_pixel_formats),
                sizeof(num_texture_pixel_formats))
+        .write(reinterpret_cast<const char*>(&num_texture_compare_funcs),
+               sizeof(num_texture_compare_funcs))
         .write(reinterpret_cast<const char*>(&num_cbuf_values), sizeof(num_cbuf_values))
         .write(reinterpret_cast<const char*>(&num_cbuf_replacement_values),
                sizeof(num_cbuf_replacement_values))
@@ -226,6 +259,15 @@ void GenericEnvironment::Serialize(std::ofstream& file) const {
     for (const auto& [key, format] : texture_pixel_formats) {
         file.write(reinterpret_cast<const char*>(&key), sizeof(key))
             .write(reinterpret_cast<const char*>(&format), sizeof(format));
+    }
+    for (const auto& [key, compare] : texture_compare_funcs) {
+        const bool has_value{compare.has_value()};
+        file.write(reinterpret_cast<const char*>(&key), sizeof(key))
+            .write(reinterpret_cast<const char*>(&has_value), sizeof(has_value));
+        if (has_value) {
+            const Shader::CompareFunction value{*compare};
+            file.write(reinterpret_cast<const char*>(&value), sizeof(value));
+        }
     }
     for (const auto& [key, type] : cbuf_values) {
         file.write(reinterpret_cast<const char*>(&key), sizeof(key))
@@ -280,6 +322,16 @@ Tegra::Texture::TICEntry GenericEnvironment::ReadTextureInfo(GPUVAddr tic_addr, 
     ASSERT(handle.first <= tic_limit);
     const GPUVAddr descriptor_addr{tic_addr + handle.first * sizeof(Tegra::Texture::TICEntry)};
     Tegra::Texture::TICEntry entry;
+    gpu_memory->ReadBlock(descriptor_addr, &entry, sizeof(entry));
+    return entry;
+}
+
+Tegra::Texture::TSCEntry GenericEnvironment::ReadSamplerInfo(GPUVAddr tsc_addr, u32 tsc_limit,
+                                                             bool via_header_index, u32 raw) {
+    const auto handle{Tegra::Texture::TexturePair(raw, via_header_index)};
+    ASSERT(handle.second <= tsc_limit);
+    const GPUVAddr descriptor_addr{tsc_addr + handle.second * sizeof(Tegra::Texture::TSCEntry)};
+    Tegra::Texture::TSCEntry entry;
     gpu_memory->ReadBlock(descriptor_addr, &entry, sizeof(entry));
     return entry;
 }
@@ -392,6 +444,24 @@ bool GraphicsEnvironment::IsTexturePixelFormatInteger(u32 handle) {
         static_cast<VideoCore::Surface::PixelFormat>(ReadTexturePixelFormat(handle)));
 }
 
+std::optional<Shader::CompareFunction> GraphicsEnvironment::ReadTextureCompareFunction(
+    u32 handle) {
+    if (const auto it = texture_compare_funcs.find(handle); it != texture_compare_funcs.end()) {
+        return it->second;
+    }
+    const auto& regs{maxwell3d->regs};
+    const bool via_header_index{regs.sampler_binding == Maxwell::SamplerBinding::ViaHeaderBinding};
+    const auto entry =
+        ReadSamplerInfo(regs.tex_sampler.Address(), regs.tex_sampler.limit, via_header_index, handle);
+    if (entry.depth_compare_enabled == 0) {
+        texture_compare_funcs.emplace(handle, std::nullopt);
+        return std::nullopt;
+    }
+    const auto compare = ConvertCompareFunction(entry.depth_compare_func);
+    texture_compare_funcs.emplace(handle, compare);
+    return compare;
+}
+
 u32 GraphicsEnvironment::ReadViewportTransformState() {
     const auto& regs{maxwell3d->regs};
     viewport_transform_state = regs.viewport_scale_offset_enabled;
@@ -447,6 +517,24 @@ bool ComputeEnvironment::IsTexturePixelFormatInteger(u32 handle) {
         static_cast<VideoCore::Surface::PixelFormat>(ReadTexturePixelFormat(handle)));
 }
 
+std::optional<Shader::CompareFunction> ComputeEnvironment::ReadTextureCompareFunction(
+    u32 handle) {
+    if (const auto it = texture_compare_funcs.find(handle); it != texture_compare_funcs.end()) {
+        return it->second;
+    }
+    const auto& regs{kepler_compute->regs};
+    const auto& qmd{kepler_compute->launch_description};
+    const auto entry =
+        ReadSamplerInfo(regs.tsc.Address(), regs.tsc.limit, qmd.linked_tsc != 0, handle);
+    if (entry.depth_compare_enabled == 0) {
+        texture_compare_funcs.emplace(handle, std::nullopt);
+        return std::nullopt;
+    }
+    const auto compare = ConvertCompareFunction(entry.depth_compare_func);
+    texture_compare_funcs.emplace(handle, compare);
+    return compare;
+}
+
 u32 ComputeEnvironment::ReadViewportTransformState() {
     return viewport_transform_state;
 }
@@ -455,12 +543,15 @@ void FileEnvironment::Deserialize(std::ifstream& file) {
     u64 code_size{};
     u64 num_texture_types{};
     u64 num_texture_pixel_formats{};
+    u64 num_texture_compare_funcs{};
     u64 num_cbuf_values{};
     u64 num_cbuf_replacement_values{};
     file.read(reinterpret_cast<char*>(&code_size), sizeof(code_size))
         .read(reinterpret_cast<char*>(&num_texture_types), sizeof(num_texture_types))
         .read(reinterpret_cast<char*>(&num_texture_pixel_formats),
               sizeof(num_texture_pixel_formats))
+        .read(reinterpret_cast<char*>(&num_texture_compare_funcs),
+              sizeof(num_texture_compare_funcs))
         .read(reinterpret_cast<char*>(&num_cbuf_values), sizeof(num_cbuf_values))
         .read(reinterpret_cast<char*>(&num_cbuf_replacement_values),
               sizeof(num_cbuf_replacement_values))
@@ -486,6 +577,19 @@ void FileEnvironment::Deserialize(std::ifstream& file) {
         file.read(reinterpret_cast<char*>(&key), sizeof(key))
             .read(reinterpret_cast<char*>(&format), sizeof(format));
         texture_pixel_formats.emplace(key, format);
+    }
+    for (size_t i = 0; i < num_texture_compare_funcs; ++i) {
+        u32 key;
+        bool has_value{};
+        file.read(reinterpret_cast<char*>(&key), sizeof(key))
+            .read(reinterpret_cast<char*>(&has_value), sizeof(has_value));
+        if (has_value) {
+            Shader::CompareFunction value;
+            file.read(reinterpret_cast<char*>(&value), sizeof(value));
+            texture_compare_funcs.emplace(key, value);
+        } else {
+            texture_compare_funcs.emplace(key, std::nullopt);
+        }
     }
     for (size_t i = 0; i < num_cbuf_values; ++i) {
         u64 key;
@@ -553,6 +657,14 @@ Shader::TexturePixelFormat FileEnvironment::ReadTexturePixelFormat(u32 handle) {
 bool FileEnvironment::IsTexturePixelFormatInteger(u32 handle) {
     return VideoCore::Surface::IsPixelFormatInteger(
         static_cast<VideoCore::Surface::PixelFormat>(ReadTexturePixelFormat(handle)));
+}
+
+std::optional<Shader::CompareFunction> FileEnvironment::ReadTextureCompareFunction(u32 handle) {
+    const auto it{texture_compare_funcs.find(handle)};
+    if (it == texture_compare_funcs.end()) {
+        throw Shader::LogicError("Uncached read texture compare function");
+    }
+    return it->second;
 }
 
 u32 FileEnvironment::ReadViewportTransformState() {

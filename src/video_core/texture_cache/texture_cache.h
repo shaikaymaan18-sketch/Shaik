@@ -264,7 +264,11 @@ SamplerId TextureCache<P>::GetGraphicsSamplerId(u32 index) {
     const auto [descriptor, is_new] = channel_state->graphics_sampler_table.Read(index);
     SamplerId& id = channel_state->graphics_sampler_ids[index];
     if (is_new) {
-        id = FindSampler(descriptor);
+        channel_state->graphics_manual_sampler_ids[index] = CORRUPT_ID;
+        id = CORRUPT_ID;
+    }
+    if (id == CORRUPT_ID) {
+        id = FindSampler(descriptor, false);
     }
     return id;
 }
@@ -278,9 +282,47 @@ SamplerId TextureCache<P>::GetComputeSamplerId(u32 index) {
     const auto [descriptor, is_new] = channel_state->compute_sampler_table.Read(index);
     SamplerId& id = channel_state->compute_sampler_ids[index];
     if (is_new) {
-        id = FindSampler(descriptor);
+        channel_state->compute_manual_sampler_ids[index] = CORRUPT_ID;
+        id = CORRUPT_ID;
+    }
+    if (id == CORRUPT_ID) {
+        id = FindSampler(descriptor, false);
     }
     return id;
+}
+
+template <class P>
+SamplerId TextureCache<P>::GetGraphicsManualSamplerId(u32 index) {
+    if (index > channel_state->graphics_sampler_table.Limit()) {
+        LOG_DEBUG(HW_GPU, "Invalid sampler index={}", index);
+        return NULL_SAMPLER_ID;
+    }
+    const auto [descriptor, is_new] = channel_state->graphics_sampler_table.Read(index);
+    SamplerId& manual_id = channel_state->graphics_manual_sampler_ids[index];
+    if (is_new) {
+        manual_id = CORRUPT_ID;
+    }
+    if (manual_id == CORRUPT_ID) {
+        manual_id = FindSampler(descriptor, true);
+    }
+    return manual_id;
+}
+
+template <class P>
+SamplerId TextureCache<P>::GetComputeManualSamplerId(u32 index) {
+    if (index > channel_state->compute_sampler_table.Limit()) {
+        LOG_DEBUG(HW_GPU, "Invalid sampler index={}", index);
+        return NULL_SAMPLER_ID;
+    }
+    const auto [descriptor, is_new] = channel_state->compute_sampler_table.Read(index);
+    SamplerId& manual_id = channel_state->compute_manual_sampler_ids[index];
+    if (is_new) {
+        manual_id = CORRUPT_ID;
+    }
+    if (manual_id == CORRUPT_ID) {
+        manual_id = FindSampler(descriptor, true);
+    }
+    return manual_id;
 }
 
 template <class P>
@@ -302,6 +344,7 @@ void TextureCache<P>::SynchronizeGraphicsDescriptors() {
     if (channel_state->graphics_sampler_table.Synchronize(maxwell3d->regs.tex_sampler.Address(),
                                                           tsc_limit)) {
         channel_state->graphics_sampler_ids.resize(tsc_limit + 1, CORRUPT_ID);
+        channel_state->graphics_manual_sampler_ids.resize(tsc_limit + 1, CORRUPT_ID);
     }
     if (channel_state->graphics_image_table.Synchronize(maxwell3d->regs.tex_header.Address(),
                                                         tic_limit)) {
@@ -317,6 +360,7 @@ void TextureCache<P>::SynchronizeComputeDescriptors() {
     const GPUVAddr tsc_gpu_addr = kepler_compute->regs.tsc.Address();
     if (channel_state->compute_sampler_table.Synchronize(tsc_gpu_addr, tsc_limit)) {
         channel_state->compute_sampler_ids.resize(tsc_limit + 1, CORRUPT_ID);
+        channel_state->compute_manual_sampler_ids.resize(tsc_limit + 1, CORRUPT_ID);
     }
     if (channel_state->compute_image_table.Synchronize(kepler_compute->regs.tic.Address(),
                                                        tic_limit)) {
@@ -1254,6 +1298,10 @@ void TextureCache<P>::InvalidateScale(Image& image) {
         if constexpr (ENABLE_VALIDATION) {
             std::ranges::fill(channel_info.graphics_image_view_ids, CORRUPT_ID);
             std::ranges::fill(channel_info.compute_image_view_ids, CORRUPT_ID);
+            std::ranges::fill(channel_info.graphics_sampler_ids, CORRUPT_ID);
+            std::ranges::fill(channel_info.compute_sampler_ids, CORRUPT_ID);
+            std::ranges::fill(channel_info.graphics_manual_sampler_ids, CORRUPT_ID);
+            std::ranges::fill(channel_info.compute_manual_sampler_ids, CORRUPT_ID);
         }
         channel_info.graphics_image_table.Invalidate();
         channel_info.compute_image_table.Invalidate();
@@ -1730,7 +1778,14 @@ std::pair<u32, u32> TextureCache<P>::PrepareDmaImage(ImageId dst_id, GPUVAddr ba
 }
 
 template <class P>
-SamplerId TextureCache<P>::FindSampler(const TSCEntry& config) {
+SamplerId TextureCache<P>::FindSampler(TSCEntry config, bool disable_compare) {
+    if (disable_compare) {
+        config.depth_compare_enabled.Assign(0);
+        config.depth_compare_func.Assign(Tegra::Texture::DepthCompareFunc::Always);
+        config.mag_filter.Assign(Tegra::Texture::TextureFilter::Nearest);
+        config.min_filter.Assign(Tegra::Texture::TextureFilter::Nearest);
+        config.mipmap_filter.Assign(Tegra::Texture::TextureMipmapFilter::Nearest);
+    }
     if (std::ranges::all_of(config.raw, [](u64 value) { return value == 0; })) {
         return NULL_SAMPLER_ID;
     }
@@ -2243,6 +2298,10 @@ void TextureCache<P>::DeleteImage(ImageId image_id, bool immediate_delete) {
         if constexpr (ENABLE_VALIDATION) {
             std::ranges::fill(channel_info.graphics_image_view_ids, CORRUPT_ID);
             std::ranges::fill(channel_info.compute_image_view_ids, CORRUPT_ID);
+            std::ranges::fill(channel_info.graphics_sampler_ids, CORRUPT_ID);
+            std::ranges::fill(channel_info.compute_sampler_ids, CORRUPT_ID);
+            std::ranges::fill(channel_info.graphics_manual_sampler_ids, CORRUPT_ID);
+            std::ranges::fill(channel_info.compute_manual_sampler_ids, CORRUPT_ID);
         }
         channel_info.graphics_image_table.Invalidate();
         channel_info.compute_image_table.Invalidate();

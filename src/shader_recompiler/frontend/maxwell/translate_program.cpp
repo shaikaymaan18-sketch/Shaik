@@ -241,8 +241,10 @@ void LowerGeometryPassthrough(const IR::Program& program, const HostTranslateInf
 } // Anonymous namespace
 
 IR::Program TranslateProgram(ObjectPool<IR::Inst>& inst_pool, ObjectPool<IR::Block>& block_pool,
-                             Environment& env, Flow::CFG& cfg, const HostTranslateInfo& host_info) {
+                             Environment& env, Flow::CFG& cfg, const HostTranslateInfo& host_info,
+                             const RecompilerOptions& options) {
     IR::Program program;
+    program.options = options;
     program.syntax_list = BuildASL(inst_pool, block_pool, env, cfg, host_info);
     program.blocks = GenerateBlocks(program.syntax_list);
     program.post_order_blocks = PostOrder(program.syntax_list.front());
@@ -285,6 +287,8 @@ IR::Program TranslateProgram(ObjectPool<IR::Inst>& inst_pool, ObjectPool<IR::Blo
     // Replace instructions before the SSA rewrite
     if (!host_info.support_float64) {
         Optimization::LowerFp64ToFp32(program);
+    } else if (program.options.amd_fp64_varying_lowering) {
+        Optimization::AmdFp64VaryingLoweringPass(program);
     }
     if (!host_info.support_float16) {
         Optimization::LowerFp16ToFp32(program);
@@ -323,6 +327,7 @@ IR::Program TranslateProgram(ObjectPool<IR::Inst>& inst_pool, ObjectPool<IR::Blo
 IR::Program MergeDualVertexPrograms(IR::Program& vertex_a, IR::Program& vertex_b,
                                     Environment& env_vertex_b) {
     IR::Program result{};
+    result.options = vertex_a.options;
     Optimization::VertexATransformPass(vertex_a);
     Optimization::VertexBTransformPass(vertex_b);
     for (const auto& term : vertex_a.syntax_list) {
@@ -339,6 +344,13 @@ IR::Program MergeDualVertexPrograms(IR::Program& vertex_a, IR::Program& vertex_b
     }
     result.stage = Stage::VertexB;
     result.info = vertex_a.info;
+    for (size_t index = 0; index < result.info.amd_converted_fp64_varyings.size(); ++index) {
+        result.info.amd_converted_fp64_varyings[index] =
+            result.info.amd_converted_fp64_varyings[index] ||
+            vertex_b.info.amd_converted_fp64_varyings[index];
+    }
+    result.info.amd_converted_fp64_varyings_indexed |=
+        vertex_b.info.amd_converted_fp64_varyings_indexed;
     result.local_memory_size = (std::max)(vertex_a.local_memory_size, vertex_b.local_memory_size);
     result.info.loads.mask |= vertex_b.info.loads.mask;
     result.info.stores.mask |= vertex_b.info.stores.mask;
@@ -419,6 +431,7 @@ IR::Program GenerateGeometryPassthrough(ObjectPool<IR::Inst>& inst_pool,
                                         IR::Program& source_program,
                                         Shader::OutputTopology output_topology) {
     IR::Program program;
+    program.options = source_program.options;
     program.stage = Stage::Geometry;
     program.output_topology = output_topology;
     program.output_vertices = GetOutputTopologyVertices(output_topology);

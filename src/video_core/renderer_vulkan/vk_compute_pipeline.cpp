@@ -158,12 +158,18 @@ void ComputePipeline::Configure(Tegra::Engines::KeplerCompute& kepler_compute,
     for (const auto& desc : info.image_buffer_descriptors) {
         add_image(desc, false);
     }
-    for (const auto& desc : info.texture_descriptors) {
+    for (size_t desc_index = 0; desc_index < info.texture_descriptors.size(); ++desc_index) {
+        const auto& desc = info.texture_descriptors[desc_index];
+        const auto& meta = info.texture_metas[desc_index];
         for (u32 index = 0; index < desc.count; ++index) {
             const auto handle{read_handle(desc, index)};
             views.push_back({handle.first});
 
-            VideoCommon::SamplerId sampler = texture_cache.GetComputeSamplerId(handle.second);
+            const bool manual_compare = meta.manual_compare;
+            VideoCommon::SamplerId sampler = manual_compare
+                                                 ? texture_cache.GetComputeManualSamplerId(
+                                                       handle.second)
+                                                 : texture_cache.GetComputeSamplerId(handle.second);
             samplers.push_back(sampler);
         }
     }

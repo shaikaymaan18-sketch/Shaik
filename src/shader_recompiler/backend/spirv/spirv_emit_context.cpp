@@ -460,8 +460,9 @@ void VectorTypes::Define(Sirit::Module& sirit_ctx, Id base_type, std::string_vie
 
 EmitContext::EmitContext(const Profile& profile_, const RuntimeInfo& runtime_info_,
                          IR::Program& program, Bindings& bindings)
-    : Sirit::Module(profile_.supported_spirv), profile{profile_}, runtime_info{runtime_info_},
-      stage{program.stage}, texture_rescaling_index{bindings.texture_scaling_index},
+    : Sirit::Module(profile_.supported_spirv), profile{profile_}, options{program.options},
+      runtime_info{runtime_info_}, stage{program.stage},
+      texture_rescaling_index{bindings.texture_scaling_index},
       image_rescaling_index{bindings.image_scaling_index} {
     const bool is_unified{profile.unified_descriptor_binding};
     u32& uniform_binding{is_unified ? bindings.unified : bindings.uniform_buffer};
@@ -1358,7 +1359,10 @@ void EmitContext::DefineImageBuffers(const Info& info, u32& binding) {
 
 void EmitContext::DefineTextures(const Info& info, u32& binding, u32& scaling_index) {
     textures.reserve(info.texture_descriptors.size());
-    for (const TextureDescriptor& desc : info.texture_descriptors) {
+    for (size_t tex_index = 0; tex_index < info.texture_descriptors.size(); ++tex_index) {
+        const TextureDescriptor& desc = info.texture_descriptors[tex_index];
+        const TextureMeta* meta =
+            tex_index < info.texture_metas.size() ? &info.texture_metas[tex_index] : nullptr;
         const Id image_type{ImageType(*this, desc)};
         const Id sampled_type{TypeSampledImage(image_type)};
         const Id pointer_type{TypePointer(spv::StorageClass::UniformConstant, sampled_type)};
@@ -1372,6 +1376,7 @@ void EmitContext::DefineTextures(const Info& info, u32& binding, u32& scaling_in
             .sampled_type = sampled_type,
             .pointer_type = pointer_type,
             .image_type = image_type,
+            .meta = meta,
             .count = desc.count,
             .is_multisample = desc.is_multisample,
         });

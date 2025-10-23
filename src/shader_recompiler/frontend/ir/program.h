@@ -19,6 +19,7 @@ struct Program {
     BlockList blocks;
     BlockList post_order_blocks;
     Info info;
+    RecompilerOptions options;
     Stage stage{};
     std::array<u32, 3> workgroup_size{};
     OutputTopology output_topology{};

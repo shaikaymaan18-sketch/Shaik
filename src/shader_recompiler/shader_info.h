@@ -6,6 +6,7 @@
 #include <array>
 #include <bitset>
 #include <map>
+#include <optional>
 
 #include "common/common_types.h"
 #include "shader_recompiler/frontend/ir/type.h"
@@ -18,8 +19,15 @@ namespace Shader {
 
 enum class ReplaceConstant : u32 {
     BaseInstance,
-    BaseVertex,
-    DrawID,
+   BaseVertex,
+   DrawID,
+};
+
+enum class CompareFunction;
+
+struct RecompilerOptions {
+    bool amd_depth_compare_workaround = false;
+    bool amd_fp64_varying_lowering = false;
 };
 
 enum class TextureType : u32 {
@@ -220,6 +228,56 @@ struct TextureDescriptor {
 };
 using TextureDescriptors = boost::container::small_vector<TextureDescriptor, 12>;
 
+struct TextureMeta {
+    TexturePixelFormat guest_format{TexturePixelFormat::A8B8G8R8_UNORM};
+    bool declared_depth{};
+    bool manual_compare{};
+    std::optional<CompareFunction> compare_func{};
+};
+using TextureMetas = boost::container::small_vector<TextureMeta, 12>;
+
+[[nodiscard]] inline bool IsDepthLike(const TextureMeta& meta) {
+    if (meta.declared_depth) {
+        return true;
+    }
+    switch (meta.guest_format) {
+    case TexturePixelFormat::D16_UNORM:
+    case TexturePixelFormat::X8_D24_UNORM:
+    case TexturePixelFormat::D24_UNORM_S8_UINT:
+    case TexturePixelFormat::S8_UINT_D24_UNORM:
+    case TexturePixelFormat::D32_FLOAT:
+    case TexturePixelFormat::D32_FLOAT_S8_UINT:
+        return true;
+    default:
+        return false;
+    }
+}
+
+[[nodiscard]] inline bool NeedsD24Quantization(const TextureMeta& meta) {
+    switch (meta.guest_format) {
+    case TexturePixelFormat::X8_D24_UNORM:
+    case TexturePixelFormat::D24_UNORM_S8_UINT:
+    case TexturePixelFormat::S8_UINT_D24_UNORM:
+        return true;
+    default:
+        return false;
+    }
+}
+
+[[nodiscard]] inline bool SupportsNativeDepthCompare(const TextureMeta& meta) {
+    switch (meta.guest_format) {
+    case TexturePixelFormat::D16_UNORM:
+    case TexturePixelFormat::X8_D24_UNORM:
+    case TexturePixelFormat::D24_UNORM_S8_UINT:
+    case TexturePixelFormat::S8_UINT_D24_UNORM:
+    case TexturePixelFormat::D32_FLOAT:
+    case TexturePixelFormat::D32_FLOAT_S8_UINT:
+        return true;
+    default:
+        return false;
+    }
+}
+
 struct ImageDescriptor {
     TextureType type;
     ImageFormat format;
@@ -254,6 +312,9 @@ struct Info {
     VaryingState loads;
     VaryingState stores;
     VaryingState passthrough;
+
+    std::array<bool, 32> amd_converted_fp64_varyings{};
+    bool amd_converted_fp64_varyings_indexed{};
 
     std::map<IR::Attribute, IR::Attribute> legacy_stores_mapping;
 
@@ -332,6 +393,7 @@ struct Info {
     TextureBufferDescriptors texture_buffer_descriptors;
     ImageBufferDescriptors image_buffer_descriptors;
     TextureDescriptors texture_descriptors;
+    TextureMetas texture_metas;
     ImageDescriptors image_descriptors;
 };
 

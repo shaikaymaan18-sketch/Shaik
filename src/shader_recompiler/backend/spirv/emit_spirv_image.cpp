@@ -185,6 +185,87 @@ private:
     spv::ImageOperandsMask mask{};
 };
 
+Id ManualDepthCompare(EmitContext& ctx, const TextureMeta& meta, Id texel, Id reference) {
+    if (!meta.compare_func.has_value()) {
+        return ctx.Const(1.0f);
+    }
+
+    const Id type{ctx.F32[1]};
+    const Id zero{ctx.Const(0.0f)};
+    const Id one{ctx.Const(1.0f)};
+    const auto clamp01 = [&](Id value) {
+        return ctx.OpFClamp(type, value, zero, one);
+    };
+
+    const bool needs_quantization = NeedsD24Quantization(meta);
+    if (needs_quantization) {
+        const Id scale{ctx.Const(16777215.0f)};
+        const Id inv_scale{ctx.Const(1.0f / 16777215.0f)};
+        const Id half{ctx.Const(0.5f)};
+        const auto quantize = [&](Id value) {
+            const Id clamped{clamp01(value)};
+            const Id scaled{ctx.OpFMul(type, clamped, scale)};
+            const Id shifted{ctx.OpFAdd(type, scaled, half)};
+            const Id floored{ctx.OpFloor(type, shifted)};
+            return ctx.OpFMul(type, floored, inv_scale);
+        };
+        texel = quantize(texel);
+        reference = quantize(reference);
+    }
+
+    const CompareFunction func{*meta.compare_func};
+    switch (func) {
+    case CompareFunction::Never:
+        return ctx.Const(0.0f);
+    case CompareFunction::Always:
+        return ctx.Const(1.0f);
+    default:
+        break;
+    }
+
+    Id tex_compare{texel};
+    Id ref_compare{reference};
+    if (needs_quantization) {
+        const Id epsilon{ctx.Const(0.5f / 16777215.0f)};
+        switch (func) {
+        case CompareFunction::LessThanEqual:
+            tex_compare = ctx.OpFAdd(type, tex_compare, epsilon);
+            break;
+        case CompareFunction::GreaterThanEqual:
+            tex_compare = ctx.OpFSub(type, tex_compare, epsilon);
+            break;
+        default:
+            break;
+        }
+    }
+
+    Id compare_result{};
+    switch (func) {
+    case CompareFunction::Less:
+        compare_result = ctx.OpFOrdLessThan(ctx.U1, ref_compare, tex_compare);
+        break;
+    case CompareFunction::Equal:
+        compare_result = ctx.OpFOrdEqual(ctx.U1, ref_compare, tex_compare);
+        break;
+    case CompareFunction::LessThanEqual:
+        compare_result = ctx.OpFOrdLessThanEqual(ctx.U1, ref_compare, tex_compare);
+        break;
+    case CompareFunction::Greater:
+        compare_result = ctx.OpFOrdGreaterThan(ctx.U1, ref_compare, tex_compare);
+        break;
+    case CompareFunction::NotEqual:
+        compare_result = ctx.OpFOrdNotEqual(ctx.U1, ref_compare, tex_compare);
+        break;
+    case CompareFunction::GreaterThanEqual:
+        compare_result = ctx.OpFOrdGreaterThanEqual(ctx.U1, ref_compare, tex_compare);
+        break;
+    default:
+        compare_result = ctx.false_value;
+        break;
+    }
+
+    return ctx.OpSelect(type, compare_result, one, zero);
+}
 Id Texture(EmitContext& ctx, IR::TextureInstInfo info, [[maybe_unused]] const IR::Value& index) {
     const TextureDefinition& def{ctx.textures.at(info.descriptor_index)};
     if (def.count > 1) {
@@ -479,6 +560,20 @@ Id EmitImageSampleExplicitLod(EmitContext& ctx, IR::Inst* inst, const IR::Value&
 Id EmitImageSampleDrefImplicitLod(EmitContext& ctx, IR::Inst* inst, const IR::Value& index,
                                   Id coords, Id dref, Id bias_lc, const IR::Value& offset) {
     const auto info{inst->Flags<IR::TextureInstInfo>()};
+    const TextureDefinition& def{ctx.textures.at(info.descriptor_index)};
+    const TextureMeta* meta = def.meta;
+    const bool manual_compare =
+        ctx.options.amd_depth_compare_workaround && meta && meta->manual_compare;
+    if (manual_compare) {
+        IR::TextureInstInfo sample_info{info};
+        sample_info.is_depth.Assign(0);
+        inst->SetFlags(sample_info);
+        const Id sampled =
+            EmitImageSampleImplicitLod(ctx, inst, index, coords, bias_lc, offset);
+        inst->SetFlags(info);
+        const Id texel{ctx.OpCompositeExtract(ctx.F32[1], sampled, 0u)};
+        return ManualDepthCompare(ctx, *meta, texel, dref);
+    }
     if (ctx.stage == Stage::Fragment) {
         const ImageOperands operands(ctx, info.has_bias != 0, false, info.has_lod_clamp != 0,
                                      bias_lc, offset);
@@ -500,6 +595,19 @@ Id EmitImageSampleDrefImplicitLod(EmitContext& ctx, IR::Inst* inst, const IR::Va
 Id EmitImageSampleDrefExplicitLod(EmitContext& ctx, IR::Inst* inst, const IR::Value& index,
                                   Id coords, Id dref, Id lod, const IR::Value& offset) {
     const auto info{inst->Flags<IR::TextureInstInfo>()};
+    const TextureDefinition& def{ctx.textures.at(info.descriptor_index)};
+    const TextureMeta* meta = def.meta;
+    const bool manual_compare =
+        ctx.options.amd_depth_compare_workaround && meta && meta->manual_compare;
+    if (manual_compare) {
+        IR::TextureInstInfo sample_info{info};
+        sample_info.is_depth.Assign(0);
+        inst->SetFlags(sample_info);
+        const Id sampled = EmitImageSampleExplicitLod(ctx, inst, index, coords, lod, offset);
+        inst->SetFlags(info);
+        const Id texel{ctx.OpCompositeExtract(ctx.F32[1], sampled, 0u)};
+        return ManualDepthCompare(ctx, *meta, texel, dref);
+    }
     const ImageOperands operands(ctx, false, true, false, lod, offset);
     return Emit(&EmitContext::OpImageSparseSampleDrefExplicitLod,
                 &EmitContext::OpImageSampleDrefExplicitLod, ctx, inst, ctx.F32[1],

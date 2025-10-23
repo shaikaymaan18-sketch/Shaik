@@ -371,12 +371,19 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
                 add_image(desc, false);
             }
         }
-        for (const auto& desc : info.texture_descriptors) {
+        for (size_t desc_index = 0; desc_index < info.texture_descriptors.size(); ++desc_index) {
+            const auto& desc = info.texture_descriptors[desc_index];
+            const auto& meta = info.texture_metas[desc_index];
             for (u32 index = 0; index < desc.count; ++index) {
                 const auto handle{read_handle(desc, index)};
                 views[view_index++] = {handle.first};
 
-                VideoCommon::SamplerId sampler{texture_cache.GetGraphicsSamplerId(handle.second)};
+                const bool manual_compare = meta.manual_compare;
+                VideoCommon::SamplerId sampler = manual_compare
+                                                     ? texture_cache.GetGraphicsManualSamplerId(
+                                                           handle.second)
+                                                     : texture_cache.GetGraphicsSamplerId(
+                                                           handle.second);
                 samplers[sampler_index++] = sampler;
             }
         }

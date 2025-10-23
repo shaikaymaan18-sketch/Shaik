@@ -283,6 +283,14 @@ public:
         return properties.driver.driverID;
     }
 
+    u32 GetVendorID() const noexcept {
+        return properties.properties.vendorID;
+    }
+
+    bool IsAmdVendor() const noexcept {
+        return GetVendorID() == 0x1002;
+    }
+
     bool ShouldBoostClocks() const;
 
     /// Returns uniform buffer alignment requirement.
