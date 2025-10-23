@@ -59,3 +59,17 @@ eden-windows-msvc
 artifacts
 *.AppImage*
 /install*
+changelog.md
+/eden
+
+# envs
+payload.json
+forgejo.env
+
+# makedeb stuff
+/makedeb*
+/PKGBUILD
+/.SRCINFO
+*.deb
+/src
+/pkg
