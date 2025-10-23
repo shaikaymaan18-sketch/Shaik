@@ -1,8 +1,8 @@
 name: "[Auto] Build on open 'Pull Request' from Forgejo"
 
-on:
-  repository_dispatch:
-    types: [pull_request]
+#on:
+#  repository_dispatch:
+#    types: [pull_request]
 
 env:
   DISABLE_ARM: ${{ vars.DISABLE_ARM }}

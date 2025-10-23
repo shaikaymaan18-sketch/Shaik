@@ -1,8 +1,8 @@
 name: "[Auto] Build on push to 'master'"
 
-on:
-  repository_dispatch:
-    types: [master]
+#on:
+#  repository_dispatch:
+#    types: [master]
 
 env:
   DISABLE_ARM: ${{ vars.DISABLE_ARM }}

@@ -1,10 +1,10 @@
 name: "[Manual] Build for 'branches'"
 
-on:
-  pull_request:
-    branches:
-      - '*'
-  workflow_dispatch:
+#on:
+#  pull_request:
+#    branches:
+#      - '*'
+#  workflow_dispatch:
 
 env:
   DISABLE_ARM: ${{ vars.DISABLE_ARM }}

@@ -1,8 +1,8 @@
 name: "[Auto] Build on create 'tag'"
 
-on:
-  repository_dispatch:
-    types: [tag]
+#on:
+#  repository_dispatch:
+#    types: [tag]
 
 env:
   DISABLE_ARM: ${{ vars.DISABLE_ARM }}
