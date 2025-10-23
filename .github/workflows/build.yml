@@ -1,152 +1,223 @@
-# TODO: This document needs to be formatted,
-# some stuff needs cleaned up etc
-name: eden-build
+name: "[Internal CI][Master] Build Workflow"
 
-#on:
-#  push:
-#    branches: [ "master" ]
+on:
+  workflow_call:
+    inputs:
+      devel:
+        description: 'Development mode (disables update checker, adds nightly qualifier)'
+        type: boolean
+        default: true
+      build-id:
+        description: 'Identifier for workflows and caching'
+        type: string
+        default: 'master'
 
-# TODO: combine build.yml into trigger_release.yml
+env:
+  DISABLE_ARM: ${{ vars.DISABLE_ARM }}
+  SCCACHE_GHA_ENABLED: "true"
+  CCACHE: "true"
+  CPM_CACHE_VERSION: "v8"
+  FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+  DEVEL: ${{ inputs.devel }}
+  TEMP_PATCH_STATUS: "false"
+  TEMP_PATCH: "2755"
+
 jobs:
-  source:
-    if: ${{ !github.head_ref }}
-    runs-on: source
+  clone:
+    outputs:
+      cachever: ${{ steps.out.outputs.cachever }}
+    name: "Parse and Clone"
+    runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v5.0.0
         with:
-          submodules: recursive
-
-      - name: Pack
-        run: ./.ci/source.sh
-
-      - name: Upload
-        uses: forgejo/upload-artifact@v4
-        with:
-          retention-days: 2
-          name: source.zip
-          path: artifacts/
-
-  windows:
-    runs-on: windows
-    strategy:
-      matrix:
-        target: ["msvc"] # TODO: Add msys2
-    defaults:
-      run:
-        shell: ${{ (matrix.target == 'msys2' && 'msys2') || 'bash' }} {0}
-    env:
-      CCACHE_DIR: ${{ runner.workspace }}/.cache/.ccache
-      CCACHE_COMPILERCHECK: content
-      CCACHE_SLOPPINESS: time_macros
-      OS: windows
-      TARGET: ${{ matrix.target }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
           fetch-depth: 0
-          fetch-tags: true
 
-      - name: Set up vcpkg cache
-        uses: actions/cache@v4
+      - name: Send Commit Status to Forgejo
+        if: ${{ inputs.build-id == 'master' || inputs.build-id == 'pull_request' }}
+        shell: bash
+        run: |
+          export FORGEJO_REPO="${{ github.event.client_payload.repository }}"
+          export FORGEJO_REF="${{ github.event.client_payload.ref }}"
+          python ./.ci/common/status.py pending
+
+      - name: Parse Forgejo payload
+        shell: bash
+        run: |
+          echo '${{ toJSON(github.event.client_payload) }}' > ./payload.json
+          cat payload.json
+          ./.ci/forgejo.sh --parse ${{ inputs.build-id }}
+
+      - name: Load payload environment
+        shell: bash
+        run: |
+          . ./.ci/common/load-env.sh --load-payload-env
+
+      # for some amazing reason you can't pass env vars to reusable workflows
+      - name: Setup Outputs
+        id: out
+        shell: bash
+        run: |
+          echo "cachever=${CPM_CACHE_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Clone
+        shell: bash
+        run: |
+          ./.ci/forgejo.sh --clone ${{ inputs.build-id }}
+
+      - name: Apply Temporary Patch
+        if: ${{ env.TEMP_PATCH_STATUS == 'true' }}
+        shell: bash
+        run: |
+          wget https://git.eden-emu.dev/eden-emu/eden/pulls/${TEMP_PATCH}.patch
+          git -C eden apply ../${TEMP_PATCH}.patch
+          rm ${TEMP_PATCH}.patch
+
+      - name: Summary
+        shell: bash
+        run: |
+          ./.ci/forgejo.sh --summary ${{ inputs.build-id }}
+
+      - name: Cleanup
+        run: |
+          rm -rf eden/.git* eden/.ci eden/.github
+
+      - name: Upload payload environment
+        uses: actions/upload-artifact@v4.6.2
         with:
+          name: forgejo-env
+          path: forgejo.env
+
+      - name: Upload cloned repo
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: eden
+          include-hidden-files: true
           path: |
-            ${{ github.workspace }}/build/vcpkg_installed
-            ${{ github.workspace }}/build/externals
-            ${{ github.workspace }}/.vcpkg
-          key: ${{ runner.os }}-${{ matrix.target }}-vcpkg-${{ hashFiles('**/CMakeLists.txt', '**/vcpkg.json') }}-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-vcpkg-
+            eden/*
+            eden/.patch
 
-      - name: Set up MSVC
-        uses: https://github.com/ilammy/msvc-dev-cmd@v1
-        if: ${{ matrix.target == 'msvc' }}
+  source:
+    name: "Source Pack"
+    runs-on: ubuntu-latest
+    needs: [clone]
 
-      - name: Cygwin with autoconf # NEEDED FOR LIBUSB
-        shell: cmd
-        run: ./.ci/windows/cygwin.bat
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5.0.0
 
-      - name: Configure & Build
-        shell: bash
-        run: |
-          ./.ci/windows/qt-envvars.sh
-          DEVEL=true WINDEPLOYQT="/c/Qt/6.9.0/msvc2022_64/bin/windeployqt6.exe" .ci/windows/build.sh -DCMAKE_PREFIX_PATH=C:/Qt/6.9.0/msvc2022_64/lib/cmake/Qt6
+      - name: Clone
+        uses: actions/download-artifact@v5.0.0
 
-      - name: Package artifacts
-        shell: bash
-        run: |
-          ./.ci/windows/qt-envvars.sh
-          ./.ci/windows/package.sh
+      - name: Build
+        run: ./.ci/source/build.sh
 
-      - name: Upload Windows artifacts
-        uses: forgejo/upload-artifact@v4
+      - name: Package
+        run: ./.ci/source/package.sh
+
+      - name: Upload source
+        uses: actions/upload-artifact@v4.6.2
         with:
-          retention-days: 2
-          name: ${{ matrix.target }}.zip
-          path: artifacts/*
+          name: source
+          path: source.*
+
+  deb:
+    name: ".deb builds"
+    needs: [clone]
+    uses: ./.github/workflows/deb.yml
+    with:
+      build-id: '${{ inputs.build-id }}'
+      cpm-cache-version: '${{ needs.clone.outputs.cachever }}'
+      devel: ${{ inputs.devel }}
+    secrets: inherit
 
   linux:
-    runs-on: linux
-    env:
-      CCACHE_DIR: /home/runner/.cache/ccache
-      CCACHE_COMPILERCHECK: content
-      CCACHE_SLOPPINESS: time_macros
-      OS: linux
-      TARGET: fresh
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
-          fetch-tags: true
+    name: "AppImage"
+    needs: [clone]
+    uses: ./.github/workflows/appimage.yml
+    with:
+      build-id: '${{ inputs.build-id }}'
+      cpm-cache-version: '${{ needs.clone.outputs.cachever }}'
+      devel: ${{ inputs.devel }}
+    secrets: inherit
 
-      - name: Build
-        run: TARGET=appimage DEVEL=true ./.ci/linux/build.sh
-
-      - name: Package AppImage
-        run: DEVEL=true ./.ci/linux/package.sh &> /dev/null
-
-      - name: Upload Linux artifacts
-        uses: forgejo/upload-artifact@v4
-        with:
-          retention-days: 3
-          name: linux.zip
-          path: ./*.AppImage
+  windows:
+    name: "Windows"
+    needs: [clone]
+    uses: ./.github/workflows/windows.yml
+    with:
+      build-id: '${{ inputs.build-id }}'
+      cpm-cache-version: '${{ needs.clone.outputs.cachever }}'
+      devel: ${{ inputs.devel }}
+    secrets: inherit
 
   android:
-    runs-on: android
+    name: "Android"
+    needs: [clone]
+    uses: ./.github/workflows/android.yml
+    with:
+      build-id: '${{ inputs.build-id }}'
+      cpm-cache-version: '${{ needs.clone.outputs.cachever }}'
+      devel: ${{ inputs.devel }}
+    secrets: inherit
 
-    env:
-      OS: android
-      TARGET: universal
+  macos:
+    name: "macOS"
+    needs: [clone]
+    uses: ./.github/workflows/macos.yml
+    with:
+      build-id: '${{ inputs.build-id }}'
+      cpm-cache-version: '${{ needs.clone.outputs.cachever }}'
+      devel: ${{ inputs.devel }}
+    secrets: inherit
 
+  unix:
+    name: "UNIX"
+    needs: [clone]
+    uses: ./.github/workflows/unix.yml
+    with:
+      build-id: '${{ inputs.build-id }}'
+      cpm-cache-version: '${{ needs.clone.outputs.cachever }}'
+      devel: ${{ inputs.devel }}
+    secrets: inherit
+
+  status-if-cancelled:
+    name: "Send Cancelled Commit Status to Forgejo"
+    needs: [source, deb, linux, windows, android, macos, unix]
+    if: ${{ always() && cancelled() && ((inputs.build-id || '') == 'master' || (inputs.build-id || '') == 'pull_request') }}
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Set tag name
+      - uses: actions/checkout@v5.0.0
+      - name: Load payload env and send status
         run: |
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-              echo "GIT_TAG_NAME=$GITHUB_REF_NAME" >> $GITHUB_ENV
-          fi
-          echo $GIT_TAG_NAME
+          export FORGEJO_REPO="${{ github.event.client_payload.repository }}"
+          export FORGEJO_REF="${{ github.event.client_payload.ref }}"
+          python3 ./.ci/common/status.py error
 
-      - name: Build
-        run: ANDROID_HOME=/home/runner/sdk ./.ci/android/build.sh
-        env:
-          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+  status-if-failure:
+    name: "Send Failure Commit Status to Forgejo"
+    needs: [source, deb, linux, windows, android, macos, unix]
+    if: ${{ always() && failure() && ((inputs.build-id || '') == 'master' || (inputs.build-id || '') == 'pull_request') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5.0.0
+      - name: Load payload env and send status
+        run: |
+          export FORGEJO_REPO="${{ github.event.client_payload.repository }}"
+          export FORGEJO_REF="${{ github.event.client_payload.ref }}"
+          python3 ./.ci/common/status.py failure
 
-      - name: Package Android artifacts
-        run: ./.ci/android/package.sh
-
-      - name: Upload Android artifacts
-        uses: forgejo/upload-artifact@v4
-        with:
-          retention-days: 2
-          name: android.zip
-          path: artifacts/*
+  status-if-success:
+    name: "Send Success Commit Status to Forgejo"
+    needs: [source, deb, linux, windows, android, macos, unix]
+    if: ${{ always() && success() && ((inputs.build-id || '') == 'master' || (inputs.build-id || '') == 'pull_request') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5.0.0
+      - name: Load payload env and send status
+        run: |
+          export FORGEJO_REPO="${{ github.event.client_payload.repository }}"
+          export FORGEJO_REF="${{ github.event.client_payload.ref }}"
+          python3 ./.ci/common/status.py success

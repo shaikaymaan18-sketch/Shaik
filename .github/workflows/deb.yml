@@ -1,0 +1,100 @@
+name: "[Internal CI] .deb builds"
+
+on:
+  workflow_call:
+    inputs:
+      build-id:
+        description: "build id"
+        type: string
+        required: true
+      cpm-cache-version:
+        description: "CPM cache version (e.g. v7)"
+        type: string
+        required: true
+      devel:
+        description: 'development build'
+        type: string
+        required: true
+
+env:
+  DISABLE_ARM: ${{ vars.DISABLE_ARM }}
+  SCCACHE_GHA_ENABLED: "true"
+  CCACHE: "true"
+  FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+  DEVEL: ${{ inputs.devel }}
+
+jobs:
+  ubuntu:
+    name: "Ubuntu 24.04 (${{ matrix.os.arch }})"
+    runs-on: ${{ matrix.os.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - arch: aarch64
+            runs-on: ubuntu-24.04-arm
+          - arch: amd64
+            runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5.0.0
+
+      - name: Build & Package
+        uses: ./.github/workflows/debian
+        with:
+          arch: ${{ matrix.os.arch }}
+          name: ubuntu
+          cpm-cache-version: ${{ inputs.cpm-cache-version }}
+          devel: ${{ inputs.devel }}
+
+  debian-13:
+    name: "Debian 13 (${{ matrix.os.arch }})"
+    runs-on: ${{ matrix.os.runs-on }}
+    container: ghcr.io/nilcons/debian:latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - arch: aarch64
+            runs-on: ubuntu-24.04-arm
+          - arch: amd64
+            runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5.0.0
+
+      - name: Build & Package
+        uses: ./.github/workflows/debian
+        with:
+          arch: ${{ matrix.os.arch }}
+          name: debian-13
+          cpm-cache-version: ${{ inputs.cpm-cache-version }}
+          devel: ${{ inputs.devel }}
+
+  debian-12:
+    name: "Debian 12 (${{ matrix.os.arch }})"
+    runs-on: ${{ matrix.os.runs-on }}
+    container: ghcr.io/xrplf/ci/debian-bookworm:gcc-12
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - arch: aarch64
+            runs-on: ubuntu-24.04-arm
+          - arch: amd64
+            runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5.0.0
+
+      - name: Build & Package
+        uses: ./.github/workflows/debian
+        with:
+          arch: ${{ matrix.os.arch }}
+          name: debian-12
+          cpm-cache-version: ${{ inputs.cpm-cache-version }}
+          devel: ${{ inputs.devel }}
+

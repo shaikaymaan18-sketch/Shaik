@@ -1,0 +1,67 @@
+name: "[Manual] Build for 'branches'"
+
+on:
+  pull_request:
+    branches:
+      - '*'
+  workflow_dispatch:
+
+env:
+  DISABLE_ARM: ${{ vars.DISABLE_ARM }}
+
+jobs:
+  # TODO: Create a fake payload to ONLY test all workflows without building packages
+  build:
+    name: Build
+    concurrency:
+      group: test-build
+      cancel-in-progress: true
+    uses: ./.github/workflows/build.yml
+    with:
+      build-id: 'test'
+    secrets: inherit
+
+  release:
+    name: "Create Release"
+    needs: [build]
+    permissions:
+      actions: read
+      security-events: write
+      contents: write
+      discussions: write
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v5.0.0
+
+      - name: Load payload environment
+        shell: bash
+        run: |
+          export FORGEJO_LENV=forgejo-env/forgejo.env
+          . ./.ci/common/load-env.sh --load-payload-env
+
+      - name: Set environment variables
+        run: |
+          echo "DEVEL=true" >> $GITHUB_ENV
+          echo "TIMESTAMP=$(date +%s)" >> $GITHUB_ENV
+
+      - name: Package artifacts nicely
+        run: |
+          export ID=${FORGEJO_REF}
+          ./.ci/common/pack.sh
+
+          ls -lh artifacts
+
+      - name: Generate changelog
+        run: ./.ci/changelog/generate.sh master > changelog.md
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: changelog
+          path: changelog.md
