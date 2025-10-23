@@ -1377,7 +1377,7 @@ void TextureCacheRuntime::CopyImage(Image& dst, Image& src,
     // As per the size-compatible formats section of vulkan, copy manually via ReinterpretImage
     // these images that aren't size-compatible
     if (BytesPerBlock(src.info.format) != BytesPerBlock(dst.info.format)) {
-#ifdef __WIN32__
+#ifdef _WIN32
         if (src.info.type == ImageType::Linear || dst.info.type == ImageType::Linear) {
             return;
         }
