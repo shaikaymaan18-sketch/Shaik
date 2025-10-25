@@ -788,13 +788,7 @@ void BufferCache<P>::BindHostGraphicsUniformBuffers(size_t stage) {
 template <class P>
 void BufferCache<P>::BindHostGraphicsUniformBuffer(size_t stage, u32 index, u32 binding_index, bool needs_bind) {
     ++channel_state->uniform_cache_shots[0];
-    if (stage >= channel_state->uniform_buffers.size() || index >= channel_state->uniform_buffers[stage].size()) {
-        return;
-    }
     const Binding& binding = channel_state->uniform_buffers[stage][index];
-    if (binding.buffer_id == NULL_BUFFER_ID) {
-        return;
-    }
     const DAddr device_addr = binding.device_addr;
     u32 size = (std::min)(binding.size, (*channel_state->uniform_buffer_sizes)[stage][index]);
     if (size == 0) {
