@@ -56,8 +56,6 @@ ImageInfo::ImageInfo(const TICEntry& config) noexcept {
         tex_type = TextureType::Texture1DArray;
     } else if (tex_type == TextureType::Texture2D && (config.Depth() > 1 || config.BaseLayer() != 0)) {
         tex_type = TextureType::Texture2DArray;
-    } else if (tex_type == TextureType::TextureCubemap && (config.Depth() > 1 || config.BaseLayer() != 0)) {
-        tex_type = TextureType::TextureCubeArray;
     }
     switch (tex_type) {
     case TextureType::Texture1D:
@@ -99,7 +97,6 @@ ImageInfo::ImageInfo(const TICEntry& config) noexcept {
         break;
     case TextureType::TextureCubemap:
         ASSERT(config.Depth() == 1);
-        ASSERT(config.BaseLayer() == 0);
         type = ImageType::e2D;
         size.width = config.Width();
         size.height = config.Height();
