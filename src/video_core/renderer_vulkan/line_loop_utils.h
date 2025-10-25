@@ -34,7 +34,7 @@ inline void GenerateSequentialWithClosureRaw(std::span<u8> dst, size_t element_s
     u64 value = start_value;
     while (offset < last) {
         std::memcpy(dst.data() + offset, &value, element_size);
-        offset += element_size;g
+        offset += element_size;
         ++value;
     }
     std::memcpy(dst.data() + offset, &start_value, element_size);
