@@ -790,7 +790,7 @@ void BufferCache<P>::BindHostGraphicsUniformBuffer(size_t stage, u32 index, u32 
     ++channel_state->uniform_cache_shots[0];
     const Binding& binding = channel_state->uniform_buffers[stage][index];
     const DAddr device_addr = binding.device_addr;
-    u32 size = (std::min)(binding.size, (*channel_state->uniform_buffer_sizes)[stage][index]);
+    const u32 size = (std::min)(binding.size, (*channel_state->uniform_buffer_sizes)[stage][index]);
     Buffer& buffer = slot_buffers[binding.buffer_id];
     TouchBuffer(buffer, binding.buffer_id);
     const bool use_fast_buffer = binding.buffer_id != NULL_BUFFER_ID && size <= channel_state->uniform_buffer_skip_cache_size && !memory_tracker.IsRegionGpuModified(device_addr, size);
@@ -804,18 +804,14 @@ void BufferCache<P>::BindHostGraphicsUniformBuffer(size_t stage, u32 index, u32 
                     runtime.BindFastUniformBuffer(stage, binding_index, size);
                 }
                 const auto span = ImmediateBufferWithData(device_addr, size);
-                if (!span.empty()) {
-                    runtime.PushFastUniformBuffer(stage, binding_index, span);
-                }
+                runtime.PushFastUniformBuffer(stage, binding_index, span);
                 return;
             }
         }
         channel_state->fast_bound_uniform_buffers[stage] |= 1u << binding_index;
         channel_state->uniform_buffer_binding_sizes[stage][binding_index] = size;
         const std::span<u8> span = runtime.BindMappedUniformBuffer(stage, binding_index, size);
-        if (!span.empty()) {
-            device_memory.ReadBlockUnsafe(device_addr, span.data(), size);
-        }
+        device_memory.ReadBlockUnsafe(device_addr, span.data(), size);
         return;
     }
     // Classic cached path
