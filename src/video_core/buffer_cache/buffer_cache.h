@@ -1503,13 +1503,12 @@ void BufferCache<P>::MappedUploadMemory([[maybe_unused]] Buffer& buffer,
                                         [[maybe_unused]] std::span<BufferCopy> copies) {
     if constexpr (USE_MEMORY_MAPS) {
         auto upload_staging = runtime.UploadStagingBuffer(total_size_bytes);
-        const std::span<u8> staging_pointer = upload_staging.mapped_span;
-        for (BufferCopy& copy : copies) {
+        auto staging_pointer = upload_staging.mapped_span;
+        for (auto& copy : copies) {
+            assert(copy.src_offset + copy.size <= staging_pointer.size());
             u8* const src_pointer = staging_pointer.data() + copy.src_offset;
             const DAddr device_addr = buffer.CpuAddr() + copy.dst_offset;
             device_memory.ReadBlockUnsafe(device_addr, src_pointer, copy.size);
-
-            // Apply the staging offset
             copy.src_offset += upload_staging.offset;
         }
         const bool can_reorder = runtime.CanReorderUpload(buffer, copies);
