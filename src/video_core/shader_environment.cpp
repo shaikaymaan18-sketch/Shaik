@@ -323,7 +323,7 @@ GraphicsEnvironment::GraphicsEnvironment(Tegra::Engines::Maxwell3D& maxwell3d_,
     }
     const u64 local_size{sph.LocalMemorySize()};
     ASSERT(local_size <= (std::numeric_limits<u32>::max)());
-    local_memory_size = static_cast<u32>(local_size) + sph.common3.shader_local_memory_crs_size;
+    local_memory_size = static_cast<u32>(local_size);
     texture_bound = maxwell3d->regs.bindless_texture_const_buffer_slot;
     is_proprietary_driver = texture_bound == 2;
     has_hle_engine_state =
@@ -405,7 +405,9 @@ ComputeEnvironment::ComputeEnvironment(Tegra::Engines::KeplerCompute& kepler_com
                                                                           &kepler_compute_} {
     const auto& qmd{kepler_compute->launch_description};
     stage = Shader::Stage::Compute;
-    local_memory_size = qmd.local_pos_alloc + qmd.local_crs_alloc;
+    const u32 local_pos = qmd.local_pos_alloc;
+    const u32 local_neg = qmd.local_neg_alloc;
+    local_memory_size = local_pos + local_neg;
     texture_bound = kepler_compute->regs.tex_cb_index;
     is_proprietary_driver = texture_bound == 2;
     shared_memory_size = qmd.shared_alloc;
