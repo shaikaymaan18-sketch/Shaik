@@ -23,7 +23,7 @@ Item {
     Component.onCompleted: sync()
 
     function apply() {
-        console.log("Applying value", value, "to", setting.label)
+        // console.log("Applying value", value, "to", setting.label)
         if (setting.value !== value) {
             setting.value = value
         }

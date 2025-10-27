@@ -309,7 +309,7 @@ void QtConfig::ReadUIGamelistValues() {
 }
 
 void QtConfig::ReadUILayoutValues() {
-    BeginGroup(Settings::TranslateCategory(Settings::Category::UiGameList));
+    BeginGroup(Settings::TranslateCategory(Settings::Category::UiLayout));
 
     ReadCategory(Settings::Category::UiLayout);
 

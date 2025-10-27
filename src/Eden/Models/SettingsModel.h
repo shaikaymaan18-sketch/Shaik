@@ -32,6 +32,8 @@ public:
     void append(QMLSetting *setting);
     void append(QList<QMLSetting *> settings);
 
+    Q_INVOKABLE QList<QMLSetting *> items();
+
 protected:
     QHash<int, QByteArray> roleNames() const override;
 

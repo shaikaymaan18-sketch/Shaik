@@ -3,6 +3,8 @@ pragma Singleton
 import QtQuick
 
 QtObject {
+
+
     /**
      * Recursively search an Item for children matching the specified type.
      * @return A list of found items.

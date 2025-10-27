@@ -18,7 +18,7 @@ Item {
         color: "transparent"
         border {
             width: 4
-            color: PathView.isCurrentItem ? "deepskyblue" : "transparent"
+            color: PathView.isCurrentItem ? palette.accent : "transparent"
         }
 
         Image {

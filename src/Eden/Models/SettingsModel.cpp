@@ -72,6 +72,11 @@ void SettingsModel::append(QList<QMLSetting *> settings)
     }
 }
 
+QList<QMLSetting *> SettingsModel::items()
+{
+    return m_data;
+}
+
 QHash<int, QByteArray> SettingsModel::roleNames() const
 {
     QHash<int,QByteArray> rez;

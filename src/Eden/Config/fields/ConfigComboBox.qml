@@ -6,6 +6,8 @@ import Eden.Constants
 import Eden.Config
 
 BaseField {
+    id: field
+
     contentItem: ComboBox {
         id: control
         enabled: enable
@@ -15,6 +17,16 @@ BaseField {
 
         font.pixelSize: 14
         model: setting.combo
-        currentIndex: value
+
+        currentIndex: -1
+
+        // currentIndex: value
+        Component.onCompleted: {
+            currentIndex = setting.value === undefined ? 0 : setting.value
+        }
+        onCurrentIndexChanged: {
+            if (currentIndex !== undefined)
+                field.value = currentIndex
+        }
     }
 }

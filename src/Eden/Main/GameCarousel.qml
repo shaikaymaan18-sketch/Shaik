@@ -51,7 +51,7 @@ ListView {
 
         color: "transparent"
         border {
-            color: "deepskyblue"
+            color: palette.accent
             width: 4
         }
 
@@ -69,7 +69,7 @@ ListView {
             font.pixelSize: 22
             font.family: "Monospace"
 
-            color: "lightblue"
+            color: palette.accent
             background: "transparent"
         }
     }

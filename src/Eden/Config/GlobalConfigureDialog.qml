@@ -22,18 +22,19 @@ Dialog {
     title: qsTr("Configuration")
     standardButtons: Dialog.Ok | Dialog.Cancel
 
-    Component.onCompleted: configs = Util.searchItem(swipe, "BaseField")
+    Component.onCompleted: configs = Util.searchItem(swipe, "PageScrollView")
     onAccepted: {
-        console.log("Accepted")
         configs.forEach(config => {
                             config.apply()
-                            console.log(config.setting.label)
                         })
+
+        // console.log("Saving")
         QtConfig.save()
     }
     onRejected: {
         console.log("Rejected")
-        configs.forEach(config => config.sync())
+        // TODO
+        // configs.forEach(config => config.sync())
         // QtConfig.reload()
     }
 

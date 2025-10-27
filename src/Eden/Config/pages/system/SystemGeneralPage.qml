@@ -7,14 +7,22 @@ import Eden.Config
 
 PageScrollView {
     id: scroll
+
+    function apply() {
+        net.apply()
+        sys.apply()
+    }
+
     ColumnLayout {
         width: scroll.width - scroll.effectiveScrollBarWidth
 
         SettingsList {
+            id: net
             category: SettingsCategories.Network
         }
 
         SettingsList {
+            id: sys
             category: SettingsCategories.System
             idExclude: ["custom_rtc", "custom_rtc_offset", "current_user"]
         }

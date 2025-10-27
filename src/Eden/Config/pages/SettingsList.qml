@@ -5,12 +5,22 @@ import Eden.Config
 import Eden.Interface
 
 ListView {
+    id: list
+
     required property int category
 
     property bool inset: false
     property string header: ""
     property list<string> idInclude: []
     property list<string> idExclude: []
+
+    function apply() {
+        for (var i = 0; i < count; ++i) {
+            var itm = itemAtIndex(i)
+            if (itm !== null)
+                itm.apply()
+        }
+    }
 
     clip: true
     boundsBehavior: Flickable.StopAtBounds

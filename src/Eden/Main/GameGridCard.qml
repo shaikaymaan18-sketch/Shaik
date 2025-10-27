@@ -5,6 +5,8 @@ import QtCore
 
 import Eden.Constants
 
+import Carboxyl.Base
+
 Rectangle {
     id: wrapper
 
@@ -73,7 +75,7 @@ Rectangle {
         font.pixelSize: 18
         font.family: "Monospace"
 
-        color: "lightblue"
+        color: palette.accent
         background: "transparent"
 
         canMarquee: wrapper.GridView.isCurrentItem

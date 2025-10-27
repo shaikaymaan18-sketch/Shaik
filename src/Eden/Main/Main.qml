@@ -15,6 +15,9 @@ ApplicationWindow {
 
     palette: Palettes.theme
 
+    property var theme: SettingsInterface.setting("carboxyl_theme")
+    property var accent: SettingsInterface.setting("carboxyl_accent")
+
     GameList {
         anchors {
             top: parent.top
@@ -22,6 +25,11 @@ ApplicationWindow {
             right: parent.right
             bottom: status.top
         }
+    }
+
+    Component.onCompleted: {
+        Palettes.theme = Palettes.themes[theme.value]
+        Palettes.accent = Palettes.accents[accent.value]
     }
 
     /** Dialogs */

@@ -8,12 +8,15 @@ import Eden.Config
 PageScrollView {
     id: scroll
 
+    function apply() {
+        gfx.apply()
+    }
+
     ColumnLayout {
         width: scroll.width - scroll.effectiveScrollBarWidth
 
         SettingsList {
-            Layout.fillWidth: true
-
+            id: gfx
             category: SettingsCategories.DebuggingGraphics
         }
     }

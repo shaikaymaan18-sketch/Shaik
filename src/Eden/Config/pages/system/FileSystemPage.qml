@@ -7,10 +7,16 @@ import Eden.Config
 
 PageScrollView {
     id: scroll
+
+    function apply() {
+        fs.apply()
+    }
+
     ColumnLayout {
         width: scroll.width - scroll.effectiveScrollBarWidth
 
         SettingsList {
+            id: fs
             category: SettingsCategories.DataStorage
         }
     }

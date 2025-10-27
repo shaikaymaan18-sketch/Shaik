@@ -72,24 +72,24 @@ Rectangle {
             margins: 8
         }
 
-        GameGrid {
-            setting: root.setting
+        // GameGrid {
+        //     setting: root.setting
 
-            id: grid
+        //     id: grid
 
-            anchors.fill: parent
+        //     anchors.fill: parent
+        // }
+        GameCarousel {
+            id: carousel
+
+            height: 300
+
+            anchors {
+                right: view.right
+                left: view.left
+
+                verticalCenter: view.verticalCenter
+            }
         }
-        //     GameCarousel {
-        //         id: carousel
-
-        //         height: 300
-
-        //         anchors {
-        //             right: view.right
-        //             left: view.left
-
-        //             verticalCenter: view.verticalCenter
-        //         }
-        //     }
     }
 }

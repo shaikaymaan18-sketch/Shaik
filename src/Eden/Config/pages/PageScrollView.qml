@@ -5,6 +5,8 @@ import QtQuick.Layouts
 ScrollView {
     id: scroll
 
+    readonly property string typeName: "PageScrollView"
+
     WheelHandler {
         target: scroll
         onWheel: event => {

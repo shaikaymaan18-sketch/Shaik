@@ -44,7 +44,7 @@ GridView {
 
         radius: 16
         border {
-            color: "deepskyblue"
+            color: palette.accent
             width: 4
         }
     }
