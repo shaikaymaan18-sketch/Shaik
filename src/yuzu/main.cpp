@@ -4582,10 +4582,9 @@ void GMainWindow::OnCheckGraphicsBackend() {
 
     QMessageBox msgbox(this);
     msgbox.setWindowTitle(tr("Wayland Detected!"));
-    msgbox.setText(tr("You are running Eden under Wayland Graphics Backend.\n\n"
-                      "It's recommended to use X11 for the best compatibility.\n\n"
-                      "There's no plan to support Wayland at moment\n"
-                      "Expect slow performance and crashes!"));
+    msgbox.setText(tr("Wayland is known to have significant performance issues and mysterious bugs.\n"
+                      "It's recommended to use X11 instead.\n\n"
+                      "Would you like to force it for future launches?"));
     msgbox.setIcon(QMessageBox::Warning);
 
     QPushButton* okButton = msgbox.addButton(tr("Use X11"), QMessageBox::AcceptRole);
