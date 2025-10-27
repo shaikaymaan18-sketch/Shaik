@@ -73,7 +73,6 @@ ImageViewInfo::ImageViewInfo(const TICEntry& config, s32 base_layer) noexcept
     case TextureType::Texture2D:
     case TextureType::Texture2DNoMipmap:
         ASSERT(config.Depth() == 1);
-        ASSERT(base_layer == 0);
         type = config.normalized_coords ? ImageViewType::e2D : ImageViewType::Rect;
         range.extent.layers = 1;
         break;
