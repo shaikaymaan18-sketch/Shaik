@@ -1516,6 +1516,7 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
+        NativeLibrary.surfaceDestroyed()
         emulationState.clearSurface()
         emulationStarted = false
     }
