@@ -32,12 +32,14 @@ class AddGameFolderDialogFragment : DialogFragment() {
             .setTitle(R.string.add_game_folder)
             .setPositiveButton(android.R.string.ok) { _: DialogInterface, _: Int ->
                 val newGameDir = GameDir(folderUriString!!, binding.deepScanSwitch.isChecked)
-                homeViewModel.setGamesDirSelected(true)
                 val calledFromGameFragment = requireArguments().getBoolean(
                     "calledFromGameFragment",
                     false
                 )
-                gamesViewModel.addFolder(newGameDir, calledFromGameFragment)
+                val job = gamesViewModel.addFolder(newGameDir, calledFromGameFragment)
+                job.invokeOnCompletion {
+                    homeViewModel.setGamesDirSelected(true)
+                }
             }
             .setNegativeButton(android.R.string.cancel, null)
             .setView(binding.root)
