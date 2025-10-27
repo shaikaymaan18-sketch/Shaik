@@ -418,18 +418,9 @@ TransformBufferCopies(std::span<const VideoCommon::BufferCopy> copies, size_t bu
         size_t buffer_offset;
         VkImageAspectFlags aspect_mask;
     };
-    if (aspect_mask == (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) {
-        boost::container::small_vector<VkBufferImageCopy, 16> result(copies.size() * 2);
-        std::ranges::transform(copies, result.begin(),
-                               Maker{buffer_offset, VK_IMAGE_ASPECT_DEPTH_BIT});
-        std::ranges::transform(copies, result.begin() + copies.size(),
-                               Maker{buffer_offset, VK_IMAGE_ASPECT_STENCIL_BIT});
-        return result;
-    } else {
-        boost::container::small_vector<VkBufferImageCopy, 16> result(copies.size());
-        std::ranges::transform(copies, result.begin(), Maker{buffer_offset, aspect_mask});
-        return result;
-    }
+    boost::container::small_vector<VkBufferImageCopy, 16> result(copies.size());
+    std::ranges::transform(copies, result.begin(), Maker{buffer_offset, aspect_mask});
+    return result;
 }
 
 [[nodiscard]] VkImageSubresourceRange MakeSubresourceRange(VkImageAspectFlags aspect_mask,
