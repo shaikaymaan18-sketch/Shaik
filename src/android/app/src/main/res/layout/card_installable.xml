@@ -51,7 +51,7 @@
             android:contentDescription="@string/export"
             android:tooltipText="@string/export"
             android:visibility="gone"
-            app:icon="@drawable/ic_export"
+            app:icon="@drawable/ic_import"
             tools:visibility="visible" />
 
         <Button
@@ -64,7 +64,7 @@
             android:contentDescription="@string/string_import"
             android:tooltipText="@string/string_import"
             android:visibility="gone"
-            app:icon="@drawable/ic_import"
+            app:icon="@drawable/ic_export"
             tools:visibility="visible" />
 
     </LinearLayout>
