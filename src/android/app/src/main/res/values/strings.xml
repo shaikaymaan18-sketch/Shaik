@@ -200,6 +200,7 @@
     <string name="multiplayer_chat">Chat</string>
     <string name="multiplayer_more_options">More Options</string>
     <string name="chat">Chat</string>
+    <string name="clear">Clear</string>
     <string name="type_message">Type message…</string>
     <string name="send_message">Send Message</string>
     <string name="multiplayer_moderation">Moderation</string>
