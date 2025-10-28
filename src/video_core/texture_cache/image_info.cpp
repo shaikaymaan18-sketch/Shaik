@@ -125,6 +125,7 @@ ImageInfo::ImageInfo(const TICEntry& config) noexcept {
     default:
         ASSERT_MSG(false, "Invalid texture_type={}", static_cast<int>(tex_type));
         break;
+    }
     if (num_samples > 1) {
         size.width  *= NumSamplesX(config.msaa_mode);
         size.height *= NumSamplesY(config.msaa_mode);
