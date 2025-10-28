@@ -32,18 +32,18 @@ ListView {
 
     Layout.fillHeight: true
     Layout.fillWidth: true
-    Layout.leftMargin: 5
-    spacing: 0
+    Layout.leftMargin: 0
+    spacing: 5
 
     model: SettingsInterface.category(category, idInclude, idExclude)
 
-    Rectangle {
-        anchors.fill: parent
-        color: "transparent"
+    // Rectangle {
+    //     anchors.fill: parent
+    //     color: "transparent"
 
-        border {
-            color: inset ? palette.text : "transparent"
-            width: 1
-        }
-    }
+    //     border {
+    //         color: inset ? palette.text : "transparent"
+    //         width: 1
+    //     }
+    // }
 }

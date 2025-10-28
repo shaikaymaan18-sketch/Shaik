@@ -10,17 +10,15 @@ function(EdenModule)
     set(oneValueArgs
         NAME
         URI
-        NATIVE
-    )
+        NATIVE)
 
     set(multiValueArgs
         LIBRARIES
         QML_FILES
-        SOURCES
-    )
+        SOURCES)
 
     cmake_parse_arguments(MODULE "" "${oneValueArgs}" "${multiValueArgs}"
-                          "${ARGN}")
+        "${ARGN}")
 
     set(LIB_NAME Eden${MODULE_NAME})
 
@@ -30,14 +28,12 @@ function(EdenModule)
 
     qt_add_qml_module(${LIB_NAME}
         URI ${MODULE_URI}
-        NO_PLUGIN
         VERSION 0.1
 
         QML_FILES ${MODULE_QML_FILES}
         SOURCES ${MODULE_SOURCES}
 
-        ${MODULE_UNPARSED_ARGUMENTS}
-    )
+        ${MODULE_UNPARSED_ARGUMENTS})
 
     add_library(Eden::${MODULE_NAME} ALIAS ${LIB_NAME})
 
@@ -46,4 +42,5 @@ function(EdenModule)
     endif()
 
     target_link_libraries(${LIB_NAME} PRIVATE Carboxyl::Base Carboxyl::Styles)
+    target_link_libraries(${LIB_NAME} PUBLIC ${LIB_NAME}plugin)
 endfunction()

@@ -61,10 +61,12 @@ Item {
         z: 2
         force: field.forceCheckbox
 
-        height: 40
+        height: 30
 
         anchors {
             left: help.right
+            leftMargin: -5
+            verticalCenter: parent.verticalCenter
         }
     }
 

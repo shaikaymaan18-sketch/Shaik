@@ -214,8 +214,8 @@ add_executable(yuzu
     util/url_request_interceptor.h
     util/util.cpp
     util/util.h
-    vk_device_info.cpp
-    vk_device_info.h
+
+
     compatdb.cpp
     compatdb.h
     user_data_migration.cpp
@@ -237,7 +237,7 @@ add_executable(yuzu
     main_window.h main_window.cpp
 )
 
-set_target_properties(yuzu PROPERTIES OUTPUT_NAME "eden")
+set_target_properties(yuzu PROPERTIES OUTPUT_NAME "eden-widgets")
 
 if (YUZU_CRASH_DUMPS)
     target_sources(yuzu PRIVATE

@@ -28,7 +28,7 @@
 #include "ryujinx_dialog.h"
 #include "set_play_time_dialog.h"
 #include "util/util.h"
-#include "vk_device_info.h"
+#include "qt_common/util/vk_device_info.h"
 
 #include "applets/qt_amiibo_settings.h"
 #include "applets/qt_controller.h"
@@ -2830,7 +2830,7 @@ void MainWindow::OnMenuLoadFile() {
     is_load_file_select_active = true;
     const QString extensions =
         QStringLiteral("*.")
-            .append(GameList::supported_file_extensions.join(QStringLiteral(" *.")))
+            .append(QtCommon::supported_file_extensions.join(QStringLiteral(" *.")))
             .append(QStringLiteral(" main"));
     const QString file_filter = tr("Switch Executable (%1);;All Files (*.*)",
                                    "%1 is an identifier for the Switch executable file extensions.")

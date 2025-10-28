@@ -13,6 +13,7 @@ EdenModule(
         MetaObjectHelper.h
         QMLConfig.h
         TitleManager.h TitleManager.cpp
+        GraphicsDeviceInterface.h GraphicsDeviceInterface.cpp
     LIBRARIES
         Qt6::Quick
         Qt6::Core

@@ -31,6 +31,8 @@ add_library(qt_common STATIC
 
     discord/discord.h
     util/fs.h util/fs.cpp
+    util/vk_device_info.cpp
+    util/vk_device_info.h
 )
 
 if (UNIX)

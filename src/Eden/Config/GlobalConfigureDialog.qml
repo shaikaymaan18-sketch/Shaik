@@ -48,7 +48,6 @@ Dialog {
 
             left: parent.left
             leftMargin: 10
-            bottom: parent.bottom
         }
         contentWidth: 100
         contentHeight: 60

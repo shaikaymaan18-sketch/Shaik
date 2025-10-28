@@ -53,7 +53,7 @@ Q_ENUM_NS(Category)
 
 class SettingsInterface : public QObject {
     Q_OBJECT
-    QML_ELEMENT
+
 public:
     explicit SettingsInterface(QObject* parent = nullptr);
 

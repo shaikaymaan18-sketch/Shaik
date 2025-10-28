@@ -10,7 +10,7 @@
 #include "common/settings_enums.h"
 #include "core/core.h"
 #include "ui_configure.h"
-#include "vk_device_info.h"
+#include "qt_common/util/vk_device_info.h"
 #include "yuzu/configuration/configure_applets.h"
 #include "yuzu/configuration/configure_audio.h"
 #include "yuzu/configuration/configure_cpu.h"

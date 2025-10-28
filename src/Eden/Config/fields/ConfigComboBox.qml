@@ -8,6 +8,8 @@ import Eden.Config
 BaseField {
     id: field
 
+    property var runtimeModel: null
+
     contentItem: ComboBox {
         id: control
         enabled: enable
@@ -16,7 +18,7 @@ BaseField {
         Layout.rightMargin: 10
 
         font.pixelSize: 14
-        model: setting.combo
+        model: runtimeModel !== null ? runtimeModel : setting.combo
 
         currentIndex: -1
 

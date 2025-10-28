@@ -43,7 +43,7 @@
 #include "yuzu/configuration/configure_network.h"
 #include "qt_common/config/uisettings.h"
 #include "yuzu/util/util.h"
-#include "yuzu/vk_device_info.h"
+#include "qt_common/util/vk_device_info.h"
 
 ConfigurePerGame::ConfigurePerGame(QWidget* parent, u64 title_id_, const std::string& file_name,
                                    std::vector<VkDeviceInfo::Record>& vk_device_records,

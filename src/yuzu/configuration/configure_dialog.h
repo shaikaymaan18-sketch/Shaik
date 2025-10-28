@@ -12,7 +12,7 @@
 #include "configuration/shared_widget.h"
 #include "yuzu/configuration/configuration_shared.h"
 #include "qt_common/config/shared_translation.h"
-#include "yuzu/vk_device_info.h"
+#include "qt_common/util/vk_device_info.h"
 
 namespace Core {
 class System;

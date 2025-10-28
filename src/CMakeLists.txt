@@ -238,6 +238,7 @@ endif()
 if (ENABLE_QT)
     add_subdirectory(qt_common)
     add_subdirectory(Eden)
+    add_subdirectory(yuzu)
 endif()
 
 if (ENABLE_WEB_SERVICE)
@@ -248,3 +249,5 @@ if (ANDROID)
     add_subdirectory(android/app/src/main/jni)
     target_include_directories(yuzu-android PRIVATE android/app/src/main)
 endif()
+
+include(GenerateDepHashes)

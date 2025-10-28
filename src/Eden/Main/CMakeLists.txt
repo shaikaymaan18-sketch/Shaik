@@ -18,5 +18,6 @@ EdenModule(
 
         GameCarouselCard.qml
         GameCarousel.qml
-    LIBRARIES Eden::Interface
+    LIBRARIES
+        Eden::Interface
 )

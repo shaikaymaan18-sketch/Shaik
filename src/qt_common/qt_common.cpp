@@ -108,12 +108,12 @@ Core::Frontend::EmuWindow::WindowSystemInfo GetWindowSystemInfo(QWindow* window)
 
 const QString tr(const char* str)
 {
-    return QGuiApplication::tr(str);
+    return rootObject->tr(str);
 }
 
 const QString tr(const std::string& str)
 {
-    return QGuiApplication::tr(str.c_str());
+    return rootObject->tr(str.c_str());
 }
 
 static void LogRuntimes() {
