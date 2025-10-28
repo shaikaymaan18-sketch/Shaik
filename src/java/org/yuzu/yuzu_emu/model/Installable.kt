@@ -1,0 +1,15 @@
+// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2023 yuzu Emulator Project
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package org.yuzu.yuzu_emu.model
+
+import androidx.annotation.StringRes
+
+data class Installable(
+    @StringRes val titleId: Int,
+    @StringRes val descriptionId: Int,
+    val install: (() -> Unit)? = null,
+    val export: (() -> Unit)? = null
+)

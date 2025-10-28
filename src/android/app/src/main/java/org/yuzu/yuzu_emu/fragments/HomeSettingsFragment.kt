@@ -6,6 +6,7 @@ package org.yuzu.yuzu_emu.fragments
 import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.DocumentsContract
@@ -42,6 +43,7 @@ import org.yuzu.yuzu_emu.model.HomeViewModel
 import org.yuzu.yuzu_emu.ui.main.MainActivity
 import org.yuzu.yuzu_emu.utils.FileUtil
 import org.yuzu.yuzu_emu.utils.Log
+import org.yuzu.yuzu_emu.utils.LogFilter
 
 class HomeSettingsFragment : Fragment() {
     private var _binding: FragmentHomeSettingsBinding? = null
@@ -250,7 +252,8 @@ class HomeSettingsFragment : Fragment() {
             adapter = HomeSettingAdapter(
                 requireActivity() as AppCompatActivity,
                 viewLifecycleOwner,
-                optionsList
+                optionsList,
+                onFilterClick = { shareLogWithFilter(true) }
             )
             val spacing = resources.getDimensionPixelSize(R.dimen.spacing_small)
             addItemDecoration(SpacingItemDecoration(spacing))
@@ -364,6 +367,10 @@ class HomeSettingsFragment : Fragment() {
     // Share the current log if we just returned from a game but share the old log
     // if we just started the app and the old log exists.
     private fun shareLog() {
+        shareLogWithFilter(false)
+    }
+
+    private fun shareLogWithFilter(filter: Boolean) {
         val currentLog = DocumentFile.fromSingleUri(
             mainActivity,
             DocumentsContract.buildDocumentUri(
@@ -379,22 +386,72 @@ class HomeSettingsFragment : Fragment() {
             )
         )!!
 
-        val intent = Intent(Intent.ACTION_SEND)
-            .setDataAndType(currentLog.uri, FileUtil.TEXT_PLAIN)
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        if (!Log.gameLaunched && oldLog.exists()) {
-            intent.putExtra(Intent.EXTRA_STREAM, oldLog.uri)
-            startActivity(Intent.createChooser(intent, getText(R.string.share_log)))
+        // Determine which log to use
+        val logToShare = if (!Log.gameLaunched && oldLog.exists()) {
+            oldLog.uri
         } else if (currentLog.exists()) {
-            intent.putExtra(Intent.EXTRA_STREAM, currentLog.uri)
-            startActivity(Intent.createChooser(intent, getText(R.string.share_log)))
+            currentLog.uri
         } else {
+            null
+        }
+
+        if (logToShare == null) {
             Toast.makeText(
                 requireContext(),
                 getText(R.string.share_log_missing),
                 Toast.LENGTH_SHORT
             ).show()
+            return
         }
+
+        // Process the log and share it
+        processAndShareLog(logToShare, filter)
+    }
+
+    private fun processAndShareLog(logUri: Uri, filter: Boolean) {
+        val shareUri = if (filter) {
+            // Create filtered log file first
+            val result = LogFilter.createFilteredLogFile(requireContext(), logUri)
+            if (result != null) {
+                val (filteredFile, filteredUri) = result
+                val filterSuccess = LogFilter.filterLogs(requireContext(), logUri, filteredFile)
+                if (filterSuccess) {
+                    Toast.makeText(
+                        requireContext(),
+                        "Filtered log created successfully",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    filteredUri
+                } else {
+                    Toast.makeText(
+                        requireContext(),
+                        "Failed to filter log, sharing original",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    Log.error("[HomeSettingsFragment] Failed to filter log file")
+                    logUri
+                }
+            } else {
+                Toast.makeText(
+                    requireContext(),
+                    "Failed to create filtered file, sharing original",
+                    Toast.LENGTH_SHORT
+                ).show()
+                Log.error("[HomeSettingsFragment] Failed to create filtered log file")
+                logUri
+            }
+        } else {
+            // Use original log without filtering
+            logUri
+        }
+
+        // Share the log
+        val intent = Intent(Intent.ACTION_SEND)
+            .setDataAndType(shareUri, FileUtil.TEXT_PLAIN)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            .putExtra(Intent.EXTRA_STREAM, shareUri)
+
+        startActivity(Intent.createChooser(intent, getText(R.string.share_log)))
     }
 
     private fun setInsets() =
