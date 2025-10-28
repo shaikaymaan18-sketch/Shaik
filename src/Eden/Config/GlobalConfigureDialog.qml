@@ -19,6 +19,8 @@ Dialog {
     implicitWidth: 1000
     implicitHeight: 700
 
+    padding: 5
+
     title: qsTr("Configuration")
     standardButtons: Dialog.Ok | Dialog.Cancel
 
@@ -42,22 +44,29 @@ Dialog {
         id: tabBar
         vertical: true
 
+        // TODO: style-dependent
+        property int topMargin: 45
+
         anchors {
             top: parent.top
-            topMargin: 55
+            topMargin: tabBar.topMargin
 
             left: parent.left
-            leftMargin: 10
+            leftMargin: 0
         }
-        contentWidth: 100
-        contentHeight: 60
+
+        height: Math.min(contentHeight * count + 20,
+                         parent.height - tabBar.topMargin)
+        contentWidth: 85
+        contentHeight: 55
 
         position: TabBar.Footer
 
         currentIndex: swipe.currentIndex
 
-        height: contentHeight * count + 20
         width: contentWidth
+
+        clip: true
 
         Repeater {
             model: [qsTr("General"), qsTr("System"), qsTr("CPU"), qsTr(
@@ -90,7 +99,7 @@ Dialog {
             top: parent.top
             bottom: parent.bottom
 
-            leftMargin: 5
+            leftMargin: 0
         }
 
         clip: true

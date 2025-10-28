@@ -17,13 +17,15 @@ Item {
             top: parent.top
             left: parent.left
             right: parent.right
+
+            leftMargin: 5
         }
 
         Repeater {
             model: tabs
 
             CarboxylTabButton {
-                font.pixelSize: 16
+                font.pixelSize: 14
                 text: modelData
             }
         }

@@ -66,7 +66,7 @@ Item {
         anchors {
             left: help.right
             leftMargin: -5
-            verticalCenter: parent.verticalCenter
+            verticalCenter: help.verticalCenter
         }
     }
 
@@ -87,12 +87,14 @@ Item {
     RowLayout {
         id: content
 
-        height: 40
+        height: 30
         visible: showLabel
 
         anchors {
             left: parent.horizontalCenter
             right: parent.right
+
+            verticalCenter: help.verticalCenter
         }
 
         children: [contentItem]

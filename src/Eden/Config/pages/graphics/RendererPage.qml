@@ -16,16 +16,16 @@ PageScrollView {
         vsync.apply()
     }
 
-    GraphicsDeviceInterface {
-        id: gdi
-
-        api: api.value
-        device: dev.value
-        vsyncMode: vsync.value
-    }
-
     ColumnLayout {
         width: scroll.width - scroll.effectiveScrollBarWidth
+
+        GraphicsDeviceInterface {
+            id: gdi
+
+            api: api.value
+            device: dev.value
+            vsyncMode: vsync.value
+        }
 
         ConfigComboBox {
             Layout.fillWidth: true

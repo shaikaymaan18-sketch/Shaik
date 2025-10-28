@@ -11,7 +11,7 @@ SwipeView {
         right: parent.right
         bottom: parent.bottom
 
-        leftMargin: 20
+        leftMargin: 5
         topMargin: 10
     }
 }
