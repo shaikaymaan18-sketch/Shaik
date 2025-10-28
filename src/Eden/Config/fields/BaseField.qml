@@ -18,12 +18,12 @@ Item {
     readonly property string typeName: "BaseField"
 
     clip: true
-    height: 40 + (helpText.height + helpText.anchors.topMargin)
 
+    height: implicitHeight
+    implicitHeight: 40 + (helpText.height + helpText.anchors.topMargin)
     Component.onCompleted: sync()
 
     function apply() {
-        // console.log("Applying value", value, "to", setting.label)
         if (setting.value !== value) {
             setting.value = value
         }
@@ -116,65 +116,29 @@ Item {
         font.pixelSize: 12
         wrapMode: Text.WordWrap
 
-        visible: false
         opacity: 0
 
         function toggle() {
-            if (visible) {
-                hideAnim.start()
+            if (opacity < 0.5) {
+                opacity = 1
+                anchors.topMargin = 0
             } else {
-                showAnim.start()
+                opacity = 0
+                anchors.topMargin = -helpText.height
             }
         }
 
-        ParallelAnimation {
-            id: showAnim
-
+        Behavior on opacity {
             SmoothedAnimation {
-                target: helpText
-                property: "opacity"
-                from: 0
-                to: 1
-
                 velocity: 3
             }
-
-            SmoothedAnimation {
-                target: helpText
-                property: "anchors.topMargin"
-                from: -helpText.height
-                to: 0
-
-                duration: 300
-                velocity: -1
-            }
-
-            onStarted: helpText.visible = true
         }
 
-        ParallelAnimation {
-            id: hideAnim
-
+        Behavior on anchors.topMargin {
             SmoothedAnimation {
-                target: helpText
-                property: "opacity"
-                from: 1
-                to: 0
-
-                velocity: 3
-            }
-
-            SmoothedAnimation {
-                target: helpText
-                property: "anchors.topMargin"
-                from: 0
-                to: -helpText.height
-
                 duration: 300
                 velocity: -1
             }
-
-            onFinished: helpText.visible = false
         }
     }
 }
