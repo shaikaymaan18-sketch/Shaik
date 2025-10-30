@@ -278,7 +278,7 @@ class GamePropertiesFragment : Fragment() {
                         add(SubMenuPropertySecondaryAction(
                             isShown = configExists,
                             descriptionId = R.string.import_config,
-                            iconId = R.drawable.ic_export,
+                            iconId = R.drawable.ic_import,
                             action = {
                                 importConfig.launch(arrayOf("text/ini", "application/octet-stream"))
                             }
@@ -287,7 +287,7 @@ class GamePropertiesFragment : Fragment() {
                         add(SubMenuPropertySecondaryAction(
                             isShown = configExists,
                             descriptionId = R.string.export_config,
-                            iconId = R.drawable.ic_import,
+                            iconId = R.drawable.ic_export,
                             action = {
                                 exportConfig.launch(args.game.settingsName + ".ini")
                             }
