@@ -534,11 +534,7 @@ else()
     find_package(zstd 1.5 REQUIRED MODULE)
 
     # wow
-    if (PLATFORM_LINUX OR APPLE)
-        find_package(Boost 1.57.0 REQUIRED COMPONENTS context fiber)
-    else()
-        find_package(Boost 1.57.0 REQUIRED)
-    endif()
+    find_package(Boost 1.57.0 CONFIG REQUIRED OPTIONAL_COMPONENTS headers context fiber)
 
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux" OR ANDROID)
         find_package(gamemode 1.7 MODULE)
