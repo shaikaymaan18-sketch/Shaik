@@ -11,13 +11,13 @@
 #ifndef ASSERT
 #   define ASSERT(expr) do if(!(expr)) [[unlikely]] assert_terminate_impl(__FILE__ ": " #expr); while(0)
 #endif
-#ifndef UNREACHABLE
-#   ifdef _MSC_VER
-#       define UNREACHABLE() ASSERT(false && __FILE__ ": unreachable")
-#   else
-#       define UNREACHABLE() __builtin_unreachable();
-#   endif
-#endif
+#define UNREACHABLE() \
+    do { \
+        fmt::print(stderr, "[UNREACHABLE] reached at {}:{} ({})\n", __FILE__, __LINE__, __func__); \
+        fflush(stderr); \
+        ASSERT(false); \
+        __builtin_unreachable(); \
+    } while (0)
 #ifndef DEBUG_ASSERT
 #   ifndef NDEBUG
 #       define DEBUG_ASSERT(_a_) ASSERT(_a_)
