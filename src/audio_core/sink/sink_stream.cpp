@@ -220,7 +220,7 @@ u64 SinkStream::GetExpectedPlayedSampleCount() {
     auto time_delta{cur_time - last_sample_count_update_time};
     auto exp_played_sample_count{min_played_sample_count + (TargetSampleRate * time_delta) / std::chrono::seconds{1}};
 
-    // Add 15ms of latency in sample reporting to allow for some leeway in scheduler timings
+    // Add 25ms of latency in sample reporting to allow for some leeway in scheduler timings
     return std::min<u64>(exp_played_sample_count, max_played_sample_count) + TargetSampleCount * 5;
 }
 
@@ -231,7 +231,7 @@ void SinkStream::WaitFreeSpace(std::stop_token stop_token) {
         return paused || queued_buffers < max_queue_size;
     };
 
-    release_cv.wait_for(lk, std::chrono::milliseconds(8), can_continue);
+    release_cv.wait_for(lk, std::chrono::milliseconds(7), can_continue);
 
     if (queued_buffers > max_queue_size + 3) {
         release_cv.wait(lk, stop_token, can_continue);
