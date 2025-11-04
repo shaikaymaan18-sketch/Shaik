@@ -1030,8 +1030,10 @@ class SettingsFragmentPresenter(
                 override fun reset() = IntSetting.THEME.setInt(defaultValue)
             }
 
+            add(HeaderSetting(R.string.app_settings))
+            add(IntSetting.APP_LANGUAGE.key)
+
             if (NativeLibrary.isUpdateCheckerEnabled()) {
-                add(HeaderSetting(R.string.app_settings))
                 add(BooleanSetting.ENABLE_UPDATE_CHECKS.key)
             }
 
@@ -1150,8 +1152,6 @@ class SettingsFragmentPresenter(
                     descriptionId = R.string.use_black_backgrounds_description
                 )
             )
-
-            add(IntSetting.APP_LANGUAGE.key)
         }
     }
 
