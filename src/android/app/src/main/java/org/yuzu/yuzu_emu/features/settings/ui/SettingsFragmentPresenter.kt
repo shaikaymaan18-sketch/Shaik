@@ -1150,6 +1150,8 @@ class SettingsFragmentPresenter(
                     descriptionId = R.string.use_black_backgrounds_description
                 )
             )
+
+            add(IntSetting.APP_LANGUAGE.key)
         }
     }
 
