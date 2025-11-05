@@ -292,48 +292,6 @@ struct System::Impl {
         return SystemResultStatus::Success;
     }
 
-
-    void LoadOverrides(u64 programId) const {
-        std::string vendor = gpu_core->Renderer().GetDeviceVendor();
-        LOG_INFO(Core, "GPU Vendor: {}", vendor);
-
-        // Reset all per-game flags
-        Settings::values.use_squashed_iterated_blend = false;
-
-        // Insert PC overrides here
-
-    #ifdef ANDROID
-        // Example on how to set a setting based on the program ID and vendor
-        if (programId == 0x010028600EBDA000 && vendor == "Mali") { // Mario 3d World
-          // Settings::values.example = true;
-        }
-
-        // Example array of program IDs
-        const std::array<u64, 10> example_array = {
-                //0xprogramId
-                0x0004000000033400, // Game 1
-                0x0004000000033500 // Game 2
-                // And so on
-        };
-
-        for (auto id : example_array) {
-            if (programId == id) {
-             // Settings::values.example = true;
-                break;
-            }
-        }
-
-    #endif
-
-        // Ninja Gaiden Ragebound
-        constexpr u64 ngr = 0x0100781020710000ULL;
-
-        if (programId == ngr) {
-            LOG_INFO(Core, "Enabling game specifc override: use_squashed_iterated_blend");
-            Settings::values.use_squashed_iterated_blend = true;
-        }
-    }
-
     SystemResultStatus Load(System& system, Frontend::EmuWindow& emu_window,
                             const std::string& filepath,
                             Service::AM::FrontendAppletParameters& params) {
@@ -434,9 +392,6 @@ struct System::Impl {
 
     void ShutdownMainProcess() {
         SetShuttingDown(true);
-
-        // Reset per-game flags
-        Settings::values.use_squashed_iterated_blend = false;
 
         is_powered_on = false;
         exit_locked = false;
