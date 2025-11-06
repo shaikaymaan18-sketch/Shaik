@@ -171,6 +171,9 @@
         "min_version": "2.26.4",
         "disabled_platforms": [
             "macos-universal"
+        ],
+        "patches": [
+            "0001-SDL_endian.h-don-t-add-_m_prefetch-hack-for-clang-cl.patch"
         ]
     },
     "catch2": {

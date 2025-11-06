@@ -1,0 +1,55 @@
+From eacd966158b1a59698df55a7464056c7a8fc237f Mon Sep 17 00:00:00 2001
+From: Ozkan Sezer <sezeroz@gmail.com>
+Date: Mon, 15 Sep 2025 19:28:28 +0300
+Subject: [PATCH 1/2] SDL_endian.h: don't add _m_prefetch hack for clang-cl if
+ available as a builtin
+
+Fixes: https://github.com/libsdl-org/SDL/issues/13952 .
+
+(backport from SDL3 commit 81f2f4484392883e6ecbb2f4b04c99c0174d6bff)
+---
+ include/SDL2/SDL_endian.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/SDL2/SDL_endian.h b/include/SDL2/SDL_endian.h
+index 5be66ea..fcc428e 100644
+--- a/include/SDL2/SDL_endian.h
++++ b/include/SDL2/SDL_endian.h
+@@ -33,7 +33,7 @@
+ #if defined(_MSC_VER) && (_MSC_VER >= 1400)
+ /* As of Clang 11, '_m_prefetchw' is conflicting with the winnt.h's version,
+    so we define the needed '_m_prefetch' here as a pseudo-header, until the issue is fixed. */
+-#ifdef __clang__
++#if defined(__clang__) && !SDL_HAS_BUILTIN(_m_prefetch)
+ #ifndef __PRFCHWINTRIN_H
+ #define __PRFCHWINTRIN_H
+ static __inline__ void __attribute__((__always_inline__, __nodebug__))
+-- 
+2.48.1
+
+
+From dd0c6a720caa24e2445491b22d4acc28f75a9d13 Mon Sep 17 00:00:00 2001
+From: Ozkan Sezer <sezeroz@gmail.com>
+Date: Mon, 15 Sep 2025 20:29:50 +0300
+Subject: [PATCH 2/2] fix build.
+
+---
+ include/SDL2/SDL_endian.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/SDL2/SDL_endian.h b/include/SDL2/SDL_endian.h
+index fcc428e..96aca54 100644
+--- a/include/SDL2/SDL_endian.h
++++ b/include/SDL2/SDL_endian.h
+@@ -33,7 +33,7 @@
+ #if defined(_MSC_VER) && (_MSC_VER >= 1400)
+ /* As of Clang 11, '_m_prefetchw' is conflicting with the winnt.h's version,
+    so we define the needed '_m_prefetch' here as a pseudo-header, until the issue is fixed. */
+-#if defined(__clang__) && !SDL_HAS_BUILTIN(_m_prefetch)
++#if defined(__clang__) &&  !_SDL_HAS_BUILTIN(_m_prefetch)
+ #ifndef __PRFCHWINTRIN_H
+ #define __PRFCHWINTRIN_H
+ static __inline__ void __attribute__((__always_inline__, __nodebug__))
+-- 
+2.48.1
+
