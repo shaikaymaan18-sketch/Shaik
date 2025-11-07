@@ -620,18 +620,20 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         const bool is_rdna2 =
             supported_extensions.contains(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
 
-        // Always disable VIDS when EDS=0 to prevent black screen
-        if (Settings::values.dyna_state.GetValue() == 0) {
-            LOG_WARNING(Render_Vulkan,
-                        "Disabling VK_EXT_vertex_input_dynamic_state due to black screen with EDS=0");
+        // Always disable VIDS when EDS=0 to prevent black screen or RNDA2
+        // RDNA1 status unknown
+        // Also Warn about glitches on RDNA2
+        if (Settings::values.dyna_state.GetValue() == 0 || is_rdna2) {
+            if (is_rdna2)
+                LOG_WARNING(Render_Vulkan,
+                            "RADV glitchy VK_EXT_vertex_input_dynamic_state may cause glitches on some driver versions");
+            else
+                LOG_WARNING(Render_Vulkan,
+                            "Disabling VK_EXT_vertex_input_dynamic_state due to black screen with EDS=0");
+
             RemoveExtensionFeature(extensions.vertex_input_dynamic_state,
                                    features.vertex_input_dynamic_state,
                                    VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
-        } else if (is_rdna2) {
-            // RDNA1 status unknown
-            // Warn about glitches on RDNA2
-            LOG_WARNING(Render_Vulkan,
-                        "RADV glitchy VK_EXT_vertex_input_dynamic_state may cause glitches on some driver versions");
         }
     }
     if (extensions.extended_dynamic_state3 &&
