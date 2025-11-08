@@ -91,6 +91,12 @@ class DriverManagerFragment : Fragment() {
             }
         }
 
+        driverViewModel.shouldShowDriverShaderDialog.collect(viewLifecycleOwner) { shouldShow ->
+            if (shouldShow) {
+                showDriverShaderWipeDialog()
+            }
+        }
+
         if (!driverViewModel.isInteractionAllowed.value) {
             DriversLoadingDialogFragment().show(
                 childFragmentManager,
@@ -235,5 +241,19 @@ class DriverManagerFragment : Fragment() {
                 }
             ).show(requireActivity().supportFragmentManager, MessageDialogFragment.TAG)
         }
+    }
+
+    private fun showDriverShaderWipeDialog() {
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.driver_shader_wipe_dialog_title)
+            .setMessage(R.string.driver_shader_wipe_dialog_message)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                driverViewModel.onDriverShaderDialogDismissed(dontShowAgain = false)
+            }
+            .setNegativeButton(R.string.dont_show_again) { _, _ ->
+                driverViewModel.onDriverShaderDialogDismissed(dontShowAgain = true)
+            }
+            .setCancelable(false)
+            .show()
     }
 }
