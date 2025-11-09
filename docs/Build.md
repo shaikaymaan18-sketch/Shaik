@@ -53,7 +53,11 @@ This is recommended for *BSD, Solaris, Linux, and MSYS2. MSVC is possible, but n
 <details>
 <summary>Click to Open</summary>
 
-Note that CMake must be in your PATH, and you must be in the cloned Eden directory. On Windows, you must also set up a Visual C++ development environment. This can be done by running `C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat` in the same terminal.
+Important notes:
+- *CMake* **MUST** be in your PATH (and also *ninja*, if you are using it as GENERATOR)
+- You *MUST* be in the cloned *Eden* directory
+- On Windows, you must load **Visual C++ development environment**:
+  - This can be done by running our convenience script: `.tools/windows/load-msvc-env.ps1`
 
 Recommended generators:
 
