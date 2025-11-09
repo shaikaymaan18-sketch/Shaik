@@ -57,7 +57,7 @@ Important notes:
 - *CMake* **MUST** be in your PATH (and also *ninja*, if you are using it as GENERATOR)
 - You *MUST* be in the cloned *Eden* directory
 - On Windows, you must load **Visual C++ development environment**:
-  - This can be done by running our convenience script: `.tools/windows/load-msvc-env.ps1`
+  - This can be done by running our convenience script: `tools/windows/load-msvc-env.ps1`
 
 Recommended generators:
 
