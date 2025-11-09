@@ -18,7 +18,7 @@ The following additional tools are also required:
 * **[Git](https://git-scm.com/)** for version control
   - **[Windows installer](https://gitforwindows.org)**
 * On Windows, you must install the **[Vulkan SDK](https://vulkan.lunarg.com/sdk/home#windows)** as well
-  - *A convenience script to install the latest SDK is provided in `.ci/windows/install-vulkan-sdk.ps1`*
+  - *A convenience script to install the latest SDK is provided in `tools/windows/install-vulkan-sdk.ps1`*
 
 If you are on desktop and plan to use the Qt frontend, you *must* install Qt 6, and optionally Qt Creator (the recommended IDE for building)
 * On Linux, *BSD and macOS, this can be done by the package manager
