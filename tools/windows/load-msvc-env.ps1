@@ -7,7 +7,7 @@ switch ($osArch) {
     "X64"   { $arch = "x64" }
     "Arm64" { $arch = "arm64" }
     default {
-        Write-Error "❌ Unsupported architecture: $osArch"
+        Write-Error "load-msvc-env.ps1: Unsupported architecture: $osArch"
         exit 1
     }
 }
