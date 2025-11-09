@@ -26,7 +26,7 @@ Android has a completely different build process than other platforms. See its [
 
 If the configure phase fails, see the `Troubleshooting` section below. Usually, as long as you followed the dependencies guide, the defaults *should* successfully configure and build.
 
-### Qt Creator
+### Option A: Qt Creator
 
 This is the recommended GUI method for Linux, macOS, and Windows.
 
@@ -46,41 +46,47 @@ Hit "Configure Project", then wait for CMake to finish configuring (may take a w
 
 </details>
 
-### Command Line
+### Option B: Command Line
 
 <details>
 <summary>Click to Open</summary>
 
-Important notes:
-- *CMake* **MUST** be in your PATH (and also *ninja*, if you are using it as GENERATOR)
-- You *MUST* be in the cloned *Eden* directory
-- On Windows, you must load **Visual C++ development environment**:
-  - This can be done by running our convenience script: `tools/windows/load-msvc-env.ps1`
+> [!WARNING]
+>For all systems:
+>- *CMake* **MUST** be in your PATH (and also *ninja*, if you are using it as `<GENERATOR>`)
+>- You *MUST* be in the cloned *Eden* directory
+>
+>On Windows:
+>  - It's recommended to install **[Ninja](https://ninja-build.org/)**
+>  - You must load **Visual C++ development environment**, this can be done by running our convenience script:
+>    - `tools/windows/load-msvc-env.ps1`
 
-Recommended generators:
-
+Availables `<GENERATOR>`:
 - MSYS2: `MSYS Makefiles`
-- MSVC: Install **[ninja](https://ninja-build.org/)** and use `Ninja` (recommended), OR use `Visual Studio 17 2022`
+- MSVC: `Ninja` (preferred) or `Visual Studio 17 2022`
 - macOS: `Ninja` (preferred) or `Xcode`
 - Others: `Ninja` (preferred) or `UNIX Makefiles`
 
-BUILD_TYPE should usually be `Release` or `RelWithDebInfo` (debug symbols--compiled executable will be large). If you are using a debugger and annoyed with stuff getting optimized out, try `Debug`.
+Availables `<BUILD_TYPE>`:
+- `Release` (default)
+- `RelWithDebInfo` (debug symbols--compiled executable will be large)
+- `Debug` (if you are using a debugger and annoyed with stuff getting optimized out)
 
 Also see the [Options](Options.md) page for additional CMake options.
 
 ```sh
-cmake -S . -B build -G "GENERATOR" -DCMAKE_BUILD_TYPE=<BUILD_TYPE> -DYUZU_TESTS=OFF
+cmake -S . -B build -G "<GENERATOR>" -DCMAKE_BUILD_TYPE=<BUILD_TYPE> -DYUZU_TESTS=OFF
 ```
 
 If you are on Windows and prefer to use Clang:
 
 ```sh
-cmake -S . -B build -G "GENERATOR" -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl
+cmake -S . -B build -G "<GENERATOR>" -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl
 ```
 
 </details>
 
-### [CLion](https://www.jetbrains.com/clion/)
+### Option C: [CLion](https://www.jetbrains.com/clion/)
 
 <details>
 <summary>Click to Open</summary>
@@ -135,13 +141,13 @@ Many platforms have quirks, bugs, and other fun stuff that may cause issues when
 
 ## Building & Running
 
-### Qt Creator
+### On Qt Creator
 
 Simply hit Ctrl+B, or the "hammer" icon in the bottom left. To run, hit the "play" icon, or Ctrl+R.
 
-### Command Line
+### On Command Line
 
-If you are not on Windows and are using the `UNIX Makefiles` generator, you must also add `-j$(nproc)` to this command.
+If you are using the `UNIX Makefiles` or `Visual Studio 17 2022` as `<GENERATOR>`, you must also want to add `--parallel $(nproc)` to this command to improve building time.
 
 ```
 cmake --build build
