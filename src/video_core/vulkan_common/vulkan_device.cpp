@@ -583,9 +583,7 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
 
     if (Settings::values.dyna_state.GetValue() == 0) {
         must_emulate_scaled_formats = true;
-        LOG_INFO(Render_Vulkan, "Dynamic state is disabled (dyna_state = 0), forcing scaled format emulation ON");
 
-        RemoveExtensionFeature(extensions.vertex_input_dynamic_state, features.vertex_input_dynamic_state, VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
         dynamic_state3_blending = false;
         dynamic_state3_enables = false;
 
@@ -593,6 +591,11 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
     } else {
         must_emulate_scaled_formats = false;
         LOG_INFO(Render_Vulkan, "Dynamic state is enabled (dyna_state = 1-3), disabling scaled format emulation");
+    }
+
+    if (Settings::values.dyna_state.GetValue() != 3){
+        RemoveExtensionFeature(extensions.vertex_input_dynamic_state, features.vertex_input_dynamic_state, VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
+        LOG_INFO(Render_Vulkan, "Dynamic state is disabled (dyna_state != 3)");
     }
 
     if (Settings::values.dyna_state.GetValue() == 1) {
