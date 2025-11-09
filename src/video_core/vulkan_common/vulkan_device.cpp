@@ -629,12 +629,14 @@ LOG_INFO(Render_Vulkan, "=== End of Vulkan Driver Debug Info ===");
             features.extended_dynamic_state3.extendedDynamicState3ColorWriteMask = false;
             dynamic_state3_blending = false;
         }
-        const u32 version = (properties.properties.driverVersion << 3) >> 3;
-        if (version < VK_MAKE_API_VERSION(0, 23, 1, 0)) {
-            LOG_WARNING(Render_Vulkan,
-                        "RADV versions older than 23.1.0 have broken depth clamp dynamic state");
-            features.extended_dynamic_state3.extendedDynamicState3DepthClampEnable = true;
-            dynamic_state3_enables = true;
+        if (is_radv) {
+            const u32 version = (properties.properties.driverVersion << 3) >> 3;
+            if (version < VK_MAKE_API_VERSION(0, 23, 1, 0)) {
+                LOG_WARNING(Render_Vulkan,
+                            "RADV versions older than 23.1.0 have broken depth clamp dynamic state");
+                features.extended_dynamic_state3.extendedDynamicState3DepthClampEnable = true;
+                dynamic_state3_enables = true;
+            }
         }
     }
 LOG_INFO(Render_Vulkan, "=== Vulkan Driver Debug Info ===");
@@ -666,7 +668,7 @@ LOG_INFO(Render_Vulkan, "dynamic_state3_enables: {}", dynamic_state3_enables);
 LOG_INFO(Render_Vulkan, "=== End of Vulkan Driver Debug Info ===");
 
 
-    if (extensions.vertex_input_dynamic_state && is_radv) {
+    if (extensions.vertex_input_dynamic_state && is_amd) {
         // TODO(ameerj): Blacklist only offending driver versions
         // TODO(ameerj): Confirm if RDNA1 is affected
         const bool is_rdna2 =
@@ -674,9 +676,9 @@ LOG_INFO(Render_Vulkan, "=== End of Vulkan Driver Debug Info ===");
         if (is_rdna2) {
             LOG_WARNING(Render_Vulkan,
                         "RADV has broken VK_EXT_vertex_input_dynamic_state on RDNA2 hardware");
-            //  RemoveExtensionFeature(extensions.vertex_input_dynamic_state,
-            //      features.vertex_input_dynamic_state,
-            //    VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
+              RemoveExtensionFeature(extensions.vertex_input_dynamic_state,
+                  features.vertex_input_dynamic_state,
+                VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
         }
     }
     if (extensions.vertex_input_dynamic_state && is_qualcomm) {
@@ -824,10 +826,10 @@ LOG_INFO(Render_Vulkan, "=== End of Vulkan Driver Debug Info ===");
         LOG_WARNING(Render_Vulkan, "Driver has broken dynamic state, forcing to 0 to prevent graphical issues");
         Settings::values.dyna_state.SetValue(0);
     }
-RemoveExtensionFeature(extensions.extended_dynamic_state, features.extended_dynamic_state, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
     if (Settings::values.dyna_state.GetValue() == 0) {
         must_emulate_scaled_formats = true;
         LOG_INFO(Render_Vulkan, "Dynamic state is disabled (dyna_state = 0), forcing scaled format emulation ON");
+        RemoveExtensionFeature(extensions.extended_dynamic_state, features.extended_dynamic_state, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
 
         // Disable dynamic state 1-3 and all extensions
         RemoveExtensionFeature(extensions.custom_border_color, features.custom_border_color, VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME);
