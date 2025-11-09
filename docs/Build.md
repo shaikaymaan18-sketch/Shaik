@@ -48,8 +48,6 @@ Hit "Configure Project", then wait for CMake to finish configuring (may take a w
 
 ### Command Line
 
-This is recommended for *BSD, Solaris, Linux, and MSYS2. MSVC is possible, but not recommended.
-
 <details>
 <summary>Click to Open</summary>
 
@@ -62,7 +60,7 @@ Important notes:
 Recommended generators:
 
 - MSYS2: `MSYS Makefiles`
-- MSVC: Install **[ninja](https://ninja-build.org/)** and use `Ninja`, OR use `Visual Studio 17 2022`
+- MSVC: Install **[ninja](https://ninja-build.org/)** and use `Ninja` (recommended), OR use `Visual Studio 17 2022`
 - macOS: `Ninja` (preferred) or `Xcode`
 - Others: `Ninja` (preferred) or `UNIX Makefiles`
 
