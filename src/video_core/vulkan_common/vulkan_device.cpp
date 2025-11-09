@@ -593,7 +593,6 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         LOG_WARNING(Render_Vulkan, "RADV has broken extendedDynamicState3ColorBlendEquation");
         features.extended_dynamic_state3.extendedDynamicState3ColorBlendEnable = true;
         features.extended_dynamic_state3.extendedDynamicState3ColorBlendEquation = true;
-        features.extended_dynamic_state3.extendedDynamicState3ColorWriteMask = true;
         dynamic_state3_blending = true;
 
         const u32 version = (properties.properties.driverVersion << 3) >> 3;
@@ -617,7 +616,6 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         } else {
             features.extended_dynamic_state3.extendedDynamicState3ColorBlendEnable = true;
             features.extended_dynamic_state3.extendedDynamicState3ColorBlendEquation = true;
-            features.extended_dynamic_state3.extendedDynamicState3ColorWriteMask = true;
             dynamic_state3_blending = true;
         }
     }
