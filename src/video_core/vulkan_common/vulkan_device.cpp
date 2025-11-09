@@ -430,6 +430,34 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
     const bool is_s8gen2 = device_id == 0x43050a01;
     const bool is_arm = driver_id == VK_DRIVER_ID_ARM_PROPRIETARY;
 
+LOG_INFO(Render_Vulkan, "=== Vulkan Driver Debug Info ===");
+LOG_INFO(Render_Vulkan, "Driver ID: {}", driver_id);
+LOG_INFO(Render_Vulkan, "Is RADV: {}", is_radv);
+LOG_INFO(Render_Vulkan, "Is AMD proprietary: {}", is_amd_driver);
+LOG_INFO(Render_Vulkan, "Is AMD (any): {}", is_amd);
+LOG_INFO(Render_Vulkan, "Is Qualcomm: {}", is_qualcomm);
+LOG_INFO(Render_Vulkan, "Is Intel (Windows): {}", is_intel_windows);
+LOG_INFO(Render_Vulkan, "Is NVIDIA: {}", is_nvidia);
+LOG_INFO(Render_Vulkan, "Driver version: {}", (properties.properties.driverVersion << 3) >> 3);
+LOG_INFO(Render_Vulkan, "Dynamic State Setting (Settings::values.dyna_state): {}",
+         Settings::values.dyna_state.GetValue());
+LOG_INFO(Render_Vulkan, "Has VK_EXT_extended_dynamic_state: {}", extensions.extended_dynamic_state);
+LOG_INFO(Render_Vulkan, "Has VK_EXT_extended_dynamic_state2: {}", extensions.extended_dynamic_state2);
+LOG_INFO(Render_Vulkan, "Has VK_EXT_extended_dynamic_state3: {}", extensions.extended_dynamic_state3);
+LOG_INFO(Render_Vulkan, "EDS3 ColorBlendEnable: {}",
+         features.extended_dynamic_state3.extendedDynamicState3ColorBlendEnable);
+LOG_INFO(Render_Vulkan, "EDS3 ColorBlendEquation: {}",
+         features.extended_dynamic_state3.extendedDynamicState3ColorBlendEquation);
+LOG_INFO(Render_Vulkan, "EDS3 ColorWriteMask: {}",
+         features.extended_dynamic_state3.extendedDynamicState3ColorWriteMask);
+LOG_INFO(Render_Vulkan, "EDS3 DepthClampEnable: {}",
+         features.extended_dynamic_state3.extendedDynamicState3DepthClampEnable);
+LOG_INFO(Render_Vulkan, "EDS3 RasterizationStream: {}",
+         features.extended_dynamic_state3.extendedDynamicState3RasterizationStream);
+LOG_INFO(Render_Vulkan, "dynamic_state3_blending: {}", dynamic_state3_blending);
+LOG_INFO(Render_Vulkan, "dynamic_state3_enables: {}", dynamic_state3_enables);
+LOG_INFO(Render_Vulkan, "=== End of Vulkan Driver Debug Info ===");
+
     if ((is_mvk || is_qualcomm || is_turnip || is_arm) && !is_suitable) {
         LOG_WARNING(Render_Vulkan, "Unsuitable driver, continuing anyway");
     } else if (!is_suitable) {
@@ -589,12 +617,18 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
             //VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
         }
     }
-    if (extensions.extended_dynamic_state3 && is_radv) {
-        LOG_WARNING(Render_Vulkan, "RADV has broken extendedDynamicState3ColorBlendEquation");
+    if (extensions.extended_dynamic_state3 && (is_amd || driver_id == VK_DRIVER_ID_SAMSUNG_PROPRIETARY)) {
+        LOG_WARNING(Render_Vulkan,
+                    "AMD and Samsung drivers have broken extendedDynamicState3ColorBlendEquation");
         features.extended_dynamic_state3.extendedDynamicState3ColorBlendEnable = true;
         features.extended_dynamic_state3.extendedDynamicState3ColorBlendEquation = true;
         dynamic_state3_blending = true;
-
+        if (Settings::values.dyna_state.GetValue() == 0) {
+            features.extended_dynamic_state3.extendedDynamicState3ColorBlendEnable = false;
+            features.extended_dynamic_state3.extendedDynamicState3ColorBlendEquation = false;
+            features.extended_dynamic_state3.extendedDynamicState3ColorWriteMask = false;
+            dynamic_state3_blending = false;
+        }
         const u32 version = (properties.properties.driverVersion << 3) >> 3;
         if (version < VK_MAKE_API_VERSION(0, 23, 1, 0)) {
             LOG_WARNING(Render_Vulkan,
@@ -603,23 +637,35 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
             dynamic_state3_enables = true;
         }
     }
-    if (extensions.extended_dynamic_state3 && (is_amd_driver || driver_id == VK_DRIVER_ID_SAMSUNG_PROPRIETARY)) {
-        // AMD and Samsung drivers have broken extendedDynamicState3ColorBlendEquation
-        LOG_WARNING(Render_Vulkan,
-                    "AMD and Samsung drivers have broken extendedDynamicState3ColorBlendEquation");
-        // Only set to false when EDS = 0, otherwise keep true
-        if (Settings::values.dyna_state.GetValue() == 0) {
-            features.extended_dynamic_state3.extendedDynamicState3ColorBlendEnable = false;
-            features.extended_dynamic_state3.extendedDynamicState3ColorBlendEquation = false;
-            features.extended_dynamic_state3.extendedDynamicState3ColorWriteMask = false;
-            dynamic_state3_blending = false;
-        } else {
-            features.extended_dynamic_state3.extendedDynamicState3ColorBlendEnable = true;
-            features.extended_dynamic_state3.extendedDynamicState3ColorBlendEquation = true;
-            features.extended_dynamic_state3.extendedDynamicState3ColorWriteMask = true;
-            dynamic_state3_blending = true;
-        }
-    }
+LOG_INFO(Render_Vulkan, "=== Vulkan Driver Debug Info ===");
+LOG_INFO(Render_Vulkan, "Driver ID: {}", driver_id);
+LOG_INFO(Render_Vulkan, "Is RADV: {}", is_radv);
+LOG_INFO(Render_Vulkan, "Is AMD proprietary: {}", is_amd_driver);
+LOG_INFO(Render_Vulkan, "Is AMD (any): {}", is_amd);
+LOG_INFO(Render_Vulkan, "Is Qualcomm: {}", is_qualcomm);
+LOG_INFO(Render_Vulkan, "Is Intel (Windows): {}", is_intel_windows);
+LOG_INFO(Render_Vulkan, "Is NVIDIA: {}", is_nvidia);
+LOG_INFO(Render_Vulkan, "Driver version: {}", (properties.properties.driverVersion << 3) >> 3);
+LOG_INFO(Render_Vulkan, "Dynamic State Setting (Settings::values.dyna_state): {}",
+         Settings::values.dyna_state.GetValue());
+LOG_INFO(Render_Vulkan, "Has VK_EXT_extended_dynamic_state: {}", extensions.extended_dynamic_state);
+LOG_INFO(Render_Vulkan, "Has VK_EXT_extended_dynamic_state2: {}", extensions.extended_dynamic_state2);
+LOG_INFO(Render_Vulkan, "Has VK_EXT_extended_dynamic_state3: {}", extensions.extended_dynamic_state3);
+LOG_INFO(Render_Vulkan, "EDS3 ColorBlendEnable: {}",
+         features.extended_dynamic_state3.extendedDynamicState3ColorBlendEnable);
+LOG_INFO(Render_Vulkan, "EDS3 ColorBlendEquation: {}",
+         features.extended_dynamic_state3.extendedDynamicState3ColorBlendEquation);
+LOG_INFO(Render_Vulkan, "EDS3 ColorWriteMask: {}",
+         features.extended_dynamic_state3.extendedDynamicState3ColorWriteMask);
+LOG_INFO(Render_Vulkan, "EDS3 DepthClampEnable: {}",
+         features.extended_dynamic_state3.extendedDynamicState3DepthClampEnable);
+LOG_INFO(Render_Vulkan, "EDS3 RasterizationStream: {}",
+         features.extended_dynamic_state3.extendedDynamicState3RasterizationStream);
+LOG_INFO(Render_Vulkan, "dynamic_state3_blending: {}", dynamic_state3_blending);
+LOG_INFO(Render_Vulkan, "dynamic_state3_enables: {}", dynamic_state3_enables);
+LOG_INFO(Render_Vulkan, "=== End of Vulkan Driver Debug Info ===");
+
+
     if (extensions.vertex_input_dynamic_state && is_radv) {
         // TODO(ameerj): Blacklist only offending driver versions
         // TODO(ameerj): Confirm if RDNA1 is affected
@@ -742,6 +788,33 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         dynamic_state3_blending = true;
         dynamic_state3_enables = true;
     }
+LOG_INFO(Render_Vulkan, "=== Vulkan Driver Debug Info ===");
+LOG_INFO(Render_Vulkan, "Driver ID: {}", driver_id);
+LOG_INFO(Render_Vulkan, "Is RADV: {}", is_radv);
+LOG_INFO(Render_Vulkan, "Is AMD proprietary: {}", is_amd_driver);
+LOG_INFO(Render_Vulkan, "Is AMD (any): {}", is_amd);
+LOG_INFO(Render_Vulkan, "Is Qualcomm: {}", is_qualcomm);
+LOG_INFO(Render_Vulkan, "Is Intel (Windows): {}", is_intel_windows);
+LOG_INFO(Render_Vulkan, "Is NVIDIA: {}", is_nvidia);
+LOG_INFO(Render_Vulkan, "Driver version: {}", (properties.properties.driverVersion << 3) >> 3);
+LOG_INFO(Render_Vulkan, "Dynamic State Setting (Settings::values.dyna_state): {}",
+         Settings::values.dyna_state.GetValue());
+LOG_INFO(Render_Vulkan, "Has VK_EXT_extended_dynamic_state: {}", extensions.extended_dynamic_state);
+LOG_INFO(Render_Vulkan, "Has VK_EXT_extended_dynamic_state2: {}", extensions.extended_dynamic_state2);
+LOG_INFO(Render_Vulkan, "Has VK_EXT_extended_dynamic_state3: {}", extensions.extended_dynamic_state3);
+LOG_INFO(Render_Vulkan, "EDS3 ColorBlendEnable: {}",
+         features.extended_dynamic_state3.extendedDynamicState3ColorBlendEnable);
+LOG_INFO(Render_Vulkan, "EDS3 ColorBlendEquation: {}",
+         features.extended_dynamic_state3.extendedDynamicState3ColorBlendEquation);
+LOG_INFO(Render_Vulkan, "EDS3 ColorWriteMask: {}",
+         features.extended_dynamic_state3.extendedDynamicState3ColorWriteMask);
+LOG_INFO(Render_Vulkan, "EDS3 DepthClampEnable: {}",
+         features.extended_dynamic_state3.extendedDynamicState3DepthClampEnable);
+LOG_INFO(Render_Vulkan, "EDS3 RasterizationStream: {}",
+         features.extended_dynamic_state3.extendedDynamicState3RasterizationStream);
+LOG_INFO(Render_Vulkan, "dynamic_state3_blending: {}", dynamic_state3_blending);
+LOG_INFO(Render_Vulkan, "dynamic_state3_enables: {}", dynamic_state3_enables);
+LOG_INFO(Render_Vulkan, "=== End of Vulkan Driver Debug Info ===");
 
     // Mesa Intel drivers on UHD 620 have broken EDS causing extreme flickering - unknown if it affects other iGPUs
     // ALSO affects ALL versions of UHD drivers on Windows 10+, seems to cause even worse issues like straight up crashing
@@ -770,6 +843,33 @@ RemoveExtensionFeature(extensions.extended_dynamic_state, features.extended_dyna
         must_emulate_scaled_formats = false;
         LOG_INFO(Render_Vulkan, "Dynamic state is enabled (dyna_state = 1-3), disabling scaled format emulation");
     }
+LOG_INFO(Render_Vulkan, "=== Vulkan Driver Debug Info ===");
+LOG_INFO(Render_Vulkan, "Driver ID: {}", driver_id);
+LOG_INFO(Render_Vulkan, "Is RADV: {}", is_radv);
+LOG_INFO(Render_Vulkan, "Is AMD proprietary: {}", is_amd_driver);
+LOG_INFO(Render_Vulkan, "Is AMD (any): {}", is_amd);
+LOG_INFO(Render_Vulkan, "Is Qualcomm: {}", is_qualcomm);
+LOG_INFO(Render_Vulkan, "Is Intel (Windows): {}", is_intel_windows);
+LOG_INFO(Render_Vulkan, "Is NVIDIA: {}", is_nvidia);
+LOG_INFO(Render_Vulkan, "Driver version: {}", (properties.properties.driverVersion << 3) >> 3);
+LOG_INFO(Render_Vulkan, "Dynamic State Setting (Settings::values.dyna_state): {}",
+         Settings::values.dyna_state.GetValue());
+LOG_INFO(Render_Vulkan, "Has VK_EXT_extended_dynamic_state: {}", extensions.extended_dynamic_state);
+LOG_INFO(Render_Vulkan, "Has VK_EXT_extended_dynamic_state2: {}", extensions.extended_dynamic_state2);
+LOG_INFO(Render_Vulkan, "Has VK_EXT_extended_dynamic_state3: {}", extensions.extended_dynamic_state3);
+LOG_INFO(Render_Vulkan, "EDS3 ColorBlendEnable: {}",
+         features.extended_dynamic_state3.extendedDynamicState3ColorBlendEnable);
+LOG_INFO(Render_Vulkan, "EDS3 ColorBlendEquation: {}",
+         features.extended_dynamic_state3.extendedDynamicState3ColorBlendEquation);
+LOG_INFO(Render_Vulkan, "EDS3 ColorWriteMask: {}",
+         features.extended_dynamic_state3.extendedDynamicState3ColorWriteMask);
+LOG_INFO(Render_Vulkan, "EDS3 DepthClampEnable: {}",
+         features.extended_dynamic_state3.extendedDynamicState3DepthClampEnable);
+LOG_INFO(Render_Vulkan, "EDS3 RasterizationStream: {}",
+         features.extended_dynamic_state3.extendedDynamicState3RasterizationStream);
+LOG_INFO(Render_Vulkan, "dynamic_state3_blending: {}", dynamic_state3_blending);
+LOG_INFO(Render_Vulkan, "dynamic_state3_enables: {}", dynamic_state3_enables);
+LOG_INFO(Render_Vulkan, "=== End of Vulkan Driver Debug Info ===");
 
     logical = vk::Device::Create(physical, queue_cis, ExtensionListForVulkan(loaded_extensions), first_next, dld);
 
