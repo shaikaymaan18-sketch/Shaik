@@ -501,14 +501,14 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
                                VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
      }
 
-    if ((!extensions.extended_dynamic_state && extensions.extended_dynamic_state2) || Settings::values.dyna_state.GetValue() < 1) {
+    if ((!extensions.extended_dynamic_state && extensions.extended_dynamic_state2)) {
         LOG_INFO(Render_Vulkan,
                  "Removing extendedDynamicState2 due to missing extendedDynamicState");
         RemoveExtensionFeature(extensions.extended_dynamic_state2, features.extended_dynamic_state2,
                                VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
     }
 
-    if ((!extensions.extended_dynamic_state2 && extensions.extended_dynamic_state3) || Settings::values.dyna_state.GetValue() < 2) {
+    if ((!extensions.extended_dynamic_state2 && extensions.extended_dynamic_state3)) {
         LOG_INFO(Render_Vulkan,
                  "Removing extendedDynamicState3 due to missing extendedDynamicState2");
         RemoveExtensionFeature(extensions.extended_dynamic_state3, features.extended_dynamic_state3,
@@ -595,7 +595,7 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         LOG_INFO(Render_Vulkan, "Dynamic state is enabled (dyna_state = 1-3), disabling scaled format emulation");
     }
 
-    if (extensions.extended_dynamic_state) {
+    if (Settings::values.dyna_state.GetValue() == 1) {
         if (is_radv) {
             // Mask driver version variant
             const u32 version = (properties.properties.driverVersion << 3) >> 3;
@@ -629,7 +629,7 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
             //     VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
         }
     }
-    if (extensions.extended_dynamic_state2) {
+    if (Settings::values.dyna_state.GetValue() == 2) {
         if (is_radv) {
             const u32 version = (properties.properties.driverVersion << 3) >> 3;
             if (version < VK_MAKE_API_VERSION(0, 22, 3, 1)) {
@@ -654,7 +654,7 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
             }
         }
     }
-    if (extensions.extended_dynamic_state3 && (is_amd || driver_id == VK_DRIVER_ID_SAMSUNG_PROPRIETARY)) {
+    if (Settings::values.dyna_state.GetValue() == 3 && (is_amd || driver_id == VK_DRIVER_ID_SAMSUNG_PROPRIETARY)) {
         LOG_WARNING(Render_Vulkan,
                     "AMD and Samsung drivers have broken extendedDynamicState3ColorBlendEquation");
         features.extended_dynamic_state3.extendedDynamicState3ColorBlendEnable = true;
