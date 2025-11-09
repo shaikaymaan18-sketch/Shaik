@@ -593,11 +593,15 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         LOG_INFO(Render_Vulkan, "Dynamic state is enabled (dyna_state = 1-3), disabling scaled format emulation");
     }
 
-    if (Settings::values.dyna_state.GetValue() != 3){
+    if (Settings::values.dyna_state.GetValue() == 2){
         RemoveExtensionFeature(extensions.vertex_input_dynamic_state, features.vertex_input_dynamic_state, VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
-        LOG_INFO(Render_Vulkan, "Dynamic state is disabled (dyna_state != 3)");
+        LOG_INFO(Render_Vulkan, "Dynamic state is disabled (dyna_state == 2)");
     }
 
+    if (Settings::values.dyna_state.GetValue() == 0){
+        RemoveExtensionFeature(extensions.vertex_input_dynamic_state, features.vertex_input_dynamic_state, VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
+        LOG_INFO(Render_Vulkan, "Dynamic state is disabled (dyna_state == 0)");
+    }
     if (Settings::values.dyna_state.GetValue() == 1) {
         if (is_radv) {
             // Mask driver version variant
