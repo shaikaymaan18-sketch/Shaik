@@ -494,21 +494,21 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
     CollectPhysicalMemoryInfo();
     CollectToolingInfo();
 
-     if (Settings::values.dyna_state.GetValue() == 0) {
+     if (Settings::values.dyna_state.GetValue() <= 0) {
         LOG_INFO(Render_Vulkan,
                  "Removing extendedDynamicState due to dyna_state = 0");
         RemoveExtensionFeature(extensions.extended_dynamic_state, features.extended_dynamic_state,
                                VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
      }
 
-    if ((!extensions.extended_dynamic_state && extensions.extended_dynamic_state2)) {
+    if (Settings::values.dyna_state.GetValue() <= 1) {
         LOG_INFO(Render_Vulkan,
                  "Removing extendedDynamicState2 due to missing extendedDynamicState");
         RemoveExtensionFeature(extensions.extended_dynamic_state2, features.extended_dynamic_state2,
                                VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
     }
 
-    if ((!extensions.extended_dynamic_state2 && extensions.extended_dynamic_state3)) {
+    if (Settings::values.dyna_state.GetValue() <= 2) {
         LOG_INFO(Render_Vulkan,
                  "Removing extendedDynamicState3 due to missing extendedDynamicState2");
         RemoveExtensionFeature(extensions.extended_dynamic_state3, features.extended_dynamic_state3,
@@ -584,8 +584,7 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         must_emulate_scaled_formats = true;
         LOG_INFO(Render_Vulkan, "Dynamic state is disabled (dyna_state = 0), forcing scaled format emulation ON");
 
-        if (!is_amd)
-            RemoveExtensionFeature(extensions.vertex_input_dynamic_state, features.vertex_input_dynamic_state, VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
+        RemoveExtensionFeature(extensions.vertex_input_dynamic_state, features.vertex_input_dynamic_state, VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
         dynamic_state3_blending = false;
         dynamic_state3_enables = false;
 
@@ -615,9 +614,9 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
             if (is_rdna2) {
                 LOG_WARNING(Render_Vulkan,
                             "RADV has broken VK_EXT_vertex_input_dynamic_state on RDNA2 hardware");
-                RemoveExtensionFeature(extensions.vertex_input_dynamic_state,
-                    features.vertex_input_dynamic_state,
-                    VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
+                //RemoveExtensionFeature(extensions.vertex_input_dynamic_state,
+                //    features.vertex_input_dynamic_state,
+                //    VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
             }
         }
         if (is_qualcomm) {
