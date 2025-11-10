@@ -8,12 +8,19 @@
 #include "video_core/vulkan_common/vma.h"
 
 #include <codecvt>
+#include <cstdio>
+#include <cstring>
 #include <locale>
+#include <map>
+#include <set>
+#include <sstream>
 #include <span>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 #include <dlfcn.h>
+#include <unistd.h>
 
 #ifdef ARCHITECTURE_arm64
 #include <adrenotools/driver.h>
@@ -465,6 +472,175 @@ static Core::SystemResultStatus RunEmulation(const std::string& filepath,
     return Core::SystemResultStatus::Success;
 }
 
+namespace {
+
+struct CpuPartInfo {
+    u32 vendor;
+    u32 part;
+    const char* name;
+};
+
+static constexpr CpuPartInfo s_cpu_list[] = {
+    // ARM - 0x41
+    {0x41, 0xd01, "cortex-a32"},
+    {0x41, 0xd02, "cortex-a34"},
+    {0x41, 0xd04, "cortex-a35"},
+    {0x41, 0xd03, "cortex-a53"},
+    {0x41, 0xd05, "cortex-a55"},
+    {0x41, 0xd46, "cortex-a510"},
+    {0x41, 0xd80, "cortex-a520"},
+    {0x41, 0xd88, "cortex-a520ae"},
+    {0x41, 0xd07, "cortex-a57"},
+    {0x41, 0xd06, "cortex-a65"},
+    {0x41, 0xd43, "cortex-a65ae"},
+    {0x41, 0xd08, "cortex-a72"},
+    {0x41, 0xd09, "cortex-a73"},
+    {0x41, 0xd0a, "cortex-a75"},
+    {0x41, 0xd0b, "cortex-a76"},
+    {0x41, 0xd0e, "cortex-a76ae"},
+    {0x41, 0xd0d, "cortex-a77"},
+    {0x41, 0xd41, "cortex-a78"},
+    {0x41, 0xd42, "cortex-a78ae"},
+    {0x41, 0xd4b, "cortex-a78c"},
+    {0x41, 0xd47, "cortex-a710"},
+    {0x41, 0xd4d, "cortex-a715"},
+    {0x41, 0xd81, "cortex-a720"},
+    {0x41, 0xd89, "cortex-a720ae"},
+    {0x41, 0xd87, "cortex-a725"},
+    {0x41, 0xd44, "cortex-x1"},
+    {0x41, 0xd4c, "cortex-x1c"},
+    {0x41, 0xd48, "cortex-x2"},
+    {0x41, 0xd4e, "cortex-x3"},
+    {0x41, 0xd82, "cortex-x4"},
+    {0x41, 0xd85, "cortex-x925"},
+    {0x41, 0xd4a, "neoverse-e1"},
+    {0x41, 0xd0c, "neoverse-n1"},
+    {0x41, 0xd49, "neoverse-n2"},
+    {0x41, 0xd8e, "neoverse-n3"},
+    {0x41, 0xd40, "neoverse-v1"},
+    {0x41, 0xd4f, "neoverse-v2"},
+    {0x41, 0xd84, "neoverse-v3"},
+    {0x41, 0xd83, "neoverse-v3ae"},
+    // Qualcomm - 0x51
+    {0x51, 0x201, "kryo"},
+    {0x51, 0x205, "kryo"},
+    {0x51, 0x211, "kryo"},
+    {0x51, 0x800, "kryo-385-gold"},
+    {0x51, 0x801, "kryo-385-silver"},
+    {0x51, 0x802, "kryo-485-gold"},
+    {0x51, 0x803, "kryo-485-silver"},
+    {0x51, 0x804, "kryo-680-prime"},
+    {0x51, 0x805, "kryo-680-gold"},
+    {0x51, 0x06f, "krait"},
+    {0x51, 0xc00, "falkor"},
+    {0x51, 0xc01, "saphira"},
+    {0x51, 0x001, "oryon-1"},
+};
+
+const char* find_cpu_name(u32 vendor, u32 part) {
+    for (const auto& cpu : s_cpu_list) {
+        if (cpu.vendor == vendor && cpu.part == part) {
+            return cpu.name;
+        }
+    }
+    return nullptr;
+}
+
+u64 read_midr_sysfs(u32 cpu_id) {
+    char path[128];
+    std::snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu%u/regs/identification/midr_el1", cpu_id);
+
+    FILE* f = std::fopen(path, "r");
+    if (!f) return 0;
+
+    char value[32];
+    if (!std::fgets(value, sizeof(value), f)) {
+        std::fclose(f);
+        return 0;
+    }
+    std::fclose(f);
+
+    return std::strtoull(value, nullptr, 16);
+}
+
+std::string get_arm_cpu_name() {
+    std::map<u64, int> core_layout;
+    for (u32 i = 0; i < std::thread::hardware_concurrency(); ++i) {
+        const auto midr = read_midr_sysfs(i);
+        if (midr == 0) break;
+        core_layout[midr]++;
+    }
+
+    if (!core_layout.empty()) {
+        const CpuPartInfo* lowest_part = nullptr;
+        u32 lowest_part_id = 0xFFFFFFFF;
+
+        for (const auto& [midr, count] : core_layout) {
+            const auto vendor = (midr >> 24) & 0xff;
+            const auto part = (midr >> 4) & 0xfff;
+
+            for (const auto& cpu : s_cpu_list) {
+                if (cpu.vendor == vendor && cpu.part == part) {
+                    if (cpu.part < lowest_part_id) {
+                        lowest_part_id = cpu.part;
+                        lowest_part = &cpu;
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (lowest_part) {
+            return lowest_part->name;
+        }
+    }
+
+    FILE* f = std::fopen("/proc/cpuinfo", "r");
+    if (!f) return "";
+
+    char buf[512];
+    std::string result;
+
+    auto trim = [](std::string& s) {
+        const auto start = s.find_first_not_of(" \t\r\n");
+        const auto end = s.find_last_not_of(" \t\r\n");
+        s = (start == std::string::npos) ? "" : s.substr(start, end - start + 1);
+    };
+
+    while (std::fgets(buf, sizeof(buf), f)) {
+        std::string line(buf);
+        if (line.find("Hardware") == 0) {
+            auto pos = line.find(':');
+            if (pos != std::string::npos) {
+                result = line.substr(pos + 1);
+                trim(result);
+                break;
+            }
+        }
+    }
+    std::fclose(f);
+
+    if (!result.empty()) {
+        std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    }
+
+    return result;
+}
+
+const char* fallback_cpu_detection() {
+    static std::string s_result = []() -> std::string {
+        std::string result = get_arm_cpu_name();
+        if (result.empty()) {
+            return "cortex-a34";
+        }
+        return result;
+    }();
+
+    return s_result.c_str();
+}
+
+} // namespace
+
 extern "C" {
 
 void Java_org_yuzu_yuzu_1emu_NativeLibrary_surfaceChanged(JNIEnv* env, jobject instance,
@@ -684,6 +860,268 @@ jstring Java_org_yuzu_yuzu_1emu_NativeLibrary_getCpuBackend(JNIEnv* env, jclass 
 jstring Java_org_yuzu_yuzu_1emu_NativeLibrary_getGpuDriver(JNIEnv* env, jobject jobj) {
     return Common::Android::ToJString(
         env, EmulationSession::GetInstance().System().GPU().Renderer().GetDeviceVendor());
+}
+
+jstring Java_org_yuzu_yuzu_1emu_NativeLibrary_getCpuSummary(JNIEnv* env, jobject /*jobj*/) {
+    constexpr const char* CPUINFO_PATH = "/proc/cpuinfo";
+
+    auto trim = [](std::string& s) {
+        const auto start = s.find_first_not_of(" \t\r\n");
+        const auto end = s.find_last_not_of(" \t\r\n");
+        s = (start == std::string::npos) ? "" : s.substr(start, end - start + 1);
+    };
+
+    auto to_lower = [](std::string s) {
+        for (auto& c : s) c = std::tolower(c);
+        return s;
+    };
+
+    try {
+        std::string result;
+
+        FILE* f = std::fopen(CPUINFO_PATH, "r");
+        if (!f) return Common::Android::ToJString(env, "Unknown");
+
+        char buf[512];
+        std::map<std::string, int> part_counts;
+        int thread_count = 0;
+
+        while (std::fgets(buf, sizeof(buf), f)) {
+            std::string line(buf);
+            if (line.find("processor") == 0) {
+                thread_count++;
+            } else if (line.find("CPU part") == 0) {
+                auto pos = line.find(':');
+                if (pos != std::string::npos) {
+                    std::string val = line.substr(pos + 1);
+                    trim(val);
+                    val = to_lower(val);
+
+                    u32 part_id = 0;
+                    if (val.length() > 2 && val[0] == '0' && val[1] == 'x') {
+                        try {
+                            part_id = std::stoul(val.substr(2), nullptr, 16);
+                        } catch (...) {}
+                    }
+
+                    const char* cpu_name = find_cpu_name(0x41, part_id);
+                    if (cpu_name) {
+                        part_counts[cpu_name]++;
+                    } else {
+                        part_counts[val]++; // Fallback to hex ID
+                    }
+                }
+            }
+        }
+        std::fclose(f);
+
+        if (thread_count == 0) {
+            thread_count = sysconf(_SC_NPROCESSORS_CONF);
+            if (thread_count <= 0) thread_count = 1;
+        }
+
+        if (part_counts.empty()) {
+            part_counts["Unknown"] = thread_count;
+        }
+
+        std::vector<std::pair<std::string, int>> sorted_parts(part_counts.begin(), part_counts.end());
+        std::sort(sorted_parts.begin(), sorted_parts.end(), [](const auto& a, const auto& b) {
+            auto get_part_id = [](const std::string& name) -> u32 {
+                for (const auto& cpu : s_cpu_list) {
+                    if (cpu.name == name) {
+                        return cpu.part;
+                    }
+                }
+
+                if (name.length() > 2 && name[0] == '0' && name[1] == 'x') {
+                    try {
+                        return std::stoul(name.substr(2), nullptr, 16);
+                    } catch (...) {}
+                }
+
+                return 0;
+            };
+
+            u32 part_a = get_part_id(a.first);
+            u32 part_b = get_part_id(b.first);
+
+            if (part_a != part_b) return part_a > part_b;
+            return a.first > b.first;
+        });
+
+        std::string cluster_str;
+        for (size_t i = 0; i < sorted_parts.size(); ++i) {
+            if (i > 0) cluster_str += " + ";
+            cluster_str += fmt::format("{}x{}", sorted_parts[i].second, sorted_parts[i].first);
+        }
+
+        fmt::format_to(std::back_inserter(result), "ARM {} | {} Threads",
+                       cluster_str, thread_count);
+
+        f = std::fopen(CPUINFO_PATH, "r");
+        if (f) {
+            std::set<std::string> feature_set;
+            while (std::fgets(buf, sizeof(buf), f)) {
+                std::string line(buf);
+                if (line.find("Features") == 0 || line.find("features") == 0) {
+                    auto pos = line.find(':');
+                    if (pos != std::string::npos) {
+                        std::string feat_line = line.substr(pos + 1);
+                        trim(feat_line);
+
+                        std::istringstream iss(feat_line);
+                        std::string feature;
+                        while (iss >> feature) {
+                            feature_set.insert(to_lower(feature));
+                        }
+                    }
+                }
+            }
+            std::fclose(f);
+
+            bool has_neon = feature_set.count("neon") || feature_set.count("asimd");
+            bool has_fp = feature_set.count("fp") || feature_set.count("vfp");
+            bool has_sve = feature_set.count("sve");
+            bool has_sve2 = feature_set.count("sve2");
+            bool has_crypto = feature_set.count("aes") || feature_set.count("sha1") ||
+                             feature_set.count("sha2") || feature_set.count("pmull");
+            bool has_dotprod = feature_set.count("asimddp") || feature_set.count("dotprod");
+            bool has_i8mm = feature_set.count("i8mm");
+            bool has_bf16 = feature_set.count("bf16");
+            bool has_atomics = feature_set.count("atomics") || feature_set.count("lse");
+
+            if (has_neon || has_fp) {
+                result += " | NEON";
+                if (has_dotprod) result += "+DP";
+                if (has_i8mm) result += "+I8MM";
+                if (has_bf16) result += "+BF16";
+            }
+
+            if (has_sve) {
+                result += " | SVE";
+                if (has_sve2) result += "2";
+            }
+
+            if (has_crypto) {
+                result += " | Crypto";
+            }
+
+            if (has_atomics) {
+                result += " | LSE";
+            }
+        }
+
+        fmt::format_to(std::back_inserter(result), "\nLLVM CPU: {}", fallback_cpu_detection());
+
+        return Common::Android::ToJString(env, result);
+    } catch (...) {
+        return Common::Android::ToJString(env, "Unknown");
+    }
+}
+
+
+namespace {
+constexpr u32 VENDOR_QUALCOMM = 0x5143;
+constexpr u32 VENDOR_ARM = 0x13B5;
+
+VkPhysicalDeviceProperties GetVulkanDeviceProperties() {
+    Common::DynamicLibrary library;
+    if (!library.Open("libvulkan.so")) {
+        return {};
+    }
+
+    Vulkan::vk::InstanceDispatch dld;
+    const auto instance = Vulkan::CreateInstance(library, dld, VK_API_VERSION_1_1);
+    const auto physical_devices = instance.EnumeratePhysicalDevices();
+    if (physical_devices.empty()) {
+        return {};
+    }
+
+    const Vulkan::vk::PhysicalDevice physical_device(physical_devices[0], dld);
+    return physical_device.GetProperties();
+}
+} // namespace
+
+jstring Java_org_yuzu_yuzu_1emu_NativeLibrary_getVulkanDriverVersion(JNIEnv* env, jobject jobj) {
+    try {
+        const auto props = GetVulkanDeviceProperties();
+        if (props.deviceID == 0) {
+            return Common::Android::ToJString(env, "N/A");
+        }
+
+        const u32 driver_version = props.driverVersion;
+        const u32 vendor_id = props.vendorID;
+
+        if (driver_version == 0) {
+            return Common::Android::ToJString(env, "N/A");
+        }
+
+        std::string version_str;
+
+        if (vendor_id == VENDOR_QUALCOMM) {
+            const u32 major = (driver_version >> 24) << 2;
+            const u32 minor = (driver_version >> 12) & 0xFFF;
+            const u32 patch = driver_version & 0xFFF;
+            version_str = fmt::format("{}.{}.{}", major, minor, patch);
+        }
+        else if (vendor_id == VENDOR_ARM) {
+            u32 major = VK_API_VERSION_MAJOR(driver_version);
+            u32 minor = VK_API_VERSION_MINOR(driver_version);
+            u32 patch = VK_API_VERSION_PATCH(driver_version);
+
+            // ARM custom encoding for newer drivers
+            if (major > 10) {
+                major = (driver_version >> 22) & 0x3FF;
+                minor = (driver_version >> 12) & 0x3FF;
+                patch = driver_version & 0xFFF;
+            }
+            version_str = fmt::format("{}.{}.{}", major, minor, patch);
+        }
+        // Standard Vulkan version encoding for other vendors
+        else {
+            const u32 major = VK_API_VERSION_MAJOR(driver_version);
+            const u32 minor = VK_API_VERSION_MINOR(driver_version);
+            const u32 patch = VK_API_VERSION_PATCH(driver_version);
+            version_str = fmt::format("{}.{}.{}", major, minor, patch);
+        }
+
+        return Common::Android::ToJString(env, version_str);
+    } catch (...) {
+        return Common::Android::ToJString(env, "N/A");
+    }
+}
+
+jstring Java_org_yuzu_yuzu_1emu_NativeLibrary_getVulkanApiVersion(JNIEnv* env, jobject jobj) {
+    try {
+        const auto props = GetVulkanDeviceProperties();
+        if (props.deviceID == 0) {
+            return Common::Android::ToJString(env, "N/A");
+        }
+
+        const u32 api_version = props.apiVersion;
+        const u32 major = VK_API_VERSION_MAJOR(api_version);
+        const u32 minor = VK_API_VERSION_MINOR(api_version);
+        const u32 patch = VK_API_VERSION_PATCH(api_version);
+        const u32 variant = VK_API_VERSION_VARIANT(api_version);
+
+        // Include variant if non-zero (rare on Android)
+        const std::string version_str = variant > 0
+            ? fmt::format("{}.{}.{}.{}", variant, major, minor, patch)
+            : fmt::format("{}.{}.{}", major, minor, patch);
+
+        return Common::Android::ToJString(env, version_str);
+    } catch (...) {
+        return Common::Android::ToJString(env, "N/A");
+    }
+}
+
+jstring Java_org_yuzu_yuzu_1emu_NativeLibrary_getGpuModel(JNIEnv* env, jobject jobj) {
+    const auto props = GetVulkanDeviceProperties();
+    if (props.deviceID == 0) {
+        return Common::Android::ToJString(env, "Unknown");
+    }
+
+    return Common::Android::ToJString(env, props.deviceName);
 }
 
 void Java_org_yuzu_yuzu_1emu_NativeLibrary_applySettings(JNIEnv* env, jobject jobj) {
