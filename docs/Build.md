@@ -62,7 +62,7 @@ Hit "Configure Project", then wait for CMake to finish configuring (may take a w
 >    - `tools/windows/load-msvc-env.ps1`
 >  - If you're using CCache:
 >    - You need to add the environment variable `CL` with the `/FS` flag (`set CL=/FS`)
->    - Build may fail cause multiple cl instaces are trying to write to the same file (and Windows can't do it nicely), just hit "Build" again (you may need to do it a few times)
+>    - 
 
 Availables `<GENERATOR>`:
 - MSYS2: `MSYS Makefiles`
