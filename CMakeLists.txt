@@ -173,6 +173,12 @@ if (YUZU_STATIC_BUILD)
     endif()
 endif()
 
+# This will be used for CI packages, cause we need to build symbols
+set(IS_DEBUG_BUILD OFF)
+if (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
+    set(IS_DEBUG_BUILD ON)
+endif()
+
 # Detect current compilation architecture and create standard definitions
 # =======================================================================
 
@@ -629,6 +635,7 @@ if (YUZU_USE_CPM)
 
     # zlib
     AddJsonPackage(zlib)
+    DisableCCacheForPackage(zlib)
 
     if (ZLIB_ADDED)
         add_library(ZLIB::ZLIB ALIAS zlibstatic)

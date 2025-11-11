@@ -41,6 +41,7 @@ endif()
 
 # enet
 AddJsonPackage(enet)
+DisableCCacheForPackage(enet)
 
 if (enet_ADDED)
     target_include_directories(enet INTERFACE ${enet_SOURCE_DIR}/include)
@@ -52,6 +53,7 @@ endif()
 
 # mbedtls
 AddJsonPackage(mbedtls)
+DisableCCacheForPackage(mbedtls mbedx509 mbedcrypto)
 
 # VulkanUtilityHeaders - pulls in headers and utility libs
 AddJsonPackage(vulkan-utility-headers)
@@ -156,21 +158,15 @@ set(BUILD_SHARED_LIBS OFF)
 AddJsonPackage(spirv-headers)
 
 # Sirit
-if (YUZU_USE_BUNDLED_SIRIT)
+if (YUZU_USE_BUNDLED_SIRIT AND NOT IS_DEBUG_BUILD)
     AddJsonPackage(sirit-ci)
 else()
     AddJsonPackage(sirit)
-    # Change to old-but-more-cacheable debug info on Windows
-    if (WIN32 AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
-        get_target_property(sirit_opts sirit COMPILE_OPTIONS)
-        list(FILTER sirit_opts EXCLUDE REGEX "/Zi")
-        list(APPEND sirit_opts "/Z7")
-        set_target_properties(sirit PROPERTIES COMPILE_OPTIONS "${sirit_opts}")
-    endif()
     if(MSVC AND CXX_CLANG)
         target_compile_options(siritobj PRIVATE -Wno-error=unused-command-line-argument)
     endif()
 endif()
+DisableCCacheForPackage(sirit)
 
 # SPIRV Tools
 AddJsonPackage(spirv-tools)
@@ -196,6 +192,7 @@ add_subdirectory(glad)
 # libusb
 if (ENABLE_LIBUSB)
     add_subdirectory(libusb)
+    DisableCCacheForPackage(usb)
 endif()
 
 # VMA
