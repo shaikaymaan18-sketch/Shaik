@@ -173,9 +173,6 @@ if (YUZU_STATIC_BUILD)
     endif()
 endif()
 
-# Windows dont like if you compile small packages too fast, disable ccache on them
-include(DisableCCacheForPackage)
-
 # Detect current compilation architecture and create standard definitions
 # =======================================================================
 
@@ -341,7 +338,7 @@ if ((MSVC AND NOT (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo") OR ANDROID))
 endif()
 
 # ffmpeg
-option(YUZU_USE_BUNDLED_FFMPEG "Download bundled FFmpeg" ${USE_BUNDLED_DEFAULT})
+option(YUZU_USE_BUNDLED_FFMPEG "Download bundled FFmpeg" ${USE_CPM_DEFAULT})
 cmake_dependent_option(YUZU_USE_EXTERNAL_FFMPEG "Build FFmpeg from external source" "${PLATFORM_SUN}" "NOT WIN32 AND NOT ANDROID" OFF)
 
 # sirit
@@ -375,7 +372,9 @@ option(USE_CCACHE "Use ccache for compilation" OFF)
 set(CCACHE_PATH "ccache" CACHE STRING "Path to ccache binary")
 if(USE_CCACHE)
     find_program(CCACHE_BINARY ${CCACHE_PATH})
-    if(CCACHE_BINARY)
+    if (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
+        message(WARNING "USE_CCACHE is disabled for Debug builds!")
+    elseif(CCACHE_BINARY)
         message(STATUS "Found ccache at: ${CCACHE_BINARY}")
         set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_BINARY})
         set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_BINARY})
@@ -451,13 +450,6 @@ endif()
 if (ANDROID)
     set(CMAKE_SKIP_INSTALL_RULES ON)
     set(CMAKE_POLICY_VERSION_MINIMUM 3.5) # Workaround for Oboe
-endif()
-
-# We need to downgrade debug info (/Zi -> /Z7) to use an older but more cacheable format
-# See https://github.com/nanoant/CMakePCHCompiler/issues/21
-if(WIN32 AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
-    string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
-    string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
 endif()
 
 # Default to a Release build
@@ -639,7 +631,6 @@ if (YUZU_USE_CPM)
 
     # zlib
     AddJsonPackage(zlib)
-    DisableCCacheForPackage(zlib)
 
     if (ZLIB_ADDED)
         add_library(ZLIB::ZLIB ALIAS zlibstatic)

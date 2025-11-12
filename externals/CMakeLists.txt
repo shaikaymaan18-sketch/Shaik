@@ -8,7 +8,6 @@
 # otherwise we have to do weird shenanigans with library linking and stuff
 
 include(CPMUtil)
-include(DisableCCacheForPackage)
 
 # Explicitly declare this option here to propagate to the oaknut CPM call
 option(DYNARMIC_TESTS "Build tests" ${BUILD_TESTING})
@@ -42,7 +41,6 @@ endif()
 
 # enet
 AddJsonPackage(enet)
-DisableCCacheForPackage(enet)
 
 if (enet_ADDED)
     target_include_directories(enet INTERFACE ${enet_SOURCE_DIR}/include)
@@ -54,7 +52,6 @@ endif()
 
 # mbedtls
 AddJsonPackage(mbedtls)
-DisableCCacheForPackage(mbedtls mbedx509 mbedcrypto)
 
 # VulkanUtilityHeaders - pulls in headers and utility libs
 AddJsonPackage(vulkan-utility-headers)
@@ -167,7 +164,6 @@ else()
         target_compile_options(siritobj PRIVATE -Wno-error=unused-command-line-argument)
     endif()
 endif()
-DisableCCacheForPackage(sirit)
 
 # SPIRV Tools
 AddJsonPackage(spirv-tools)
@@ -193,7 +189,6 @@ add_subdirectory(glad)
 # libusb
 if (ENABLE_LIBUSB)
     add_subdirectory(libusb)
-    DisableCCacheForPackage(usb)
 endif()
 
 # VMA
