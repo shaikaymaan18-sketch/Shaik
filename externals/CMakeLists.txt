@@ -159,7 +159,7 @@ set(BUILD_SHARED_LIBS OFF)
 AddJsonPackage(spirv-headers)
 
 # Sirit
-if (YUZU_USE_BUNDLED_SIRIT AND NOT IS_DEBUG_BUILD)
+if (YUZU_USE_BUNDLED_SIRIT)
     AddJsonPackage(sirit-ci)
 else()
     AddJsonPackage(sirit)
