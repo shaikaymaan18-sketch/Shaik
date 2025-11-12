@@ -195,6 +195,7 @@
     <string name="multiplayer_chat">Chat</string>
     <string name="multiplayer_more_options">Plus d\'options</string>
     <string name="chat">Chat</string>
+    <string name="clear">Effacer</string>
     <string name="type_message">Écrire un message…</string>
     <string name="send_message">Envoyer un message</string>
     <string name="multiplayer_moderation">Modération</string>
@@ -677,6 +678,7 @@
     <string name="copy_details">Copier les détails</string>
     <string name="add_ons">Extensions</string>
     <string name="add_ons_description">Activer les mods, mises à jour et DLC</string>
+    <string name="playtime">Temps de jeu :</string>
     <string name="reset_playtime">Réinitialiser le Temps de Jeu</string>
     <string name="reset_playtime_description">Réinitialiser le temps de jeu du jeu actuel à 0 seconde</string>
     <string name="reset_playtime_warning_description">Cela effacera les données de temps de jeu du jeu actuel. Êtes-vous sûr \?</string>
@@ -790,10 +792,21 @@
     <string name="emulation_pause">Mettre en pause l\'émulation</string>
     <string name="emulation_unpause">Reprendre l\'émulation</string>
     <string name="emulation_input_overlay">Options de l\'overlay</string>
+    <string name="load_amiibo">Charger l’Amiibo</string>
     <string name="touchscreen">Écran tactile</string>
     <string name="lock_drawer">Verrouiller le tiroir</string>
     <string name="unlock_drawer">Déverrouiller le tiroir</string>
     <string name="reset">Réinitialiser</string>
+
+    <!-- Amiibo -->
+    <string name="amiibo_title">Amiibo</string>
+    <string name="amiibo_removed_message">L’Amiibo actuel a été supprimé</string>
+    <string name="amiibo_wrong_state">Le jeu actuel ne recherche pas d’Amiibo</string>
+    <string name="amiibo_not_valid">Le fichier sélectionné n’est pas un Amiibo valide</string>
+    <string name="amiibo_in_use">Le fichier sélectionné est déjà utilisé</string>
+    <string name="amiibo_unknown_error">Une erreur inconnue est survenue</string>
+    <string name="amiibo_load_success">Amiibo chargé</string>
+
 
     <!-- Software keyboard -->
     <string name="software_keyboard">Clavier virtuel</string>

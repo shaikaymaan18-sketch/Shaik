@@ -195,6 +195,7 @@
     <string name="multiplayer_chat">Чат</string>
     <string name="multiplayer_more_options">Додаткові налаштування</string>
     <string name="chat">Чат</string>
+    <string name="clear">Очистити</string>
     <string name="type_message">Введіть повідомлення…</string>
     <string name="send_message">Надіслати повідомлення</string>
     <string name="multiplayer_moderation">Модерація</string>
@@ -679,6 +680,7 @@
     <string name="copy_details">Копіювати подробиці</string>
     <string name="add_ons">Доповнення</string>
     <string name="add_ons_description">Перемикати моди, оновлення та доповнення</string>
+    <string name="playtime">Награний час: </string>
     <string name="reset_playtime">Очистити награний час</string>
     <string name="reset_playtime_description">Скинути награний час поточної гри до 0 секунд</string>
     <string name="reset_playtime_warning_description">Це очистить дані про награний час поточної гри. Ви впевнені\?</string>
@@ -792,10 +794,21 @@
     <string name="emulation_pause">Призупинити емуляцію</string>
     <string name="emulation_unpause">Продовжити емуляцію</string>
     <string name="emulation_input_overlay">Опції накладання</string>
+    <string name="load_amiibo">Завантажити amiibo</string>
     <string name="touchscreen">Сенсорний екран</string>
     <string name="lock_drawer">Заблокувати панель</string>
     <string name="unlock_drawer">Розблокувати панель</string>
     <string name="reset">Скинути</string>
+
+    <!-- Amiibo -->
+    <string name="amiibo_title">Amiibo</string>
+    <string name="amiibo_removed_message">Поточний amiibo вилучено</string>
+    <string name="amiibo_wrong_state">Поточна гра не очікує на amiibo</string>
+    <string name="amiibo_not_valid">Вибраний файл не є дійсним amiibo</string>
+    <string name="amiibo_in_use">Вибраний файл уже використовується</string>
+    <string name="amiibo_unknown_error">Сталася невідома помилка</string>
+    <string name="amiibo_load_success">Amiibo завантажено</string>
+
 
     <!-- Software keyboard -->
     <string name="software_keyboard">Програмна клавіатура</string>
