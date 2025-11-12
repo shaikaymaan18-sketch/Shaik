@@ -8,6 +8,7 @@
 # otherwise we have to do weird shenanigans with library linking and stuff
 
 include(CPMUtil)
+include(DisableCCacheForPackage)
 
 # Explicitly declare this option here to propagate to the oaknut CPM call
 option(DYNARMIC_TESTS "Build tests" ${BUILD_TESTING})

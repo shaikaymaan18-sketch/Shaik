@@ -173,7 +173,8 @@ if (YUZU_STATIC_BUILD)
     endif()
 endif()
 
-# This will be used for CI packages, cause we need to build symbols
+# This will mostly be used for CI packages, cause we need to build symbols
+include(DisableCCacheForPackage)
 set(IS_DEBUG_BUILD OFF)
 if (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
     set(IS_DEBUG_BUILD ON)
