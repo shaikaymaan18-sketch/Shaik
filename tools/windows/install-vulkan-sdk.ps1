@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # SPDX-FileCopyrightText: 2023 yuzu Emulator Project
 # SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -10,16 +13,22 @@ if (-not ([bool](net session 2>$null))) {
 }
 
 $VulkanSDKVer = "1.4.328.1"
+$VULKAN_SDK = "C:/VulkanSDK/$VulkanSDKVer"
 $ExeFile = "vulkansdk-windows-X64-$VulkanSDKVer.exe"
 $Uri = "https://sdk.lunarg.com/sdk/download/$VulkanSDKVer/windows/$ExeFile"
 $Destination = "./$ExeFile"
+
+# Check if Vulkan SDK is already installed
+if (Test-Path $VULKAN_SDK) {
+    Write-Host "-- Vulkan SDK already installed at $VULKAN_SDK"
+    return
+}
 
 echo "Downloading Vulkan SDK $VulkanSDKVer from $Uri"
 $WebClient = New-Object System.Net.WebClient
 $WebClient.DownloadFile($Uri, $Destination)
 echo "Finished downloading $ExeFile"
 
-$VULKAN_SDK = "C:/VulkanSDK/$VulkanSDKVer"
 $Arguments = "--root `"$VULKAN_SDK`" --accept-licenses --default-answer --confirm-command install"
 
 echo "Installing Vulkan SDK $VulkanSDKVer"
