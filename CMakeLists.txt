@@ -324,25 +324,22 @@ set(YUZU_QT_MIRROR "" CACHE STRING "What mirror to use for downloading the bundl
 
 option(ENABLE_CUBEB "Enables the cubeb audio backend" ON)
 
-# Make CPM default on Windows and Android
-set(USE_CPM_DEFAULT OFF)
+set(EXT_DEFAULT OFF)
 if (MSVC OR ANDROID)
-    set(USE_CPM_DEFAULT ON)
+    set(EXT_DEFAULT ON)
 endif()
-option(YUZU_USE_CPM "Use CPM to fetch system dependencies (fmt, boost, etc) if needed. Externals will still be fetched." ${USE_CPM_DEFAULT})
-
-# Disable some Bundled Packages on Debug builds
-set(USE_BUNDLED_DEFAULT OFF)
-if ((MSVC AND NOT (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo") OR ANDROID))
-    set(USE_BUNDLED_DEFAULT ON)
-endif()
+option(YUZU_USE_CPM "Use CPM to fetch system dependencies (fmt, boost, etc) if needed. Externals will still be fetched." ${EXT_DEFAULT})
 
 # ffmpeg
-option(YUZU_USE_BUNDLED_FFMPEG "Download bundled FFmpeg" ${USE_CPM_DEFAULT})
+option(YUZU_USE_BUNDLED_FFMPEG "Download bundled FFmpeg" ${EXT_DEFAULT})
 cmake_dependent_option(YUZU_USE_EXTERNAL_FFMPEG "Build FFmpeg from external source" "${PLATFORM_SUN}" "NOT WIN32 AND NOT ANDROID" OFF)
 
 # sirit
-option(YUZU_USE_BUNDLED_SIRIT "Download bundled sirit" ${USE_BUNDLED_DEFAULT})
+set(BUNDLED_SIRIT_DEFAULT OFF)
+if ((MSVC AND NOT (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo") OR ANDROID))
+    set(BUNDLED_SIRIT_DEFAULT ON)
+endif()
+option(YUZU_USE_BUNDLED_SIRIT "Download bundled sirit" ${BUNDLED_SIRIT_DEFAULT})
 
 # Re-allow on FreeBSD once its on mainline ports
 cmake_dependent_option(ENABLE_LIBUSB "Enable the use of LibUSB" ON "WIN32 OR PLATFORM_LINUX OR APPLE" OFF)
@@ -372,14 +369,23 @@ option(USE_CCACHE "Use ccache for compilation" OFF)
 set(CCACHE_PATH "ccache" CACHE STRING "Path to ccache binary")
 if(USE_CCACHE)
     find_program(CCACHE_BINARY ${CCACHE_PATH})
-    if (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
-        message(WARNING "USE_CCACHE is disabled for Debug builds!")
-    elseif(CCACHE_BINARY)
+    if(CCACHE_BINARY)
         message(STATUS "Found ccache at: ${CCACHE_BINARY}")
         set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_BINARY})
         set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_BINARY})
     else()
         message(FATAL_ERROR "USE_CCACHE enabled, but no executable found at: ${CCACHE_PATH}")
+    endif()
+    # Follow SCCache recommendations:
+    # <https://github.com/mozilla/sccache/blob/main/README.md?plain=1#L144>
+    if(WIN32)
+        if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+            string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+            string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+        elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+            string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+            string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
+        endif()
     endif()
 endif()
 
