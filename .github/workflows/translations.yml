@@ -9,7 +9,7 @@ on:
     branches: [ master ]
 
 jobs:
-  license-header:
+  tx-update:
     runs-on: source
     steps:
       - uses: actions/checkout@v4
@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 0
 
       - name: Get New Translations
-        run: tx pull -t
+        run: tx-cli pull -t -f
 
       - name: Push branch
         run: |
