@@ -173,12 +173,8 @@ if (YUZU_STATIC_BUILD)
     endif()
 endif()
 
-# This will mostly be used for CI packages, cause we need to build symbols
+# Windows dont like if you compile small packages too fast, disable ccache on them
 include(DisableCCacheForPackage)
-set(IS_DEBUG_BUILD OFF)
-if (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
-    set(IS_DEBUG_BUILD ON)
-endif()
 
 # Detect current compilation architecture and create standard definitions
 # =======================================================================
@@ -316,7 +312,7 @@ cmake_dependent_option(ENABLE_SDL2 "Enable the SDL2 frontend" ON "NOT ANDROID" O
 
 if (ENABLE_SDL2)
     # TODO(crueter): Cleanup, each dep that has a bundled option should allow to choose between bundled, external, system
-    cmake_dependent_option(YUZU_USE_EXTERNAL_SDL2 "Compile external SDL2" OFF "NOT MSVC" OFF)
+    cmake_dependent_option(YUZU_USE_EXTERNAL_SDL2 "Build SDL2 from external source" OFF "NOT MSVC" OFF)
     option(YUZU_USE_BUNDLED_SDL2 "Download bundled SDL2 build" "${MSVC}")
 endif()
 
@@ -331,18 +327,25 @@ set(YUZU_QT_MIRROR "" CACHE STRING "What mirror to use for downloading the bundl
 
 option(ENABLE_CUBEB "Enables the cubeb audio backend" ON)
 
-set(EXT_DEFAULT OFF)
+# Make CPM default on Windows and Android
+set(USE_CPM_DEFAULT OFF)
 if (MSVC OR ANDROID)
-    set(EXT_DEFAULT ON)
+    set(USE_CPM_DEFAULT ON)
 endif()
-option(YUZU_USE_CPM "Use CPM to fetch system dependencies (fmt, boost, etc) if needed. Externals will still be fetched." ${EXT_DEFAULT})
+option(YUZU_USE_CPM "Use CPM to fetch system dependencies (fmt, boost, etc) if needed. Externals will still be fetched." ${USE_CPM_DEFAULT})
+
+# Disable some Bundled Packages on Debug builds
+set(USE_BUNDLED_DEFAULT OFF)
+if ((MSVC AND NOT (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo") OR ANDROID))
+    set(USE_BUNDLED_DEFAULT ON)
+endif()
 
 # ffmpeg
-option(YUZU_USE_BUNDLED_FFMPEG "Download bundled FFmpeg" ${EXT_DEFAULT})
-cmake_dependent_option(YUZU_USE_EXTERNAL_FFMPEG "Build FFmpeg from source" "${PLATFORM_SUN}" "NOT WIN32 AND NOT ANDROID" OFF)
+option(YUZU_USE_BUNDLED_FFMPEG "Download bundled FFmpeg" ${USE_BUNDLED_DEFAULT})
+cmake_dependent_option(YUZU_USE_EXTERNAL_FFMPEG "Build FFmpeg from external source" "${PLATFORM_SUN}" "NOT WIN32 AND NOT ANDROID" OFF)
 
 # sirit
-option(YUZU_USE_BUNDLED_SIRIT "Download bundled sirit" ${EXT_DEFAULT})
+option(YUZU_USE_BUNDLED_SIRIT "Download bundled sirit" ${USE_BUNDLED_DEFAULT})
 
 # Re-allow on FreeBSD once its on mainline ports
 cmake_dependent_option(ENABLE_LIBUSB "Enable the use of LibUSB" ON "WIN32 OR PLATFORM_LINUX OR APPLE" OFF)
@@ -420,7 +423,7 @@ endif()
 option(ENABLE_OPENSSL "Enable OpenSSL backend for ISslConnection" ${DEFAULT_ENABLE_OPENSSL})
 if (ENABLE_OPENSSL)
     set(DEFAULT_YUZU_USE_BUNDLED_OPENSSL OFF)
-    if (EXT_DEFAULT OR PLATFORM_SUN)
+    if (MSVC OR ANDROID OR PLATFORM_SUN)
         set(DEFAULT_YUZU_USE_BUNDLED_OPENSSL ON)
     endif()
     option(YUZU_USE_BUNDLED_OPENSSL "Download bundled OpenSSL build" ${DEFAULT_YUZU_USE_BUNDLED_OPENSSL})

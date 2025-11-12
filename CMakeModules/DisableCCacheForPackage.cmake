@@ -3,7 +3,7 @@
 
 # Disable CCache for packages that build too fast and break ccache on Windows
 function(DisableCCacheForPackage)
-    if (WIN32 AND (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo"))
+    if (WIN32)
         foreach(target_package IN LISTS ARGV)
             if (TARGET ${target_package})
                 message(STATUS "[DisableCCacheForPackage] Disabling compiler launcher for target '${target_package}'")
