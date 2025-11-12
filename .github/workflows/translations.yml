@@ -43,22 +43,19 @@ jobs:
           BODY="Automatic translation update for $(date)"
           BASE=master
           HEAD=update-translations-$TIMESTAMP
-          DATA=$(jq -n \
-            --arg base "$BASE" \
-            --arg body "$BODY" \
-            --arg title "$TITLE" \
-            --arg head "$HEAD" \
-          '{
-            "base": "$base",
-            "body": "$body",
-            "head": "$head",
-            "title": "$title"
-          }')
+          cat << EOF > data.json
+          {
+            "base": "$BASE",
+            "body": "$BODY",
+            "head": "$HEAD",
+            "title": "$TITLE"
+          }
+          EOF
 
           curl -X 'POST' \
             'https://git.eden-emu.dev/api/v1/repos/eden-emu/eden/pulls' \
             -H 'accept: application/json' \
             -H 'Authorization: Bearer ${{ secrets.CI_FJ_TOKEN }}' \
             -H 'Content-Type: application/json' \
-            -d "$DATA" --fail
+            -d "@data.json" --fail
 
