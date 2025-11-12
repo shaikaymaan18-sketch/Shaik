@@ -307,11 +307,9 @@ endif()
 # On Linux system SDL2 is likely to be lacking HIDAPI support which have drawbacks but is needed for SDL motion
 cmake_dependent_option(ENABLE_SDL2 "Enable the SDL2 frontend" ON "NOT ANDROID" OFF)
 
-if (ENABLE_SDL2)
-    # TODO(crueter): Cleanup, each dep that has a bundled option should allow to choose between bundled, external, system
-    cmake_dependent_option(YUZU_USE_EXTERNAL_SDL2 "Build SDL2 from external source" OFF "NOT MSVC" OFF)
-    option(YUZU_USE_BUNDLED_SDL2 "Download bundled SDL2 build" "${MSVC}")
-endif()
+# TODO(crueter): Cleanup, each dep that has a bundled option should allow to choose between bundled, external, system
+cmake_dependent_option(YUZU_USE_EXTERNAL_SDL2 "Build SDL2 from external source" OFF "ENABLE_SDL2;NOT MSVC" OFF)
+cmake_dependent_option(YUZU_USE_BUNDLED_SDL2 "Download bundled SDL2 build" "${MSVC}" "ENABLE_SDL2" OFF)
 
 # qt stuff
 option(ENABLE_QT "Enable the Qt frontend" ON)
@@ -428,7 +426,7 @@ endif()
 option(ENABLE_OPENSSL "Enable OpenSSL backend for ISslConnection" ${DEFAULT_ENABLE_OPENSSL})
 if (ENABLE_OPENSSL)
     set(DEFAULT_YUZU_USE_BUNDLED_OPENSSL OFF)
-    if (MSVC OR ANDROID OR PLATFORM_SUN)
+    if (EXT_DEFAULT OR PLATFORM_SUN)
         set(DEFAULT_YUZU_USE_BUNDLED_OPENSSL ON)
     endif()
     option(YUZU_USE_BUNDLED_OPENSSL "Download bundled OpenSSL build" ${DEFAULT_YUZU_USE_BUNDLED_OPENSSL})
