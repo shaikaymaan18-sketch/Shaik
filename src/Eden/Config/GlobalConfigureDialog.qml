@@ -16,12 +16,12 @@ Dialog {
 
     anchors.centerIn: Overlay.overlay
 
-    implicitWidth: 1000
-    implicitHeight: 700
+    implicitWidth: 900
+    implicitHeight: 600
 
     padding: 5
 
-    title: qsTr("Configuration")
+    title: qsTr("Eden Configuration")
     standardButtons: Dialog.Ok | Dialog.Apply | Dialog.Cancel
 
     Component.onCompleted: configs = Util.searchItem(swipe, "PageScrollView")

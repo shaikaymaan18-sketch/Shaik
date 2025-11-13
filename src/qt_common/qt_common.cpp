@@ -15,6 +15,7 @@
 #include "common/logging/log.h"
 #include "common/scm_rev.h"
 #include "core/memory.h"
+#include "qt_common/util/content.h"
 
 #ifdef ARCHITECTURE_x86_64
 #include "common/x64/cpu_detect.h"
@@ -37,6 +38,11 @@
 #include <qpa/qplatformnativeinterface.h>
 #elif defined(__APPLE__)
 #include <objc/message.h>
+#endif
+
+#ifdef _WIN32
+#include <windows.h>
+#include <QSettings>
 #endif
 
 using namespace Common::Literals;
@@ -274,6 +280,9 @@ void Init(QObject* root)
 
     // Remove cached contents generated during the previous session
     RemoveCachedContents();
+
+    // Check for orphaned profiles and reset profile data if necessary
+    QtCommon::Content::FixProfiles();
 }
 
 std::filesystem::path GetEdenCommand()
