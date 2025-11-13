@@ -955,7 +955,7 @@ jstring Java_org_yuzu_yuzu_1emu_NativeLibrary_getCpuSummary(JNIEnv* env, jobject
             cluster_str += fmt::format("{}x{}", sorted_parts[i].second, sorted_parts[i].first);
         }
 
-        fmt::format_to(std::back_inserter(result), "ARM {} | {} Threads",
+        fmt::format_to(std::back_inserter(result), "CPUs: {}\n{} Threads",
                        cluster_str, thread_count);
 
         f = std::fopen(CPUINFO_PATH, "r");
@@ -990,24 +990,32 @@ jstring Java_org_yuzu_yuzu_1emu_NativeLibrary_getCpuSummary(JNIEnv* env, jobject
             bool has_bf16 = feature_set.count("bf16");
             bool has_atomics = feature_set.count("atomics") || feature_set.count("lse");
 
+            std::string features;
             if (has_neon || has_fp) {
-                result += " | NEON";
-                if (has_dotprod) result += "+DP";
-                if (has_i8mm) result += "+I8MM";
-                if (has_bf16) result += "+BF16";
+                features += "NEON";
+                if (has_dotprod) features += "+DP";
+                if (has_i8mm) features += "+I8MM";
+                if (has_bf16) features += "+BF16";
             }
 
             if (has_sve) {
-                result += " | SVE";
-                if (has_sve2) result += "2";
+                if (!features.empty()) features += " | ";
+                features += "SVE";
+                if (has_sve2) features += "2";
             }
 
             if (has_crypto) {
-                result += " | Crypto";
+                if (!features.empty()) features += " | ";
+                features += "Crypto";
             }
 
             if (has_atomics) {
-                result += " | LSE";
+                if (!features.empty()) features += " | ";
+                features += "LSE";
+            }
+
+            if (!features.empty()) {
+                result += "\nFeatures: " + features;
             }
         }
 

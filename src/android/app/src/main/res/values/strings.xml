@@ -316,6 +316,7 @@
     <string name="error_getting_emulator_info">Error getting emulator info</string>
     <string name="memory_info">Memory Information</string>
     <string name="total_memory">Total Memory</string>
+    <string name="soc">SOC:</string>
 
     <string name="warning_help">Help</string>
     <string name="warning">Warning</string>

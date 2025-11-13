@@ -51,7 +51,7 @@ class SystemInfoDialogFragment : DialogFragment() {
             appendLine("=== ${getString(R.string.cpu_info)} ===")
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && Build.SOC_MODEL.isNotBlank()) {
-                appendLine("${getString(R.string.cpu)}: ${Build.SOC_MODEL}")
+                appendLine("${getString(R.string.soc)} ${Build.SOC_MODEL}")
             }
 
             val cpuSummary = NativeLibrary.getCpuSummary()
