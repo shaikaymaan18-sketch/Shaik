@@ -7,7 +7,6 @@ import android.content.Intent
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import android.view.ViewGroup.MarginLayoutParams
 import android.view.WindowManager
@@ -248,7 +247,6 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
                                 }
                             )
                         } else {
-                            Log.e("MainActivity", "Download failed for URL: $apkUrl")
                             Toast.makeText(
                                 this@MainActivity,
                                 getString(R.string.update_download_failed) + "\n\nURL: $apkUrl",
