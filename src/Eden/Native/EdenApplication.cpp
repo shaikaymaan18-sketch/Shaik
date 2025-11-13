@@ -67,7 +67,7 @@ int EdenApplication::run() {
         CarboxylApplication *carboxylApp = new CarboxylApplication(*this,
                                                                    &engine,
                                                                    style,
-                                                                   QStringLiteral("Trioxide"));
+                                                                   QStringLiteral("Helios"));
         carboxylApp->setParent(this);
 
         /// CONTEXT

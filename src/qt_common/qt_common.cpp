@@ -43,6 +43,8 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <QSettings>
+#include "core/core_timing.h"
+#include "common/windows/timer_resolution.h"
 #endif
 
 using namespace Common::Literals;

@@ -17,4 +17,5 @@ EdenModule(
     LIBRARIES
         Qt6::Quick
         Qt6::Core
+        frontend_common
 )

@@ -40,6 +40,9 @@ Dialog {
 
         if (EdenApplication.shouldReload) {
             EdenApplication.shouldReload = false
+
+            // TODO(crueter): Warn the user.
+            // TODO(crueter): Configurable game icon size for carousel
             EdenApplication.reload()
         }
     }
@@ -72,8 +75,8 @@ Dialog {
 
         height: Math.min(contentHeight * count + 20,
                          parent.height - tabBar.topMargin)
-        contentWidth: 85
-        contentHeight: 55
+        contentWidth: 110
+        contentHeight: 45
 
         position: TabBar.Footer
 
@@ -88,6 +91,9 @@ Dialog {
                     "Graphics"), qsTr("Audio"), qsTr("Debug"), qsTr("Controls")]
 
             CarboxylTabButton {
+                font.pixelSize: 15
+                font.weight: 600
+
                 text: modelData
                 coloredIcon: true
                 inlineIcon: true

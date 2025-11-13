@@ -13,10 +13,7 @@ qt_add_library(EdenModels STATIC
     GameIconProvider.h GameIconProvider.cpp
 )
 
-target_link_libraries(EdenModels
-    PRIVATE
-    Qt6::Gui
-)
-target_link_libraries(EdenModels PRIVATE Qt6::Core Qt6::Quick)
+target_link_libraries(EdenModels PRIVATE Qt6::Core Qt6::Quick Qt6::Gui)
+target_link_libraries(EdenModels PUBLIC frontend_common)
 
 add_library(Eden::Models ALIAS EdenModels)

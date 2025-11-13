@@ -160,7 +160,7 @@ struct Values {
     // TODO: native-like style default
     Setting<Settings::Theme> carboxyl_theme{linkage,   Settings::Theme::System  , "carboxyl_theme", Category::UiLayout};
     Setting<Settings::Style> carboxyl_style{linkage,
-                                            Settings::Style::Trioxide,
+                                            Settings::Style::Helios,
                                             "carboxyl_style",
                                             Category::UiLayout};
     Setting<Settings::Accent> carboxyl_accent{linkage, Settings::Accent::System , "carboxyl_accent", Category::UiLayout};

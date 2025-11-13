@@ -28,6 +28,7 @@ Item {
 
             CarboxylTabButton {
                 font.pixelSize: 14
+                font.weight: 600
                 text: modelData
             }
         }
