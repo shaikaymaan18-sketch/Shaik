@@ -157,6 +157,21 @@ cmake_dependent_option(ENABLE_SDL2 "Enable the SDL2 frontend" ON "NOT ANDROID" O
 cmake_dependent_option(YUZU_USE_EXTERNAL_SDL2 "Build SDL2 from external source" OFF "ENABLE_SDL2;NOT MSVC" OFF)
 cmake_dependent_option(YUZU_USE_BUNDLED_SDL2 "Download bundled SDL2 build" "${MSVC}" "ENABLE_SDL2" OFF)
 
+# qt stuff
+option(ENABLE_QT "Enable the Qt frontend" ON)
+cmake_dependent_option(ENABLE_QT_QML "Enable the experimental Qt Quick frontend" OFF "ENABLE_QT" OFF)
+cmake_dependent_option(ENABLE_QT_WIDGETS "Enable the stable Qt Widgets frontend" ON "ENABLE_QT" OFF)
+option(ENABLE_QT_TRANSLATION "Enable translations for the Qt frontend" OFF)
+option(ENABLE_UPDATE_CHECKER "Enable update checker (for Qt and Android)" OFF)
+cmake_dependent_option(YUZU_USE_BUNDLED_QT "Download bundled Qt binaries" "${MSVC}" "ENABLE_QT" OFF)
+option(YUZU_USE_QT_MULTIMEDIA "Use QtMultimedia for Camera" OFF)
+option(YUZU_USE_QT_WEB_ENGINE "Use QtWebEngine for web applet implementation" OFF)
+set(YUZU_QT_MIRROR "" CACHE STRING "What mirror to use for downloading the bundled Qt libraries")
+
+if (ENABLE_QT AND NOT ENABLE_QT_QML AND NOT ENABLE_QT_WIDGETS)
+    message(FATAL_ERROR "ENABLE_QT specified without a valid frontend")
+endif()
+
 option(ENABLE_CUBEB "Enables the cubeb audio backend" ON)
 
 set(EXT_DEFAULT OFF)
@@ -601,8 +616,9 @@ if (ENABLE_QT)
 
     find_package(Qt6 CONFIG REQUIRED COMPONENTS Widgets Concurrent)
 
-    if (YUZU_USE_QT_MULTIMEDIA)
-        find_package(Qt6 REQUIRED COMPONENTS Multimedia)
+    if (PLATFORM_LINUX)
+        list(APPEND YUZU_QT_COMPONENTS DBus)
+        set(YUZU_OPTIONAL_QT GuiPrivate)
     endif()
 
     if (PLATFORM_LINUX OR PLATFORM_FREEBSD)
@@ -614,8 +630,13 @@ if (ENABLE_QT)
     endif()
 
     if (ENABLE_QT_TRANSLATION)
-        find_package(Qt6 REQUIRED COMPONENTS LinguistTools)
+        list(APPEND YUZU_QT_COMPONENTS LinguistTools)
     endif()
+
+    find_package(Qt6 REQUIRED COMPONENTS ${YUZU_QT_COMPONENTS} OPTIONAL_COMPONENTS ${YUZU_OPTIONAL_QT})
+    set(QT_MAJOR_VERSION 6)
+    # Qt6 sets cxx_std_17 and we need to undo that
+    set_target_properties(Qt6::Platform PROPERTIES INTERFACE_COMPILE_FEATURES "")
 
     if (NOT DEFINED QT_TARGET_PATH)
         get_target_property(qtcore_path Qt6::Core LOCATION_Release)
@@ -642,14 +663,21 @@ if (ENABLE_QT)
     if (PLATFORM_LINUX)
         list(APPEND YUZU_QT_COMPONENTS DBus)
     endif()
+
     if (YUZU_USE_QT_MULTIMEDIA)
         list(APPEND YUZU_QT_COMPONENTS Multimedia)
     endif()
+
     if (YUZU_USE_QT_WEB_ENGINE)
         list(APPEND YUZU_QT_COMPONENTS WebEngineCore WebEngineWidgets)
     endif()
+
     if (ENABLE_QT_TRANSLATION)
         list(APPEND YUZU_QT_COMPONENTS LinguistTools)
+    endif()
+
+    if (ENABLE_QT_QML)
+        list(APPEND YUZU_QT_COMPONENTS Quick QuickControls2)
     endif()
 
     find_package(Qt6 REQUIRED COMPONENTS ${YUZU_QT_COMPONENTS})

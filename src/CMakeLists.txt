@@ -175,7 +175,7 @@ else()
     # glibc, which may default to 32 bits. glibc allows this to be configured
     # by setting _FILE_OFFSET_BITS.
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR MINGW)
-        add_definitions(-D_FILE_OFFSET_BITS=64)
+        add_compile_definitions(_FILE_OFFSET_BITS=64)
     endif()
 
     if (YUZU_STATIC_BUILD AND NOT APPLE)
@@ -235,7 +235,12 @@ endif()
 
 if (ENABLE_QT)
     add_subdirectory(qt_common)
+endif()
+
+if (ENABLE_QT_QML)
     add_subdirectory(Eden)
+elseif(ENABLE_QT_WIDGETS)
+    add_subdirectory(yuzu)
 endif()
 
 if (ENABLE_WEB_SERVICE)
@@ -246,3 +251,5 @@ if (ANDROID)
     add_subdirectory(android/app/src/main/jni)
     target_include_directories(yuzu-android PRIVATE android/app/src/main)
 endif()
+
+include(GenerateDepHashes)
