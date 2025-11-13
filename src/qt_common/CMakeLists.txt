@@ -55,7 +55,7 @@ if (USE_DISCORD_PRESENCE)
 endif()
 
 # TODO(crueter)
-if (ENABLE_QT)
+if (ENABLE_QT_WIDGETS)
     target_link_libraries(qt_common PRIVATE Qt6::Widgets)
 endif()
 

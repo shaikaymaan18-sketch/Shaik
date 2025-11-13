@@ -22,7 +22,11 @@ endif()
 
 # TODO(crueter): GET RID OF THESE
 if (ENABLE_QT)
-    add_compile_definitions(YUZU_QT_WIDGETS YUZU_QT_QML)
+    add_compile_definitions(YUZU_QT_WIDGETS)
+endif()
+
+if (ENABLE_QT_QML)
+    add_compile_definitions(YUZU_QT_QML)
 endif()
 
 # Set compilation flags

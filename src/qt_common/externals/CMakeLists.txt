@@ -20,6 +20,6 @@ AddJsonPackage(frozen)
 
 # Carboxyl
 # TODO
-if (ENABLE_QT)
+if (ENABLE_QT_QML)
     AddJsonPackage(carboxyl)
 endif()
