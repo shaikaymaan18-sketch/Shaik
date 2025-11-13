@@ -179,18 +179,6 @@ static QString PrettyProductName() {
     return QSysInfo::prettyProductName();
 }
 
-#ifdef _WIN32
-static void OverrideWindowsFont() {
-    // Qt5 chooses these fonts on Windows and they have fairly ugly alphanumeric/cyrillic characters
-    // Asking to use "MS Shell Dlg 2" gives better other chars while leaving the Chinese Characters.
-    const QString startup_font = QApplication::font().family();
-    const QStringList ugly_fonts = {QStringLiteral("SimSun"), QStringLiteral("PMingLiU")};
-    if (ugly_fonts.contains(startup_font)) {
-        QApplication::setFont(QFont(QStringLiteral("MS Shell Dlg 2"), 9, QFont::Normal));
-    }
-}
-#endif
-
 static void RemoveCachedContents() {
     const auto cache_dir = Common::FS::GetEdenPath(Common::FS::EdenPath::CacheDir);
     const auto offline_fonts = cache_dir / "fonts";
