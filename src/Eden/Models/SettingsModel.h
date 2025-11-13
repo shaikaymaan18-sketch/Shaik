@@ -5,7 +5,7 @@
 #define SETTINGSMODEL_H
 
 #include <QAbstractListModel>
-#include "Interface/QMLSetting.h"
+#include "Eden/Interface/QMLSetting.h"
 
 class SettingsModel : public QAbstractListModel {
     Q_OBJECT

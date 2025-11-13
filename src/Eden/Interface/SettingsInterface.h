@@ -9,7 +9,7 @@
 
 #include "QMLSetting.h"
 #include "qt_common/config/shared_translation.h"
-#include "Models/SettingsModel.h"
+#include "Eden/Models/SettingsModel.h"
 
 namespace SettingsCategories {
 Q_NAMESPACE

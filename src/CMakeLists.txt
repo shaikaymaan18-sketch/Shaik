@@ -124,7 +124,6 @@ else()
     add_compile_options(
         -Werror=all
         -Werror=extra
-        -Werror=missing-declarations
         -Werror=shadow
         -Werror=unused
 
@@ -206,17 +205,23 @@ else()
 endif()
 
 add_subdirectory(common)
+add_subdirectory(network)
+
+if (YUZU_ROOM)
+    add_subdirectory(dedicated_room)
+endif()
+
 add_subdirectory(core)
 add_subdirectory(audio_core)
 add_subdirectory(video_core)
 add_subdirectory(hid_core)
-add_subdirectory(network)
 add_subdirectory(input_common)
 add_subdirectory(frontend_common)
 add_subdirectory(shader_recompiler)
 
-if (YUZU_ROOM)
-    add_subdirectory(dedicated_room)
+if (YUZU_ROOM_STANDALONE)
+    add_subdirectory(yuzu_room_standalone)
+    set_target_properties(yuzu-room PROPERTIES OUTPUT_NAME "eden-room")
 endif()
 
 if (YUZU_TESTS)
@@ -228,18 +233,15 @@ if (ENABLE_SDL2 AND YUZU_CMD)
     set_target_properties(yuzu-cmd PROPERTIES OUTPUT_NAME "eden-cli")
 endif()
 
-if (YUZU_ROOM_STANDALONE)
-    add_subdirectory(yuzu_room_standalone)
-    set_target_properties(yuzu-room PROPERTIES OUTPUT_NAME "eden-room")
-endif()
-
 if (ENABLE_QT)
     add_subdirectory(qt_common)
 endif()
 
 if (ENABLE_QT_QML)
     add_subdirectory(Eden)
-elseif(ENABLE_QT_WIDGETS)
+endif()
+
+if(ENABLE_QT_WIDGETS)
     add_subdirectory(yuzu)
 endif()
 

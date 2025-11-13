@@ -12,8 +12,6 @@ if (YUZU_USE_BUNDLED_QT AND PLATFORM_LINUX)
     set(CMAKE_BUILD_RPATH "${CMAKE_BINARY_DIR}/bin/lib/")
 endif()
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
-
 add_executable(yuzu
     Info.plist
     about_dialog.cpp
@@ -237,7 +235,7 @@ add_executable(yuzu
     main_window.h main_window.cpp
 )
 
-set_target_properties(yuzu PROPERTIES OUTPUT_NAME "eden-widgets")
+set_target_properties(yuzu PROPERTIES OUTPUT_NAME "eden")
 
 if (YUZU_CRASH_DUMPS)
     target_sources(yuzu PRIVATE

@@ -41,8 +41,6 @@ target_link_libraries(eden PRIVATE common core input_common frontend_common qt_c
 target_link_libraries(eden PRIVATE Boost::headers glad fmt)
 target_link_libraries(eden PRIVATE ${PLATFORM_LIBRARIES} Threads::Threads)
 
-target_link_libraries(eden PRIVATE Vulkan::Headers)
-
 target_compile_definitions(eden PRIVATE
     # Use QStringBuilder for string concatenation to reduce
     # the overall number of temporary strings created.
@@ -58,7 +56,45 @@ target_compile_definitions(eden PRIVATE
     -DQT_NO_URL_CAST_FROM_STRING
 )
 
-set_target_properties(eden PROPERTIES OUTPUT_NAME "eden")
+if (APPLE)
+    set(MACOSX_ICON "../../dist/eden.icns")
+    set_source_files_properties(${MACOSX_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    target_sources(eden PRIVATE ${MACOSX_ICON})
+    set_target_properties(eden PROPERTIES MACOSX_BUNDLE TRUE)
+    set_target_properties(eden PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist)
+
+    if (YUZU_USE_BUNDLED_MOLTENVK)
+        set(MOLTENVK_PLATFORM "macOS")
+        set(MOLTENVK_VERSION "v1.4.0")
+        download_moltenvk(${MOLTENVK_PLATFORM} ${MOLTENVK_VERSION})
+    endif()
+
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".dylib")
+    find_library(MOLTENVK_LIBRARY MoltenVK REQUIRED)
+    message(STATUS "Using MoltenVK at ${MOLTENVK_LIBRARY}.")
+
+    set_source_files_properties(${MOLTENVK_LIBRARY} PROPERTIES
+        MACOSX_PACKAGE_LOCATION Frameworks
+        XCODE_FILE_ATTRIBUTES "CodeSignOnCopy")
+    target_sources(eden PRIVATE ${MOLTENVK_LIBRARY})
+elseif(WIN32)
+    # compile as a win32 gui application instead of a console application
+    target_link_libraries(eden PRIVATE Qt6::EntryPointPrivate)
+    if(MSVC)
+        target_link_libraries(eden PRIVATE version.lib)
+        set_target_properties(eden PROPERTIES LINK_FLAGS_RELEASE "/SUBSYSTEM:WINDOWS")
+    elseif(MINGW)
+        set_target_properties(eden PROPERTIES LINK_FLAGS_RELEASE "-Wl,--subsystem,windows")
+        target_link_libraries(eden PRIVATE dwmapi)
+    endif()
+endif()
+
+if (ENABLE_QT_WIDGETS)
+    set_target_properties(eden PROPERTIES OUTPUT_NAME "eden-qml")
+else()
+    set_target_properties(eden PROPERTIES OUTPUT_NAME "eden")
+endif()
+
 include(GNUInstallDirs)
 install(TARGETS eden
     BUNDLE DESTINATION .

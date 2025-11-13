@@ -1,14 +1,21 @@
 // SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Qt on macOS doesn't define VMA shit
+#if defined(QT_STATICPLUGIN) && !defined(__APPLE__)
+#undef VMA_IMPLEMENTATION
+#endif
+
 #include <QApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include "CarboxylApplication.h"
-#include "Interface/QMLConfig.h"
-#include "Interface/SettingsInterface.h"
-#include "Interface/TitleManager.h"
-#include "Models/GameListModel.h"
+
+#include "Eden/Interface/QMLConfig.h"
+#include "Eden/Interface/SettingsInterface.h"
+#include "Eden/Interface/TitleManager.h"
+#include "Eden/Models/GameListModel.h"
+
 #include "common/settings_enums.h"
 #include "qt_common/config/uisettings.h"
 #include "qt_common/qt_common.h"
@@ -84,3 +91,8 @@ int main(int argc, char *argv[])
 
     return app.exec();
 }
+
+#if !defined(QT_STATICPLUGIN) || defined(__APPLE__)
+#define VMA_IMPLEMENTATION
+#include "video_core/vulkan_common/vma.h"
+#endif

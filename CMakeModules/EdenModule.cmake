@@ -7,6 +7,9 @@
 cmake_minimum_required(VERSION 3.16)
 
 function(EdenModule)
+    qt_policy(SET QTP0001 NEW)
+    qt_policy(SET QTP0004 NEW)
+
     set(oneValueArgs
         NAME
         URI
@@ -39,8 +42,11 @@ function(EdenModule)
 
     if (DEFINED MODULE_LIBRARIES)
         target_link_libraries(${LIB_NAME} PRIVATE ${MODULE_LIBRARIES})
+        target_link_libraries(${LIB_NAME}plugin PRIVATE ${MODULE_LIBRARIES})
     endif()
 
     target_link_libraries(${LIB_NAME} PRIVATE Carboxyl::Base Carboxyl::Styles)
+    target_link_libraries(${LIB_NAME}plugin PRIVATE Carboxyl::Base Carboxyl::Styles)
+
     target_link_libraries(${LIB_NAME} PUBLIC ${LIB_NAME}plugin)
 endfunction()
