@@ -22,10 +22,11 @@ Dialog {
     padding: 5
 
     title: qsTr("Configuration")
-    standardButtons: Dialog.Ok | Dialog.Cancel
+    standardButtons: Dialog.Ok | Dialog.Apply | Dialog.Cancel
 
     Component.onCompleted: configs = Util.searchItem(swipe, "PageScrollView")
-    onAccepted: {
+
+    function applyConfigs() {
         configs.forEach(config => {
                             config.apply()
                         })
@@ -33,8 +34,22 @@ Dialog {
         // console.log("Saving")
         QtConfig.save()
     }
+
+    onAccepted: {
+        applyConfigs()
+
+        if (EdenApplication.shouldReload) {
+            EdenApplication.shouldReload = false
+            EdenApplication.reload()
+        }
+    }
+
+    onApplied: {
+        applyConfigs()
+    }
+
     onRejected: {
-        console.log("Rejected")
+
         // TODO
         // configs.forEach(config => config.sync())
         // QtConfig.reload()
@@ -75,7 +90,7 @@ Dialog {
             CarboxylTabButton {
                 text: modelData
                 coloredIcon: true
-                inlineIcon: false // TODO: fix inlineIcon
+                inlineIcon: true
 
                 icon.source: "qrc:/icons/" + modelData.toLowerCase() + ".svg"
                 icon.width: 20

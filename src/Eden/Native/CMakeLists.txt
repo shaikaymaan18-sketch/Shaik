@@ -7,6 +7,7 @@
 qt_add_executable(eden
     main.cpp
     icons.qrc
+    EdenApplication.h EdenApplication.cpp
 )
 
 set(MODULES

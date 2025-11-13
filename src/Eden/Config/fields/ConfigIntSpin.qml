@@ -13,11 +13,12 @@ BaseField {
 
         Layout.fillWidth: true
         Layout.rightMargin: 10
+        Layout.maximumHeight: 30
 
         from: setting.min
         to: setting.max
 
-        font.pixelSize: 15
+        font.pixelSize: 14
 
         value: field.value
 

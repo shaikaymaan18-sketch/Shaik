@@ -10,6 +10,10 @@ import Carboxyl.Base
 PageScrollView {
     id: scroll
     function apply() {
+        if (style.unsaved) {
+            EdenApplication.shouldReload = true
+        }
+
         ui.apply()
         style.apply()
         theme.apply()

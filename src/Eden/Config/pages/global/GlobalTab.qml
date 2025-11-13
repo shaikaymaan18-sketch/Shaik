@@ -13,6 +13,8 @@ Item {
         id: tabBar
         currentIndex: swipe.currentIndex
 
+        contentHeight: 35
+
         anchors {
             top: parent.top
             left: parent.left

@@ -12,12 +12,13 @@ BaseField {
 
         Layout.fillWidth: true
         Layout.rightMargin: 10
+        Layout.maximumHeight: 30
 
         validator: RegularExpressionValidator {
             regularExpression: /[0-9a-fA-F]{0,8}/
         }
 
-        font.pixelSize: 15
+        font.pixelSize: 14
 
         text: Number(value).toString(16)
 

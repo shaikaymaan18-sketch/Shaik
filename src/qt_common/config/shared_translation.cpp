@@ -411,11 +411,14 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent)
     // Web Service
 
     // Ui
+
+#ifdef YUZU_QT_QML
     INSERT(UISettings, carboxyl_accent, tr("Accent"), tr("What accent color to use throughout the application."));
     INSERT(UISettings, carboxyl_theme, tr("Theme"), tr("The palette to use throughout the application."));
 
     // TODO: brief explanations, link to Carboxyl?
     INSERT(UISettings, carboxyl_style, tr("Style"), tr("The control style to use throughout the application."));
+#endif
 
     // Ui General
     INSERT(UISettings,

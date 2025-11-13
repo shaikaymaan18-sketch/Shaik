@@ -16,6 +16,7 @@ BaseField {
 
         Layout.fillWidth: true
         Layout.rightMargin: 10
+        Layout.maximumHeight: 30
 
         font.pixelSize: 14
         model: runtimeModel !== null ? runtimeModel : setting.combo

@@ -14,6 +14,7 @@ Item {
 
     property alias enable: enable.checked
     property Item contentItem
+    property bool unsaved: value !== setting.value
 
     readonly property string typeName: "BaseField"
 

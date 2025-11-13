@@ -24,6 +24,7 @@ BaseField {
             onMoved: field.value = value
 
             Layout.rightMargin: 10
+            Layout.maximumHeight: 30
 
             snapMode: Slider.SnapAlways
         }
@@ -34,6 +35,7 @@ BaseField {
             text: field.value + setting.suffix
 
             Layout.rightMargin: 10
+            Layout.maximumHeight: 30
         }
     }
 }

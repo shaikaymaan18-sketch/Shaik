@@ -10,10 +10,12 @@ BaseField {
     contentItem: TextField {
         enabled: enable
 
+        Layout.maximumHeight: 30
+
         Layout.fillWidth: true
         Layout.rightMargin: 10
 
-        font.pixelSize: 15
+        font.pixelSize: 14
 
         text: value
 

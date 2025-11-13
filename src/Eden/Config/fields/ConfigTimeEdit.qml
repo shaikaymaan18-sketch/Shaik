@@ -13,6 +13,7 @@ BaseField {
 
         Layout.fillWidth: true
         Layout.rightMargin: 10
+        Layout.maximumHeight: 30
 
         inputMethodHints: Qt.ImhDigitsOnly
         validator: IntValidator {
@@ -20,7 +21,7 @@ BaseField {
             top: setting.max
         }
 
-        font.pixelSize: 15
+        font.pixelSize: 14
 
         text: value
         // suffix: setting.suffix
