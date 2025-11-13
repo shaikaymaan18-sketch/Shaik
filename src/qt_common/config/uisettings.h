@@ -158,12 +158,18 @@ struct Values {
 
 #ifdef YUZU_QT_QML
     // TODO: native-like style default
-    Setting<Settings::Theme> carboxyl_theme{linkage,   Settings::Theme::System  , "carboxyl_theme", Category::UiLayout};
+    Setting<Settings::Theme> carboxyl_theme{linkage,
+                                            Settings::Theme::Dark,
+                                            "carboxyl_theme",
+                                            Category::UiLayout};
     Setting<Settings::Style> carboxyl_style{linkage,
                                             Settings::Style::Helios,
                                             "carboxyl_style",
                                             Category::UiLayout};
-    Setting<Settings::Accent> carboxyl_accent{linkage, Settings::Accent::System , "carboxyl_accent", Category::UiLayout};
+    Setting<Settings::Accent> carboxyl_accent{linkage,
+                                              Settings::Accent::Pink,
+                                              "carboxyl_accent",
+                                              Category::UiLayout};
 #endif
 
     // Discord RPC
