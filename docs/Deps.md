@@ -6,8 +6,9 @@ To build Eden, you MUST have a C++ compiler.
 * On Windows, we support:
   - **[MSVC](https://visualstudio.microsoft.com/downloads/)** (default)
     - It's STRONGLY RECOMMENDED to use the *Community* option
-    - You need to install: **Desktop development with C++**
-  - **clang-cl** (included when you install **Desktop development with C++**)
+    - You need to install: **[Desktop development with C++](https://learn.microsoft.com/en-us/cpp/build/vscpp-step-0-installation?view=msvc-170)**
+  - **[clang-cl](https://learn.microsoft.com/en-us/cpp/build/clang-support-msbuild?view=msvc-180)**
+    - You need to install: **C++ Clang tools for Windows**
   - **[MSYS2](https://www.msys2.org)** (experimental)
 * On macOS, this is Apple Clang
   - This can be installed with `xcode-select --install`
@@ -20,17 +21,17 @@ The following additional tools are also required:
 * On Windows, you must install the **[Vulkan SDK](https://vulkan.lunarg.com/sdk/home#windows)** as well
   - *A convenience script to install the latest SDK is provided in `tools/windows/install-vulkan-sdk.ps1`*
 
-If you are on desktop and plan to use the Qt frontend, you *must* install Qt 6, and optionally Qt Creator (the recommended IDE for building)
+If you are on desktop and plan to use the Qt frontend, you *must* install Qt 6, and optionally Qt Creator (the **RECOMMENDED** IDE for building)
 * On Linux, *BSD and macOS, this can be done by the package manager
   - If you wish to use Qt Creator, append `qtcreator` or `qt-creator` to the commands seen below.
-* MSVC/clang-cl users on Windows must install through the [official installer](https://www.qt.io/download-qt-installer-oss)
+* MSVC/clang-cl users on Windows must install through the official [Qt 6](https://www.qt.io/download-qt-installer-oss) installer
 * Linux and macOS users may choose to use the installer as well.
 * MSYS2 can also install Qt 6 via the package manager
 
 If you are on Windows, a convenience script to install MSVC, MSYS2, Qt, all necessary packages for MSYS2, and set up a zsh environment with useful keybinds and aliases can be found [here](https://git.crueter.xyz/scripts/windev).
 - For help setting up Qt Creator, run `./install.sh -h qtcreator`
 
-If you are on Windows and NOT building with MSYS2, you may go [back home](Build.md) and continue.
+If you are on **Windows** and building with **MSVC** or **clang-cl**, you may go [back home](Build.md) and continue.
 
 ## Externals
 The following are handled by Eden's externals:
