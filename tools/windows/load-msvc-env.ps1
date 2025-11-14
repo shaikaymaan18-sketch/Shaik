@@ -1,11 +1,11 @@
 # SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-$osArch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+$archRaw = $env:PROCESSOR_ARCHITECTURE
 
 switch ($osArch) {
-    "X64"   { $arch = "x64" }
-    "Arm64" { $arch = "arm64" }
+    "AMD64" { $arch = "x64" }
+    "ARM64" { $arch = "arm64" }
     default {
         Write-Error "load-msvc-env.ps1: Unsupported architecture: $osArch"
         exit 1

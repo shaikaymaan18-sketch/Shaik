@@ -5,7 +5,7 @@ To build Eden, you MUST have a C++ compiler.
   - GCC 12 also requires Clang 14+
 * On Windows, we support:
   - **[MSVC](https://visualstudio.microsoft.com/downloads/)** (default)
-    - It's STRONGLY RECOMMENDED to use the *Community* option
+    - It's STRONGLY RECOMMENDED to use the **Community** option and **Visual Studio 2022**
     - You need to install: **[Desktop development with C++](https://learn.microsoft.com/en-us/cpp/build/vscpp-step-0-installation?view=msvc-170)**
   - **[clang-cl](https://learn.microsoft.com/en-us/cpp/build/clang-support-msbuild?view=msvc-180)**
     - You need to install: **C++ Clang tools for Windows**
@@ -18,6 +18,7 @@ The following additional tools are also required:
 * **[CMake](https://www.cmake.org/)** 3.22+ - already included with the Android SDK
 * **[Git](https://git-scm.com/)** for version control
   - **[Windows installer](https://gitforwindows.org)**
+* **[Python3](https://www.python.org/downloads/)** 3.10+ - necessary to download external repositories
 * On Windows, you must install the **[Vulkan SDK](https://vulkan.lunarg.com/sdk/home#windows)** as well
   - *A convenience script to install the latest SDK is provided in `tools/windows/install-vulkan-sdk.ps1`*
 

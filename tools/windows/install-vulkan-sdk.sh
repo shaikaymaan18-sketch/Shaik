@@ -3,16 +3,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 : "${VULKAN_SDK_VER:=1.4.328.1}"
-: "${VULKAN_SDK:=C:/VulkanSDK/$VULKAN_SDK_VER}"
+: "${VULKAN_ROOT:=C:/VulkanSDK/$VULKAN_SDK_VER}"
 EXE_FILE="vulkansdk-windows-X64-$VULKAN_SDK_VER.exe"
 URI="https://sdk.lunarg.com/sdk/download/$VULKAN_SDK_VER/windows/$EXE_FILE"
-DESTINATION="./$EXE_FILE"
-
-if command -v cygpath >/dev/null 2>&1; then
-    VULKAN_ROOT_UNIX=$(cygpath -u "$VULKAN_SDK")
-else
-    VULKAN_ROOT_UNIX="$VULKAN_SDK"
-fi
+VULKAN_ROOT_UNIX=$(cygpath -u "$VULKAN_ROOT")
 
 # Check if Vulkan SDK is already installed
 if [ -d "$VULKAN_ROOT_UNIX" ]; then
@@ -21,18 +15,29 @@ if [ -d "$VULKAN_ROOT_UNIX" ]; then
 fi
 
 echo "Downloading Vulkan SDK $VULKAN_SDK_VER from $URI"
-curl -L -o "$DESTINATION" "$URI"
-chmod +x "$DESTINATION"
+[ ! -f "./$EXE_FILE" ] && curl -L -o "./$EXE_FILE" "$URI"
+chmod +x "./$EXE_FILE"
 echo "Finished downloading $EXE_FILE"
 
 echo "Installing Vulkan SDK $VULKAN_SDK_VER..."
-"$DESTINATION" --root "$VULKAN_ROOT_UNIX" --accept-licenses --default-answer --confirm-command install
+if net session > /dev/null 2>&1; then
+    ./$EXE_FILE --root "$VULKAN_ROOT" --accept-licenses --default-answer --confirm-command install
+else
+    DESTINATION=$(cygpath -w "$PWD/$EXE_FILE")
+    powershell.exe -Command "
+    Start-Process \"$DESTINATION\" -Verb RunAs -ArgumentList @(
+        '--root', '$VULKAN_ROOT',
+        '--accept-licenses',
+        '--default-answer',
+        '--confirm-command',
+        'install'
+    )"
+fi
 
 echo "Finished installing Vulkan SDK $VULKAN_SDK_VER"
 
 # GitHub Actions integration
-if [ "${GITHUB_ACTIONS:-false}" = "true" ]; then
-    echo "VULKAN_SDK=$VULKAN_SDK" >> "$GITHUB_ENV"
-    echo "$VULKAN_SDK/bin" >> "$GITHUB_PATH"
+if [ \"${GITHUB_ACTIONS:-false}\" = \"true\" ]; then
+    echo \"VULKAN_SDK=$VULKAN_ROOT\" >> \"$GITHUB_ENV\"
+    echo \"$VULKAN_ROOT/bin\" >> \"$GITHUB_PATH\"
 fi
-

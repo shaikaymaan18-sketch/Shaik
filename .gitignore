@@ -60,3 +60,4 @@ eden-windows-msvc
 artifacts
 *.AppImage*
 /install*
+vulkansdk*.exe
