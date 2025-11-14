@@ -141,6 +141,13 @@ abstract class SettingsItem(
             )
             put(
                 SwitchSetting(
+                    BooleanSetting.RENDERER_PRESERVE_DYNAMIC_STATE,
+                    titleId = R.string.preserve_dynamic_state,
+                    descriptionId = R.string.preserve_dynamic_state_description
+                )
+            )
+            put(
+                SwitchSetting(
                     BooleanSetting.RENDERER_PROVOKING_VERTEX,
                     titleId = R.string.provoking_vertex,
                     descriptionId = R.string.provoking_vertex_description

@@ -743,7 +743,8 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         Settings::values.dyna_state.SetValue(0);
     }
 
-    if (Settings::values.dyna_state.GetValue() == 0) {
+    const bool preserve_dynamic_state = Settings::values.preserve_dynamic_state.GetValue();
+    if (Settings::values.dyna_state.GetValue() == 0 && !preserve_dynamic_state) {
         must_emulate_scaled_formats = true;
         LOG_INFO(Render_Vulkan, "Extended dynamic state is fully disabled, scaled format emulation is ON");
 
@@ -752,6 +753,9 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         RemoveExtensionFeature(extensions.extended_dynamic_state2, features.extended_dynamic_state2, VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
         RemoveExtensionFeature(extensions.extended_dynamic_state3, features.extended_dynamic_state3, VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
         RemoveExtensionFeature(extensions.vertex_input_dynamic_state, features.vertex_input_dynamic_state, VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
+}
+
+    if (Settings::values.dyna_state.GetValue() == 0) {
         dynamic_state3_blending = false;
         dynamic_state3_enables = false;
 
