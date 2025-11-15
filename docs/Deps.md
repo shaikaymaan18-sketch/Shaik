@@ -20,7 +20,9 @@ The following additional tools are also required:
   - **[Windows installer](https://gitforwindows.org)**
 * **[Python3](https://www.python.org/downloads/)** 3.10+ - necessary to download external repositories
 * On Windows, you must install the **[Vulkan SDK](https://vulkan.lunarg.com/sdk/home#windows)** as well
-  - *A convenience script to install the latest SDK is provided in `tools/windows/install-vulkan-sdk.ps1`*
+  - *A convenience script to install the latest SDK is provided in:*
+    - `tools/windows/install-vulkan-sdk.ps1` (for PowerShell 5+)
+    - `tools/windows/install-vulkan-sdk.sh` (for MSYS2, Git Bash, etc)
 
 If you are on desktop and plan to use the Qt frontend, you *must* install Qt 6, and optionally Qt Creator (the **RECOMMENDED** IDE for building)
 * On Linux, *BSD and macOS, this can be done by the package manager

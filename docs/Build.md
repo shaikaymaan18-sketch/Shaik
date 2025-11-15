@@ -59,7 +59,8 @@ Hit "Configure Project", then wait for CMake to finish configuring (may take a w
 >On Windows:
 >  - It's recommended to install **[Ninja](https://ninja-build.org/)**
 >  - You must load **Visual C++ development environment**, this can be done by running our convenience script:
->    - `tools/windows/load-msvc-env.ps1`
+>    - `tools/windows/load-msvc-env.ps1` (for PowerShell 5+)
+>    - `tools/windows/load-msvc-env.sh` (for MSYS2, Git Bash, etc)
 
 Availables `<GENERATOR>`:
 - MSYS2: `MSYS Makefiles`
