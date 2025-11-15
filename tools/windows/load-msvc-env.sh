@@ -2,6 +2,7 @@
 # SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+VCVARS_BASH_URL="https://github.com/Vee99BR/vcvars-bash/raw/refs/heads/main/vcvarsall.sh"
 ARCH_RAW="$PROCESSOR_ARCHITECTURE"
 
 case "$ARCH_RAW" in
@@ -10,36 +11,12 @@ case "$ARCH_RAW" in
     *) echo "load-msvc-env.sh: Unsupported architecture: $ARCH_RAW"; exit 1 ;;
 esac
 
-VS_BASE=""
-for p in \
-    "/c/Program Files/Microsoft Visual Studio/18/Community" \
-	"/c/Program Files/Microsoft Visual Studio/17/Community" \
-    "/c/Program Files/Microsoft Visual Studio/2022/Community"
-do
-    echo "load-msvc-env.sh: $p"
-    if [ -d "$p/VC/Auxiliary/Build" ]; then
-        VS_BASE="$p"
-        break
-    fi
-done
+TMP_DIR="$(mktemp -d)"
+VCVARS_BASH="$TMP_DIR/vcvarsall.sh"
 
-if [ -z "$VS_BASE" ]; then
-    echo "load-msvc-env.sh: Could not locate Visual Studio installation."
-    exit 1
-fi
+curl -sL "$VCVARS_BASH_URL" -o "$VCVARS_BASH"
+chmod +x "$VCVARS_BASH"
 
-MSVC_ROOT="$VS_BASE/VC/Tools/MSVC"
-if [ ! -d "$MSVC_ROOT" ]; then
-    echo "load-msvc-env.sh: Could not locate MSVC tools: $MSVC_ROOT"
-    exit 1
-fi
+eval "$("$VCVARS_BASH" "$ARCH")"
 
-MSVC_VER=$(ls "$MSVC_ROOT" | sort -V | tail -n1)
-BIN_PATH="$MSVC_ROOT/$MSVC_VER/bin/Host$ARCH/$ARCH"
-
-export PATH="$BIN_PATH:$PATH"
-
-echo "MSVC environment loaded:"
-echo "  VS path:   $VS_BASE"
-echo "  MSVC ver:  $MSVC_VER"
-echo "  Arch:      $ARCH"
+echo "MSVC environment loaded for $ARCH via vcvars-bash"
