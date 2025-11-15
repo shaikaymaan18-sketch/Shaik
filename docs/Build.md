@@ -60,7 +60,6 @@ Hit "Configure Project", then wait for CMake to finish configuring (may take a w
 >  - It's recommended to install **[Ninja](https://ninja-build.org/)**
 >  - You must load **Visual C++ development environment**, this can be done by running our convenience script:
 >    - `tools/windows/load-msvc-env.ps1`
->  - You need to add the environment variable `CL` with the `/FS` flag ([Reference](https://learn.microsoft.com/pt-br/cpp/build/reference/fs-force-synchronous-pdb-writes?view=msvc-170)) to prevent building errors.
 
 Availables `<GENERATOR>`:
 - MSYS2: `MSYS Makefiles`
@@ -72,6 +71,9 @@ Availables `<BUILD_TYPE>`:
 - `Release` (default)
 - `RelWithDebInfo` (debug symbols--compiled executable will be large)
 - `Debug` (if you are using a debugger and annoyed with stuff getting optimized out)
+
+Caveat for Debug Builds:
+- If you're building with CCache, you will need to add the environment variable `CL` with the `/FS` flag ([Reference](https://learn.microsoft.com/pt-br/cpp/build/reference/fs-force-synchronous-pdb-writes?view=msvc-170))
 
 Also see the [Options](Options.md) page for additional CMake options.
 
