@@ -1,8 +1,7 @@
-#!/usr/bin/sh
+#!/usr/bin/bash
 # SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-VCVARS_BASH_URL="https://github.com/Vee99BR/vcvars-bash/raw/refs/heads/main/vcvarsall.sh"
 ARCH_RAW="$PROCESSOR_ARCHITECTURE"
 
 case "$ARCH_RAW" in
@@ -11,12 +10,15 @@ case "$ARCH_RAW" in
     *) echo "load-msvc-env.sh: Unsupported architecture: $ARCH_RAW"; exit 1 ;;
 esac
 
-TMP_DIR="$(mktemp -d)"
-VCVARS_BASH="$TMP_DIR/vcvarsall.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VCVARS_BASH="$SCRIPT_DIR/vcvarsall.sh"
 
-curl -sL "$VCVARS_BASH_URL" -o "$VCVARS_BASH"
+if [ ! -f "$VCVARS_BASH" ]; then
+    echo "load-msvc-env.sh: vcvarsall.sh not found in $SCRIPT_DIR"
+    #exit 1
+fi
 chmod +x "$VCVARS_BASH"
 
 eval "$("$VCVARS_BASH" "$ARCH")"
 
-echo "MSVC environment loaded for $ARCH via vcvars-bash"
+echo "MSVC environment loaded for $ARCH with vcvars-bash script"
