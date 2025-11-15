@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-$archRaw = $env:PROCESSOR_ARCHITECTURE
+$osArch = $env:PROCESSOR_ARCHITECTURE
 
 switch ($osArch) {
     "AMD64" { $arch = "x64" }
