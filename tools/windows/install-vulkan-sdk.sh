@@ -23,15 +23,8 @@ echo "Installing Vulkan SDK $VULKAN_SDK_VER..."
 if net session > /dev/null 2>&1; then
     ./$EXE_FILE --root "$VULKAN_ROOT" --accept-licenses --default-answer --confirm-command install
 else
-    DESTINATION=$(cygpath -w "$PWD/$EXE_FILE")
-    powershell.exe -Command "
-    Start-Process \"$DESTINATION\" -Verb RunAs -ArgumentList @(
-        '--root', '$VULKAN_ROOT',
-        '--accept-licenses',
-        '--default-answer',
-        '--confirm-command',
-        'install'
-    )"
+    echo "This script must be run with administrator privileges!"
+    exit 1
 fi
 
 echo "Finished installing Vulkan SDK $VULKAN_SDK_VER"

@@ -27,7 +27,7 @@ The following additional tools are also required:
 If you are on desktop and plan to use the Qt frontend, you *must* install Qt 6, and optionally Qt Creator (the **RECOMMENDED** IDE for building)
 * On Linux, *BSD and macOS, this can be done by the package manager
   - If you wish to use Qt Creator, append `qtcreator` or `qt-creator` to the commands seen below.
-* MSVC/clang-cl users on Windows must install through the official [Qt 6](https://www.qt.io/download-qt-installer-oss) installer
+* MSVC/clang-cl users on Windows must install through the official [Qt](https://www.qt.io/download-qt-installer-oss) installer
 * Linux and macOS users may choose to use the installer as well.
 * MSYS2 can also install Qt 6 via the package manager
 

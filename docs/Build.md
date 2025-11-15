@@ -62,13 +62,13 @@ Hit "Configure Project", then wait for CMake to finish configuring (may take a w
 >    - `tools/windows/load-msvc-env.ps1` (for PowerShell 5+)
 >    - `tools/windows/load-msvc-env.sh` (for MSYS2, Git Bash, etc)
 
-Availables `<GENERATOR>`:
+Available `<GENERATOR>`:
 - MSYS2: `MSYS Makefiles`
 - MSVC: `Ninja` (preferred) or `Visual Studio 17 2022`
 - macOS: `Ninja` (preferred) or `Xcode`
 - Others: `Ninja` (preferred) or `UNIX Makefiles`
 
-Availables `<BUILD_TYPE>`:
+Available `<BUILD_TYPE>`:
 - `Release` (default)
 - `RelWithDebInfo` (debug symbols--compiled executable will be large)
 - `Debug` (if you are using a debugger and annoyed with stuff getting optimized out)
@@ -151,7 +151,7 @@ Simply hit Ctrl+B, or the "hammer" icon in the bottom left. To run, hit the "pla
 
 ### On Command Line
 
-If you are using the `UNIX Makefiles` or `Visual Studio 17 2022` as `<GENERATOR>`, you must also want to add `--parallel $(nproc)` to this command to improve building time.
+If you are using the `UNIX Makefiles` or `Visual Studio 17 2022` as `<GENERATOR>`, you should also add `--parallel` for faster build times.
 
 ```
 cmake --build build
