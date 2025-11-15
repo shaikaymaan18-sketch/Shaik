@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 #
+# SPDX-FileCopyrightText: Copyright 2023 Nathan Poirier <nathan@poirier.io>
+# SPDX-License-Identifier: MIT License
+#
 # Source: https://github.com/nathan818fr/vcvars-bash
-# Author: Nathan Poirier <nathan@poirier.io>
 #
 set -Eeuo pipefail
 shopt -s inherit_errexit
