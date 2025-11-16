@@ -9,8 +9,6 @@ ListView {
 
     required property int category
 
-    property bool inset: false
-    property string header: ""
     property list<string> idInclude: []
     property list<string> idExclude: []
 
@@ -36,14 +34,4 @@ ListView {
     spacing: 5
 
     model: SettingsInterface.category(category, idInclude, idExclude)
-
-    // Rectangle {
-    //     anchors.fill: parent
-    //     color: "transparent"
-
-    //     border {
-    //         color: inset ? palette.text : "transparent"
-    //         width: 1
-    //     }
-    // }
 }

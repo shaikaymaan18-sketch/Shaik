@@ -10,8 +10,8 @@ ListView {
     id: carousel
 
     focus: true
-    focusPolicy: Qt.StrongFocus
 
+    // focusPolicy: Qt.StrongFocus
     model: EdenGameList
     orientation: ListView.Horizontal
     clip: false

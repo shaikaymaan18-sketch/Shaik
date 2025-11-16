@@ -50,5 +50,5 @@ GridView {
     }
 
     focus: true
-    focusPolicy: "StrongFocus"
+    // focusPolicy: "StrongFocus"
 }

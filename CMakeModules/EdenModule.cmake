@@ -8,7 +8,9 @@ cmake_minimum_required(VERSION 3.16)
 
 function(EdenModule)
     qt_policy(SET QTP0001 NEW)
-    qt_policy(SET QTP0004 NEW)
+    if (Qt6_VERSION VERSION_GREATER_EQUAL 6.8)
+        qt_policy(SET QTP0004 NEW)
+    endif()
 
     set(oneValueArgs
         NAME
