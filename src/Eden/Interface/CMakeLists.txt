@@ -17,5 +17,6 @@ EdenModule(
     LIBRARIES
         Qt6::Quick
         Qt6::Core
+        Vulkan::UtilityHeaders
         frontend_common
 )
