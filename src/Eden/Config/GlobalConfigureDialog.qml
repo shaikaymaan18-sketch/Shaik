@@ -9,17 +9,11 @@ import Eden.Util
 
 import Carboxyl.Base
 
-Dialog {
+NativeDialog {
     property list<var> configs
 
-    popupType: Dialog.Native
-
-    anchors.centerIn: Overlay.overlay
-
-    implicitWidth: 900
-    implicitHeight: 600
-
-    padding: 5
+    width: 900
+    height: 600
 
     title: qsTr("Eden Configuration")
     standardButtons: Dialog.Ok | Dialog.Apply | Dialog.Cancel

@@ -106,7 +106,7 @@ ApplicationWindow {
             Action {
                 text: qsTr("Con&figure...")
                 shortcut: "Ctrl+,"
-                onTriggered: globalConfig.open()
+                onTriggered: globalConfig.show()
             }
 
             Action {
