@@ -24,14 +24,16 @@ SettingsModel *SettingsInterface::category(SettingsCategories::Category category
 
     QList<QMLSetting *> settingsList;
     for (Settings::BasicSetting *setting : settings) {
+        const QString qlabel = QString::fromStdString(setting->GetLabel());
+
         // paired settings get ignored
         if (setting->Specialization() == Settings::Specialization::Paired) {
             LOG_DEBUG(Frontend, "\"{}\" has specialization Paired: ignoring", setting->GetLabel());
             continue;
         }
 
-        if ((idInclude.empty() || idInclude.contains(setting->GetLabel()))
-            && (idExclude.empty() || !idExclude.contains(setting->GetLabel()))) {
+        if ((idInclude.empty() || idInclude.contains(qlabel))
+            && (idExclude.empty() || !idExclude.contains(qlabel))) {
             settingsList.append(this->getSetting(setting));
         }
     }
