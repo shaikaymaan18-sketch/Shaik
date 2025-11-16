@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 ## When linking to a static Qt build on MinGW, certain additional libraries
 ## must be statically linked to as well.
 
