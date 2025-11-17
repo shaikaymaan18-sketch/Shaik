@@ -22,6 +22,7 @@
 #include <dlfcn.h>
 #include <unistd.h>
 
+#include <iostream>
 #ifdef ARCHITECTURE_arm64
 #include <adrenotools/driver.h>
 #endif
@@ -480,7 +481,7 @@ struct CpuPartInfo {
     const char* name;
 };
 
-static constexpr CpuPartInfo s_cpu_list[] = {
+constexpr CpuPartInfo s_cpu_list[] = {
     // ARM - 0x41
     {0x41, 0xd01, "Cortex-A32"},
     {0x41, 0xd02, "Cortex-A34"},
@@ -563,11 +564,41 @@ u64 read_midr_sysfs(u32 cpu_id) {
     return std::strtoull(value, nullptr, 16);
 }
 
+std::pair<u32, std::string> get_pretty_cpus() {
+    std::map<u64, int> core_layout;
+    u32 valid_cpus = 0;
+    for (u32 i = 0; i < std::thread::hardware_concurrency(); ++i) {
+        const auto midr = read_midr_sysfs(i);
+        if (midr == 0) break;
+
+        valid_cpus++;
+        core_layout[midr]++;
+    }
+
+    std::string cpus;
+
+    if (!core_layout.empty()) {
+        const CpuPartInfo* lowest_part = nullptr;
+        u32 lowest_part_id = 0xFFFFFFFF;
+
+        for (const auto& [midr, count] : core_layout) {
+            const auto vendor = (midr >> 24) & 0xff;
+            const auto part = (midr >> 4) & 0xfff;
+
+            if (!cpus.empty()) cpus += " + ";
+            cpus += fmt::format("{}x {}", count, find_cpu_name(vendor, part));
+        }
+    }
+
+    return {valid_cpus, cpus};
+}
+
 std::string get_arm_cpu_name() {
     std::map<u64, int> core_layout;
     for (u32 i = 0; i < std::thread::hardware_concurrency(); ++i) {
         const auto midr = read_midr_sysfs(i);
         if (midr == 0) break;
+
         core_layout[midr]++;
     }
 
@@ -863,6 +894,7 @@ jstring Java_org_yuzu_yuzu_1emu_NativeLibrary_getGpuDriver(JNIEnv* env, jobject 
 }
 
 jstring Java_org_yuzu_yuzu_1emu_NativeLibrary_getCpuSummary(JNIEnv* env, jobject /*jobj*/) {
+    get_arm_cpu_name();
     constexpr const char* CPUINFO_PATH = "/proc/cpuinfo";
 
     auto trim = [](std::string& s) {
@@ -878,87 +910,18 @@ jstring Java_org_yuzu_yuzu_1emu_NativeLibrary_getCpuSummary(JNIEnv* env, jobject
 
     try {
         std::string result;
-
-        FILE* f = std::fopen(CPUINFO_PATH, "r");
-        if (!f) return Common::Android::ToJString(env, "Unknown");
-
-        char buf[512];
-        std::map<std::string, int> part_counts;
-        int thread_count = 0;
-
-        while (std::fgets(buf, sizeof(buf), f)) {
-            std::string line(buf);
-            if (line.find("processor") == 0) {
-                thread_count++;
-            } else if (line.find("CPU part") == 0) {
-                auto pos = line.find(':');
-                if (pos != std::string::npos) {
-                    std::string val = line.substr(pos + 1);
-                    trim(val);
-                    val = to_lower(val);
-
-                    u32 part_id = 0;
-                    if (val.length() > 2 && val[0] == '0' && val[1] == 'x') {
-                        try {
-                            part_id = std::stoul(val.substr(2), nullptr, 16);
-                        } catch (...) {}
-                    }
-
-                    const char* cpu_name = find_cpu_name(0x41, part_id);
-                    if (cpu_name) {
-                        part_counts[cpu_name]++;
-                    } else {
-                        part_counts[val]++; // Fallback to hex ID
-                    }
-                }
-            }
-        }
-        std::fclose(f);
-
-        if (thread_count == 0) {
-            thread_count = sysconf(_SC_NPROCESSORS_CONF);
-            if (thread_count <= 0) thread_count = 1;
-        }
-
-        if (part_counts.empty()) {
-            part_counts["Unknown"] = thread_count;
-        }
-
-        std::vector<std::pair<std::string, int>> sorted_parts(part_counts.begin(), part_counts.end());
-        std::sort(sorted_parts.begin(), sorted_parts.end(), [](const auto& a, const auto& b) {
-            auto get_part_id = [](const std::string& name) -> u32 {
-                for (const auto& cpu : s_cpu_list) {
-                    if (cpu.name == name) {
-                        return cpu.part;
-                    }
-                }
-
-                if (name.length() > 2 && name[0] == '0' && name[1] == 'x') {
-                    try {
-                        return std::stoul(name.substr(2), nullptr, 16);
-                    } catch (...) {}
-                }
-
-                return 0;
-            };
-
-            u32 part_a = get_part_id(a.first);
-            u32 part_b = get_part_id(b.first);
-
-            if (part_a != part_b) return part_a > part_b;
-            return a.first > b.first;
-        });
-
-        std::string cluster_str;
-        for (size_t i = 0; i < sorted_parts.size(); ++i) {
-            if (i > 0) cluster_str += " + ";
-            cluster_str += fmt::format("{}x {}", sorted_parts[i].second, sorted_parts[i].first);
-        }
+        std::pair<u32, std::string> pretty_cpus = get_pretty_cpus();
+        u32 threads = pretty_cpus.first;
+        std::string cpus = pretty_cpus.second;
 
         fmt::format_to(std::back_inserter(result), "CPUs: {}\n{} Threads",
-                       cluster_str, thread_count);
+                       cpus, threads);
 
-        f = std::fopen(CPUINFO_PATH, "r");
+        FILE* f = std::fopen(CPUINFO_PATH, "r");
+        if (!f) return Common::Android::ToJString(env, result);
+
+        char buf[512];
+
         if (f) {
             std::set<std::string> feature_set;
             while (std::fgets(buf, sizeof(buf), f)) {
@@ -1039,6 +1002,7 @@ VkPhysicalDeviceProperties GetVulkanDeviceProperties() {
     }
 
     Vulkan::vk::InstanceDispatch dld;
+    // TODO: warn the user that Vulkan is unavailable rather than hard crash
     const auto instance = Vulkan::CreateInstance(library, dld, VK_API_VERSION_1_1);
     const auto physical_devices = instance.EnumeratePhysicalDevices();
     if (physical_devices.empty()) {
