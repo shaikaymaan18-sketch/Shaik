@@ -331,7 +331,7 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent)
 
     INSERT(Settings,
            enable_vertex_input_dynamic_state,
-           tr("Enable Vertex Input Dynamic State"),
+           tr("Vertex Input Dynamic State"),
            tr("Enables vertex input dynamic state feature for better quality and performance."));
 
     INSERT(Settings,
