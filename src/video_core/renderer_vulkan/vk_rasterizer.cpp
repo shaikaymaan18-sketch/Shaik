@@ -945,7 +945,6 @@ bool AccelerateDMA::BufferToImage(const Tegra::DMA::ImageCopy& copy_info,
 
 void RasterizerVulkan::UpdateDynamicStates() {
     auto& regs = maxwell3d->regs;
-
     UpdateViewportsState(regs);
     UpdateScissorsState(regs);
     UpdateDepthBias(regs);
@@ -953,11 +952,7 @@ void RasterizerVulkan::UpdateDynamicStates() {
     UpdateDepthBounds(regs);
     UpdateStencilFaces(regs);
     UpdateLineWidth(regs);
-
-    const u8 dynamic_state = Settings::values.dyna_state.GetValue();
-    const bool enable_vertex_input_dynamic_state = Settings::values.enable_vertex_input_dynamic_state.GetValue();
-
-    if (device.IsExtExtendedDynamicStateSupported() && dynamic_state > 0) {
+    if (device.IsExtExtendedDynamicStateSupported()) {
         UpdateCullMode(regs);
         UpdateDepthCompareOp(regs);
         UpdateFrontFace(regs);
@@ -967,12 +962,12 @@ void RasterizerVulkan::UpdateDynamicStates() {
             UpdateDepthTestEnable(regs);
             UpdateDepthWriteEnable(regs);
             UpdateStencilTestEnable(regs);
-            if (device.IsExtExtendedDynamicState2Supported() && dynamic_state > 1) {
+            if (device.IsExtExtendedDynamicState2Supported()) {
                 UpdatePrimitiveRestartEnable(regs);
                 UpdateRasterizerDiscardEnable(regs);
                 UpdateDepthBiasEnable(regs);
             }
-            if (device.IsExtExtendedDynamicState3EnablesSupported() && dynamic_state > 2) {
+            if (device.IsExtExtendedDynamicState3EnablesSupported()) {
                 using namespace Tegra::Engines;
                 if (device.GetDriverID() == VkDriverIdKHR::VK_DRIVER_ID_AMD_OPEN_SOURCE || device.GetDriverID() == VkDriverIdKHR::VK_DRIVER_ID_AMD_PROPRIETARY) {
                     const auto has_float = std::any_of(
@@ -992,14 +987,14 @@ void RasterizerVulkan::UpdateDynamicStates() {
                 UpdateConservativeRasterizationMode(regs);
             }
         }
-        if (device.IsExtExtendedDynamicState2ExtrasSupported() && dynamic_state > 1) {
+        if (device.IsExtExtendedDynamicState2ExtrasSupported()) {
             UpdateLogicOp(regs);
         }
-        if (device.IsExtExtendedDynamicState3BlendingSupported() && dynamic_state > 2) {
+        if (device.IsExtExtendedDynamicState3BlendingSupported()) {
             UpdateBlending(regs);
         }
     }
-    if (device.IsExtVertexInputDynamicStateSupported() && enable_vertex_input_dynamic_state) {
+    if (device.IsExtVertexInputDynamicStateSupported()) {
         if (auto* gp = pipeline_cache.CurrentGraphicsPipeline(); gp && gp->HasDynamicVertexInput()) {
             UpdateVertexInput(regs);
         }
