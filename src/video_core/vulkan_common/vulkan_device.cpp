@@ -730,8 +730,8 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
                  "Removing extendedDynamicState3 due to missing extendedDynamicState2");
         RemoveExtensionFeature(extensions.extended_dynamic_state3, features.extended_dynamic_state3,
                                VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
-        dynamic_state3_blending = true;
-        dynamic_state3_enables = true;
+        dynamic_state3_blending = false;
+        dynamic_state3_enables = false;
     }
 
     // Mesa Intel drivers on UHD 620 have broken EDS causing extreme flickering - unknown if it affects other iGPUs
