@@ -611,17 +611,23 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         features.extended_dynamic_state3.extendedDynamicState3ColorBlendEquation = true;
         dynamic_state3_blending = true;
     }
-    if (extensions.vertex_input_dynamic_state && is_radv) {
+    // VIDS causes black screen when EDS=0, must be off in this case
+    if (extensions.vertex_input_dynamic_state) {
+        // Always disable VIDS when EDS=0 to prevent black screen (all drivers)
+        if (Settings::values.dyna_state.GetValue() == 0) {
+            LOG_WARNING(Render_Vulkan,
+                        "Disabling VK_EXT_vertex_input_dynamic_state due to black screen with EDS=0");
+            RemoveExtensionFeature(extensions.vertex_input_dynamic_state,
+                                   features.vertex_input_dynamic_state,
+                                   VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
+        }
         // TODO(ameerj): Blacklist only offending driver versions
         // TODO(ameerj): Confirm if RDNA1 is affected
         const bool is_rdna2 =
             supported_extensions.contains(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
-        if (is_rdna2) {
+        if (is_radv && is_rdna2) {
             LOG_WARNING(Render_Vulkan,
                         "RADV has broken VK_EXT_vertex_input_dynamic_state on RDNA2 hardware");
-            //  RemoveExtensionFeature(extensions.vertex_input_dynamic_state,
-            //      features.vertex_input_dynamic_state,
-            //    VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
         }
     }
     if (extensions.vertex_input_dynamic_state && is_qualcomm) {
@@ -747,12 +753,9 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
     if (Settings::values.dyna_state.GetValue() == 0 && !preserve_dynamic_state) {
         must_emulate_scaled_formats = true;
         LOG_INFO(Render_Vulkan, "Extended dynamic state is fully disabled, scaled format emulation is ON");
-
-        RemoveExtensionFeature(extensions.custom_border_color, features.custom_border_color, VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME);
         RemoveExtensionFeature(extensions.extended_dynamic_state, features.extended_dynamic_state, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
         RemoveExtensionFeature(extensions.extended_dynamic_state2, features.extended_dynamic_state2, VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
         RemoveExtensionFeature(extensions.extended_dynamic_state3, features.extended_dynamic_state3, VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
-        RemoveExtensionFeature(extensions.vertex_input_dynamic_state, features.vertex_input_dynamic_state, VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
 }
 
     if (Settings::values.dyna_state.GetValue() == 0) {
