@@ -405,8 +405,7 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
     }
 
     const u8 dynamic_state = Settings::values.dyna_state.GetValue();
-
-    LOG_INFO(Render_Vulkan, "DynamicState value is set to {}", (u32) dynamic_state);
+    const bool enable_vertex_input_dynamic_state = Settings::values.enable_vertex_input_dynamic_state.GetValue();
 
     dynamic_features = DynamicFeatures{
         .has_extended_dynamic_state = device.IsExtExtendedDynamicStateSupported() && dynamic_state > 0,
@@ -414,7 +413,7 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         .has_extended_dynamic_state_2_extra = device.IsExtExtendedDynamicState2ExtrasSupported() && dynamic_state > 1,
         .has_extended_dynamic_state_3_blend = device.IsExtExtendedDynamicState3BlendingSupported() && dynamic_state > 2,
         .has_extended_dynamic_state_3_enables = device.IsExtExtendedDynamicState3EnablesSupported() && dynamic_state > 2,
-        .has_dynamic_vertex_input = device.IsExtVertexInputDynamicStateSupported() && dynamic_state > 0,
+        .has_dynamic_vertex_input = device.IsExtVertexInputDynamicStateSupported() && enable_vertex_input_dynamic_state,
     };
 }
 

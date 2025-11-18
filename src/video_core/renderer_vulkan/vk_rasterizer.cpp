@@ -955,6 +955,7 @@ void RasterizerVulkan::UpdateDynamicStates() {
     UpdateLineWidth(regs);
 
     const u8 dynamic_state = Settings::values.dyna_state.GetValue();
+    const bool enable_vertex_input_dynamic_state = Settings::values.enable_vertex_input_dynamic_state.GetValue();
 
     if (device.IsExtExtendedDynamicStateSupported() && dynamic_state > 0) {
         UpdateCullMode(regs);
@@ -974,14 +975,13 @@ void RasterizerVulkan::UpdateDynamicStates() {
             if (device.IsExtExtendedDynamicState3EnablesSupported() && dynamic_state > 2) {
                 using namespace Tegra::Engines;
                 if (device.GetDriverID() == VkDriverIdKHR::VK_DRIVER_ID_AMD_OPEN_SOURCE || device.GetDriverID() == VkDriverIdKHR::VK_DRIVER_ID_AMD_PROPRIETARY) {
-                    struct In {
-                        const Maxwell3D::Regs::VertexAttribute::Type d;
-                        In(Maxwell3D::Regs::VertexAttribute::Type n) : d(n) {}
-                        bool operator()(Maxwell3D::Regs::VertexAttribute n) const {
-                            return n.type == d;
+                    const auto has_float = std::any_of(
+                        regs.vertex_attrib_format.begin(),
+                        regs.vertex_attrib_format.end(),
+                        [](const auto& attrib) {
+                            return attrib.type == Maxwell3D::Regs::VertexAttribute::Type::Float;
                         }
-                    };
-                    auto has_float = std::any_of(regs.vertex_attrib_format.begin(), regs.vertex_attrib_format.end(), In(Maxwell3D::Regs::VertexAttribute::Type::Float));
+                    );
                     if (regs.logic_op.enable) {
                         regs.logic_op.enable = static_cast<u32>(!has_float);
                     }
@@ -999,9 +999,11 @@ void RasterizerVulkan::UpdateDynamicStates() {
             UpdateBlending(regs);
         }
     }
-    if (device.IsExtVertexInputDynamicStateSupported() && dynamic_state > 0)
-        if (auto* gp = pipeline_cache.CurrentGraphicsPipeline(); gp && gp->HasDynamicVertexInput())
+    if (device.IsExtVertexInputDynamicStateSupported() && enable_vertex_input_dynamic_state) {
+        if (auto* gp = pipeline_cache.CurrentGraphicsPipeline(); gp && gp->HasDynamicVertexInput()) {
             UpdateVertexInput(regs);
+        }
+    }
 }
 
 void RasterizerVulkan::HandleTransformFeedback() {
