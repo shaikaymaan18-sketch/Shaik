@@ -613,25 +613,6 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         must_emulate_bgr565 = true;
     }
 
-    if (extensions.push_descriptor && is_intel_anv) {
-        const u32 version = (properties.properties.driverVersion << 3) >> 3;
-        if (version >= VK_MAKE_API_VERSION(0, 22, 3, 0) &&
-            version < VK_MAKE_API_VERSION(0, 23, 2, 0)) {
-            // Disable VK_KHR_push_descriptor due to
-            // mesa/mesa/-/commit/ff91c5ca42bc80aa411cb3fd8f550aa6fdd16bdc
-            LOG_WARNING(Render_Vulkan,
-                        "ANV drivers 22.3.0 to 23.1.0 have broken VK_KHR_push_descriptor");
-            //RemoveExtension(extensions.push_descriptor, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
-        }
-    } else if (extensions.push_descriptor && is_nvidia) {
-        const auto arch = GetNvidiaArch();
-        if (arch <= NvidiaArchitecture::Arch_Pascal) {
-            LOG_WARNING(Render_Vulkan,
-                        "Pascal and older architectures have broken VK_KHR_push_descriptor");
-            //RemoveExtension(extensions.push_descriptor, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
-        }
-    }
-
     if (is_mvk) {
         LOG_WARNING(Render_Vulkan,
                     "MVK driver breaks when using more than 16 vertex attributes/bindings");
