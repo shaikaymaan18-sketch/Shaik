@@ -591,25 +591,25 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
     }
     if (extensions.extended_dynamic_state3 && is_radv) {
         LOG_WARNING(Render_Vulkan, "RADV has broken extendedDynamicState3ColorBlendEquation");
-        features.extended_dynamic_state3.extendedDynamicState3ColorBlendEnable = true;
-        features.extended_dynamic_state3.extendedDynamicState3ColorBlendEquation = true;
-        dynamic_state3_blending = true;
+        features.extended_dynamic_state3.extendedDynamicState3ColorBlendEnable = false;
+        features.extended_dynamic_state3.extendedDynamicState3ColorBlendEquation = false;
+        dynamic_state3_blending = false;
 
         const u32 version = (properties.properties.driverVersion << 3) >> 3;
         if (version < VK_MAKE_API_VERSION(0, 23, 1, 0)) {
             LOG_WARNING(Render_Vulkan,
                         "RADV versions older than 23.1.0 have broken depth clamp dynamic state");
-            features.extended_dynamic_state3.extendedDynamicState3DepthClampEnable = true;
-            dynamic_state3_enables = true;
+            features.extended_dynamic_state3.extendedDynamicState3DepthClampEnable = false;
+            dynamic_state3_enables = false;
         }
     }
     if (extensions.extended_dynamic_state3 && (is_amd_driver || driver_id == VK_DRIVER_ID_SAMSUNG_PROPRIETARY)) {
         // AMD and Samsung drivers have broken extendedDynamicState3ColorBlendEquation
         LOG_WARNING(Render_Vulkan,
                     "AMD and Samsung drivers have broken extendedDynamicState3ColorBlendEquation");
-        features.extended_dynamic_state3.extendedDynamicState3ColorBlendEnable = true;
-        features.extended_dynamic_state3.extendedDynamicState3ColorBlendEquation = true;
-        dynamic_state3_blending = true;
+        features.extended_dynamic_state3.extendedDynamicState3ColorBlendEnable = false;
+        features.extended_dynamic_state3.extendedDynamicState3ColorBlendEquation = false;
+        dynamic_state3_blending = false;
     }
     if (extensions.vertex_input_dynamic_state && is_radv) {
         // TODO(ameerj): Blacklist only offending driver versions
