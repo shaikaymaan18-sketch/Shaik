@@ -457,6 +457,7 @@ class SettingsFragmentPresenter(
             add(BooleanSetting.RENDERER_DESCRIPTOR_INDEXING.key)
             add(BooleanSetting.RENDERER_SAMPLE_SHADING.key)
             add(IntSetting.RENDERER_SAMPLE_SHADING_FRACTION.key)
+            add(BooleanSetting.RENDERER_VERTEX_INPUT_DYNAMIC_STATE.key)
 
             add(HeaderSetting(R.string.veil_renderer))
             add(BooleanSetting.RENDERER_EARLY_RELEASE_FENCES.key)
@@ -470,7 +471,6 @@ class SettingsFragmentPresenter(
             add(IntSetting.RENDERER_ASTC_DECODE_METHOD.key)
             add(IntSetting.RENDERER_ASTC_RECOMPRESSION.key)
             add(IntSetting.RENDERER_FORMAT_REINTERPRETATION.key)
-            add(BooleanSetting.RENDERER_VERTEX_INPUT_DYNAMIC_STATE.key)
             add(BooleanSetting.FORCE_IDENTITY_SWIZZLE.key)
             add(BooleanSetting.FORCE_LDR_TO_SRGB.key)
             add(IntSetting.RENDERER_VRAM_USAGE_MODE.key)
