@@ -332,7 +332,7 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent)
     INSERT(Settings,
            vertex_input_dynamic_state,
            tr("Vertex Input Dynamic State"),
-           tr("Enables vertex input dynamic state feature for better quality and performance."));
+           tr("Improves lighting and vertex handling in certain games. Only supported on Vulkan 1.0+ GPUs."));
 
     INSERT(Settings,
            provoking_vertex,

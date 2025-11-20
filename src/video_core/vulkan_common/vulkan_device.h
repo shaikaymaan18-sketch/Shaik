@@ -58,6 +58,7 @@ VK_DEFINE_HANDLE(VmaAllocator)
     FEATURE(EXT, Robustness2, ROBUSTNESS_2, robustness2)                                           \
     FEATURE(EXT, TransformFeedback, TRANSFORM_FEEDBACK, transform_feedback)                        \
     FEATURE(EXT, VertexInputDynamicState, VERTEX_INPUT_DYNAMIC_STATE, vertex_input_dynamic_state)  \
+    FEATURE(EXT, ImageRobustness, IMAGE_ROBUSTNESS, image_robustness)                              \
     FEATURE(KHR, PipelineExecutableProperties, PIPELINE_EXECUTABLE_PROPERTIES,                     \
             pipeline_executable_properties)                                                        \
     FEATURE(KHR, WorkgroupMemoryExplicitLayout, WORKGROUP_MEMORY_EXPLICIT_LAYOUT,                  \
@@ -75,6 +76,7 @@ VK_DEFINE_HANDLE(VmaAllocator)
     EXTENSION(EXT, SHADER_VIEWPORT_INDEX_LAYER, shader_viewport_index_layer)                       \
     EXTENSION(EXT, TOOLING_INFO, tooling_info)                                                     \
     EXTENSION(EXT, VERTEX_ATTRIBUTE_DIVISOR, vertex_attribute_divisor)                             \
+    EXTENSION(EXT, SWAPCHAIN_MAINTENANCE_1, swapchain_maintenance1)                                \
     EXTENSION(KHR, DRAW_INDIRECT_COUNT, draw_indirect_count)                                       \
     EXTENSION(KHR, DRIVER_PROPERTIES, driver_properties)                                           \
     EXTENSION(KHR, PUSH_DESCRIPTOR, push_descriptor)                                               \
@@ -84,6 +86,15 @@ VK_DEFINE_HANDLE(VmaAllocator)
     EXTENSION(KHR, SWAPCHAIN, swapchain)                                                           \
     EXTENSION(KHR, SWAPCHAIN_MUTABLE_FORMAT, swapchain_mutable_format)                             \
     EXTENSION(KHR, IMAGE_FORMAT_LIST, image_format_list)                                           \
+    EXTENSION(KHR, MAINTENANCE_1, maintenance1)                                                    \
+    EXTENSION(KHR, MAINTENANCE_2, maintenance2)                                                    \
+    EXTENSION(KHR, MAINTENANCE_3, maintenance3)                                                    \
+    EXTENSION(KHR, MAINTENANCE_4, maintenance4)                                                    \
+    EXTENSION(KHR, MAINTENANCE_5, maintenance5)                                                    \
+    EXTENSION(KHR, MAINTENANCE_6, maintenance6)                                                    \
+    EXTENSION(KHR, MAINTENANCE_7, maintenance7)                                                    \
+    EXTENSION(KHR, MAINTENANCE_8, maintenance8)                                                    \
+    EXTENSION(KHR, MAINTENANCE_9, maintenance9)                                                    \
     EXTENSION(NV, DEVICE_DIAGNOSTICS_CONFIG, device_diagnostics_config)                            \
     EXTENSION(NV, GEOMETRY_SHADER_PASSTHROUGH, geometry_shader_passthrough)                        \
     EXTENSION(NV, VIEWPORT_ARRAY2, viewport_array2)                                                \
@@ -365,6 +376,12 @@ public:
         return properties.subgroup_properties.supportedOperations & feature;
     }
 
+    /// Returns true if subgroup operations are supported in the specified shader stage.
+    /// Mobile GPUs (Qualcomm Adreno) often only support subgroups in fragment/compute stages.
+    bool IsSubgroupSupportedForStage(VkShaderStageFlagBits stage) const {
+        return properties.subgroup_properties.supportedStages & stage;
+    }
+
     /// Returns the maximum number of push descriptors.
     u32 MaxPushDescriptors() const {
         return properties.push_descriptor.maxPushDescriptors;
@@ -520,6 +537,39 @@ public:
         return extensions.custom_border_color;
     }
 
+    /// Base Vulkan Dynamic State support checks.
+    /// These provide granular control over each base dynamic state, allowing individual states
+    /// to be disabled if broken driver implementations are detected at device initialization.
+    /// By default all states are enabled. If a specific driver has issues with certain states,
+    /// they can be disabled in vulkan_device.cpp constructor (see has_broken_compute pattern).
+    bool SupportsDynamicViewport() const {
+        return supports_dynamic_viewport;
+    }
+    bool SupportsDynamicScissor() const {
+        return supports_dynamic_scissor;
+    }
+    bool SupportsDynamicLineWidth() const {
+        return supports_dynamic_line_width;
+    }
+    bool SupportsDynamicDepthBias() const {
+        return supports_dynamic_depth_bias;
+    }
+    bool SupportsDynamicBlendConstants() const {
+        return supports_dynamic_blend_constants;
+    }
+    bool SupportsDynamicDepthBounds() const {
+        return supports_dynamic_depth_bounds;
+    }
+    bool SupportsDynamicStencilCompareMask() const {
+        return supports_dynamic_stencil_compare;
+    }
+    bool SupportsDynamicStencilWriteMask() const {
+        return supports_dynamic_stencil_write;
+    }
+    bool SupportsDynamicStencilReference() const {
+        return supports_dynamic_stencil_reference;
+    }
+
     /// Returns true if the device supports VK_EXT_extended_dynamic_state.
     bool IsExtExtendedDynamicStateSupported() const {
         return extensions.extended_dynamic_state;
@@ -552,6 +602,98 @@ public:
     /// Returns true if the device supports VK_EXT_extended_dynamic_state3.
     bool IsExtExtendedDynamicState3EnablesSupported() const {
         return dynamic_state3_enables;
+    }
+
+    // EDS2 granular feature checks
+    bool IsExtExtendedDynamicState2LogicOpSupported() const {
+        return extensions.extended_dynamic_state2 &&
+               features.extended_dynamic_state2.extendedDynamicState2LogicOp;
+    }
+
+    bool IsExtExtendedDynamicState2PatchControlPointsSupported() const {
+        return extensions.extended_dynamic_state2 &&
+               features.extended_dynamic_state2.extendedDynamicState2PatchControlPoints;
+    }
+
+    // EDS3 granular feature checks
+    bool IsExtExtendedDynamicState3DepthClampEnableSupported() const {
+        return extensions.extended_dynamic_state3 &&
+               features.extended_dynamic_state3.extendedDynamicState3DepthClampEnable;
+    }
+
+    bool IsExtExtendedDynamicState3LogicOpEnableSupported() const {
+        return extensions.extended_dynamic_state3 &&
+               features.extended_dynamic_state3.extendedDynamicState3LogicOpEnable;
+    }
+
+    bool IsExtExtendedDynamicState3TessellationDomainOriginSupported() const {
+        return extensions.extended_dynamic_state3 &&
+               features.extended_dynamic_state3.extendedDynamicState3TessellationDomainOrigin;
+    }
+
+    bool IsExtExtendedDynamicState3PolygonModeSupported() const {
+        return extensions.extended_dynamic_state3 &&
+               features.extended_dynamic_state3.extendedDynamicState3PolygonMode;
+    }
+
+    bool IsExtExtendedDynamicState3RasterizationSamplesSupported() const {
+        return extensions.extended_dynamic_state3 &&
+               features.extended_dynamic_state3.extendedDynamicState3RasterizationSamples;
+    }
+
+    bool IsExtExtendedDynamicState3SampleMaskSupported() const {
+        return extensions.extended_dynamic_state3 &&
+               features.extended_dynamic_state3.extendedDynamicState3SampleMask;
+    }
+
+    bool IsExtExtendedDynamicState3AlphaToCoverageEnableSupported() const {
+        return extensions.extended_dynamic_state3 &&
+               features.extended_dynamic_state3.extendedDynamicState3AlphaToCoverageEnable;
+    }
+
+    bool IsExtExtendedDynamicState3AlphaToOneEnableSupported() const {
+        return extensions.extended_dynamic_state3 &&
+               features.extended_dynamic_state3.extendedDynamicState3AlphaToOneEnable;
+    }
+
+    bool IsExtExtendedDynamicState3DepthClipEnableSupported() const {
+        return extensions.extended_dynamic_state3 &&
+               features.extended_dynamic_state3.extendedDynamicState3DepthClipEnable;
+    }
+
+    bool IsExtExtendedDynamicState3DepthClipNegativeOneToOneSupported() const {
+        return extensions.extended_dynamic_state3 &&
+               features.extended_dynamic_state3.extendedDynamicState3DepthClipNegativeOneToOne;
+    }
+
+    bool IsExtExtendedDynamicState3LineRasterizationModeSupported() const {
+        return extensions.extended_dynamic_state3 &&
+               features.extended_dynamic_state3.extendedDynamicState3LineRasterizationMode;
+    }
+
+    bool IsExtExtendedDynamicState3LineStippleEnableSupported() const {
+        return extensions.extended_dynamic_state3 &&
+               features.extended_dynamic_state3.extendedDynamicState3LineStippleEnable;
+    }
+
+    bool IsExtExtendedDynamicState3ProvokingVertexModeSupported() const {
+        return extensions.extended_dynamic_state3 &&
+               features.extended_dynamic_state3.extendedDynamicState3ProvokingVertexMode;
+    }
+
+    bool IsExtExtendedDynamicState3ConservativeRasterizationModeSupported() const {
+        return extensions.extended_dynamic_state3 &&
+               features.extended_dynamic_state3.extendedDynamicState3ConservativeRasterizationMode;
+    }
+
+    bool IsExtExtendedDynamicState3SampleLocationsEnableSupported() const {
+        return extensions.extended_dynamic_state3 &&
+               features.extended_dynamic_state3.extendedDynamicState3SampleLocationsEnable;
+    }
+
+    bool IsExtExtendedDynamicState3RasterizationStreamSupported() const {
+        return extensions.extended_dynamic_state3 &&
+               features.extended_dynamic_state3.extendedDynamicState3RasterizationStream;
     }
 
     /// Returns true if the device supports VK_EXT_filter_cubic
@@ -833,9 +975,6 @@ private:
     bool is_blit_depth24_stencil8_supported{}; ///< Support for blitting from and to D24S8.
     bool is_blit_depth32_stencil8_supported{}; ///< Support for blitting from and to D32S8.
     bool is_warp_potentially_bigger{};         ///< Host warp size can be bigger than guest.
-    bool is_integrated{};                      ///< Is GPU an iGPU.
-    bool is_virtual{};                         ///< Is GPU a virtual GPU.
-    bool is_non_gpu{};                         ///< Is SoftwareRasterizer, FPGA, non-GPU device.
     bool has_broken_compute{};                 ///< Compute shaders can cause crashes
     bool has_broken_cube_compatibility{};      ///< Has broken cube compatibility bit
     bool has_broken_parallel_compiling{};      ///< Has broken parallel shader compiling.
@@ -851,6 +990,22 @@ private:
     bool supports_conditional_barriers{};      ///< Allows barriers in conditional control flow.
     u64 device_access_memory{};                ///< Total size of device local memory in bytes.
     u32 sets_per_pool{};                       ///< Sets per Description Pool
+
+    /// Base Vulkan Dynamic State support flags (granular fallback for broken drivers).
+    /// All default to true. These can be individually disabled in vulkan_device.cpp
+    /// if specific broken driver implementations are detected during initialization.
+    /// This provides emergency protection against drivers that report support but crash/misbehave.
+    /// Pattern: Check driver/device and set to false in vulkan_device.cpp constructor.
+    bool supports_dynamic_viewport{true};          ///< VK_DYNAMIC_STATE_VIEWPORT
+    bool supports_dynamic_scissor{true};           ///< VK_DYNAMIC_STATE_SCISSOR
+    bool supports_dynamic_line_width{true};        ///< VK_DYNAMIC_STATE_LINE_WIDTH
+    bool supports_dynamic_depth_bias{true};        ///< VK_DYNAMIC_STATE_DEPTH_BIAS
+    bool supports_dynamic_blend_constants{true};   ///< VK_DYNAMIC_STATE_BLEND_CONSTANTS
+    bool supports_dynamic_depth_bounds{true};      ///< VK_DYNAMIC_STATE_DEPTH_BOUNDS
+    bool supports_dynamic_stencil_compare{true};   ///< VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK
+    bool supports_dynamic_stencil_write{true};     ///< VK_DYNAMIC_STATE_STENCIL_WRITE_MASK
+    bool supports_dynamic_stencil_reference{true}; ///< VK_DYNAMIC_STATE_STENCIL_REFERENCE
+
     NvidiaArchitecture nvidia_arch{NvidiaArchitecture::Arch_AmpereOrNewer};
 
     // Telemetry parameters

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // SPDX-FileCopyrightText: Copyright 2019 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -18,12 +21,35 @@ namespace Vulkan {
 using Maxwell = Tegra::Engines::Maxwell3D::Regs;
 
 struct DynamicFeatures {
-    bool has_extended_dynamic_state;
-    bool has_extended_dynamic_state_2;
-    bool has_extended_dynamic_state_2_extra;
-    bool has_extended_dynamic_state_3_blend;
-    bool has_extended_dynamic_state_3_enables;
-    bool has_dynamic_vertex_input;
+    // VK_EXT_extended_dynamic_state (EDS1) - Bit 0
+    bool has_extended_dynamic_state : 1;
+    // VK_EXT_extended_dynamic_state2 (EDS2) - Bits 1-3
+    bool has_extended_dynamic_state_2 : 1;                      // Core EDS2
+    bool has_extended_dynamic_state_2_logic_op : 1;             // LogicOp
+    bool has_extended_dynamic_state_2_patch_control_points : 1; // Tessellation
+    // VK_EXT_extended_dynamic_state3 (EDS3) - Bits 4-5
+    bool has_extended_dynamic_state_3_blend : 1;   // Blending composite
+    bool has_extended_dynamic_state_3_enables : 1; // Enables composite
+    // VK_EXT_vertex_input_dynamic_state - Bit 6
+    bool has_dynamic_vertex_input : 1;
+    // EDS3 Granular Features - Bits 7-15
+    bool has_extended_dynamic_state_3_depth_clamp;
+    bool has_extended_dynamic_state_3_logic_op_enable;
+    bool has_extended_dynamic_state_3_tessellation_domain_origin;
+    bool has_extended_dynamic_state_3_polygon_mode;
+    bool has_extended_dynamic_state_3_rasterization_samples;
+    bool has_extended_dynamic_state_3_sample_mask;
+    bool has_extended_dynamic_state_3_alpha_to_coverage_enable : 1;
+    bool has_extended_dynamic_state_3_alpha_to_one_enable : 1;
+    bool has_extended_dynamic_state_3_depth_clip_enable : 1;
+    // EDS3 Additional Features - Bits 16-22
+    bool has_extended_dynamic_state_3_depth_clip_negative_one_to_one : 1;
+    bool has_extended_dynamic_state_3_line_rasterization_mode : 1;
+    bool has_extended_dynamic_state_3_line_stipple_enable : 1;
+    bool has_extended_dynamic_state_3_provoking_vertex_mode : 1;
+    bool has_extended_dynamic_state_3_conservative_rasterization_mode : 1;
+    bool has_extended_dynamic_state_3_sample_locations_enable : 1;
+    bool has_extended_dynamic_state_3_rasterization_stream : 1;
 };
 
 struct FixedPipelineState {
@@ -184,23 +210,56 @@ struct FixedPipelineState {
 
     union {
         u32 raw1;
+        // EDS1 - Bit 0
         BitField<0, 1, u32> extended_dynamic_state;
-        BitField<1, 1, u32> extended_dynamic_state_2;
-        BitField<2, 1, u32> extended_dynamic_state_2_extra;
-        BitField<3, 1, u32> extended_dynamic_state_3_blend;
-        BitField<4, 1, u32> extended_dynamic_state_3_enables;
-        BitField<5, 1, u32> dynamic_vertex_input;
-        BitField<6, 1, u32> xfb_enabled;
-        BitField<7, 1, u32> ndc_minus_one_to_one;
-        BitField<8, 2, u32> polygon_mode;
-        BitField<10, 2, u32> tessellation_primitive;
-        BitField<12, 2, u32> tessellation_spacing;
-        BitField<14, 1, u32> tessellation_clockwise;
-        BitField<15, 5, u32> patch_control_points_minus_one;
 
+        // EDS2 - Bits 1-3
+        BitField<1, 1, u32> extended_dynamic_state_2;
+        BitField<2, 1, u32> extended_dynamic_state_2_logic_op;
+        BitField<3, 1, u32> extended_dynamic_state_2_patch_control_points;
+
+        // EDS3 Blending/Enables - Bits 4-5
+        BitField<4, 1, u32> extended_dynamic_state_3_blend;
+        BitField<5, 1, u32> extended_dynamic_state_3_enables;
+
+        // Vertex Input - Bit 6
+        BitField<6, 1, u32> dynamic_vertex_input;
+
+        // Other state - Bits 7-19
+        BitField<7, 1, u32> xfb_enabled;
+        BitField<8, 1, u32> ndc_minus_one_to_one;
+        BitField<9, 2, u32> polygon_mode;
+        BitField<11, 2, u32> tessellation_primitive;
+        BitField<13, 2, u32> tessellation_spacing;
+        BitField<15, 1, u32> tessellation_clockwise;
+        BitField<16, 5, u32> patch_control_points_minus_one;
+
+        // Topology and MSAA - Bits 24-31
         BitField<24, 4, Maxwell::PrimitiveTopology> topology;
         BitField<28, 4, Tegra::Texture::MsaaMode> msaa_mode;
     };
+
+    union {
+        u32 raw1_eds3_extended;
+        // EDS3 Additional Features - Bits 0-15
+        BitField<0, 1, u32> extended_dynamic_state_3_depth_clamp;
+        BitField<1, 1, u32> extended_dynamic_state_3_logic_op_enable;
+        BitField<2, 1, u32> extended_dynamic_state_3_tessellation_domain_origin;
+        BitField<3, 1, u32> extended_dynamic_state_3_polygon_mode;
+        BitField<4, 1, u32> extended_dynamic_state_3_rasterization_samples;
+        BitField<5, 1, u32> extended_dynamic_state_3_sample_mask;
+        BitField<6, 1, u32> extended_dynamic_state_3_alpha_to_coverage_enable;
+        BitField<7, 1, u32> extended_dynamic_state_3_alpha_to_one_enable;
+        BitField<8, 1, u32> extended_dynamic_state_3_depth_clip_enable;
+        BitField<9, 1, u32> extended_dynamic_state_3_depth_clip_negative_one_to_one;
+        BitField<10, 1, u32> extended_dynamic_state_3_line_rasterization_mode;
+        BitField<11, 1, u32> extended_dynamic_state_3_line_stipple_enable;
+        BitField<12, 1, u32> extended_dynamic_state_3_provoking_vertex_mode;
+        BitField<13, 1, u32> extended_dynamic_state_3_conservative_rasterization_mode;
+        BitField<14, 1, u32> extended_dynamic_state_3_sample_locations_enable;
+        BitField<15, 1, u32> extended_dynamic_state_3_rasterization_stream;
+    };
+
     union {
         u32 raw2;
         BitField<1, 3, u32> alpha_test_func;
@@ -215,12 +274,13 @@ struct FixedPipelineState {
         BitField<16, 1, u32> alpha_to_one_enabled;
         BitField<17, 3, Tegra::Engines::Maxwell3D::EngineHint> app_stage;
     };
-    std::array<u8, Maxwell::NumRenderTargets> color_formats;
-
     u32 alpha_test_ref;
     u32 point_size;
 
+    std::array<u8, Maxwell::NumRenderTargets> color_formats;
     std::array<u16, Maxwell::NumViewports> viewport_swizzles;
+    u32 pad_align_u64;
+
     union {
         u64 attribute_types; // Used with VK_EXT_vertex_input_dynamic_state
         u64 enabled_divisors;
