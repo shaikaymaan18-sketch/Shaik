@@ -400,7 +400,7 @@ void ArmNce::ClearInstructionCache() {
 }
 
 void ArmNce::InvalidateCacheRange(u64 addr, std::size_t size) {
-#ifdef __aarch64__
+#ifdef ARCHITECTURE_arm64
     // Invalidate instruction cache for specific range instead of full flush
     constexpr u64 cache_line_size = 64;
     const u64 aligned_addr = addr & ~(cache_line_size - 1);
