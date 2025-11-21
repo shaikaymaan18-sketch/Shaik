@@ -29,6 +29,7 @@ import org.yuzu.yuzu_emu.R
 import org.yuzu.yuzu_emu.databinding.FragmentAboutBinding
 import org.yuzu.yuzu_emu.model.HomeViewModel
 import org.yuzu.yuzu_emu.utils.ViewUtils.updateMargins
+import org.yuzu.yuzu_emu.NativeLibrary
 
 class AboutFragment : Fragment() {
     private var _binding: FragmentAboutBinding? = null
