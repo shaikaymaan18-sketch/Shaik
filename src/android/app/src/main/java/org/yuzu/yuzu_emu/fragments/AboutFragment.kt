@@ -78,11 +78,15 @@ class AboutFragment : Fragment() {
             binding.root.findNavController().navigate(R.id.action_aboutFragment_to_licensesFragment)
         }
 
-        binding.textVersionName.text = BuildConfig.VERSION_NAME
+        val buildName = getString(R.string.app_name_suffixed)
+        val buildVersion = NativeLibrary.getBuildVersion()
+        val fullVersionText = "$buildName ($buildVersion)"
+
+        binding.textVersionName.text = fullVersionText
         binding.buttonVersionName.setOnClickListener {
             val clipBoard =
                 requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = ClipData.newPlainText(getString(R.string.build), BuildConfig.GIT_HASH)
+            val clip = ClipData.newPlainText(getString(R.string.build), fullVersionText)
             clipBoard.setPrimaryClip(clip)
 
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {

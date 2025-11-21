@@ -69,9 +69,6 @@ android {
             abiFilters += listOf("arm64-v8a")
         }
 
-        buildConfigField("String", "GIT_HASH", "\"${getGitHash()}\"")
-        buildConfigField("String", "BRANCH", "\"${getBranch()}\"")
-
         externalNativeBuild {
             cmake {
                 val extraCMakeArgs =
@@ -326,9 +323,3 @@ fun getGitVersion(): String {
     }
     return versionName.ifEmpty { "0.0" }
 }
-
-fun getGitHash(): String =
-    runGitCommand(listOf("git", "rev-parse", "--short", "HEAD")).ifEmpty { "dummy-hash" }
-
-fun getBranch(): String =
-    runGitCommand(listOf("git", "rev-parse", "--abbrev-ref", "HEAD")).ifEmpty { "dummy-hash" }
