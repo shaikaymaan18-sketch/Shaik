@@ -61,7 +61,6 @@ android {
         minSdk = 24
         targetSdk = 36
         versionName = getGitVersion()
-
         versionCode = autoVersion
 
         ndk {
@@ -89,13 +88,13 @@ android {
                         "-DYUZU_TESTS=OFF",
                         "-DDYNARMIC_TESTS=OFF",
                         *extraCMakeArgs.toTypedArray()
-                ))
+                    )
+                )
 
                 abiFilters("arm64-v8a")
             }
         }
     }
-
 
     val keystoreFile = System.getenv("ANDROID_KEYSTORE_FILE")
     signingConfigs {
@@ -159,7 +158,39 @@ android {
         }
     }
 
-        // this is really annoying but idk any other ways to fix this behavior
+    flavorDimensions.add("version")
+    productFlavors {
+        create("mainline") {
+            dimension = "version"
+            resValue("string", "app_name_suffixed", "Eden")
+        }
+
+        create("genshinSpoof") {
+            dimension = "version"
+            resValue("string", "app_name_suffixed", "Eden Optimized")
+            applicationId = "com.miHoYo.Yuanshen"
+        }
+
+        create("legacy") {
+            dimension = "version"
+            resValue("string", "app_name_suffixed", "Eden Legacy")
+            applicationId = "dev.legacy.eden_emulator"
+
+            externalNativeBuild {
+                cmake {
+                    arguments.add("-DYUZU_LEGACY=ON")
+                }
+            }
+
+            sourceSets {
+                getByName("legacy") {
+                    res.srcDirs("src/main/legacy")
+                }
+            }
+        }
+    }
+
+    // this is really annoying but idk any other ways to fix this behavior
     applicationVariants.all {
         val variant = this
         when {
@@ -180,40 +211,6 @@ android {
             }
             variant.flavorName == "genshinSpoof" && variant.buildType.name == "relWithDebInfo" -> {
                 variant.resValue("string", "app_name_suffixed", "Eden Optimized Debug Release")
-            }
-        }
-    }
-
-    android {
-        flavorDimensions.add("version")
-        productFlavors {
-            create("mainline") {
-                dimension = "version"
-                resValue("string", "app_name_suffixed", "Eden")
-            }
-
-            create("genshinSpoof") {
-                dimension = "version"
-                resValue("string", "app_name_suffixed", "Eden Optimized")
-                applicationId = "com.miHoYo.Yuanshen"
-            }
-
-            create("legacy") {
-                dimension = "version"
-                resValue("string", "app_name_suffixed", "Eden Legacy")
-                applicationId = "dev.legacy.eden_emulator"
-
-                externalNativeBuild {
-                    cmake {
-                        arguments.add("-DYUZU_LEGACY=ON")
-                    }
-                }
-
-                sourceSets {
-                    getByName("legacy") {
-                        res.srcDirs("src/main/legacy")
-                    }
-                }
             }
         }
     }
@@ -281,7 +278,6 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.2")
     implementation("androidx.window:window:1.3.0")
-    implementation("androidx.constraintlayout:constraintlayout:2.2.1")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation("org.commonmark:commonmark:0.22.0")
     implementation("androidx.navigation:navigation-fragment-ktx:2.8.9")
@@ -299,7 +295,9 @@ fun runGitCommand(command: List<String>): String {
             .directory(project.rootDir)
             .redirectOutput(ProcessBuilder.Redirect.PIPE)
             .redirectError(ProcessBuilder.Redirect.PIPE)
-            .start().inputStream.bufferedReader().use { it.readText() }
+            .start()
+            .inputStream.bufferedReader()
+            .use { it.readText() }
             .trim()
     } catch (e: Exception) {
         logger.error("Cannot find git")
