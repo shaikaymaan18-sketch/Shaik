@@ -271,7 +271,8 @@
     <string name="folder">Folder</string>
     <string name="dont_show_again">Don\'t Show Again</string>
     <string name="add_directory_success">New game directory added successfully </string>
-    <string name="enable_update_checks">Check for updates on app startup.</string>
+    <string name="enable_update_checks">Check for Updates</string>
+    <string name="enable_update_checks_description">Check for updates on launch, and optionally download and install the new update.</string>
     <string name="update_available">Update Available</string>
     <string name="update_available_description">A new version is available: %1$s\n\nWould you like to download it?</string>
     <string name="downloading_update">Downloading Update</string>
