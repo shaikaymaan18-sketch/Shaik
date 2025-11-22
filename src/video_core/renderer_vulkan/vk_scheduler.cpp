@@ -270,6 +270,11 @@ void Scheduler::EndPendingOperations() {
     EndRenderPass();
 }
 
+void Scheduler::EndPendingOperations() {
+    query_cache->CounterReset(VideoCommon::QueryType::ZPassPixelCount64);
+    EndRenderPass();
+}
+
 void Scheduler::EndRenderPass() {
     if (!state.renderpass) {
         return;
@@ -282,42 +287,37 @@ void Scheduler::EndRenderPass() {
             images = renderpass_images,
             ranges = renderpass_image_ranges](vk::CommandBuffer cmdbuf) {
         std::array<VkImageMemoryBarrier, 9> barriers;
-
-        // Aggregate usage across all attachments in the finished render pass
-        bool any_color_write = false;
-        bool any_depth_stencil_write = false;
-
-        VkPipelineStageFlags src_stages_union = 0;
+        VkPipelineStageFlags src_stages = 0;
 
         for (size_t i = 0; i < num_images; ++i) {
             const VkImageSubresourceRange& range = ranges[i];
             const bool is_color = (range.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) != 0;
-            const bool is_depth_stencil =
-                (range.aspectMask & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) != 0;
+            const bool is_depth_stencil = (range.aspectMask &
+                                           (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) != 0;
 
             VkAccessFlags src_access = 0;
-            VkPipelineStageFlags this_src_stage = 0;
+            VkPipelineStageFlags this_stage = 0;
 
             if (is_color) {
-                any_color_write = true;
                 src_access |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-                this_src_stage |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-            }
-            if (is_depth_stencil) {
-                any_depth_stencil_write = true;
-                src_access |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-                this_src_stage |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
-                                  VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+                this_stage |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
             }
 
-            src_stages_union |= this_src_stage;
+            if (is_depth_stencil) {
+                src_access |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                this_stage |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                              VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            }
+
+            src_stages |= this_stage;
 
             barriers[i] = VkImageMemoryBarrier{
                 .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
                 .pNext = nullptr,
                 .srcAccessMask = src_access,
-                // Assume common next use: shader reads; expand only if needed elsewhere
-                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT |
+                                 VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                                 VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
                 .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
                 .newLayout = VK_IMAGE_LAYOUT_GENERAL,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -327,29 +327,20 @@ void Scheduler::EndRenderPass() {
             };
         }
 
-        // AMD/Windows robustness: ensure the union includes required stages,
-        // but only for aspects actually used in the pass (avoid unconditional over-sync).
-        VkPipelineStageFlags src_stages =
-            (any_color_write ? VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT : 0) |
-            (any_depth_stencil_write ? (VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
-                                        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT) : 0);
-
-        // If you prefer to also include the accumulated union (covers mixed cases):
-        src_stages |= src_stages_union;
+        // Graft: ensure explicit fragment tests + color output stages are always synchronized (AMD/Windows fix)
+        src_stages |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                      VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
+                      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
         cmdbuf.EndRenderPass();
 
-        // Narrow destination stages to typical consumers (shader reads). Add more if needed.
-        VkPipelineStageFlags dst_stages = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-                                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-
         cmdbuf.PipelineBarrier(
             src_stages,
-            dst_stages,
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
             0,
             nullptr,
             nullptr,
-            vk::Span(barriers.data(), num_images)
+            vk::Span(barriers.data(), num_images)  // Batched image barriers
         );
     });
 
