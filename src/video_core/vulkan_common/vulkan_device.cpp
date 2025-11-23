@@ -1121,7 +1121,6 @@ bool Device::GetSuitability(bool requires_swapchain) {
     // Driver detection variables for workarounds in GetSuitability
     const VkDriverId driver_id = properties.driver.driverID;
     const bool is_intel_windows = driver_id == VK_DRIVER_ID_INTEL_PROPRIETARY_WINDOWS;
-    const bool is_qualcomm = driver_id == VK_DRIVER_ID_QUALCOMM_PROPRIETARY;
     
     // VK_EXT_extended_dynamic_state2 below this will appear drivers that need workarounds.
     
@@ -1135,14 +1134,6 @@ bool Device::GetSuitability(bool requires_swapchain) {
                     "Samsung: Disabling broken extendedDynamicState3ColorBlendEquation");
         features.extended_dynamic_state3.extendedDynamicState3ColorBlendEnable = false;
         features.extended_dynamic_state3.extendedDynamicState3ColorBlendEquation = false;
-    }
-    
-    // Qualcomm: Broken VertexInputDynamicState implementation
-    // Disable VertexInputDynamicState on all Qualcomm drivers
-    if (extensions.vertex_input_dynamic_state && is_qualcomm) {
-        LOG_WARNING(Render_Vulkan,
-                    "Qualcomm: Disabling broken VK_EXT_vertex_input_dynamic_state");
-        features.vertex_input_dynamic_state.vertexInputDynamicState = false;
     }
     
     // Intel Windows < 27.20.100.0: Broken VertexInputDynamicState
