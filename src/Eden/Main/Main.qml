@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import QtQuick
 import QtQuick.Controls
 
@@ -5,7 +8,7 @@ import Eden.Config
 import Eden.Items
 import Eden.Constants
 
-import Carboxyl.Base
+import Carboxyl.Clover
 
 ApplicationWindow {
     width: Constants.width
@@ -13,7 +16,7 @@ ApplicationWindow {
     visible: true
     title: TitleManager.title
 
-    palette: Palettes.theme
+    palette: Clover.theme
 
     property var theme: SettingsInterface.setting("carboxyl_theme")
     property var accent: SettingsInterface.setting("carboxyl_accent")
@@ -28,8 +31,8 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
-        Palettes.theme = Palettes.themes[theme.value]
-        Palettes.accent = Palettes.accents[accent.value]
+        Clover.theme = Clover.themes[theme.value]
+        Clover.accent = Clover.accents[accent.value]
     }
 
     /** Dialogs */

@@ -1,17 +1,18 @@
+// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import QtQuick
 import QtQuick.Controls
 import Qt.labs.platform
 import QtCore
 
-import Eden.Constants
 import Eden.Interface
 
 // import Eden.Native.Gamepad
 Rectangle {
     id: root
 
-    property var setting: SettingsInterface.setting("grid_columns")
-
+    // property var setting: SettingsInterface.setting("grid_columns")
     property int gx: 0
     property int gy: 0
 

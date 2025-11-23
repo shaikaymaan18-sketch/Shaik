@@ -1,9 +1,12 @@
+// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import QtQuick
 import QtQuick.Controls
 import Qt.labs.platform
 import QtCore
 
-import Eden.Constants
+import Carboxyl.Clover
 
 Item {
     property string title: model.name.replace(/-/g, " ")
@@ -18,7 +21,7 @@ Item {
         color: "transparent"
         border {
             width: 4
-            color: PathView.isCurrentItem ? palette.accent : "transparent"
+            color: PathView.isCurrentItem ? Clover.theme.currentAccent : "transparent"
         }
 
         Image {

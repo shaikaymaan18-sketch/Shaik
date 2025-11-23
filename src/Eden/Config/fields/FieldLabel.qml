@@ -1,8 +1,11 @@
+// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-import Carboxyl.Base
+import Carboxyl.Contour
 
 Label {
     property var setting

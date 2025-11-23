@@ -1,10 +1,14 @@
+// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import QtQuick
 import QtQuick.Controls
 import Qt.labs.platform
 import QtCore
 
-import Eden.Constants
 import Eden.Interface
+
+import Carboxyl.Clover
 
 ListView {
     id: carousel
@@ -51,7 +55,7 @@ ListView {
 
         color: "transparent"
         border {
-            color: palette.accent
+            color: Clover.theme.currentAccent
             width: 4
         }
 
@@ -69,7 +73,7 @@ ListView {
             font.pixelSize: 22
             font.family: "Monospace"
 
-            color: palette.accent
+            color: Clover.theme.currentAccent
             background: "transparent"
         }
     }

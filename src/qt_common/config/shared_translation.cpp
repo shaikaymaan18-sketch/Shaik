@@ -776,7 +776,6 @@ std::unique_ptr<ComboboxTranslationMap> ComboboxEnumeration(QObject* parent)
 #define ACCENT(name) PAIR(Accent, name, tr(#name))
     translations->insert({Settings::EnumMetadata<Settings::Accent>::Index(),
                           {
-                              ACCENT(System),
                               ACCENT(Red),
                               ACCENT(Blue),
                               ACCENT(Orange),

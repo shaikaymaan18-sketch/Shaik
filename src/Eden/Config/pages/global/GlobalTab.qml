@@ -1,9 +1,10 @@
+// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import QtQuick 2.15
 import QtQuick.Controls
 
-import Eden.Constants
-
-import Carboxyl.Base
+import Carboxyl.Contour
 
 Item {
     required property list<string> tabs

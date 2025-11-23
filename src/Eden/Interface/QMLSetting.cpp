@@ -3,6 +3,7 @@
 
 #include "QMLSetting.h"
 #include "common/settings.h"
+#include "qt_common/config/uisettings.h"
 
 #include <QVariant>
 
@@ -150,6 +151,7 @@ void QMLSetting::setValue(const QVariant &newValue)
     var.convert(QMetaType(m_metaType));
 
     m_setting->LoadString(var.toString().toStdString());
+
     emit valueChanged();
 }
 

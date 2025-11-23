@@ -4,8 +4,8 @@
 // SPDX-FileCopyrightText: 2023 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-#include <algorithm>
-#include <array>
+#include "config.h"
+#include "common/assert.h"
 #include "common/fs/fs.h"
 #include "common/fs/path_util.h"
 #include "common/logging/log.h"
@@ -19,8 +19,6 @@
 #endif
 
 #include <boost/algorithm/string/replace.hpp>
-
-#include "common/assert.h"
 
 namespace FS = Common::FS;
 

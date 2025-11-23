@@ -1,11 +1,10 @@
+// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import QtQuick
 import QtQuick.Controls
-import Qt.labs.platform
-import QtCore
 
-import Eden.Constants
-
-import Carboxyl.Base
+import Carboxyl.Clover
 
 Rectangle {
     id: wrapper
@@ -75,7 +74,7 @@ Rectangle {
         font.pixelSize: 18
         font.family: "Monospace"
 
-        color: palette.accent
+        color: Clover.theme.currentAccent
         background: "transparent"
 
         canMarquee: wrapper.GridView.isCurrentItem

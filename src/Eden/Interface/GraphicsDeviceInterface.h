@@ -62,13 +62,15 @@ private:
 
     std::vector<std::vector<VkPresentModeKHR>> device_present_modes;
 
-    void populateDevices();
-    void populateVsync();
-
     Settings::RendererBackend m_api;
     bool m_isOpenGL;
     bool m_isVulkan;
 
     int m_device;
     int m_vsyncMode;
+
+private slots:
+    void populateDevices();
+    void populateVsync();
+
 };

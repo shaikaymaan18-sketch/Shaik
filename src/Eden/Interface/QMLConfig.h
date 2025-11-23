@@ -20,11 +20,9 @@ public:
     {}
 
     Q_INVOKABLE inline void reload() {
-        qDebug() << "Reloading";
         m_config->ReloadAllValues();
     }
     Q_INVOKABLE inline void save() {
-        qDebug() << "Saving";
         m_config->SaveAllValues();
     }
 };

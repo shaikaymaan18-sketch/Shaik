@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -5,7 +8,7 @@ import QtQuick.Layouts
 import Eden.Interface
 import Eden.Config
 
-import Carboxyl.Base
+import Carboxyl.Clover
 
 PageScrollView {
     id: scroll
@@ -19,8 +22,8 @@ PageScrollView {
         theme.apply()
         accent.apply()
 
-        Palettes.accent = Palettes.accents[accent.contentItem.currentIndex]
-        Palettes.theme = Palettes.themes[theme.contentItem.currentIndex]
+        Clover.accent = Clover.accents[accent.contentItem.currentIndex]
+        Clover.theme = Clover.themes[theme.contentItem.currentIndex]
 
         if (linux.visible)
             linux.apply()

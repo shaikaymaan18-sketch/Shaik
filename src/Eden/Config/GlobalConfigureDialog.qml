@@ -1,31 +1,35 @@
+// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-import Eden.Constants
 import Eden.Items
 import Eden.Interface
+import Eden.Constants
 import Eden.Util
 
-import Carboxyl.Base
+import Carboxyl.Contour
 
 NativeDialog {
     property list<var> configs
 
-    width: 900
-    height: 600
+    width: Constants.width
+    height: Constants.height
 
     title: qsTr("Eden Configuration")
     standardButtons: Dialog.Ok | Dialog.Apply | Dialog.Cancel
 
-    Component.onCompleted: configs = Util.searchItem(swipe, "PageScrollView")
+    Component.onCompleted: {
+        configs = Util.searchItem(swipe, "PageScrollView")
+    }
 
     function applyConfigs() {
         configs.forEach(config => {
                             config.apply()
                         })
 
-        // console.log("Saving")
         QtConfig.save()
     }
 
@@ -57,7 +61,7 @@ NativeDialog {
         vertical: true
 
         // TODO: style-dependent
-        property int topMargin: 45
+        property int topMargin: general.tabBar.height
 
         anchors {
             top: parent.top
@@ -67,7 +71,7 @@ NativeDialog {
             leftMargin: 0
         }
 
-        height: Math.min(contentHeight * count + 20,
+        height: Math.min(contentItem.contentHeight + 20,
                          parent.height - tabBar.topMargin)
         contentWidth: 110
         contentHeight: 45
@@ -81,10 +85,12 @@ NativeDialog {
         clip: true
 
         Repeater {
+            id: buttons
             model: [qsTr("General"), qsTr("System"), qsTr("CPU"), qsTr(
                     "Graphics"), qsTr("Audio"), qsTr("Debug"), qsTr("Controls")]
 
-            CarboxylTabButton {
+            delegate: CarboxylTabButton {
+                id: btn
                 font.pixelSize: 15
                 font.weight: 600
 
@@ -114,12 +120,14 @@ NativeDialog {
             top: parent.top
             bottom: parent.bottom
 
-            leftMargin: 0
+            leftMargin: -5
         }
 
         clip: true
 
-        GlobalGeneralPage {}
+        GlobalGeneralPage {
+            id: general
+        }
         GlobalSystemPage {}
         GlobalCpuPage {}
         GlobalGraphicsPage {}

@@ -49,8 +49,8 @@ function(EdenModule)
         target_link_libraries(${LIB_NAME}plugin PRIVATE ${MODULE_LIBRARIES})
     endif()
 
-    target_link_libraries(${LIB_NAME} PRIVATE Carboxyl::Base Carboxyl::Styles)
-    target_link_libraries(${LIB_NAME}plugin PRIVATE Carboxyl::Base Carboxyl::Styles)
+    target_link_libraries(${LIB_NAME} PRIVATE Carboxyl::Carboxyl)
+    target_link_libraries(${LIB_NAME}plugin PRIVATE Carboxyl::Carboxyl)
 
     target_link_libraries(${LIB_NAME} PUBLIC ${LIB_NAME}plugin)
 endfunction()

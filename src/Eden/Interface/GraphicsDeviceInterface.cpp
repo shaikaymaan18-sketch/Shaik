@@ -30,7 +30,12 @@ static const QString TranslateVSyncMode(VkPresentModeKHR mode,
 
 GraphicsDeviceInterface::GraphicsDeviceInterface(QQuickItem *parent)
     : QQuickItem(parent)
-{}
+{
+    // NB: QML does NOT guarantee ordering!
+    setApi(Settings::values.renderer_backend.GetValue());
+    setVsyncMode(int(Settings::values.vsync_mode.GetValue()));
+    setDevice(Settings::values.vulkan_device.GetValue());
+}
 
 QStringList GraphicsDeviceInterface::devices()
 {
@@ -43,6 +48,7 @@ void GraphicsDeviceInterface::populateDevices()
     vulkan_devices.reserve(records.size());
     device_present_modes.clear();
     device_present_modes.reserve(records.size());
+
     for (const auto &record : records) {
         vulkan_devices.push_back(QString::fromStdString(record.name));
         device_present_modes.push_back(record.vsync_support);
@@ -127,8 +133,6 @@ void GraphicsDeviceInterface::setDevice(int newDevice)
         return;
     m_device = newDevice;
     emit deviceChanged(m_device);
-
-    populateVsync();
 }
 
 QStringList GraphicsDeviceInterface::vsyncModes() const

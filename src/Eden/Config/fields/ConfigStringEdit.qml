@@ -1,10 +1,12 @@
+// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
 
 import Eden.Items
 import Eden.Config
-import Eden.Constants
 
 BaseField {
     contentItem: TextField {

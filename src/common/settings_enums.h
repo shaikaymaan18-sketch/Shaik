@@ -156,7 +156,7 @@ ENUM(TemperatureUnits, Celsius, Fahrenheit)
 ENUM(ExtendedDynamicState, Disabled, EDS1, EDS2, EDS3);
 
 #ifdef YUZU_QT_QML
-ENUM(Accent, System, Red, Blue, Orange, Gold, Forest, Violet, Pink, Cyan, Steel);
+ENUM(Accent, Red, Blue, Orange, Gold, Forest, Violet, Pink, Cyan, Steel);
 ENUM(Theme, System, Light, Dark, Midnight);
 ENUM(Style, Trioxide, Graphide, Basalt, Hydrogen, Helios);
 #endif
