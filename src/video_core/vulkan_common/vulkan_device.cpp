@@ -1225,6 +1225,21 @@ void Device::RemoveUnsuitableExtensions() {
                                        features.extended_dynamic_state3,
                                        VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
 
+    // VK_EXT_robustness2
+    // Enable if at least one robustness2 feature is available
+    extensions.robustness_2 = features.robustness2.robustBufferAccess2 ||
+                              features.robustness2.robustImageAccess2 ||
+                              features.robustness2.nullDescriptor;
+    
+    RemoveExtensionFeatureIfUnsuitable(extensions.robustness_2, features.robustness2,
+                                       VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+
+    // VK_EXT_image_robustness
+    // Enable if robustImageAccess is available
+    extensions.image_robustness = features.image_robustness.robustImageAccess;
+    RemoveExtensionFeatureIfUnsuitable(extensions.image_robustness, features.image_robustness,
+                                       VK_EXT_IMAGE_ROBUSTNESS_EXTENSION_NAME);
+
     // VK_EXT_provoking_vertex
     if (Settings::values.provoking_vertex.GetValue()) {
         extensions.provoking_vertex = features.provoking_vertex.provokingVertexLast

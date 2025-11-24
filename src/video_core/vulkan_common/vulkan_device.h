@@ -37,6 +37,7 @@ VK_DEFINE_HANDLE(VmaAllocator)
     FEATURE(KHR, TimelineSemaphore, TIMELINE_SEMAPHORE, timeline_semaphore)
 
 #define FOR_EACH_VK_FEATURE_1_3(FEATURE)                                                           \
+    FEATURE(EXT, ImageRobustness, IMAGE_ROBUSTNESS, image_robustness)                              \
     FEATURE(EXT, ShaderDemoteToHelperInvocation, SHADER_DEMOTE_TO_HELPER_INVOCATION,               \
             shader_demote_to_helper_invocation)                                                    \
     FEATURE(EXT, SubgroupSizeControl, SUBGROUP_SIZE_CONTROL, subgroup_size_control)                \
@@ -120,6 +121,7 @@ VK_DEFINE_HANDLE(VmaAllocator)
     EXTENSION_NAME(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME)                                 \
     EXTENSION_NAME(VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME)                                     \
     EXTENSION_NAME(VK_EXT_4444_FORMATS_EXTENSION_NAME)                                             \
+    EXTENSION_NAME(VK_EXT_IMAGE_ROBUSTNESS_EXTENSION_NAME)                                         \
     EXTENSION_NAME(VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME)                                       \
     EXTENSION_NAME(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME)                                             \
     EXTENSION_NAME(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME)                               \
@@ -171,6 +173,7 @@ VK_DEFINE_HANDLE(VmaAllocator)
     FEATURE_NAME(depth_bias_control, depthBiasExact)                                               \
     FEATURE_NAME(extended_dynamic_state, extendedDynamicState)                                     \
     FEATURE_NAME(format_a4b4g4r4, formatA4B4G4R4)                                                  \
+    FEATURE_NAME(image_robustness, robustImageAccess)                                              \
     FEATURE_NAME(index_type_uint8, indexTypeUint8)                                                 \
     FEATURE_NAME(primitive_topology_list_restart, primitiveTopologyListRestart)                    \
     FEATURE_NAME(provoking_vertex, provokingVertexLast)                                            \
@@ -535,12 +538,42 @@ public:
         return extensions.custom_border_color;
     }
 
-    /// Returns true if customBorderColors feature is available (required for custom colors).
+    /// Returns true if the device supports VK_EXT_image_robustness.
+    bool IsExtImageRobustnessSupported() const {
+        return extensions.image_robustness;
+    }
+
+    /// Returns true if robustImageAccess is supported.
+    bool IsRobustImageAccessSupported() const {
+        return features.image_robustness.robustImageAccess;
+    }
+
+    /// Returns true if the device supports VK_EXT_robustness2.
+    bool IsExtRobustness2Supported() const {
+        return extensions.robustness_2;
+    }
+
+    /// Returns true if robustBufferAccess2 is supported.
+    bool IsRobustBufferAccess2Supported() const {
+        return features.robustness2.robustBufferAccess2;
+    }
+
+    /// Returns true if robustImageAccess2 is supported.
+    bool IsRobustImageAccess2Supported() const {
+        return features.robustness2.robustImageAccess2;
+    }
+
+    /// Returns true if nullDescriptor is supported.
+    bool IsNullDescriptorSupported() const {
+        return features.robustness2.nullDescriptor;
+    }
+
+    /// Returns true if customBorderColors feature is available.
     bool IsCustomBorderColorsSupported() const {
         return features.custom_border_color.customBorderColors;
     }
 
-    /// Returns true if customBorderColorWithoutFormat feature is available (allows VK_FORMAT_UNDEFINED).
+    /// Returns true if customBorderColorWithoutFormat feature is available.
     bool IsCustomBorderColorWithoutFormatSupported() const {
         return features.custom_border_color.customBorderColorWithoutFormat;
     }
