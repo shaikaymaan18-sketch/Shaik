@@ -6,6 +6,7 @@
 #include <memory>
 #include <utility>
 
+#include "GameSettings.h"
 #include "audio_core/audio_core.h"
 #include "common/fs/fs.h"
 #include "common/logging/log.h"
@@ -377,7 +378,8 @@ struct System::Impl {
             LOG_ERROR(Core, "Failed to find program id for ROM");
         }
 
-        LoadOverrides(program_id);
+
+        GameSettings::LoadOverrides(program_id, gpu_core->Renderer());
         if (auto room_member = Network::GetRoomMember().lock()) {
             Network::GameInfo game_info;
             game_info.name = name;

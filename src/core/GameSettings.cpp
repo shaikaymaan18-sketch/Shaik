@@ -99,12 +99,9 @@ void LoadOverrides(std::uint64_t program_id, const VideoCore::RendererBase& rend
     const auto env = DetectEnvironment(renderer);
 
     switch (static_cast<TitleID>(program_id)) {
-        case TitleID::SuperMario3DWorld:
-            // examples
-            /*if (env.os == OS::Android || env.vendor == GPUVendor::ARM) {
-                Settings::values.aspect_ratio = Settings::AspectRatio::R21_9;
-            }
-            break;*/
+        case TitleID::NinjaGaidenRagebound:
+            Settings::values.use_squashed_iterated_blend = true;
+            break;
         default:
             break;
     }
