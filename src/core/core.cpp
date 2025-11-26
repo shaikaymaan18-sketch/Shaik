@@ -6,7 +6,7 @@
 #include <memory>
 #include <utility>
 
-#include "GameSettings.h"
+#include "game_settings.h"
 #include "audio_core/audio_core.h"
 #include "common/fs/fs.h"
 #include "common/logging/log.h"
@@ -394,6 +394,9 @@ struct System::Impl {
 
     void ShutdownMainProcess() {
         SetShuttingDown(true);
+
+        // Reset per-game flags
+        Settings::values.use_squashed_iterated_blend = false;
 
         is_powered_on = false;
         exit_locked = false;
