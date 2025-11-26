@@ -34,6 +34,7 @@ import org.yuzu.yuzu_emu.adapters.SetupAdapter
 import org.yuzu.yuzu_emu.databinding.FragmentSetupBinding
 import org.yuzu.yuzu_emu.features.settings.model.Settings
 import org.yuzu.yuzu_emu.model.ButtonState
+import org.yuzu.yuzu_emu.model.GamesViewModel
 import org.yuzu.yuzu_emu.model.HomeViewModel
 import org.yuzu.yuzu_emu.model.PageButton
 import org.yuzu.yuzu_emu.model.SetupCallback
@@ -51,6 +52,7 @@ class SetupFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val homeViewModel: HomeViewModel by activityViewModels()
+    private val gamesViewModel: GamesViewModel by activityViewModels()
 
     private lateinit var mainActivity: MainActivity
 
@@ -284,13 +286,19 @@ class SetupFragment : Fragment() {
             override fun onPageSelected(position: Int) {
                 super.onPageSelected(position)
 
-                if (position == 1 && previousPosition == 0) {
-                    ViewUtils.showView(binding.buttonNext)
-                    ViewUtils.showView(binding.buttonBack)
-                } else if (position == 0 && previousPosition == 1) {
+                val isFirstPage = position == 0
+                val isLastPage = position == pages.size - 1
+
+                if (isFirstPage) {
                     ViewUtils.hideView(binding.buttonBack)
-                } else if (position == pages.size - 1 && previousPosition == pages.size - 2) {
+                } else {
+                    ViewUtils.showView(binding.buttonBack)
+                }
+
+                if (isLastPage) {
                     ViewUtils.hideView(binding.buttonNext)
+                } else {
+                    ViewUtils.showView(binding.buttonNext)
                 }
 
                 previousPosition = position
@@ -450,6 +458,9 @@ class SetupFragment : Fragment() {
             .edit()
             .putBoolean(Settings.PREF_FIRST_APP_LAUNCH, false)
             .apply()
+
+        gamesViewModel.reloadGames(directoriesChanged = true, firstStartup = false)
+
         mainActivity.finishSetup(binding.root.findNavController())
     }
 
