@@ -145,7 +145,7 @@ bool IsSizeInt32(Size size) {
 }
 
 void ImageAtomOp(TranslatorVisitor& v, IR::Reg dest_reg, IR::Reg operand_reg, IR::Reg coord_reg,
-                 IR::Reg bindless_reg, AtomicOp op, Clamp clamp, Size size, Type type,
+                 std::optional<IR::Reg> bindless_reg, AtomicOp op, Clamp clamp, Size size, Type type,
                  u64 bound_offset, bool is_bindless, bool write_result) {
     if (clamp != Clamp::IGN) {
         throw NotImplementedException("Clamp {}", clamp);
@@ -158,8 +158,7 @@ void ImageAtomOp(TranslatorVisitor& v, IR::Reg dest_reg, IR::Reg operand_reg, IR
     const TextureType tex_type{GetType(type)};
     const IR::Value coords{MakeCoords(v, coord_reg, type)};
 
-    const IR::U32 handle{is_bindless != 0 ? v.X(bindless_reg)
-                                          : v.ir.Imm32(static_cast<u32>(bound_offset * 4))};
+    const IR::U32 handle = is_bindless ? v.X(*bindless_reg) : v.ir.Imm32(u32(bound_offset * 4));
     IR::TextureInstInfo info{};
     info.type.Assign(tex_type);
     info.image_format.Assign(format);
@@ -185,7 +184,7 @@ void TranslatorVisitor::SUATOM(u64 insn) {
         BitField<0, 8, IR::Reg> dest_reg;
         BitField<8, 8, IR::Reg> coord_reg;
         BitField<20, 8, IR::Reg> operand_reg;
-        BitField<36, 13, u64> bound_offset;    // !is_bindless
+        BitField<36, 13, u64> bound_offset; // !is_bindless
         BitField<39, 8, IR::Reg> bindless_reg; // is_bindless
     } const suatom{insn};
 
