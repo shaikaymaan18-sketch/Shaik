@@ -207,9 +207,9 @@ void TranslatorVisitor::SURED(u64 insn) {
         BitField<36, 13, u64> bound_offset;    // is_bound
         BitField<39, 8, IR::Reg> bindless_reg; // !is_bound
     } const sured{insn};
-    ImageAtomOp(*this, IR::Reg::RZ, sured.operand_reg, sured.coord_reg, sured.bindless_reg,
+    ImageAtomOp(*this, IR::Reg::RZ, sured.operand_reg, sured.coord_reg, std::nullopt,
                 sured.op, sured.clamp, sured.size, sured.type, sured.bound_offset,
-                sured.is_bound == 0, false);
+                false, false);
 }
 
 } // namespace Shader::Maxwell
