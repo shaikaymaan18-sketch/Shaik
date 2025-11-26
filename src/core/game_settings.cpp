@@ -10,6 +10,10 @@
 #include "common/settings.h"
 #include "video_core/renderer_base.h"
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 namespace Core::GameSettings {
 
 static GPUVendor GetGPU(const std::string& gpu_vendor_string) {
@@ -72,8 +76,28 @@ static GPUVendor GetGPU(const std::string& gpu_vendor_string) {
 static OS DetectOS() {
 #if defined(_WIN32)
     return OS::Windows;
+#elif defined(__FIREOS__)
+    return OS::FireOS;
 #elif defined(__ANDROID__)
     return OS::Android;
+#elif defined(__OHOS__)
+    return OS::HarmonyOS;
+#elif defined(__HAIKU__)
+    return OS::HaikuOS;
+#elif defined(__DragonFly__)
+    return OS::DragonFlyBSD;
+#elif defined(__NetBSD__)
+    return OS::NetBSD;
+#elif defined(__OpenBSD__)
+    return OS::OpenBSD;
+#elif defined(_AIX)
+    return OS::AIX;
+#elif defined(__managarm__)
+    return OS::Managarm;
+#elif defined(__redox__)
+    return OS::RedoxOS;
+#elif defined(__APPLE__) && defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+    return OS::IOS;
 #elif defined(__APPLE__)
     return OS::MacOS;
 #elif defined(__FreeBSD__)
