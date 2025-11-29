@@ -16,10 +16,9 @@ tasks.register("clean").configure {
     delete(rootProject.layout.buildDirectory)
 }
 
-// Do not index dependecies on Android Studio
+// Do not index .cache/cpm on Android Studio
 idea {
     module {
-        excludeDirs.add(file("$rootDir/.cache"))
-        excludeDirs.add(file("$rootDir/externals"))
+        excludeDirs.add(file("$rootDir/.cache/cpm"))
     }
 }
