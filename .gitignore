@@ -27,6 +27,7 @@ dist/english_plurals/generated_en.ts
 .vs/
 .vscode/
 .cache/
+.gradle
 profile.json.gz
 CMakeLists.txt.user*
 
@@ -61,3 +62,6 @@ artifacts
 *.AppImage*
 /install*
 vulkansdk*.exe
+
+# Local configuration file (sdk path, etc)
+local.properties
