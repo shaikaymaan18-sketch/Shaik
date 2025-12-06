@@ -183,4 +183,22 @@ object NativeConfig {
      */
     @Synchronized
     external fun saveControlPlayerValues()
+
+    /**
+     * Directory paths getters and setters
+     */
+    @Synchronized
+    external fun getSaveDir(): String
+    @Synchronized
+    external fun getDefaultSaveDir(): String
+    @Synchronized
+    external fun setSaveDir(path: String)
+    @Synchronized
+    external fun getNandDir(): String
+    @Synchronized
+    external fun setNandDir(path: String)
+    @Synchronized
+    external fun getSdmcDir(): String
+    @Synchronized
+    external fun setSdmcDir(path: String)
 }
