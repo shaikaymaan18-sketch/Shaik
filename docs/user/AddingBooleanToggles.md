@@ -2,6 +2,8 @@
 
 > [!WARNING]
 > This guide is intended for developers ONLY. If you are not a developer, this likely irrelevant to yourself.
+>
+> If you want to add temporary toggles, please refer to **[Adding Debug Knobs](AddingDebugKnobs.md)**
 
 This guide will walk you through adding a new boolean toggle setting to Eden's configuration across both Qt's (PC) and Kotlin's (Android) UIs.
 
