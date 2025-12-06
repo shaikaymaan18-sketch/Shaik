@@ -350,10 +350,10 @@ std::shared_ptr<FileSys::SaveDataFactory> FileSystemController::CreateSaveDataFa
     const auto rw_mode = FileSys::OpenMode::ReadWrite;
 
     auto vfs = system.GetFilesystem();
-    const auto nand_directory =
-        vfs->OpenDirectory(Common::FS::GetEdenPathString(EdenPath::NANDDir), rw_mode);
+    const auto save_directory =
+        vfs->OpenDirectory(Common::FS::GetEdenPathString(EdenPath::SaveDir), rw_mode);
     return std::make_shared<FileSys::SaveDataFactory>(system, program_id,
-                                                      std::move(nand_directory));
+                                                      std::move(save_directory));
 }
 
 Result FileSystemController::OpenSDMC(FileSys::VirtualDir* out_sdmc) const {

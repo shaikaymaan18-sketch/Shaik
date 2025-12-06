@@ -30,12 +30,15 @@ private:
     enum class DirectoryTarget {
         NAND,
         SD,
+        Save,
         Gamecard,
         Dump,
         Load,
     };
 
     void SetDirectory(DirectoryTarget target, QLineEdit* edit);
+    void SetSaveDirectory();
+    void PromptSaveMigration(const QString& from_path, const QString& to_path);
     void ResetMetadata();
     void UpdateEnabledControls();
 
