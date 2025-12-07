@@ -47,7 +47,6 @@ enum class Category {
     Multiplayer = u32(Settings::Category::Multiplayer),
     Services = u32(Settings::Category::Services),
     Paths = u32(Settings::Category::Paths),
-    Linux = u32(Settings::Category::Linux),
     LibraryApplet = u32(Settings::Category::LibraryApplet),
     MaxEnum = u32(Settings::Category::MaxEnum),
 };

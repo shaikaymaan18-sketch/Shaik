@@ -1,6 +1,6 @@
+
 // SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -24,9 +24,6 @@ PageScrollView {
 
         Clover.accent = Clover.accents[accent.contentItem.currentIndex]
         Clover.theme = Clover.themes[theme.contentItem.currentIndex]
-
-        if (linux.visible)
-            linux.apply()
     }
 
     ColumnLayout {
@@ -39,12 +36,6 @@ PageScrollView {
 
         SectionHeader {
             text: qsTr("Linux")
-            visible: Qt.platform.os === "linux"
-        }
-
-        SettingsList {
-            id: linux
-            category: SettingsCategories.Linux
             visible: Qt.platform.os === "linux"
         }
 

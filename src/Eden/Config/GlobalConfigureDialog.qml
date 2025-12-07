@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -21,9 +20,7 @@ NativeDialog {
     title: qsTr("Eden Configuration")
     standardButtons: Dialog.Ok | Dialog.Apply | Dialog.Cancel
 
-    Component.onCompleted: {
-        configs = Util.searchItem(swipe, "PageScrollView")
-    }
+    Component.onCompleted: configs = Util.searchItem(swipe, "PageScrollView")
 
     function applyConfigs() {
         configs.forEach(config => {
@@ -33,21 +30,29 @@ NativeDialog {
         QtConfig.save()
     }
 
+    MessageDialog {
+        id: warn
+        text: qsTr("To apply the new style, Eden will now close and re-open.")
+        icon: CarboxylEnums.Warning
+        title: qsTr("Reloading")
+        standardButtons: DialogButtonBox.Ok
+
+        onVisibleChanged: if (!visible)
+                              EdenApplication.reload()
+    }
+
     onAccepted: {
         applyConfigs()
 
+        // TODO(crueter): Configurable game icon size for carousel
         if (EdenApplication.shouldReload) {
             EdenApplication.shouldReload = false
 
-            // TODO(crueter): Warn the user.
-            // TODO(crueter): Configurable game icon size for carousel
-            EdenApplication.reload()
+            warn.show()
         }
     }
 
-    onApplied: {
-        applyConfigs()
-    }
+    onApplied: applyConfigs()
 
     onRejected: {
 
