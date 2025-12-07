@@ -7,12 +7,6 @@
 #include <QGuiApplication>
 #include "qt_common/qt_common.h"
 
-#ifdef YUZU_QT_WIDGETS
-#include <QFileDialog>
-#include <QWidget>
-#include <QMessageBox>
-#endif
-
 /**
  * manages common functionality e.g. message boxes and such for Qt/QML
  */
@@ -20,15 +14,6 @@ namespace QtCommon::Frontend {
 
 Q_NAMESPACE
 
-#ifdef YUZU_QT_WIDGETS
-using Options = QFileDialog::Options;
-using Option = QFileDialog::Option;
-
-using StandardButton = QMessageBox::StandardButton;
-using StandardButtons = QMessageBox::StandardButtons;
-
-using Icon = QMessageBox::Icon;
-#else
 enum Option {
     ShowDirsOnly = 0x00000001,
     DontResolveSymlinks = 0x00000002,
@@ -83,7 +68,7 @@ typedef StandardButton Button;
 Q_DECLARE_FLAGS(StandardButtons, StandardButton)
 Q_FLAG_NS(StandardButtons)
 
-enum Icon {
+enum class Icon {
     // keep this in sync with QMessageDialogOptions::StandardIcon
     NoIcon = 0,
     Information = 1,
@@ -92,8 +77,6 @@ enum Icon {
     Question = 4
 };
 Q_ENUM_NS(Icon)
-
-#endif
 
 // TODO(crueter) widgets-less impl, choices et al.
 StandardButton ShowMessage(Icon icon,
@@ -106,16 +89,28 @@ StandardButton ShowMessage(Icon icon,
     inline StandardButton level(QObject *parent, \
                                              const QString &title, \
                                              const QString &text, \
-                                             StandardButtons buttons = StandardButton::Ok) \
+                                             StandardButtons buttons) \
     { \
         return ShowMessage(Icon::level, title, text, buttons, parent); \
     } \
+    inline StandardButton level(QObject *parent, \
+                                const QString &title, \
+                                const QString &text, \
+                                int buttons = StandardButton::Ok) \
+    { \
+        return ShowMessage(Icon::level, title, text, StandardButtons(buttons), parent); \
+    } \
     inline StandardButton level(const QString title, \
                                              const QString &text, \
-                                             StandardButtons buttons \
-                                             = StandardButton::Ok) \
+                                             StandardButtons buttons) \
     { \
         return ShowMessage(Icon::level, title, text, buttons, rootObject); \
+    } \
+    inline StandardButton level(const QString &title, \
+                                const QString &text, \
+                                int buttons = StandardButton::Ok) \
+    { \
+        return ShowMessage(Icon::level, title, text, StandardButtons(buttons), rootObject); \
     }
 
 UTIL_OVERRIDES(Information)

@@ -23,7 +23,7 @@ add_library(qt_common STATIC
     util/applet.h util/applet.cpp
     util/compress.h util/compress.cpp
 
-    abstract/frontend.h abstract/frontend.cpp
+    abstract/frontend.h
     abstract/qt_progress_dialog.h abstract/qt_progress_dialog.cpp
 
     qt_string_lookup.h
@@ -54,11 +54,6 @@ if (USE_DISCORD_PRESENCE)
     target_compile_definitions(qt_common PUBLIC USE_DISCORD_PRESENCE)
 endif()
 
-# TODO(crueter)
-if (ENABLE_QT_WIDGETS)
-    target_link_libraries(qt_common PRIVATE Qt6::Widgets)
-endif()
-
 target_compile_definitions(qt_common PUBLIC
     # Use QStringBuilder for string concatenation to reduce
     # the overall number of temporary strings created.
@@ -87,6 +82,7 @@ find_package(frozen)
 target_link_libraries(qt_common PRIVATE core input_common)
 target_link_libraries(qt_common PRIVATE gamemode::headers)
 target_link_libraries(qt_common PRIVATE Qt6::Core Qt6::Concurrent SimpleIni::SimpleIni QuaZip::QuaZip)
+target_link_libraries(qt_common PRIVATE Qt6::Widgets)
 target_link_libraries(qt_common PUBLIC frozen::frozen-headers Vulkan::UtilityHeaders)
 
 if (NOT APPLE AND ENABLE_OPENGL)

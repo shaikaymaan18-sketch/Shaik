@@ -17,11 +17,11 @@ bool OpenShaderCache(u64 program_id, QObject *parent)
     const auto shader_cache_dir = Common::FS::GetEdenPath(Common::FS::EdenPath::ShaderDir);
     const auto shader_cache_folder_path{shader_cache_dir / fmt::format("{:016x}", program_id)};
     if (!Common::FS::CreateDirs(shader_cache_folder_path)) {
-        QtCommon::Frontend::ShowMessage(QMessageBox::Warning,
+        QtCommon::Frontend::ShowMessage(QtCommon::Frontend::Icon::Warning,
                                         tr("Error Opening Shader Cache"),
                                         tr("Failed to create or open shader cache for this title, "
                                         "ensure your app data directory has write permissions."),
-                                        QMessageBox::Ok,
+                                        QtCommon::Frontend::Ok,
                                         parent);
     }
 

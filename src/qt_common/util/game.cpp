@@ -11,7 +11,6 @@
 #include "qt_common/abstract/frontend.h"
 #include "qt_common/config/uisettings.h"
 #include "qt_common/qt_common.h"
-#include "yuzu/util/util.h"
 
 #include <QDesktopServices>
 #include <QStandardPaths>
@@ -406,29 +405,31 @@ void ResetMetadata(bool show_message)
 inline constexpr bool CreateShortcutMessagesGUI(ShortcutMessages imsg, const QString& game_title)
 {
     int result = 0;
-    QMessageBox::StandardButtons buttons;
+    using namespace QtCommon::Frontend;
+    int buttons;
+
     switch (imsg) {
     case ShortcutMessages::Fullscreen:
-        buttons = QMessageBox::Yes | QMessageBox::No;
+        buttons = Yes | No;
         result
             = QtCommon::Frontend::Information(tr("Create Shortcut"),
                                               tr("Do you want to launch the game in fullscreen?"),
                                               buttons);
-        return result == QMessageBox::Yes;
+        return result == Yes;
     case ShortcutMessages::Success:
         QtCommon::Frontend::Information(tr("Shortcut Created"),
                                         tr("Successfully created a shortcut to %1").arg(game_title));
         return false;
     case ShortcutMessages::Volatile:
-        buttons = QMessageBox::StandardButton::Ok | QMessageBox::StandardButton::Cancel;
+        buttons = Ok | Cancel;
         result = QtCommon::Frontend::Warning(
             tr("Shortcut may be Volatile!"),
             tr("This will create a shortcut to the current AppImage. This may "
                "not work well if you update. Continue?"),
             buttons);
-        return result == QMessageBox::Ok;
+        return result == Ok;
     default:
-        buttons = QMessageBox::Ok;
+        buttons = Ok;
         QtCommon::Frontend::Critical(tr("Failed to Create Shortcut"),
                                      tr("Failed to create a shortcut to %1").arg(game_title),
                                      buttons);

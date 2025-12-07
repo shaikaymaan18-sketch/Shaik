@@ -52,7 +52,7 @@ const std::optional<Common::UUID> GetProfileID() {
                                                                  .display_options = {},
                                                                  .purpose = Service::AM::Frontend::UserSelectionPurpose::General,
                                                                  };
-        QtProfileSelectionDialog dialog(*QtCommon::system, QtCommon::rootObject, parameters);
+        QtProfileSelectionDialog dialog(*QtCommon::system, (QWidget *)QtCommon::rootObject, parameters);
         dialog.setWindowFlags(Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint |
                               Qt::WindowSystemMenuHint | Qt::WindowCloseButtonHint);
         dialog.setWindowModality(Qt::WindowModal);

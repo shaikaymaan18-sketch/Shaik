@@ -26,16 +26,14 @@ bool CheckGameFirmware(u64 program_id, QObject* parent)
 {
     if (FirmwareManager::GameRequiresFirmware(program_id)
         && !FirmwareManager::CheckFirmwarePresence(*system)) {
-        auto result = QtCommon::Frontend::ShowMessage(
-            QMessageBox::Warning,
+        auto result = QtCommon::Frontend::Warning(
             tr("Game Requires Firmware"),
             tr("The game you are trying to launch requires firmware to boot or to get past the "
                "opening menu. Please <a href='https://yuzu-mirror.github.io/help/quickstart'>"
                "dump and install firmware</a>, or press \"OK\" to launch anyways."),
-            QMessageBox::Ok | QMessageBox::Cancel,
-            parent);
+            QtCommon::Frontend::Ok | QtCommon::Frontend::Cancel);
 
-        return result == QMessageBox::Ok;
+        return result == QtCommon::Frontend::Ok;
     }
 
     return true;
@@ -47,7 +45,7 @@ void InstallFirmware(const QString& location, bool recursive)
                                                   tr("Cancel"),
                                                   0,
                                                   100,
-                                                  rootObject);
+                                                  (QWidget *)rootObject);
     progress.setWindowModality(Qt::WindowModal);
     progress.setMinimumDuration(100);
     progress.setAutoClose(false);
@@ -62,7 +60,7 @@ void InstallFirmware(const QString& location, bool recursive)
 
     QString failedTitle = tr("Firmware Install Failed");
     QString successTitle = tr("Firmware Install Succeeded");
-    QMessageBox::Icon icon;
+    QtCommon::Frontend::Icon icon;
     FirmwareInstallResult result;
 
     const auto ShowMessage = [&]() {
@@ -104,7 +102,7 @@ void InstallFirmware(const QString& location, bool recursive)
 
     if (out.size() <= 0) {
         result = FirmwareInstallResult::NoNCAs;
-        icon = QMessageBox::Warning;
+        icon = QtCommon::Frontend::Icon::Warning;
         ShowMessage();
         return;
     }
@@ -114,7 +112,7 @@ void InstallFirmware(const QString& location, bool recursive)
     if (sysnand_content_vdir->IsWritable()
         && !sysnand_content_vdir->CleanSubdirectoryRecursive("registered")) {
         result = FirmwareInstallResult::FailedDelete;
-        icon = QMessageBox::Critical;
+        icon = QtCommon::Frontend::Icon::Critical;
         ShowMessage();
         return;
     }
@@ -145,7 +143,7 @@ void InstallFirmware(const QString& location, bool recursive)
 
         if (callback(100, 20 + static_cast<int>(((i) / static_cast<float>(out.size())) * 70.0))) {
             result = FirmwareInstallResult::FailedCorrupted;
-            icon = QMessageBox::Warning;
+            icon = QtCommon::Frontend::Icon::Warning;
             ShowMessage();
             return;
         }
@@ -153,7 +151,7 @@ void InstallFirmware(const QString& location, bool recursive)
 
     if (!success) {
         result = FirmwareInstallResult::FailedCopy;
-        icon = QMessageBox::Critical;
+        icon = QtCommon::Frontend::Icon::Critical;
         ShowMessage();
         return;
     }
@@ -225,7 +223,7 @@ void VerifyGameContents(const std::string& game_path)
                                                   tr("Cancel"),
                                                   0,
                                                   100,
-                                                  rootObject);
+                                                  (QWidget *)rootObject);
     progress.setWindowModality(Qt::WindowModal);
     progress.setMinimumDuration(100);
     progress.setAutoClose(false);
@@ -294,7 +292,7 @@ void VerifyInstalledContents()
                                                   tr("Cancel"),
                                                   0,
                                                   100,
-                                                  rootObject);
+                                                  (QWidget *)rootObject);
     progress.setWindowModality(Qt::WindowModal);
     progress.setMinimumDuration(100);
     progress.setAutoClose(false);
@@ -377,18 +375,18 @@ void ClearDataDir(FrontendCommon::DataManager::DataDir dir, const std::string& u
 {
     auto result = QtCommon::Frontend::Warning(tr("Really clear data?"),
                                               tr("Important data may be lost!"),
-                                              QMessageBox::Yes | QMessageBox::No);
+                                              QtCommon::Frontend::Yes | QtCommon::Frontend::No);
 
-    if (result != QMessageBox::Yes)
+    if (result != QtCommon::Frontend::Yes)
         return;
 
     result = QtCommon::Frontend::Warning(
         tr("Are you REALLY sure?"),
         tr("Once deleted, your data will NOT come back!\n"
            "Only do this if you're 100% sure you want to delete this data."),
-        QMessageBox::Yes | QMessageBox::No);
+        QtCommon::Frontend::Yes | QtCommon::Frontend::No);
 
-    if (result != QMessageBox::Yes)
+    if (result != QtCommon::Frontend::Yes)
         return;
 
     QtCommon::Frontend::QtProgressDialog dialog(tr("Clearing..."), QString(), 0, 0);
@@ -415,7 +413,7 @@ void ExportDataDir(FrontendCommon::DataManager::DataDir data_dir,
         return;
 
     QtProgressDialog* progress = new QtProgressDialog(
-        tr("Exporting data. This may take a while..."), tr("Cancel"), 0, 100, rootObject);
+        tr("Exporting data. This may take a while..."), tr("Cancel"), 0, 100, (QWidget*)rootObject);
 
     progress->setWindowTitle(tr("Exporting"));
     progress->setWindowModality(Qt::WindowModal);
@@ -486,11 +484,11 @@ void ImportDataDir(FrontendCommon::DataManager::DataDir data_dir,
            "proceed?"),
         StandardButton::Yes | StandardButton::No);
 
-    if (button != QMessageBox::Yes)
+    if (button != QtCommon::Frontend::Yes)
         return;
 
     QtProgressDialog* progress = new QtProgressDialog(
-        tr("Importing data. This may take a while..."), tr("Cancel"), 0, 100, rootObject);
+        tr("Importing data. This may take a while..."), tr("Cancel"), 0, 100, (QWidget *)rootObject);
 
     progress->setWindowTitle(tr("Importing"));
     progress->setWindowModality(Qt::WindowModal);

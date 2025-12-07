@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "common/logging/log.h"
+#include "common/settings_common.h"
 #include "input_common/main.h"
 #include "qt_config.h"
 #include "uisettings.h"
@@ -561,11 +562,12 @@ void QtConfig::SaveMultiplayerValues() {
 }
 
 std::vector<Settings::BasicSetting*>& QtConfig::FindRelevantList(Settings::Category category) {
-    auto& map = Settings::values.linkage.by_category;
-    if (map.contains(category)) {
-        return Settings::values.linkage.by_category[category];
-    }
-    return UISettings::values.linkage.by_category[category];
+    // This solution sucks, but by_category is unreliable because the settings backend
+    // mangles category mapping for some reason.
+    static auto list = Settings::values.linkage.by_category[category];
+    auto uilist = UISettings::values.linkage.by_category[category];
+    list.insert(list.end(), uilist.begin(), uilist.end());
+    return list;
 }
 
 void QtConfig::ReadQtControlPlayerValues(std::size_t player_index) {

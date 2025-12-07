@@ -242,6 +242,7 @@ if (ENABLE_QT)
 endif()
 
 if (ENABLE_QT_QML)
+    set(QML_IMPORT_PATH ${CMAKE_CURRENT_SOURCE_DIR} CACHE STRING "")
     add_subdirectory(Eden)
 endif()
 

@@ -52,11 +52,7 @@ using namespace Common::Literals;
 
 namespace QtCommon {
 
-#ifdef YUZU_QT_WIDGETS
-QWidget* rootObject = nullptr;
-#else
 QObject* rootObject = nullptr;
-#endif
 
 std::unique_ptr<Core::System> system = nullptr;
 std::shared_ptr<FileSys::RealVfsFilesystem> vfs = nullptr;
@@ -193,11 +189,7 @@ static void RemoveCachedContents() {
 }
 
 
-#ifdef YUZU_QT_WIDGETS
-void Init(QWidget * root)
-#else
 void Init(QObject* root)
-#endif
 {
     system = std::make_unique<Core::System>();
     rootObject = root;

@@ -22,4 +22,7 @@ AddJsonPackage(frozen)
 # TODO
 if (ENABLE_QT_QML)
     AddJsonPackage(carboxyl)
+    if (NOT MSVC)
+        target_compile_options(CarboxylBase PUBLIC -Wno-shadow)
+    endif()
 endif()
