@@ -18,33 +18,12 @@ StandardButton ShowMessage(Icon icon, const QString& title, const QString& text,
     return StandardButton(res);
 }
 
-const QString GetOpenFileName(const QString& title, const QString& dir, const QString& filter,
-                              QString* selectedFilter, Options options) {
-    // TODO
-    // return QFileDialog::getOpenFileName((QWidget *) rootObject, title, dir, filter,
-    // selectedFilter, QFileDialog::Options(int(options)));
-    return QString();
-}
-
-const QString GetSaveFileName(const QString& title, const QString& dir, const QString& filter,
-                              QString* selectedFilter, Options options) {
-    // return QFileDialog::getSaveFileName((QWidget *) rootObject, title, dir, filter,
-    // selectedFilter, QFileDialog::Options(int(options)));
-    return QString();
-}
-
-
-const QString GetExistingDirectory(const QString& caption, const QString& dir, Options options) {
-    // return QFileDialog::getExistingDirectory((QWidget *) rootObject, caption, dir,
-    // QFileDialog::Options(int(options)));
-    return QString();
-}
-
-QuickProgressDialog::QuickProgressDialog(const QString& labelText,
-                                         const QString& cancelButtonText, int minimum,
-                                         int maximum, QObject* parent, Qt::WindowFlags f)
+QuickProgressDialog::QuickProgressDialog(const QString& labelText, const QString& cancelButtonText,
+                                         int minimum, int maximum, QObject* parent,
+                                         Qt::WindowFlags f)
     : QtProgressDialog(labelText, cancelButtonText, minimum, maximum, parent, f),
-      m_dialog(new CarboxylProgressDialog(labelText, cancelButtonText, minimum, maximum, parent)) {}
+      m_dialog(new CarboxylProgressDialog(labelText, cancelButtonText, minimum, maximum, parent)) {
+}
 
 bool QuickProgressDialog::wasCanceled() const {
     return m_dialog->wasCanceled();

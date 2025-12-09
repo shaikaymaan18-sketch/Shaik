@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 import QtQuick
 import QtQuick.Controls
 
@@ -161,12 +160,23 @@ ApplicationWindow {
                 text: qsTr("Install &Decryption Keys")
             }
 
-            Action {
-                text: qsTr("Install &Firmware")
+            Menu {
+                title: qsTr("Install &Firmware")
+
+                Action {
+                    text: qsTr("From &Folder")
+                    onTriggered: MainWindowInterface.installFirmware()
+                }
+
+                Action {
+                    text: qsTr("From &ZIP")
+                    onTriggered: MainWindowInterface.installFirmwareZip()
+                }
             }
 
             Action {
                 text: qsTr("&Verify Installed Contents")
+                onTriggered: MainWindowInterface.verifyIntegrity()
             }
 
             MenuSeparator {}

@@ -574,8 +574,6 @@ private:
                         std::string arguments,
                         const bool needs_title);
 
-    void InstallFirmware(const QString& location, bool recursive = false);
-
 protected:
     void dropEvent(QDropEvent* event) override;
     void dragEnterEvent(QDragEnterEvent* event) override;

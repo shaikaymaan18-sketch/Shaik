@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "Eden/Interface/MainWindowInterface.h"
 #include "EdenApplication.h"
 
 #include <QQmlApplicationEngine>
@@ -100,6 +101,10 @@ int EdenApplication::run() {
         // Title Manager
         TitleManager *title = new TitleManager(&engine);
         ctx->setContextProperty(QStringLiteral("TitleManager"), title);
+
+        // MainWindow interface
+        MainWindowInterface* mwint = new MainWindowInterface(&engine);
+        ctx->setContextProperty(QStringLiteral("MainWindowInterface"), mwint);
 
         // :)
         ctx->setContextProperty(QStringLiteral("EdenApplication"), this);

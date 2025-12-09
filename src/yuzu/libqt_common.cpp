@@ -20,29 +20,6 @@ StandardButton ShowMessage(
     return StandardButton(box->exec());
 }
 
-const QString GetOpenFileName(const QString &title,
-                              const QString &dir,
-                              const QString &filter,
-                              QString *selectedFilter,
-                              Options options)
-{
-    return QFileDialog::getOpenFileName((QWidget *) rootObject, title, dir, filter, selectedFilter, QFileDialog::Options(int(options)));
-}
-
-const QString GetSaveFileName(const QString &title,
-                              const QString &dir,
-                              const QString &filter,
-                              QString *selectedFilter,
-                              Options options)
-{
-    return QFileDialog::getSaveFileName((QWidget *) rootObject, title, dir, filter, selectedFilter, QFileDialog::Options(int(options)));
-}
-
-const QString GetExistingDirectory(const QString& caption, const QString& dir,
-                                   Options options) {
-    return QFileDialog::getExistingDirectory((QWidget *) rootObject, caption, dir, QFileDialog::Options(int(options)));
-}
-
 WidgetsProgressDialog::WidgetsProgressDialog(const QString& labelText,
                                              const QString& cancelButtonText, int minimum,
                                              int maximum, QWidget* parent, Qt::WindowFlags f)

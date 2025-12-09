@@ -26,6 +26,8 @@ add_library(qt_common STATIC
     util/compress.h util/compress.cpp
 
     abstract/frontend.h
+    abstract/frontend.cpp
+
     abstract/qt_progress_dialog.h
     abstract/qt_progress_dialog.cpp
 

@@ -19,6 +19,7 @@
 #include <QFutureWatcher>
 #include <QtConcurrentRun>
 #include <JlCompress.h>
+#include <qguiapplication.h>
 
 namespace QtCommon::Content {
 
@@ -46,8 +47,11 @@ void InstallFirmware(const QString& location, bool recursive)
                                                           tr("Cancel"), 0, 100);
     progress->show();
 
+    QGuiApplication::processEvents();
+
     // Declare progress callback.
     auto callback = [&](size_t total_size, size_t processed_size) {
+        QGuiApplication::processEvents();
         progress->setValue(static_cast<int>((processed_size * 100) / total_size));
         return progress->wasCanceled();
     };
@@ -219,7 +223,10 @@ void VerifyGameContents(const std::string& game_path)
         QtCommon::Frontend::newProgressDialog(tr("Verifying integrity..."), tr("Cancel"), 0, 100);
     progress->show();
 
+    QGuiApplication::processEvents();
+
     const auto callback = [&](size_t total_size, size_t processed_size) {
+        QGuiApplication::processEvents();
         progress->setValue(static_cast<int>((processed_size * 100) / total_size));
         return progress->wasCanceled();
     };
@@ -253,7 +260,7 @@ void InstallKeys()
                                               {},
                                               QStringLiteral("Decryption Keys (*.keys)"),
                                               {},
-                                              QtCommon::Frontend::Option::ReadOnly);
+                                              QFileDialog::ReadOnly);
 
     if (key_source_location.isEmpty()) {
         return;
@@ -282,8 +289,11 @@ void VerifyInstalledContents()
                                                              tr("Cancel"), 0, 100);
     progress->show();
 
+    QGuiApplication::processEvents();
+
     // Declare progress callback.
     auto QtProgressCallback = [&](size_t total_size, size_t processed_size) {
+        QGuiApplication::processEvents();
         progress->setValue(static_cast<int>((processed_size * 100) / total_size));
         return progress->wasCanceled();
     };
@@ -522,6 +532,59 @@ void ImportDataDir(FrontendCommon::DataManager::DataDir data_dir,
 
         watcher->setFuture(future);
     });
+}
+
+bool CheckKeys() {
+    if (!ContentManager::AreKeysPresent()) {
+        QtCommon::Frontend::Information(
+            tr("Keys not installed"),
+            tr("Install decryption keys and restart Eden before attempting to install firmware."));
+        return false;
+    }
+
+    return true;
+}
+
+void InstallFirmware() {
+    if (!CheckKeys())
+        return;
+
+    const QString firmware_source_location = QtCommon::Frontend::GetExistingDirectory(
+        tr("Select Dumped Firmware Source Location"), {}, QFileDialog::ShowDirsOnly);
+
+    if (!firmware_source_location.isEmpty())
+        QtCommon::Content::InstallFirmware(firmware_source_location, false);
+}
+
+void InstallFirmwareZip() {
+    if (!CheckKeys())
+        return;
+
+    const QString firmware_zip_location = QtCommon::Frontend::GetOpenFileName(
+        tr("Select Dumped Firmware ZIP"), {}, tr("Zipped Archives (*.zip)"));
+
+    if (firmware_zip_location.isEmpty())
+        return;
+
+    const QString qCacheDir = QtCommon::Content::UnzipFirmwareToTmp(firmware_zip_location);
+
+           // In this case, it has to be done recursively, since sometimes people
+           // will pack it into a subdirectory after dumping
+    if (!qCacheDir.isEmpty()) {
+        QtCommon::Content::InstallFirmware(qCacheDir, true);
+        std::error_code ec;
+        std::filesystem::remove_all(std::filesystem::temp_directory_path() / "eden" / "firmware",
+                                    ec);
+
+        if (ec) {
+            QtCommon::Frontend::Warning(
+                tr("Firmware cleanup failed"),
+                tr("Failed to clean up extracted firmware cache.\n"
+                   "Check write permissions in the system temp directory and try "
+                   "again.\nOS reported error: %1")
+                    .arg(QString::fromStdString(ec.message())));
+        }
+    }
 }
 
 } // namespace QtCommon::Content

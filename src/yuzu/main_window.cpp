@@ -3672,32 +3672,14 @@ void MainWindow::OnVerifyInstalledContents() {
     QtCommon::Content::VerifyInstalledContents();
 }
 
-void MainWindow::InstallFirmware(const QString& location, bool recursive) {
-    QtCommon::Content::InstallFirmware(location, recursive);
-    OnCheckFirmwareDecryption();
-}
-
 void MainWindow::OnInstallFirmware() {
     // Don't do this while emulation is running, that'd probably be a bad idea.
     if (emu_thread != nullptr && emu_thread->IsRunning()) {
         return;
     }
 
-    // Check for installed keys, error out, suggest restart?
-    if (!ContentManager::AreKeysPresent()) {
-        QMessageBox::information(
-            this, tr("Keys not installed"),
-            tr("Install decryption keys and restart Eden before attempting to install firmware."));
-        return;
-    }
-
-    const QString firmware_source_location = QFileDialog::getExistingDirectory(
-        this, tr("Select Dumped Firmware Source Location"), {}, QFileDialog::ShowDirsOnly);
-    if (firmware_source_location.isEmpty()) {
-        return;
-    }
-
-    InstallFirmware(firmware_source_location);
+    QtCommon::Content::InstallFirmware();
+    OnCheckFirmwareDecryption();
 }
 
 void MainWindow::OnInstallFirmwareFromZIP() {
@@ -3706,37 +3688,8 @@ void MainWindow::OnInstallFirmwareFromZIP() {
         return;
     }
 
-    // Check for installed keys, error out, suggest restart?
-    if (!ContentManager::AreKeysPresent()) {
-        QMessageBox::information(
-            this, tr("Keys not installed"),
-            tr("Install decryption keys and restart Eden before attempting to install firmware."));
-        return;
-    }
-
-    const QString firmware_zip_location = QFileDialog::getOpenFileName(
-        this, tr("Select Dumped Firmware ZIP"), {}, tr("Zipped Archives (*.zip)"));
-    if (firmware_zip_location.isEmpty()) {
-        return;
-    }
-
-    const QString qCacheDir = QtCommon::Content::UnzipFirmwareToTmp(firmware_zip_location);
-
-    // In this case, it has to be done recursively, since sometimes people
-    // will pack it into a subdirectory after dumping
-    if (!qCacheDir.isEmpty()) {
-        InstallFirmware(qCacheDir, true);
-        std::error_code ec;
-        std::filesystem::remove_all(std::filesystem::temp_directory_path() / "eden" / "firmware", ec);
-
-        if (ec) {
-            QMessageBox::warning(this, tr("Firmware cleanup failed"),
-                                 tr("Failed to clean up extracted firmware cache.\n"
-                                    "Check write permissions in the system temp directory and try "
-                                    "again.\nOS reported error: %1")
-                                     .arg(QString::fromStdString(ec.message())));
-        }
-    }
+    QtCommon::Content::InstallFirmwareZip();
+    OnCheckFirmwareDecryption();
 }
 
 void MainWindow::OnInstallDecryptionKeys() {
