@@ -28,6 +28,7 @@ Core::Frontend::WindowSystemType GetWindowSystemType();
 Core::Frontend::EmuWindow::WindowSystemInfo GetWindowSystemInfo(QWindow *window);
 
 void Init(QObject *root);
+void SetupContentProviders();
 
 const QString tr(const char *str);
 const QString tr(const std::string &str);

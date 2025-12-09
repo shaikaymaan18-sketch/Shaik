@@ -41,22 +41,18 @@ bool CheckGameFirmware(u64 program_id, QObject* parent)
 
 void InstallFirmware(const QString& location, bool recursive)
 {
-    QtCommon::Frontend::QtProgressDialog progress(tr("Installing Firmware..."),
-                                                  tr("Cancel"),
-                                                  0,
-                                                  100,
-                                                  (QWidget *)rootObject);
-    progress.setWindowModality(Qt::WindowModal);
-    progress.setMinimumDuration(100);
-    progress.setAutoClose(false);
-    progress.setAutoReset(false);
-    progress.show();
+    // Initialize a progress dialog.
+    auto progress = QtCommon::Frontend::newProgressDialog(tr("Installing Firmware..."),
+                                                          tr("Cancel"), 0, 100);
+    progress->show();
 
     // Declare progress callback.
     auto callback = [&](size_t total_size, size_t processed_size) {
-        progress.setValue(static_cast<int>((processed_size * 100) / total_size));
-        return progress.wasCanceled();
+        progress->setValue(static_cast<int>((processed_size * 100) / total_size));
+        return progress->wasCanceled();
     };
+
+    callback(100, 0);
 
     QString failedTitle = tr("Firmware Install Failed");
     QString successTitle = tr("Firmware Install Succeeded");
@@ -160,8 +156,8 @@ void InstallFirmware(const QString& location, bool recursive)
     system->GetFileSystemController().CreateFactories(*vfs);
 
     auto VerifyFirmwareCallback = [&](size_t total_size, size_t processed_size) {
-        progress.setValue(90 + static_cast<int>((processed_size * 10) / total_size));
-        return progress.wasCanceled();
+        progress->setValue(90 + static_cast<int>((processed_size * 10) / total_size));
+        return progress->wasCanceled();
     };
 
     auto results = ContentManager::VerifyInstalledContents(*QtCommon::system,
@@ -172,14 +168,14 @@ void InstallFirmware(const QString& location, bool recursive)
     if (results.size() > 0) {
         const auto failed_names = QString::fromStdString(
             fmt::format("{}", fmt::join(results, "\n")));
-        progress.close();
+        progress->close();
         QtCommon::Frontend::Critical(
             tr("Firmware integrity verification failed!"),
             tr("Verification failed for the following files:\n\n%1").arg(failed_names));
         return;
     }
 
-    progress.close();
+    progress->close();
 
     const auto pair = FirmwareManager::GetFirmwareVersion(*system);
     const auto firmware_data = pair.first;
@@ -219,19 +215,13 @@ QString UnzipFirmwareToTmp(const QString& location)
 // Content //
 void VerifyGameContents(const std::string& game_path)
 {
-    QtCommon::Frontend::QtProgressDialog progress(tr("Verifying integrity..."),
-                                                  tr("Cancel"),
-                                                  0,
-                                                  100,
-                                                  (QWidget *)rootObject);
-    progress.setWindowModality(Qt::WindowModal);
-    progress.setMinimumDuration(100);
-    progress.setAutoClose(false);
-    progress.setAutoReset(false);
+    auto progress =
+        QtCommon::Frontend::newProgressDialog(tr("Verifying integrity..."), tr("Cancel"), 0, 100);
+    progress->show();
 
     const auto callback = [&](size_t total_size, size_t processed_size) {
-        progress.setValue(static_cast<int>((processed_size * 100) / total_size));
-        return progress.wasCanceled();
+        progress->setValue(static_cast<int>((processed_size * 100) / total_size));
+        return progress->wasCanceled();
     };
 
     const auto result = ContentManager::VerifyGameContents(*system, game_path, callback);
@@ -288,27 +278,21 @@ void InstallKeys()
 void VerifyInstalledContents()
 {
     // Initialize a progress dialog.
-    QtCommon::Frontend::QtProgressDialog progress(tr("Verifying integrity..."),
-                                                  tr("Cancel"),
-                                                  0,
-                                                  100,
-                                                  (QWidget *)rootObject);
-    progress.setWindowModality(Qt::WindowModal);
-    progress.setMinimumDuration(100);
-    progress.setAutoClose(false);
-    progress.setAutoReset(false);
+    auto progress = QtCommon::Frontend::newProgressDialog(tr("Verifying integrity..."),
+                                                             tr("Cancel"), 0, 100);
+    progress->show();
 
     // Declare progress callback.
     auto QtProgressCallback = [&](size_t total_size, size_t processed_size) {
-        progress.setValue(static_cast<int>((processed_size * 100) / total_size));
-        return progress.wasCanceled();
+        progress->setValue(static_cast<int>((processed_size * 100) / total_size));
+        return progress->wasCanceled();
     };
 
     const std::vector<std::string> result
         = ContentManager::VerifyInstalledContents(*QtCommon::system,
                                                   *QtCommon::provider,
                                                   QtProgressCallback);
-    progress.close();
+    progress->close();
 
     if (result.empty()) {
         QtCommon::Frontend::Information(tr("Integrity verification succeeded!"),
@@ -373,28 +357,29 @@ void FixProfiles()
 
 void ClearDataDir(FrontendCommon::DataManager::DataDir dir, const std::string& user_id)
 {
-    auto result = QtCommon::Frontend::Warning(tr("Really clear data?"),
+    using namespace QtCommon::Frontend;
+    auto result = Warning(tr("Really clear data?"),
                                               tr("Important data may be lost!"),
-                                              QtCommon::Frontend::Yes | QtCommon::Frontend::No);
+                                              Yes | No);
 
-    if (result != QtCommon::Frontend::Yes)
+    if (result != Yes)
         return;
 
-    result = QtCommon::Frontend::Warning(
+    result = Warning(
         tr("Are you REALLY sure?"),
         tr("Once deleted, your data will NOT come back!\n"
            "Only do this if you're 100% sure you want to delete this data."),
-        QtCommon::Frontend::Yes | QtCommon::Frontend::No);
+        Yes | No);
 
-    if (result != QtCommon::Frontend::Yes)
+    if (result != Yes)
         return;
 
-    QtCommon::Frontend::QtProgressDialog dialog(tr("Clearing..."), QString(), 0, 0);
-    dialog.show();
+    auto dialog = newProgressDialog(tr("Clearing..."), QString(), 0, 0);
+    dialog->show();
 
     FrontendCommon::DataManager::ClearDir(dir, user_id);
 
-    dialog.close();
+    dialog->close();
 }
 
 void ExportDataDir(FrontendCommon::DataManager::DataDir data_dir,
@@ -412,14 +397,11 @@ void ExportDataDir(FrontendCommon::DataManager::DataDir data_dir,
     if (zip_dump_location.isEmpty())
         return;
 
-    QtProgressDialog* progress = new QtProgressDialog(
-        tr("Exporting data. This may take a while..."), tr("Cancel"), 0, 100, (QWidget*)rootObject);
+    auto progress = QtCommon::Frontend::newProgressDialogPtr(
+        tr("Exporting data. This may take a while..."), tr("Cancel"), 0, 100);
 
-    progress->setWindowTitle(tr("Exporting"));
+    progress->setTitle(tr("Exporting"));
     progress->setWindowModality(Qt::WindowModal);
-    progress->setMinimumDuration(100);
-    progress->setAutoClose(false);
-    progress->setAutoReset(false);
     progress->show();
 
     QGuiApplication::processEvents();
@@ -487,16 +469,12 @@ void ImportDataDir(FrontendCommon::DataManager::DataDir data_dir,
     if (button != QtCommon::Frontend::Yes)
         return;
 
-    QtProgressDialog* progress = new QtProgressDialog(
-        tr("Importing data. This may take a while..."), tr("Cancel"), 0, 100, (QWidget *)rootObject);
+    QtProgressDialog* progress = newProgressDialogPtr(
+        tr("Importing data. This may take a while..."), tr("Cancel"), 0, 100);
 
-    progress->setWindowTitle(tr("Importing"));
+    progress->setTitle(tr("Importing"));
     progress->setWindowModality(Qt::WindowModal);
-    progress->setMinimumDuration(100);
-    progress->setAutoClose(false);
-    progress->setAutoReset(false);
     progress->show();
-    progress->setValue(0);
 
     QGuiApplication::processEvents();
 

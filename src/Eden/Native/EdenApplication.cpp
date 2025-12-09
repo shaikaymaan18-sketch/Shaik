@@ -15,6 +15,7 @@
 #include "common/settings_enums.h"
 #include "qt_common/config/uisettings.h"
 #include "qt_common/qt_common.h"
+#include "qt_common/util/content.h"
 
 #include <QQuickStyle>
 #include <QWidget>
@@ -32,13 +33,18 @@ EdenApplication::EdenApplication(int &argc, char *argv[])
     /// QtCommon
     QtCommon::Init(new QWidget);
 
+    QtCommon::SetupContentProviders();
+
+    // Check for orphaned profiles and reset profile data if necessary
+    QtCommon::Content::FixProfiles();
+
     /// Settings, etc
     Settings::SetConfiguringGlobal(true);
     config = new QMLConfig;
 
     // TODO: Save all values on launch and per game etc
     connect(this, &QCoreApplication::aboutToQuit, this, [this]() { config->save(); });
-    }
+}
 
 void EdenApplication::reload()
 {

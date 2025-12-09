@@ -255,17 +255,8 @@ void Init(QObject* root)
     QtCommon::system->CoreTiming().SetTimerResolutionNs(Common::Windows::GetCurrentTimerResolution());
 #endif
 
-    // content providers
-    system->SetContentProvider(std::make_unique<FileSys::ContentProviderUnion>());
-    system->RegisterContentProvider(FileSys::ContentProviderUnionSlot::FrontendManual,
-                                              provider.get());
-    system->GetFileSystemController().CreateFactories(*vfs);
-
     // Remove cached contents generated during the previous session
     RemoveCachedContents();
-
-    // Check for orphaned profiles and reset profile data if necessary
-    QtCommon::Content::FixProfiles();
 }
 
 std::filesystem::path GetEdenCommand()
@@ -287,6 +278,14 @@ std::filesystem::path GetEdenCommand()
     }
 
     return command;
+}
+
+void SetupContentProviders() {
+    system->SetContentProvider(std::make_unique<FileSys::ContentProviderUnion>());
+    system->RegisterContentProvider(FileSys::ContentProviderUnionSlot::FrontendManual,
+                                              provider.get());
+    system->GetFileSystemController().CreateFactories(*vfs);
+
 }
 
 } // namespace QtCommon

@@ -4,21 +4,13 @@
 #ifndef QT_PROGRESS_DIALOG_H
 #define QT_PROGRESS_DIALOG_H
 
-#include <QWindow>
-
-#ifdef YUZU_QT_WIDGETS
-#include <QProgressDialog>
-#endif
+#include <QObject>
+#include <memory>
 
 namespace QtCommon::Frontend {
-#ifdef YUZU_QT_WIDGETS
-
-using QtProgressDialog = QProgressDialog;
-
-// TODO(crueter): QML impl
-#else
-class QtProgressDialog
+class QtProgressDialog : public QObject
 {
+    Q_OBJECT
 public:
     QtProgressDialog(const QString &labelText,
                      const QString &cancelButtonText,
@@ -27,21 +19,32 @@ public:
                      QObject *parent = nullptr,
                      Qt::WindowFlags f = Qt::WindowFlags());
 
-    bool wasCanceled() const;
-    void setWindowModality(Qt::WindowModality modality);
-    void setMinimumDuration(int durationMs);
-    void setAutoClose(bool autoClose);
-    void setAutoReset(bool autoReset);
+    virtual ~QtProgressDialog() override;
+
+    virtual bool wasCanceled() const = 0;
+    virtual void setWindowModality(Qt::WindowModality modality) = 0;
+    virtual void setMinimumDuration(int durationMs) = 0;
+    virtual void setAutoClose(bool autoClose) = 0;
+    virtual void setAutoReset(bool autoReset) = 0;
 
 public slots:
-    void setLabelText(QString &text);
-    void setRange(int min, int max);
-    void setValue(int progress);
-    bool close();
+    virtual void setTitle(QString title) = 0;
+    virtual void setLabelText(QString text) = 0;
+    virtual void setMinimum(int min) = 0;
+    virtual void setMaximum(int max) = 0;
+    virtual void setValue(int value) = 0;
 
-    void show();
+    virtual bool close() = 0;
+    virtual void show() = 0;
 };
-#endif // YUZU_QT_WIDGETS
 
+std::unique_ptr<QtProgressDialog> newProgressDialog(const QString& labelText,
+                                                    const QString& cancelButtonText, int minimum,
+                                                    int maximum,
+                                                    Qt::WindowFlags f = Qt::WindowFlags());
+
+QtProgressDialog* newProgressDialogPtr(const QString& labelText, const QString& cancelButtonText,
+                                       int minimum, int maximum,
+                                       Qt::WindowFlags f = Qt::WindowFlags());
 }
 #endif // QT_PROGRESS_DIALOG_H

@@ -413,12 +413,17 @@ MainWindow::MainWindow(bool has_broken_vulkan)
     }
 #endif
 
+    QtCommon::SetupContentProviders();
+
     // Gen keys if necessary
     OnCheckFirmwareDecryption();
 
 #ifdef __unix__
     OnCheckGraphicsBackend();
 #endif
+
+    // Check for orphaned profiles and reset profile data if necessary
+    QtCommon::Content::FixProfiles();
 
     game_list->LoadCompatibilityList();
     game_list->PopulateAsync(UISettings::values.game_dirs);

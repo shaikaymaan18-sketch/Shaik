@@ -1,6 +1,8 @@
 # SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+set(CMAKE_AUTOMOC ON)
+
 add_library(qt_common STATIC
     qt_common.h
     qt_common.cpp
@@ -24,7 +26,8 @@ add_library(qt_common STATIC
     util/compress.h util/compress.cpp
 
     abstract/frontend.h
-    abstract/qt_progress_dialog.h abstract/qt_progress_dialog.cpp
+    abstract/qt_progress_dialog.h
+    abstract/qt_progress_dialog.cpp
 
     qt_string_lookup.h
     qt_compat.h

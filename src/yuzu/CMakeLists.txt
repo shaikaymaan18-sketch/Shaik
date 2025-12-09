@@ -234,6 +234,7 @@ add_executable(yuzu
     ryujinx_dialog.h ryujinx_dialog.cpp ryujinx_dialog.ui
     main_window.h main_window.cpp
     libqt_common.cpp
+    libqt_common.h
 )
 
 set_target_properties(yuzu PROPERTIES OUTPUT_NAME "eden")
