@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 
 import Eden.Config
 import Eden.Items
@@ -73,8 +74,30 @@ ApplicationWindow {
 
             MenuSeparator {}
 
-            Action {
-                text: qsTr("Open &eden Directory")
+            Menu {
+                title: qsTr("Open &Eden Folders")
+
+                Action {
+                    text: qsTr("&Root Data Folder")
+                    onTriggered: MainWindowInterface.openRootDataFolder()
+                }
+
+                Action {
+                    text: qsTr("&NAND Folder")
+                    onTriggered: MainWindowInterface.openNANDFolder()
+                }
+                Action {
+                    text: qsTr("&SDMC Folder")
+                    onTriggered: MainWindowInterface.openSDMCFolder()
+                }
+                Action {
+                    text: qsTr("&Mod Folder")
+                    onTriggered: MainWindowInterface.openModFolder()
+                }
+                Action {
+                    text: qsTr("&Log Folder")
+                    onTriggered: MainWindowInterface.openLogFolder()
+                }
             }
 
             MenuSeparator {}
@@ -158,6 +181,7 @@ ApplicationWindow {
 
             Action {
                 text: qsTr("Install &Decryption Keys")
+                onTriggered: MainWindowInterface.installDecryptionKeys()
             }
 
             Menu {
@@ -222,6 +246,29 @@ ApplicationWindow {
             left: parent.left
             right: parent.right
             bottom: parent.bottom
+        }
+
+        RowLayout {
+            id: right
+
+            spacing: 10
+
+            anchors {
+                top: parent.top
+                bottom: parent.bottom
+                right: parent.right
+
+                rightMargin: 15
+            }
+
+            Label {
+                id: firmware
+                font.pixelSize: 14
+                visible: MainWindowInterface.firmwareGood
+
+                text: MainWindowInterface.firmwareDisplay
+                ToolTip.text: MainWindowInterface.firmwareTooltip
+            }
         }
     }
 }

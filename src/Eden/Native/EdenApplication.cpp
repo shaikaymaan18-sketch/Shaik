@@ -103,7 +103,7 @@ int EdenApplication::run() {
         ctx->setContextProperty(QStringLiteral("TitleManager"), title);
 
         // MainWindow interface
-        MainWindowInterface* mwint = new MainWindowInterface(&engine);
+        MainWindowInterface* mwint = new MainWindowInterface(gameListModel, &engine);
         ctx->setContextProperty(QStringLiteral("MainWindowInterface"), mwint);
 
         // :)
