@@ -401,10 +401,7 @@ void ExportDataDir(FrontendCommon::DataManager::DataDir data_dir,
         tr("Exporting data. This may take a while..."), tr("Cancel"), 0, 100);
 
     progress->setTitle(tr("Exporting"));
-    progress->setWindowModality(Qt::WindowModal);
     progress->show();
-
-    QGuiApplication::processEvents();
 
     auto progress_callback = [=](size_t total_size, size_t processed_size) {
         QMetaObject::invokeMethod(progress,
@@ -473,10 +470,7 @@ void ImportDataDir(FrontendCommon::DataManager::DataDir data_dir,
         tr("Importing data. This may take a while..."), tr("Cancel"), 0, 100);
 
     progress->setTitle(tr("Importing"));
-    progress->setWindowModality(Qt::WindowModal);
     progress->show();
-
-    QGuiApplication::processEvents();
 
     // to prevent GUI mangling we have to run this in a thread as well
     QFuture<bool> delete_future = QtConcurrent::run([=]() {
