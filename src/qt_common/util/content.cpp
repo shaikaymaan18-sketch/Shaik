@@ -160,6 +160,7 @@ void InstallFirmware(const QString& location, bool recursive)
     system->GetFileSystemController().CreateFactories(*vfs);
 
     auto VerifyFirmwareCallback = [&](size_t total_size, size_t processed_size) {
+        QGuiApplication::processEvents();
         progress->setValue(90 + static_cast<int>((processed_size * 10) / total_size));
         return progress->wasCanceled();
     };
@@ -180,6 +181,7 @@ void InstallFirmware(const QString& location, bool recursive)
     }
 
     progress->close();
+    QGuiApplication::processEvents();
 
     const auto pair = FirmwareManager::GetFirmwareVersion(*system);
     const auto firmware_data = pair.first;
