@@ -452,7 +452,7 @@ Result IApplicationManagerInterface::GetApplicationViewWithPromotionInfo(
     Out<u32> out_count,
     InArray<u64, BufferAttr_HipcMapAlias> application_ids) {
     const auto requested = application_ids.size();
-    LOG_WARNING(Service_NS, "(STUBBED) called, size={}", requested);
+    LOG_WARNING(Service_NS, "called, size={}", requested);
 
     const auto fw_pair = FirmwareManager::GetFirmwareVersion(system);
     const bool is_fw20 = fw_pair.first.major >= 20;

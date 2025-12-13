@@ -236,10 +236,6 @@ Result IReadOnlyApplicationControlDataInterface::GetApplicationControlData2(
 
     const u32 total_available = static_cast<u32>(nacp_size + available_icon_bytes);
 
-    if (application_id == 0x0100152000022000) {
-        LOG_INFO(Service_NS, "Debug: AppID={:016X}, IconSize={}, TotalSize={}, Flag1={}", application_id, available_icon_bytes, total_available, flag1);
-    }
-
     *out_total_size = (static_cast<u64>(total_available) << 32) | static_cast<u64>(flag1);
     R_SUCCEED();
 }
