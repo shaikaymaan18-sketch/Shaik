@@ -66,8 +66,6 @@ NativeDialog {
                     width: 1
                 }
 
-                Component.onCompleted: console.log(display, row)
-
                 Label {
                     text: display
                     anchors.fill: parent
@@ -93,8 +91,6 @@ NativeDialog {
                 boundsBehavior: Flickable.StopAtBounds
                 clip: true
 
-                Component.onCompleted: console.log(itemAtCell(Qt.point(1, 1)))
-
                 delegate: Rectangle {
                     required property string display
                     required property int row
@@ -107,8 +103,6 @@ NativeDialog {
                         color: palette.mid
                         width: 1
                     }
-
-                    Component.onCompleted: console.log(display, row)
 
                     Label {
                         text: display

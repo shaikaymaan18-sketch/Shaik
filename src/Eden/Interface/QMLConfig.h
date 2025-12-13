@@ -7,7 +7,6 @@
 #include "qt_common/config/qt_config.h"
 
 #include <QObject>
-#include <qdebug.h>
 
 class QMLConfig : public QObject {
     Q_OBJECT
