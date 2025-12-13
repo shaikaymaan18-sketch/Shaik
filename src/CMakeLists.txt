@@ -237,21 +237,174 @@ if (ENABLE_SDL2 AND YUZU_CMD)
     set_target_properties(yuzu-cmd PROPERTIES OUTPUT_NAME "eden-cli")
 endif()
 
-if (ENABLE_QT)
-    add_subdirectory(qt_common)
-endif()
-
-if (ENABLE_QT_QML)
-    set(QML_IMPORT_PATH ${CMAKE_CURRENT_SOURCE_DIR} CACHE STRING "")
-    add_subdirectory(Eden)
-endif()
-
-if(ENABLE_QT_WIDGETS)
-    add_subdirectory(yuzu)
-endif()
-
 if (ENABLE_WEB_SERVICE)
     add_subdirectory(web_service)
+endif()
+
+if (ENABLE_QT)
+    add_subdirectory(qt_common)
+
+    function(yuzu_qt_target target)
+        target_compile_definitions(${target} PRIVATE
+            # Use QStringBuilder for string concatenation to reduce
+            # the overall number of temporary strings created.
+            -DQT_USE_QSTRINGBUILDER
+
+            # Disable implicit type narrowing in signal/slot connect() calls.
+            -DQT_NO_NARROWING_CONVERSIONS_IN_CONNECT
+
+            # Disable unsafe overloads of QProcess' start() function.
+            -DQT_NO_PROCESS_COMBINED_ARGUMENT_START
+
+            # Disable implicit QString->QUrl conversions to enforce use of proper resolving functions.
+            -DQT_NO_URL_CAST_FROM_STRING
+        )
+
+        file(GLOB COMPAT_LIST
+             ${PROJECT_BINARY_DIR}/dist/compatibility_list/compatibility_list.qrc
+             ${PROJECT_BINARY_DIR}/dist/compatibility_list/compatibility_list.json)
+        file(GLOB_RECURSE ICONS ${PROJECT_SOURCE_DIR}/dist/icons/*)
+        file(GLOB_RECURSE THEMES ${PROJECT_SOURCE_DIR}/dist/qt_themes/*)
+
+        if (ENABLE_UPDATE_CHECKER)
+            target_compile_definitions(${target} PUBLIC ENABLE_UPDATE_CHECKER)
+        endif()
+
+        if (ENABLE_QT_TRANSLATION)
+            set(YUZU_QT_LANGUAGES "${PROJECT_SOURCE_DIR}/dist/languages" CACHE PATH "Path to the translation bundle for the Qt frontend")
+            option(GENERATE_QT_TRANSLATION "Generate en.ts as the translation source file" OFF)
+            option(WORKAROUND_BROKEN_LUPDATE "Run lupdate directly through CMake if Qt's convenience wrappers don't work" OFF)
+
+            # Update source TS file if enabled
+            if (GENERATE_QT_TRANSLATION)
+                get_target_property(SRCS yuzu SOURCES)
+                # these calls to qt_create_translation also creates a rule to generate en.qm which conflicts with providing english plurals
+                # so we have to set a OUTPUT_LOCATION so that we don't have multiple rules to generate en.qm
+                set_source_files_properties(${YUZU_QT_LANGUAGES}/en.ts PROPERTIES OUTPUT_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/translations")
+                if (WORKAROUND_BROKEN_LUPDATE)
+                    add_custom_command(OUTPUT ${YUZU_QT_LANGUAGES}/en.ts
+                        COMMAND lupdate
+                            -source-language en_US
+                            -target-language en_US
+                            ${SRCS}
+                            ${UIS}
+                            -ts ${YUZU_QT_LANGUAGES}/en.ts
+                        DEPENDS
+                            ${SRCS}
+                            ${UIS}
+                        WORKING_DIRECTORY
+                            ${CMAKE_CURRENT_SOURCE_DIR}
+                    )
+                else()
+                    qt_create_translation(QM_FILES
+                        ${SRCS}
+                        ${UIS}
+                        ${YUZU_QT_LANGUAGES}/en.ts
+                    OPTIONS
+                        -source-language en_US
+                        -target-language en_US
+                    )
+                endif()
+
+                # Generate plurals into dist/english_plurals/generated_en.ts so it can be used to revise dist/english_plurals/en.ts
+                set(GENERATED_PLURALS_FILE ${PROJECT_SOURCE_DIR}/dist/english_plurals/generated_en.ts)
+                set_source_files_properties(${GENERATED_PLURALS_FILE} PROPERTIES OUTPUT_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/plurals")
+                if (WORKAROUND_BROKEN_LUPDATE)
+                    add_custom_command(OUTPUT ${GENERATED_PLURALS_FILE}
+                        COMMAND lupdate
+                            -source-language en_US
+                            -target-language en_US
+                            ${SRCS}
+                            ${UIS}
+                            -ts ${GENERATED_PLURALS_FILE}
+                        DEPENDS
+                            ${SRCS}
+                            ${UIS}
+                        WORKING_DIRECTORY
+                            ${CMAKE_CURRENT_SOURCE_DIR}
+                    )
+                else()
+                    qt_create_translation(QM_FILES ${SRCS} ${UIS} ${GENERATED_PLURALS_FILE} OPTIONS -pluralonly -source-language en_US -target-language en_US)
+                endif()
+
+                add_custom_target(translation ALL DEPENDS ${YUZU_QT_LANGUAGES}/en.ts ${GENERATED_PLURALS_FILE})
+            endif()
+
+            # Find all TS files except en.ts
+            file(GLOB_RECURSE LANGUAGES_TS ${YUZU_QT_LANGUAGES}/*.ts)
+            list(REMOVE_ITEM LANGUAGES_TS ${YUZU_QT_LANGUAGES}/en.ts)
+
+            # Compile TS files to QM files
+            qt_add_translation(LANGUAGES_QM ${LANGUAGES_TS})
+
+            # Compile english plurals TS file to en.qm
+            qt_add_translation(LANGUAGES_QM ${PROJECT_SOURCE_DIR}/dist/english_plurals/en.ts)
+
+            # Build a QRC file from the QM file list
+            set(LANGUAGES_QRC ${CMAKE_CURRENT_BINARY_DIR}/languages.qrc)
+            file(WRITE ${LANGUAGES_QRC} "<RCC><qresource prefix=\"languages\">\n")
+            foreach (QM ${LANGUAGES_QM})
+                get_filename_component(QM_FILE ${QM} NAME)
+                file(APPEND ${LANGUAGES_QRC} "<file>${QM_FILE}</file>\n")
+            endforeach (QM)
+            file(APPEND ${LANGUAGES_QRC} "</qresource></RCC>")
+
+            # Add the QRC file to package in all QM files
+            qt_add_resources(LANGUAGES ${LANGUAGES_QRC})
+        else()
+            set(LANGUAGES)
+        endif()
+
+        target_sources(${target}
+            PRIVATE
+                ${COMPAT_LIST}
+                ${ICONS}
+                ${LANGUAGES}
+                ${THEMES})
+
+        if (APPLE)
+            # Normal icns
+            set(MACOSX_ICON "${PROJECT_SOURCE_DIR}/dist/eden.icns")
+            set_source_files_properties(${MACOSX_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+            target_sources(${target} PRIVATE ${MACOSX_ICON})
+
+            # Liquid glass
+            set(MACOSX_LIQUID_GLASS_ICON "${PROJECT_SOURCE_DIR}/dist/Assets.car")
+            set_source_files_properties(${MACOSX_LIQUID_GLASS_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+            target_sources(${target} PRIVATE ${MACOSX_LIQUID_GLASS_ICON})
+
+            set_target_properties(${target} PROPERTIES MACOSX_BUNDLE TRUE)
+            set_target_properties(${target} PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist)
+
+            set(CMAKE_FIND_LIBRARY_SUFFIXES ".dylib")
+            find_library(MOLTENVK_LIBRARY MoltenVK REQUIRED)
+            message(STATUS "Using MoltenVK at ${MOLTENVK_LIBRARY}.")
+
+            set_source_files_properties(${MOLTENVK_LIBRARY} PROPERTIES
+                MACOSX_PACKAGE_LOCATION Frameworks
+                XCODE_FILE_ATTRIBUTES "CodeSignOnCopy")
+            target_sources(${target} PRIVATE ${MOLTENVK_LIBRARY})
+        elseif(WIN32)
+            # compile as a win32 gui application instead of a console application
+            target_link_libraries(${target} PRIVATE Qt6::EntryPointPrivate)
+            if(MSVC)
+                target_link_libraries(${target} PRIVATE version.lib)
+                set_target_properties(${target} PROPERTIES LINK_FLAGS_RELEASE "/SUBSYSTEM:WINDOWS")
+            elseif(MINGW)
+                set_target_properties(${target} PROPERTIES LINK_FLAGS_RELEASE "-Wl,--subsystem,windows")
+                target_link_libraries(${target} PRIVATE dwmapi)
+            endif()
+        endif()
+    endfunction()
+
+    if (ENABLE_QT_QML)
+        set(QML_IMPORT_PATH ${CMAKE_CURRENT_SOURCE_DIR} CACHE STRING "")
+        add_subdirectory(Eden)
+    endif()
+
+    if(ENABLE_QT_WIDGETS)
+        add_subdirectory(yuzu)
+    endif()
 endif()
 
 if (ANDROID)

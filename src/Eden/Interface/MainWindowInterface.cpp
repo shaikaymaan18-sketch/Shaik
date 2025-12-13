@@ -9,6 +9,9 @@
 #include "qt_common/util/game.h"
 
 #include "qt_common/abstract/frontend.h"
+#include "qt_common/qt_constants.h"
+
+#include <QDesktopServices>
 
 MainWindowInterface::MainWindowInterface(GameListModel* model, QObject* parent)
     : QObject{parent}, m_gameList(model) {
@@ -67,6 +70,8 @@ void MainWindowInterface::setFirmwareVersion() {
     setFirmwareTooltip(QString::fromStdString(display_title));
 }
 
+// TODO(qml): The following are basically all identical to main_window.cpp
+// Is there any way we can combine these?
 void MainWindowInterface::openRootDataFolder() {
     QtCommon::Game::OpenRootDataFolder();
 }
@@ -91,7 +96,35 @@ void MainWindowInterface::openLogFolder()
     QtCommon::Game::OpenLogFolder();
 }
 
+void MainWindowInterface::createHomeMenuDesktopShortcut() {
+    QtCommon::Game::CreateHomeMenuShortcut(QtCommon::Game::ShortcutTarget::Desktop);
+}
 
+void MainWindowInterface::createHomeMenuApplicationMenuShortcut() {
+    QtCommon::Game::CreateHomeMenuShortcut(QtCommon::Game::ShortcutTarget::Applications);
+}
+
+void MainWindowInterface::openURL(const QUrl& url) {
+    const bool open = QDesktopServices::openUrl(url);
+    if (!open) {
+        QtCommon::Frontend::Warning(tr("Error opening URL"),
+                             tr("Unable to open the URL \"%1\".").arg(url.toString()));
+    }
+}
+
+void MainWindowInterface::openModsPage() {
+    openURL(QUrl(QString::fromLocal8Bit(QtCommon::Constants::modPage)));
+}
+
+void MainWindowInterface::openQuickstartGuide() {
+    openURL(QUrl(QString::fromLocal8Bit(QtCommon::Constants::quickstartPage)));
+}
+
+void MainWindowInterface::openFAQ() {
+    openURL(QUrl(QString::fromLocal8Bit(QtCommon::Constants::helpPage)));
+}
+
+/// PROPERTIES ///
 QString MainWindowInterface::firmwareDisplay() const {
     return m_firmwareDisplay;
 }

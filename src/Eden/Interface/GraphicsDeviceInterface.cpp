@@ -68,7 +68,7 @@ void GraphicsDeviceInterface::populateVsync()
     }
 
     const auto &present_modes = //< relevant vector of present modes for the selected device or API
-        m_isVulkan && m_device > -1 ? device_present_modes[m_device] : default_present_modes;
+        m_isVulkan && m_device > -1 && !device_present_modes.empty() ? device_present_modes[m_device] : default_present_modes;
 
     m_vsyncModes.clear();
     m_vsyncModes.reserve(present_modes.size());

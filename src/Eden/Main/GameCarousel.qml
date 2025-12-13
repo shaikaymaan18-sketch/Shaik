@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 import QtQuick
 import QtQuick.Controls
 import Qt.labs.platform
@@ -15,7 +14,6 @@ ListView {
 
     focus: true
 
-    // focusPolicy: Qt.StrongFocus
     model: EdenGameList
     orientation: ListView.Horizontal
     clip: false
@@ -38,7 +36,6 @@ ListView {
             currentIndex = count - 1
     }
 
-    // TODO(crueter): handle move/displace/add (requires thread worker on game list and a bunch of other shit)
     Rectangle {
         id: hg
         clip: false
@@ -79,10 +76,12 @@ ListView {
     }
 
     highlightRangeMode: ListView.StrictlyEnforceRange
-    preferredHighlightBegin: currentItem === null ? 0 : x + width / 2 - currentItem.width / 2
-    preferredHighlightEnd: currentItem === null ? 0 : x + width / 2 + currentItem.width / 2
 
+    // TODO: Configurable Card size
+    preferredHighlightBegin: x + width / 2 - 150
+    preferredHighlightEnd: x + width / 2 + 150
     highlightMoveDuration: 300
+
     delegate: GameCarouselCard {
         id: game
         width: 300

@@ -3,7 +3,6 @@
 
 #include "QMLSetting.h"
 #include "common/settings.h"
-#include "qt_common/config/uisettings.h"
 
 #include <QVariant>
 
@@ -56,17 +55,17 @@ QMLSetting::QMLSetting(Settings::BasicSetting *setting, QObject *parent, Request
     }();
 
     if (type == typeid(bool)) {
-        m_type = "bool";
+        m_type = QStringLiteral("bool");
         m_metaType = QMetaType::Bool;
     } else if (setting->IsEnum()) {
         m_metaType = QMetaType::UInt;
 
         if (request == RequestType::RadioGroup) {
-            m_type = "radio";
+            m_type = QStringLiteral("radio");
             // TODO: Add the options and whatnot
             // see CreateRadioGroup
         } else {
-            m_type = "enumCombo";
+            m_type = QStringLiteral("enumCombo");
         }
     } else if (setting->IsIntegral()) {
         m_metaType = QMetaType::UInt;
@@ -75,27 +74,27 @@ QMLSetting::QMLSetting(Settings::BasicSetting *setting, QObject *parent, Request
         case RequestType::Slider:
         case RequestType::ReverseSlider:
             // TODO: Reversal and multiplier
-            m_type = "intSlider";
+            m_type = QStringLiteral("intSlider");
             break;
         case RequestType::Default:
         case RequestType::LineEdit:
-            m_type = "intSpin";
+            m_type = QStringLiteral("intSpin");
             break;
         case RequestType::DateTimeEdit:
             // TODO: disabled/restrict
-            m_type = "time";
+            m_type = QStringLiteral("time");
             break;
         case RequestType::SpinBox:
             // TODO: suffix
-            m_type = "intSpin";
+            m_type = QStringLiteral("intSpin");
             break;
         case RequestType::HexEdit:
-            m_type = "hex";
+            m_type = QStringLiteral("hex");
             break;
         case RequestType::ComboBox:
             // TODO: Add the options and whatnot
             // see CreateComboBox
-            m_type = "intCombo";
+            m_type = QStringLiteral("intCombo");
             break;
         default:
             // UNIMPLEMENTED();
@@ -108,12 +107,12 @@ QMLSetting::QMLSetting(Settings::BasicSetting *setting, QObject *parent, Request
         case RequestType::Default:
         case RequestType::SpinBox:
             // TODO: suffix
-            m_type = "doubleSpin";
+            m_type = QStringLiteral("doubleSpin");
             break;
         case RequestType::Slider:
         case RequestType::ReverseSlider:
             // TODO: multiplier, suffix, reversal
-            m_type = "doubleSlider";
+            m_type = QStringLiteral("doubleSlider");
             break;
         default:
             // UNIMPLEMENTED assert
@@ -126,10 +125,10 @@ QMLSetting::QMLSetting(Settings::BasicSetting *setting, QObject *parent, Request
         switch (request) {
         case RequestType::Default:
         case RequestType::LineEdit:
-            m_type = "stringLine";
+            m_type = QStringLiteral("stringLine");
             break;
         case RequestType::ComboBox:
-            m_type = "stringCombo";
+            m_type = QStringLiteral("stringCombo");
             break;
         default:
             // UNIMPLEMENTED();

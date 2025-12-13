@@ -18,7 +18,7 @@ public:
     {
         QQmlProperty qmlProperty(object, property);
         QMetaProperty metaProperty = qmlProperty.property();
-        return metaProperty.typeName();
+        return QString::fromLocal8Bit(metaProperty.typeName());
     }
 };
 

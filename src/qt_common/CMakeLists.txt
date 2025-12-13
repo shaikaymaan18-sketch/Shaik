@@ -38,6 +38,7 @@ add_library(qt_common STATIC
     util/fs.h util/fs.cpp
     util/vk_device_info.cpp
     util/vk_device_info.h
+    qt_constants.h
 )
 
 if (UNIX)

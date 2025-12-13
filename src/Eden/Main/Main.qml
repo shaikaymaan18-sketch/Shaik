@@ -40,6 +40,14 @@ ApplicationWindow {
         id: globalConfig
     }
 
+    AboutDialog {
+        id: aboutDialog
+    }
+
+    DepsDialog {
+        id: depDialog
+    }
+
     menuBar: MenuBar {
         Menu {
             title: qsTr("&File")
@@ -206,23 +214,45 @@ ApplicationWindow {
             MenuSeparator {}
 
             Menu {
-                title: qsTr("&Amiibo")
+                title: qsTr("Am&iibo")
             }
 
-            Action {
-                text: qsTr("Open A&lbum")
+            Menu {
+                title: qsTr("&Applets")
+
+                Action {
+                    text: qsTr("Open &Album")
+                }
+
+                Action {
+                    text: qsTr("Open &Mii Editor")
+                }
+
+                Action {
+                    text: qsTr("Open &Controller Menu")
+                }
+
+                Action {
+                    text: qsTr("Open &Home Menu")
+                }
+
+                Action {
+                    text: qsTr("Open &Setup")
+                }
             }
 
-            Action {
-                text: qsTr("Open &Mii Editor")
-            }
+            Menu {
+                title: qsTr("&Create Home Menu Shortcut")
 
-            Action {
-                text: qsTr("Open Co&ntroller Menu")
-            }
+                Action {
+                    text: qsTr("&Desktop")
+                    onTriggered: MainWindowInterface.createHomeMenuDesktopShortcut()
+                }
 
-            Action {
-                text: qsTr("Open &Home Menu")
+                Action {
+                    text: qsTr("&Application Menu")
+                    onTriggered: MainWindowInterface.createHomeMenuApplicationMenuShortcut()
+                }
             }
 
             MenuSeparator {}
@@ -234,6 +264,41 @@ ApplicationWindow {
 
             Menu {
                 title: "&TAS"
+            }
+        }
+
+        Menu {
+            title: qsTr("&Multiplayer")
+        }
+
+        Menu {
+            title: qsTr("&Help")
+
+            Action {
+                text: qsTr("Open &Mods Page")
+                onTriggered: MainWindowInterface.openModsPage()
+            }
+
+            Action {
+                text: qsTr("Open &Quickstart Guide")
+                onTriggered: MainWindowInterface.openQuickstartGuide()
+            }
+
+            Action {
+                text: qsTr("&FAQ")
+                onTriggered: MainWindowInterface.openFAQ()
+            }
+
+            MenuSeparator {}
+
+            Action {
+                text: qsTr("&About Eden")
+                onTriggered: aboutDialog.show()
+            }
+
+            Action {
+                text: qsTr("&Eden Dependencies")
+                onTriggered: depDialog.show()
             }
         }
     }

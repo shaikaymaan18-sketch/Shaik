@@ -93,11 +93,11 @@ QMLSetting *SettingsInterface::getSetting(Settings::BasicSetting *setting)
     }
 
     // TODO: Suffix (fr)
-    QString suffix = "";
+    QString suffix = QString();
 
     if ((setting->Specialization() & Settings::SpecializationAttributeMask) ==
         Settings::Specialization::Percentage) {
-        suffix = "%";
+        suffix = QStringLiteral("%");
     }
 
     // paired setting (I/A)

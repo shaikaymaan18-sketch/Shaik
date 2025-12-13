@@ -206,6 +206,11 @@ cmake_dependent_option(USE_DISCORD_PRESENCE "Enables Discord Rich Presence" OFF 
 
 option(YUZU_TESTS "Compile tests" "${BUILD_TESTING}")
 
+option(YUZU_ENABLE_LTO "Enable link-time optimization" OFF)
+if(YUZU_ENABLE_LTO)
+    include(UseLTO)
+endif()
+
 option(YUZU_DOWNLOAD_ANDROID_VVL "Download validation layer binary for android" ON)
 
 option(YUZU_LEGACY "Apply patches that improve compatibility with older GPUs (e.g. Snapdragon 865) at the cost of performance" OFF)

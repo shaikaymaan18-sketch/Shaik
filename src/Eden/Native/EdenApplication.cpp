@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "Eden/Interface/MainWindowInterface.h"
+#include "Eden/Models/DependencyModel.h"
 #include "EdenApplication.h"
 
 #include <QQmlApplicationEngine>
@@ -93,6 +94,10 @@ int EdenApplication::run() {
         // Directory List
         GameListModel *gameListModel = new GameListModel(this, &engine);
         ctx->setContextProperty(QStringLiteral("EdenGameList"), gameListModel);
+
+        // Dependency Model
+        DependencyModel* depModel = new DependencyModel(this);
+        ctx->setContextProperty(QStringLiteral("DependencyModel"), depModel);
 
         // Settings Interface
         SettingsInterface *interface = new SettingsInterface(&engine);

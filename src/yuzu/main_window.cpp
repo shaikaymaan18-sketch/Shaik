@@ -78,6 +78,7 @@
 #include "qt_common/abstract/frontend.h"
 
 #include "qt_common/qt_common.h"
+#include "qt_common/qt_constants.h"
 
 #include "qt_common/util/path.h"
 #include "qt_common/util/content.h"
@@ -2742,6 +2743,7 @@ void MainWindow::IncrementInstallProgress() {
     install_progress->setValue(install_progress->value() + 1);
 }
 
+// TODO(qml): Implement InstallDialog + Interface in QML
 void MainWindow::OnMenuInstallToNAND() {
     const QString file_filter =
         tr("Installable Switch File (*.nca *.nsp *.xci);;Nintendo Content Archive "
@@ -3105,15 +3107,15 @@ void MainWindow::OpenURL(const QUrl& url) {
 }
 
 void MainWindow::OnOpenModsPage() {
-    OpenURL(QUrl(QStringLiteral("https://github.com/eden-emulator/yuzu-mod-archive")));
+    OpenURL(QUrl(QString::fromLocal8Bit(QtCommon::Constants::modPage)));
 }
 
 void MainWindow::OnOpenQuickstartGuide() {
-    OpenURL(QUrl(QStringLiteral("https://yuzu-mirror.github.io/help/quickstart/")));
+    OpenURL(QUrl(QString::fromLocal8Bit(QtCommon::Constants::quickstartPage)));
 }
 
 void MainWindow::OnOpenFAQ() {
-    OpenURL(QUrl(QStringLiteral("https://yuzu-mirror.github.io/help")));
+    OpenURL(QUrl(QString::fromLocal8Bit(QtCommon::Constants::helpPage)));
 }
 
 void MainWindow::ToggleFullscreen() {

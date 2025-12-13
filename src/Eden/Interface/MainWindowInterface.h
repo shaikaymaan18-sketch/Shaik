@@ -24,6 +24,14 @@ public:
 
     Q_INVOKABLE void installDecryptionKeys();
 
+    Q_INVOKABLE void createHomeMenuApplicationMenuShortcut();
+    Q_INVOKABLE void createHomeMenuDesktopShortcut();
+
+    Q_INVOKABLE void openURL(const QUrl& url);
+    Q_INVOKABLE void openModsPage();
+    Q_INVOKABLE void openQuickstartGuide();
+    Q_INVOKABLE void openFAQ();
+
     bool firmwareGood() const;
     void setFirmwareGood(bool newFirmwareGood);
 

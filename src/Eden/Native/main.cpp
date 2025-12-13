@@ -6,11 +6,21 @@
 #undef VMA_IMPLEMENTATION
 #endif
 
+#include <QDirIterator>
 #include "EdenApplication.h"
 
 int main(int argc, char *argv[])
 {
     EdenApplication app(argc, argv);
+
+    QDirIterator iter(QDir(QStringLiteral(":/")), QDirIterator::Subdirectories);
+
+    while (iter.hasNext()) {
+        QString next = iter.next();
+        if (!next.contains(QStringLiteral("k")) && !next.contains(QStringLiteral("breeze"))) {
+            qDebug() << next;
+        }
+    }
 
     return app.run();
 }

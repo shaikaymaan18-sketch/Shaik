@@ -11,6 +11,7 @@ qt_add_library(EdenModels STATIC
     SettingsModel.h SettingsModel.cpp
     GameListWorker.h GameListWorker.cpp
     GameIconProvider.h GameIconProvider.cpp
+    DependencyModel.h DependencyModel.cpp
 )
 
 target_link_libraries(EdenModels PRIVATE Qt6::Core Qt6::Quick Qt6::Gui)
