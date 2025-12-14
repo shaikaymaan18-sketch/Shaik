@@ -144,11 +144,13 @@ QVariant QMLSetting::value() const
     return var;
 }
 
-void QMLSetting::setValue(const QVariant &newValue)
-{
+void QMLSetting::setValue(const QVariant& newValue) {
+    qDebug() << "changing value" << m_setting->ToString() << "to" << newValue << "for setting"
+             << m_setting->GetLabel();
     QVariant var = newValue;
     var.convert(QMetaType(m_metaType));
 
+    qDebug() << var.toString();
     m_setting->LoadString(var.toString().toStdString());
 
     emit valueChanged();

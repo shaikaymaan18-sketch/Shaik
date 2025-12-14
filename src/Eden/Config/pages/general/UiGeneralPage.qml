@@ -1,4 +1,3 @@
-
 // SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
@@ -24,6 +23,13 @@ PageScrollView {
 
         Clover.accent = Clover.accents[accent.contentItem.currentIndex]
         Clover.theme = Clover.themes[theme.contentItem.currentIndex]
+    }
+
+    function sync() {
+        ui.sync()
+        style.sync()
+        theme.sync()
+        accent.sync()
     }
 
     ColumnLayout {

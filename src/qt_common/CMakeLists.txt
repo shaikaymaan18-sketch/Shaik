@@ -39,6 +39,9 @@ add_library(qt_common STATIC
     util/vk_device_info.cpp
     util/vk_device_info.h
     qt_constants.h
+    render/emu_thread.h render/emu_thread.cpp
+    render/context.h
+
 )
 
 if (UNIX)

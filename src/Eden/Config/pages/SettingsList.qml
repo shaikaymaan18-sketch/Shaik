@@ -21,6 +21,13 @@ ListView {
                 itm.apply()
         }
     }
+    function sync() {
+        for (var i = 0; i < count; ++i) {
+            var itm = itemAtIndex(i)
+            if (itm !== null)
+                itm.apply()
+        }
+    }
 
     clip: true
     boundsBehavior: Flickable.StopAtBounds

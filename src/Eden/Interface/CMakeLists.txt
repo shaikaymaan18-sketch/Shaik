@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 find_package(Qt6 REQUIRED COMPONENTS Core)
+find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
 EdenModule(
     NAME Interface
@@ -23,11 +24,15 @@ EdenModule(
         Qt6::Concurrent
         Vulkan::UtilityHeaders
         frontend_common
+        qt_common
+        glad
 )
 
 target_link_libraries(EdenInterface PRIVATE Qt6::Core)
+target_link_libraries(EdenInterface PRIVATE Qt6::Widgets)
 
 target_sources(EdenInterface
   PRIVATE
     MainWindowInterface.h MainWindowInterface.cpp
+    RenderWindow.h RenderWindow.cpp
 )

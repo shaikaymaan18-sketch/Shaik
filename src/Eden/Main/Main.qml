@@ -234,6 +234,7 @@ ApplicationWindow {
 
                 Action {
                     text: qsTr("Open &Home Menu")
+                    onTriggered: MainWindowInterface.openHomeMenu()
                 }
 
                 Action {
@@ -329,10 +330,13 @@ ApplicationWindow {
             Label {
                 id: firmware
                 font.pixelSize: 14
-                visible: MainWindowInterface.firmwareGood
 
-                text: MainWindowInterface.firmwareDisplay
-                ToolTip.text: MainWindowInterface.firmwareTooltip
+                visible: typeof MainWindowInterface !== 'undefined'
+                         && MainWindowInterface.firmwareGood
+                text: typeof MainWindowInterface
+                      !== 'undefined' ? MainWindowInterface.firmwareDisplay : ""
+                ToolTip.text: typeof MainWindowInterface
+                              !== 'undefined' ? MainWindowInterface.firmwareTooltip : ""
             }
         }
     }

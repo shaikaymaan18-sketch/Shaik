@@ -562,12 +562,23 @@ void QtConfig::SaveMultiplayerValues() {
 }
 
 std::vector<Settings::BasicSetting*>& QtConfig::FindRelevantList(Settings::Category category) {
-    // This solution sucks, but by_category is unreliable because the settings backend
-    // mangles category mapping for some reason.
-    static auto list = Settings::values.linkage.by_category[category];
-    auto uilist = UISettings::values.linkage.by_category[category];
-    list.insert(list.end(), uilist.begin(), uilist.end());
-    return list;
+    qDebug() << "-- Category" << u32(category);
+    auto log_list = [](auto list, QString label) {
+        qDebug() << "-- !" << label;
+        for (auto s : list) {
+            qDebug() << "-- *" << s->GetLabel();
+        }
+    };
+    auto& list = Settings::values.linkage.by_category[category];
+    log_list(list, QStringLiteral("Settings"));
+
+    if (!list.empty())
+        return list;
+
+    auto& list2 = UISettings::values.linkage.by_category[category];
+    log_list(list2, QStringLiteral("UISettings"));
+
+    return list2;
 }
 
 void QtConfig::ReadQtControlPlayerValues(std::size_t player_index) {

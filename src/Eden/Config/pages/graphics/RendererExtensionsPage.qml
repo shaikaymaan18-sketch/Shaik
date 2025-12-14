@@ -13,6 +13,10 @@ PageScrollView {
     function apply() {
         ext.apply()
     }
+    function sync() {
+        ext.sync()
+    }
+
 
     ColumnLayout {
         width: scroll.width - scroll.effectiveScrollBarWidth

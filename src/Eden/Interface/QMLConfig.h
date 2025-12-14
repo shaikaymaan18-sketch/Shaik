@@ -18,9 +18,6 @@ public:
         : m_config{new QtConfig}
     {}
 
-    Q_INVOKABLE inline void reload() {
-        m_config->ReloadAllValues();
-    }
     Q_INVOKABLE inline void save() {
         m_config->SaveAllValues();
     }

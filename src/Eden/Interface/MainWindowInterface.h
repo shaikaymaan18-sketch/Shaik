@@ -4,8 +4,17 @@
 #pragma once
 
 #include <QObject>
+#include <QQuickWindow>
+#include "core/hle/service/am/applet_manager.h"
+#include "qt_common/qt_common.h"
 
+namespace InputCommon {
+class InputSubsystem;
+}
+class RenderWindow;
 class GameListModel;
+class QMLConfig;
+
 class MainWindowInterface : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool firmwareGood READ firmwareGood WRITE setFirmwareGood NOTIFY firmwareGoodChanged FINAL)
@@ -15,7 +24,8 @@ class MainWindowInterface : public QObject {
                    firmwareDisplayChanged FINAL)
 
 public:
-    explicit MainWindowInterface(GameListModel* model, QObject* parent = nullptr);
+    explicit MainWindowInterface(GameListModel* model, QMLConfig* config, QQuickWindow* rootWindow,
+                                 QObject* parent = nullptr);
 
     Q_INVOKABLE void installFirmware();
     Q_INVOKABLE void installFirmwareZip();
@@ -31,6 +41,12 @@ public:
     Q_INVOKABLE void openModsPage();
     Q_INVOKABLE void openQuickstartGuide();
     Q_INVOKABLE void openFAQ();
+
+    Q_INVOKABLE void openHomeMenu();
+
+    Q_INVOKABLE void bootGame(const QString& filename, Service::AM::FrontendAppletParameters params,
+                              StartGameType type = StartGameType::Normal);
+    Q_INVOKABLE bool loadROM(const QString& filename, Service::AM::FrontendAppletParameters params);
 
     bool firmwareGood() const;
     void setFirmwareGood(bool newFirmwareGood);
@@ -55,10 +71,29 @@ signals:
 
 private:
     GameListModel* m_gameList;
-    void setFirmwareVersion();
+    QMLConfig* m_config;
+    RenderWindow* m_renderWindow;
+    std::shared_ptr<InputCommon::InputSubsystem> input_subsystem;
+
+    // Whether emulation is currently running in yuzu.
+    bool emulation_running = false;
+    // The path to the game currently running
+    QString current_game_path;
+    // Whether a user was set on the command line (skips UserSelector if it's forced to show up)
+    bool user_flag_cmd_line = false;
+
+    // Last game booted, used for multi-process apps
+    QString last_filename_booted;
 
     bool m_firmwareGood = false;
 
     QString m_firmwareDisplay{};
     QString m_firmwareTooltip{};
+
+    void shutdownGame();
+    void setFirmwareVersion();
+    void executeProgram(std::size_t program_index);
+    Service::AM::FrontendAppletParameters applicationAppletParameters();
+    Service::AM::FrontendAppletParameters libraryAppletParameters(u64 program_id,
+                                                                  Service::AM::AppletId applet_id);
 };

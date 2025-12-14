@@ -107,10 +107,6 @@ int EdenApplication::run() {
         TitleManager *title = new TitleManager(&engine);
         ctx->setContextProperty(QStringLiteral("TitleManager"), title);
 
-        // MainWindow interface
-        MainWindowInterface* mwint = new MainWindowInterface(gameListModel, &engine);
-        ctx->setContextProperty(QStringLiteral("MainWindowInterface"), mwint);
-
         // :)
         ctx->setContextProperty(QStringLiteral("EdenApplication"), this);
 
@@ -123,6 +119,18 @@ int EdenApplication::run() {
             Qt::QueuedConnection);
 
         engine.loadFromModule("Eden.Main", "Main");
+
+        // MainWindow interface
+        QObject *root = engine.rootObjects()[0];
+        QQuickWindow *window = qobject_cast<QQuickWindow *>(root);
+
+        if (!window) {
+            qFatal("Error: Your root item has to be a window.");
+            return -1;
+        }
+
+        MainWindowInterface* mwint = new MainWindowInterface(gameListModel, config, window, &engine);
+        ctx->setContextProperty(QStringLiteral("MainWindowInterface"), mwint);
 
         ret = exec();
 

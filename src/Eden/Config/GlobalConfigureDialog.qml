@@ -13,6 +13,7 @@ import Carboxyl.Contour
 
 NativeDialog {
     property list<var> configs
+    property list<var> settings
 
     width: Constants.width
     height: Constants.height
@@ -20,14 +21,27 @@ NativeDialog {
     title: qsTr("Eden Configuration")
     standardButtons: Dialog.Ok | Dialog.Apply | Dialog.Cancel
 
-    Component.onCompleted: configs = Util.searchItem(swipe, "PageScrollView")
+    Component.onCompleted: {
+        configs = Util.searchItem(swipe, "PageScrollView")
+        settings = Util.searchItem(swipe, "BaseField")
+
+        syncConfigs()
+    }
 
     function applyConfigs() {
         configs.forEach(config => {
+                            // console.log(config)
                             config.apply()
                         })
 
         QtConfig.save()
+    }
+
+    function syncConfigs() {
+        configs.forEach(setting => {
+                            console.log(setting)
+                            setting.sync()
+                        })
     }
 
     MessageDialog {
@@ -54,12 +68,8 @@ NativeDialog {
 
     onApplied: applyConfigs()
 
-    onRejected: {
-
-        // TODO
-        // configs.forEach(config => config.sync())
-        // QtConfig.reload()
-    }
+    onVisibilityChanged: if (visible)
+                             syncConfigs()
 
     CarboxylTabBar {
         id: tabBar
@@ -133,10 +143,20 @@ NativeDialog {
         GlobalGeneralPage {
             id: general
         }
-        GlobalSystemPage {}
-        GlobalCpuPage {}
-        GlobalGraphicsPage {}
-        GlobalAudioPage {}
-        GlobalDebugPage {}
+        GlobalSystemPage {
+            id: system
+        }
+        GlobalCpuPage {
+            id: cpu
+        }
+        GlobalGraphicsPage {
+            id: gfx
+        }
+        GlobalAudioPage {
+            id: audio
+        }
+        GlobalDebugPage {
+            id: debug
+        }
     }
 }

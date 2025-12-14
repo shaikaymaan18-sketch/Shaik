@@ -19,6 +19,7 @@
 #include "common/common_types.h"
 #include "frontend_common/content_manager.h"
 #include "input_common/drivers/tas_input.h"
+#include "qt_common/qt_common.h"
 #include "qt_common/config/qt_config.h"
 #include "qt_common/util/game.h"
 #include "yuzu/user_data_migration.h"
@@ -61,11 +62,6 @@ class QtControllerSelectorDialog;
 class QtProfileSelectionDialog;
 class QtSoftwareKeyboardDialog;
 class QtNXWebEngineView;
-
-enum class StartGameType {
-    Normal, // Can use custom configuration
-    Global, // Only uses global configuration
-};
 
 namespace Core {
 enum class SystemResultStatus : u32;
@@ -181,7 +177,7 @@ signals:
      * @param emu_thread Pointer to the newly created EmuThread (to be used by widgets that need to
      *      access/change emulation state).
      */
-    void EmulationStarting(EmuThread* emu_thread);
+    void EmulationStarting();
 
     /**
      * Signal that is emitted when emulation is about to stop. At this time, the EmuThread and core
@@ -443,7 +439,7 @@ private:
     void OpenPerGameConfiguration(u64 title_id, const std::string& file_name);
     bool CheckFirmwarePresence();
     void SetFirmwareVersion();
-    void ConfigureFilesystemProvider(const std::string& filepath);
+
     /**
      * Open (or not) the right confirm dialog based on current setting and game exit lock
      * @returns true if the player confirmed or the settings do no require it
@@ -512,7 +508,6 @@ private:
 
     // Whether emulation is currently running in yuzu.
     bool emulation_running = false;
-    std::unique_ptr<EmuThread> emu_thread;
     // The path to the game currently running
     QString current_game_path;
     // Whether a user was set on the command line (skips UserSelector if it's forced to show up)

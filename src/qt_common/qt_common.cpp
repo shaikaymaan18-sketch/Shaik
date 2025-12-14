@@ -57,6 +57,7 @@ QObject* rootObject = nullptr;
 std::unique_ptr<Core::System> system = nullptr;
 std::shared_ptr<FileSys::RealVfsFilesystem> vfs = nullptr;
 std::unique_ptr<FileSys::ManualContentProvider> provider = nullptr;
+std::unique_ptr<EmuThread> emu_thread = nullptr;
 
 const QStringList supported_file_extensions = {QStringLiteral("nro"),
                                                QStringLiteral("nso"),

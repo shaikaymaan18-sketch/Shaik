@@ -59,6 +59,9 @@ void ExportDataDir(FrontendCommon::DataManager::DataDir dir,
                    std::function<void()> callback = {});
 void ImportDataDir(FrontendCommon::DataManager::DataDir dir, const std::string &user_id = "", std::function<void()> callback = {});
 
+// Loader //
+void configureFilesystemProvider(const std::string& filepath);
+
 // Profiles //
 void FixProfiles();
 }

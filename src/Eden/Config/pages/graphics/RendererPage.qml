@@ -1,6 +1,6 @@
+
 // SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -17,6 +17,14 @@ PageScrollView {
         dev.apply()
         shader.apply()
         vsync.apply()
+    }
+
+    function sync() {
+        gfx.sync()
+        api.sync()
+        dev.sync()
+        shader.sync()
+        vsync.sync()
     }
 
     ColumnLayout {

@@ -1,15 +1,14 @@
 // SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-
 CheckBox {
     property bool force: false
     property var setting
-    property var other: setting.other === null ? setting : setting.other
+    property var field
+    property var other: setting.other === null ? field : setting.other
 
     indicator.implicitHeight: 25
     indicator.implicitWidth: 25

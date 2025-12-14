@@ -48,7 +48,6 @@ enum class Category {
     Services = u32(Settings::Category::Services),
     Paths = u32(Settings::Category::Paths),
     LibraryApplet = u32(Settings::Category::LibraryApplet),
-    MaxEnum = u32(Settings::Category::MaxEnum),
 };
 Q_ENUM_NS(Category)
 }

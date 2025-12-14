@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <iostream>
 #include "common/assert.h"
 #include "common/fs/fs.h"
 #include "common/fs/path_util.h"
@@ -900,7 +901,9 @@ const std::string& Config::GetConfigFilePath() const {
 
 void Config::ReadCategory(const Settings::Category category) {
     const auto& settings = FindRelevantList(category);
-    std::ranges::for_each(settings, [&](const auto& setting) { ReadSettingGeneric(setting); });
+    std::ranges::for_each(settings, [&](const auto& setting) {
+        ReadSettingGeneric(setting);
+    });
 }
 
 void Config::WriteCategory(const Settings::Category category) {

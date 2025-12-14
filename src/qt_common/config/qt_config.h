@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QMetaType>
+#include <QObject>
 
 #include "frontend_common/config.h"
 

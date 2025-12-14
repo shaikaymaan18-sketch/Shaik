@@ -14,6 +14,10 @@ PageScrollView {
     function apply() {
         audio.apply()
     }
+    function sync() {
+        audio.sync()
+    }
+
 
     ColumnLayout {
         width: scroll.width - scroll.effectiveScrollBarWidth

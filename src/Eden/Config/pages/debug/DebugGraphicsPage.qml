@@ -14,6 +14,10 @@ PageScrollView {
     function apply() {
         gfx.apply()
     }
+    function sync() {
+        gfx.sync()
+    }
+
 
     ColumnLayout {
         width: scroll.width - scroll.effectiveScrollBarWidth

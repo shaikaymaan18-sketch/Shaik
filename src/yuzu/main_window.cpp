@@ -3,6 +3,7 @@
 
 // Qt on macOS doesn't define VMA shit
 #include "qt_common/qt_string_lookup.h"
+#include "qt_common/render/emu_thread.h"
 #if defined(QT_STATICPLUGIN) && !defined(__APPLE__)
 #undef VMA_IMPLEMENTATION
 #endif
@@ -104,15 +105,10 @@ static FileSys::VirtualFile VfsDirectoryCreateFileWrapper(const FileSys::Virtual
 
 // Common //
 #include "common/fs/fs.h"
-#include "common/logging/backend.h"
-#include "common/memory_detect.h"
+#include "common/logging/log.h"
 #include "common/scm_rev.h"
 #include "common/scope_exit.h"
 #include "common/string_util.h"
-
-#ifdef ARCHITECTURE_x86_64
-#include "common/x64/cpu_detect.h"
-#endif
 
 // Core //
 #include "core/frontend/applets/software_keyboard.h"
@@ -922,7 +918,7 @@ void MainWindow::InitializeWidgets() {
 #ifdef YUZU_ENABLE_COMPATIBILITY_REPORTING
     ui->action_Report_Compatibility->setVisible(true);
 #endif
-    render_window = new GRenderWindow(this, emu_thread.get(), input_subsystem, *QtCommon::system);
+    render_window = new GRenderWindow(this, input_subsystem);
     render_window->hide();
 
     game_list = new GameList(QtCommon::vfs, QtCommon::provider.get(), *play_time_manager, *QtCommon::system, this);
@@ -1363,11 +1359,11 @@ void MainWindow::OnAppFocusStateChanged(Qt::ApplicationState state) {
         return;
     }
     if (UISettings::values.pause_when_in_background) {
-        if (emu_thread->IsRunning() &&
+        if (QtCommon::emu_thread->IsRunning() &&
             (state & (Qt::ApplicationHidden | Qt::ApplicationInactive))) {
             auto_paused = true;
             OnPauseGame();
-        } else if (!emu_thread->IsRunning() && auto_paused && (state & Qt::ApplicationActive)) {
+        } else if (!QtCommon::emu_thread->IsRunning() && auto_paused && state == Qt::ApplicationActive) {
             auto_paused = false;
             OnStartGame();
         }
@@ -1423,8 +1419,6 @@ void MainWindow::ConnectWidgetEvents() {
     connect(this, &MainWindow::UpdateInstallProgress, this,
             &MainWindow::IncrementInstallProgress);
 
-    connect(this, &MainWindow::EmulationStarting, render_window,
-            &GRenderWindow::OnEmulationStarting);
     connect(this, &MainWindow::EmulationStopping, render_window,
             &GRenderWindow::OnEmulationStopping);
 
@@ -1546,7 +1540,7 @@ void MainWindow::ConnectMenuEvents() {
 }
 
 void MainWindow::UpdateMenuState() {
-    const bool is_paused = emu_thread == nullptr || !emu_thread->IsRunning();
+    const bool is_paused = QtCommon::emu_thread == nullptr || !QtCommon::emu_thread->IsRunning();
     const bool is_firmware_available = CheckFirmwarePresence();
 
     const std::array running_actions{
@@ -1620,17 +1614,17 @@ void MainWindow::SetupPrepareForSleep() {
 }
 
 void MainWindow::OnPrepareForSleep(bool prepare_sleep) {
-    if (emu_thread == nullptr) {
+    if (QtCommon::emu_thread == nullptr) {
         return;
     }
 
     if (prepare_sleep) {
-        if (emu_thread->IsRunning()) {
+        if (QtCommon::emu_thread->IsRunning()) {
             auto_paused = true;
             OnPauseGame();
         }
     } else {
-        if (!emu_thread->IsRunning() && auto_paused) {
+        if (!QtCommon::emu_thread->IsRunning() && auto_paused) {
             auto_paused = false;
             OnStartGame();
         }
@@ -1703,7 +1697,7 @@ void MainWindow::AllowOSSleep() {
 
 bool MainWindow::LoadROM(const QString& filename, Service::AM::FrontendAppletParameters params) {
     // Shutdown previous session if the emu thread is still active...
-    if (emu_thread != nullptr) {
+    if (QtCommon::emu_thread != nullptr) {
         ShutdownGame();
     }
 
@@ -1822,43 +1816,6 @@ bool MainWindow::SelectAndSetCurrentUser(
     return true;
 }
 
-void MainWindow::ConfigureFilesystemProvider(const std::string& filepath) {
-    // Ensure all NCAs are registered before launching the game
-    const auto file = QtCommon::vfs->OpenFile(filepath, FileSys::OpenMode::Read);
-    if (!file) {
-        return;
-    }
-
-    auto loader = Loader::GetLoader(*QtCommon::system, file);
-    if (!loader) {
-        return;
-    }
-
-    const auto file_type = loader->GetFileType();
-    if (file_type == Loader::FileType::Unknown || file_type == Loader::FileType::Error) {
-        return;
-    }
-
-    u64 program_id = 0;
-    const auto res2 = loader->ReadProgramId(program_id);
-    if (res2 == Loader::ResultStatus::Success && file_type == Loader::FileType::NCA) {
-        QtCommon::provider->AddEntry(FileSys::TitleType::Application,
-                                     FileSys::GetCRTypeFromNCAType(FileSys::NCA{file}.GetType()), program_id,
-                                     file);
-    } else if (res2 == Loader::ResultStatus::Success &&
-               (file_type == Loader::FileType::XCI || file_type == Loader::FileType::NSP)) {
-        const auto nsp = file_type == Loader::FileType::NSP
-                             ? std::make_shared<FileSys::NSP>(file)
-                             : FileSys::XCI{file}.GetSecurePartitionNSP();
-        for (const auto& title : nsp->GetNCAs()) {
-            for (const auto& entry : title.second) {
-                QtCommon::provider->AddEntry(entry.first.first, entry.first.second, title.first,
-                                             entry.second->GetBaseFile());
-            }
-        }
-    }
-}
-
 void MainWindow::BootGame(const QString& filename, Service::AM::FrontendAppletParameters params,
                            StartGameType type) {
     LOG_INFO(Frontend, "Eden starting...");
@@ -1877,7 +1834,7 @@ void MainWindow::BootGame(const QString& filename, Service::AM::FrontendAppletPa
 
     last_filename_booted = filename;
 
-    ConfigureFilesystemProvider(filename.toStdString());
+    QtCommon::Content::configureFilesystemProvider(filename.toStdString());
     const auto v_file = Core::GetGameFileFromPath(QtCommon::vfs, filename.toUtf8().constData());
     const auto loader = Loader::GetLoader(*QtCommon::system, v_file, params.program_id, params.program_index);
 
@@ -1921,23 +1878,23 @@ void MainWindow::BootGame(const QString& filename, Service::AM::FrontendAppletPa
     game_list->setDisabled(true);
 
     // Create and start the emulation thread
-    emu_thread = std::make_unique<EmuThread>(*QtCommon::system);
-    emit EmulationStarting(emu_thread.get());
-    emu_thread->start();
+    QtCommon::emu_thread = std::make_unique<EmuThread>();
+    emit EmulationStarting();
+    QtCommon::emu_thread->start();
 
     // Register an ExecuteProgram callback such that Core can execute a sub-program
     QtCommon::system->RegisterExecuteProgramCallback(
         [this](std::size_t program_index_) { render_window->ExecuteProgram(program_index_); });
 
     QtCommon::system->RegisterExitCallback([this] {
-        emu_thread->ForceStop();
+        QtCommon::emu_thread->ForceStop();
         render_window->Exit();
     });
 
     connect(render_window, &GRenderWindow::Closed, this, &MainWindow::OnStopGame);
     connect(render_window, &GRenderWindow::MouseActivity, this, &MainWindow::OnMouseActivity);
 
-    connect(emu_thread.get(), &EmuThread::LoadProgress, loading_screen,
+    connect(QtCommon::emu_thread.get(), &EmuThread::LoadProgress, loading_screen,
             &LoadingScreen::OnLoadProgress, Qt::QueuedConnection);
 
     // Update the GUI
@@ -2024,8 +1981,8 @@ bool MainWindow::OnShutdownBegin() {
     discord_rpc->Pause();
 
     RequestGameExit();
-    emu_thread->disconnect();
-    emu_thread->SetRunning(true);
+    QtCommon::emu_thread->disconnect();
+    QtCommon::emu_thread->SetRunning(true);
 
     emit EmulationStopping();
 
@@ -2040,7 +1997,7 @@ bool MainWindow::OnShutdownBegin() {
     shutdown_timer.setSingleShot(true);
     shutdown_timer.start(shutdown_time);
     connect(&shutdown_timer, &QTimer::timeout, this, &MainWindow::OnEmulationStopTimeExpired);
-    connect(emu_thread.get(), &QThread::finished, this, &MainWindow::OnEmulationStopped);
+    connect(QtCommon::emu_thread.get(), &QThread::finished, this, &MainWindow::OnEmulationStopped);
 
     // Disable everything to prevent anything from being triggered here
     ui->action_Pause->setEnabled(false);
@@ -2057,17 +2014,17 @@ void MainWindow::OnShutdownBeginDialog() {
 }
 
 void MainWindow::OnEmulationStopTimeExpired() {
-    if (emu_thread) {
-        emu_thread->ForceStop();
+    if (QtCommon::emu_thread) {
+        QtCommon::emu_thread->ForceStop();
     }
 }
 
 void MainWindow::OnEmulationStopped() {
     shutdown_timer.stop();
-    if (emu_thread) {
-        emu_thread->disconnect();
-        emu_thread->wait();
-        emu_thread.reset();
+    if (QtCommon::emu_thread) {
+        QtCommon::emu_thread->disconnect();
+        QtCommon::emu_thread->wait();
+        QtCommon::emu_thread.reset();
     }
 
     if (shutdown_dialog) {
@@ -2941,7 +2898,7 @@ void MainWindow::OnMenuRecentFile() {
 void MainWindow::OnStartGame() {
     PreventOSSleep();
 
-    emu_thread->SetRunning(true);
+    QtCommon::emu_thread->SetRunning(true);
 
     UpdateMenuState();
     OnTasStateChanged();
@@ -2967,7 +2924,7 @@ void MainWindow::OnRestartGame() {
 }
 
 void MainWindow::OnPauseGame() {
-    emu_thread->SetRunning(false);
+    QtCommon::emu_thread->SetRunning(false);
     play_time_manager->Stop();
     UpdateMenuState();
     AllowOSSleep();
@@ -2976,7 +2933,7 @@ void MainWindow::OnPauseGame() {
 
 void MainWindow::OnPauseContinueGame() {
     if (emulation_running) {
-        if (emu_thread->IsRunning()) {
+        if (QtCommon::emu_thread->IsRunning()) {
             OnPauseGame();
         } else {
             OnStartGame();
@@ -3561,7 +3518,7 @@ void MainWindow::OpenPerGameConfiguration(u64 title_id, const std::string& file_
 }
 
 void MainWindow::OnLoadAmiibo() {
-    if (emu_thread == nullptr || !emu_thread->IsRunning()) {
+    if (QtCommon::emu_thread == nullptr || !QtCommon::emu_thread->IsRunning()) {
         return;
     }
     if (is_amiibo_file_select_active) {
@@ -3676,7 +3633,7 @@ void MainWindow::OnVerifyInstalledContents() {
 
 void MainWindow::OnInstallFirmware() {
     // Don't do this while emulation is running, that'd probably be a bad idea.
-    if (emu_thread != nullptr && emu_thread->IsRunning()) {
+    if (QtCommon::emu_thread != nullptr && QtCommon::emu_thread->IsRunning()) {
         return;
     }
 
@@ -3686,7 +3643,7 @@ void MainWindow::OnInstallFirmware() {
 
 void MainWindow::OnInstallFirmwareFromZIP() {
     // Don't do this while emulation is running, that'd probably be a bad idea.
-    if (emu_thread != nullptr && emu_thread->IsRunning()) {
+    if (QtCommon::emu_thread != nullptr && QtCommon::emu_thread->IsRunning()) {
         return;
     }
 
@@ -3696,7 +3653,7 @@ void MainWindow::OnInstallFirmwareFromZIP() {
 
 void MainWindow::OnInstallDecryptionKeys() {
     // Don't do this while emulation is running.
-    if (emu_thread != nullptr && emu_thread->IsRunning()) {
+    if (QtCommon::emu_thread != nullptr && QtCommon::emu_thread->IsRunning()) {
         return;
     }
 
@@ -3813,7 +3770,7 @@ void MainWindow::OnCreateHomeMenuApplicationMenuShortcut() {
 }
 
 void MainWindow::OnCaptureScreenshot() {
-    if (emu_thread == nullptr || !emu_thread->IsRunning()) {
+    if (QtCommon::emu_thread == nullptr || !QtCommon::emu_thread->IsRunning()) {
         return;
     }
 
@@ -3949,7 +3906,7 @@ void MainWindow::OnTasStateChanged() {
 }
 
 void MainWindow::UpdateStatusBar() {
-    if (emu_thread == nullptr || !QtCommon::system->IsPoweredOn()) {
+    if (QtCommon::emu_thread == nullptr || !QtCommon::system->IsPoweredOn()) {
         status_bar_update_timer.stop();
         return;
     }
@@ -4080,7 +4037,7 @@ void MainWindow::UpdateInputDrivers() {
 }
 
 void MainWindow::HideMouseCursor() {
-    if (emu_thread == nullptr && UISettings::values.hide_mouse) {
+    if (QtCommon::emu_thread == nullptr && UISettings::values.hide_mouse) {
         mouse_hide_timer.stop();
         ShowMouseCursor();
         return;
@@ -4090,7 +4047,7 @@ void MainWindow::HideMouseCursor() {
 
 void MainWindow::ShowMouseCursor() {
     render_window->unsetCursor();
-    if (emu_thread != nullptr && UISettings::values.hide_mouse) {
+    if (QtCommon::emu_thread != nullptr && UISettings::values.hide_mouse) {
         mouse_hide_timer.start();
     }
 }
@@ -4249,7 +4206,7 @@ bool MainWindow::SelectRomFSDumpTarget(const FileSys::ContentProvider& installed
 }
 
 bool MainWindow::ConfirmClose() {
-    if (emu_thread == nullptr ||
+    if (QtCommon::emu_thread == nullptr ||
         UISettings::values.confirm_before_stopping.GetValue() == ConfirmStop::Ask_Never) {
         return true;
     }
@@ -4277,7 +4234,7 @@ void MainWindow::closeEvent(QCloseEvent* event) {
     game_list->UnloadController();
 
     // Shutdown session if the emu thread is active...
-    if (emu_thread != nullptr) {
+    if (QtCommon::emu_thread != nullptr) {
         ShutdownGame();
     }
 
@@ -4333,7 +4290,7 @@ void MainWindow::dragMoveEvent(QDragMoveEvent* event) {
 }
 
 bool MainWindow::ConfirmChangeGame() {
-    if (emu_thread == nullptr)
+    if (QtCommon::emu_thread == nullptr)
         return true;
 
     // Use custom question to link controller navigation
@@ -4344,7 +4301,7 @@ bool MainWindow::ConfirmChangeGame() {
 }
 
 bool MainWindow::ConfirmForceLockedExit() {
-    if (emu_thread == nullptr) {
+    if (QtCommon::emu_thread == nullptr) {
         return true;
     }
     const auto text = tr("The currently running application has requested Eden to not exit.\n\n"

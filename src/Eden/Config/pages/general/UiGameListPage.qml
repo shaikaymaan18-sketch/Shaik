@@ -13,10 +13,14 @@ PageScrollView {
     function apply() {
         ui.apply()
     }
+    function sync() {
+        ui.sync()
+    }
 
     ColumnLayout {
         width: scroll.width - scroll.effectiveScrollBarWidth
 
+        // TODO(qml): This is shown twice???????
         SettingsList {
             id: ui
             category: SettingsCategories.UiGameList
