@@ -24,8 +24,8 @@ private:
 };
 
 struct VulkanRenderItem : public QQuickItem {
-    explicit VulkanRenderItem(RenderWindow* parent) : QQuickItem(parent) {
-        window()->setSurfaceType(QWindow::VulkanSurface);
+    explicit VulkanRenderItem(QQuickItem* parent) : QQuickItem(parent) {
+        // window()->setSurfaceType(QWindow::VulkanSurface);
     }
 };
 
@@ -45,11 +45,11 @@ bool RenderWindow::initializeOpenGL() {
     // WA_DontShowOnScreen, WA_DeleteOnClose
     auto child = new OpenGLRenderItem(this);
     child_item = child;
-    child_item->window()->create();
-    auto context = std::make_shared<OpenGLSharedContext>(child->window());
+    child->window()->create();
+    auto context = std::make_shared<OpenGLSharedContext>(m_window);
     main_context = context;
     child->SetContext(
-        std::make_unique<OpenGLSharedContext>(context->GetShareContext(), child->window()));
+        std::make_unique<OpenGLSharedContext>(context->GetShareContext(), m_window));
 
     return true;
 #else
@@ -61,9 +61,9 @@ bool RenderWindow::initializeOpenGL() {
 
 bool RenderWindow::initializeVulkan() {
     qDebug() << "initializing Vulkan.";
-    auto child = new VulkanRenderItem(this);
+    auto child = new VulkanRenderItem(m_parent);
     child_item = child;
-    // child_item->window()->create();
+    // child->window()->create();
     main_context = std::make_unique<DummyContext>();
 
     return true;
@@ -76,8 +76,21 @@ void RenderWindow::initializeNull() {
 
 RenderWindow::RenderWindow(QQuickWindow* window,
                            std::shared_ptr<InputCommon::InputSubsystem> input_subsystem_)
-    : QQuickItem(window->contentItem()), input_subsystem{std::move(input_subsystem_)} {
+    : QQuickItem(), input_subsystem{std::move(input_subsystem_)}, m_window(window) {
     // STUBBED
+
+    QQuickItem* renderHost = m_window->findChild<QQuickItem*>("renderHost");
+
+    assert(renderHost);
+
+    setParentItem(renderHost);
+    m_parent = renderHost;
+
+    setWidth(renderHost->width());
+    setHeight(renderHost->height());
+    setX(0);
+    setY(0);
+
     window->setTitle(QStringLiteral("Eden %1 | %2-%3")
                          .arg(QString::fromUtf8(Common::g_build_name),
                               QString::fromUtf8(Common::g_scm_branch),
@@ -111,7 +124,7 @@ std::unique_ptr<Core::Frontend::GraphicsContext> RenderWindow::CreateSharedConte
         auto c = static_cast<OpenGLSharedContext*>(main_context.get());
         // Bind the shared contexts to the main surface in case the backend wants to take over
         // presentation
-        return std::make_unique<OpenGLSharedContext>(c->GetShareContext(), child_item->window());
+        return std::make_unique<OpenGLSharedContext>(c->GetShareContext(), m_window);
     }
 #endif
     return std::make_unique<DummyContext>();
@@ -151,7 +164,7 @@ bool RenderWindow::initRenderTarget() {
     }
 
     // Update the Window System information with the new render target
-    window_info = QtCommon::GetWindowSystemInfo(window());
+    window_info = QtCommon::GetWindowSystemInfo(m_window);
 
     OnMinimalClientAreaChangeRequest(GetActiveConfig().min_client_area_size);
     onFramebufferSizeChanged();
@@ -167,7 +180,7 @@ bool RenderWindow::initRenderTarget() {
 }
 
 void RenderWindow::OnMinimalClientAreaChangeRequest(std::pair<u32, u32> minimal_size) {
-    window()->setMinimumSize(QSize(minimal_size.first, minimal_size.second));
+    m_window->setMinimumSize(QSize(minimal_size.first, minimal_size.second));
 }
 
 bool RenderWindow::loadOpenGL() {
@@ -223,8 +236,9 @@ QStringList RenderWindow::getUnsupportedGLExtensions() const {
 void RenderWindow::onFramebufferSizeChanged() {
     // Screen changes potentially incur a change in screen DPI, hence we should update the
     // framebuffer size
-    const qreal pixel_ratio = window()->devicePixelRatio();
-    const u32 width = this->width() * pixel_ratio;
-    const u32 height = this->height() * pixel_ratio;
+    qDebug() << width() << height();
+    const qreal pixel_ratio = m_window->devicePixelRatio();
+    const u32 width = (this->width()) * pixel_ratio;
+    const u32 height = (this->height()) * pixel_ratio;
     UpdateCurrentFramebufferLayout(width, height);
 }

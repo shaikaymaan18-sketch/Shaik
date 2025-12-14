@@ -304,6 +304,21 @@ ApplicationWindow {
         }
     }
 
+    Item {
+        id: renderHost
+        objectName: "renderHost"
+
+        anchors {
+            top: parent.top
+            left: parent.left
+            right: parent.right
+            bottom: status.top
+        }
+
+        layer.enabled: true
+        z: -1
+    }
+
     StatusBar {
         id: status
 

@@ -27,17 +27,12 @@ Item {
 
     function apply() {
         if (setting.value !== value) {
-            console.log("Changing value", setting.value, "of setting",
-                        setting.label, "to", value)
             setting.value = value
         }
     }
 
     function sync() {
         if (value !== setting.value) {
-
-            // console.log("Syncing setting", setting.label, "from", value, "to",
-            //             setting.value)
             value = setting.value
         }
     }

@@ -1,3 +1,4 @@
+#include <qdebug.h>
 #include "core/core.h"
 #include "core/cpu_manager.h"
 #include "emu_thread.h"
@@ -20,6 +21,7 @@ void EmuThread::run() {
 
     // Main process has been loaded. Make the context current to this thread and begin GPU and CPU
     // execution.
+    qDebug() << "Obtaining Context";
     gpu.ObtainContext();
 
     emit LoadProgress(VideoCore::LoadCallbackStage::Prepare, 0, 0);
@@ -32,14 +34,25 @@ void EmuThread::run() {
     }
     emit LoadProgress(VideoCore::LoadCallbackStage::Complete, 0, 0);
 
+    qDebug() << "Releaseing Context";
+
     gpu.ReleaseContext();
+
+    qDebug() << "Starting";
+
     gpu.Start();
 
+    qDebug() << "GPU Ready";
+
     QtCommon::system->GetCpuManager().OnGpuReady();
+
+    qDebug() << "Debugger stuff.";
 
     if (QtCommon::system->DebuggerEnabled()) {
         QtCommon::system->InitializeDebugger();
     }
+
+    qDebug() << "Beginning EmuThread";
 
     while (!stop_token.stop_requested()) {
         std::unique_lock lk{m_should_run_mutex};
@@ -57,6 +70,8 @@ void EmuThread::run() {
             EmulationResumed(lk);
         }
     }
+
+    qDebug() << "Obtaining Context";
 
     // Shutdown the main emulated process
     QtCommon::system->DetachDebugger();

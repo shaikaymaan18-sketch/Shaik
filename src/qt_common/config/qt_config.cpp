@@ -562,23 +562,11 @@ void QtConfig::SaveMultiplayerValues() {
 }
 
 std::vector<Settings::BasicSetting*>& QtConfig::FindRelevantList(Settings::Category category) {
-    qDebug() << "-- Category" << u32(category);
-    auto log_list = [](auto list, QString label) {
-        qDebug() << "-- !" << label;
-        for (auto s : list) {
-            qDebug() << "-- *" << s->GetLabel();
-        }
-    };
     auto& list = Settings::values.linkage.by_category[category];
-    log_list(list, QStringLiteral("Settings"));
-
     if (!list.empty())
         return list;
 
-    auto& list2 = UISettings::values.linkage.by_category[category];
-    log_list(list2, QStringLiteral("UISettings"));
-
-    return list2;
+    return UISettings::values.linkage.by_category[category];
 }
 
 void QtConfig::ReadQtControlPlayerValues(std::size_t player_index) {

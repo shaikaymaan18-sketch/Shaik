@@ -45,6 +45,8 @@ private:
     InputCommon::TasInput::TasState last_tas_state;
 
     QQuickItem* child_item = nullptr;
+    QQuickWindow* m_window;
+    QQuickItem* m_parent;
 
     void initializeNull();
     bool initializeVulkan();

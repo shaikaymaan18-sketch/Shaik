@@ -30,7 +30,6 @@ NativeDialog {
 
     function applyConfigs() {
         configs.forEach(config => {
-                            // console.log(config)
                             config.apply()
                         })
 
@@ -39,7 +38,6 @@ NativeDialog {
 
     function syncConfigs() {
         configs.forEach(setting => {
-                            console.log(setting)
                             setting.sync()
                         })
     }
