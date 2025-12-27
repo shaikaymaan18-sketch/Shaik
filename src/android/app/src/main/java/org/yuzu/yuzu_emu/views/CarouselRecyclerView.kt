@@ -55,6 +55,16 @@ class CarouselRecyclerView @JvmOverloads constructor(
     private val preferences =
         PreferenceManager.getDefaultSharedPreferences(YuzuApplication.appContext)
 
+    private val carouselAdapterObserver = object : RecyclerView.AdapterDataObserver() {
+        override fun onChanged() {
+            if (!pendingScrollAfterReload) return
+                doOnNextLayout {
+                    refreshView()
+                    pendingScrollAfterReload = false
+                }
+            }
+        }
+
     var flingMultiplier: Float = 1f
 
     var pendingScrollAfterReload: Boolean = false
@@ -68,6 +78,18 @@ class CarouselRecyclerView @JvmOverloads constructor(
 
     init {
         setChildrenDrawingOrderEnabled(true)
+    }
+
+    override fun setAdapter(adapter: Adapter<*>?) {
+        val oldAdapter = this.adapter as? GameAdapter
+
+        if (oldAdapter !== adapter) {
+            oldAdapter?.unregisterAdapterDataObserver(carouselAdapterObserver)
+        }
+
+        super.setAdapter(adapter)
+
+        (adapter as? GameAdapter)?.registerAdapterDataObserver(carouselAdapterObserver)
     }
 
     private fun calculateCenter(width: Int, paddingStart: Int, paddingEnd: Int): Int {
@@ -251,17 +273,6 @@ class CarouselRecyclerView @JvmOverloads constructor(
                 CAROUSEL_FLING_MULTIPLIER,
                 internalFlingMultiplier
             ).coerceIn(1f, 5f)
-
-            gameAdapter .registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
-                override fun onChanged() {
-                    if (pendingScrollAfterReload) {
-                        doOnNextLayout {
-                            refreshView()
-                            pendingScrollAfterReload = false
-                        }
-                    }
-                }
-            })
 
             // Detach SnapHelper during setup
             pagerSnapHelper?.attachToRecyclerView(null)
