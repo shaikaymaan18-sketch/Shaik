@@ -367,23 +367,33 @@ void CommandGenerator::GenerateBiquadFilterEffectCommand(const s16 buffer_offset
     EffectInfoBase::ParameterState param_state{};
     s8 channel_count = 0;
 
-    if (render_context.behavior->IsEffectInfoVersion2Supported()) {
-        const auto* parameter =
-            reinterpret_cast<const BiquadFilterInfo::ParameterVersion2*>(effect_info.GetParameter());
-        if (!parameter) {
-            LOG_ERROR(Service_Audio, "Biquad filter parameter is null");
-            return;
+    const void* raw_data = effect_info.GetParameter();
+    if (!raw_data) {
+        LOG_ERROR(Service_Audio, "Biquad filter parameter is null");
+        return;
+    }
+
+    // This is a simple fix for Metroid Prime Remastered as it can throw the emulator both a v1 and v2 parameter. I wasn't sure a proper way to use this so did a simple heuristic check.
+    // This should mostly work as since the binary data is misaligned state and channel_count should almost always be a corrupted value
+    bool is_version2_active = false;
+    if (render_context.behavior->IsEffectInfoVersion2Supported() ) {
+        const auto* parameter_v2 =
+            reinterpret_cast<const BiquadFilterInfo::ParameterVersion2*>(raw_data);
+
+        if (parameter_v2->state <= EffectInfoBase::ParameterState::Updated &&
+            parameter_v2->channel_count > 0) {
+            is_version2_active = true;
+
+            state = parameter_v2->state;
+            channel_count = parameter_v2->channel_count;
         }
-        param_state = parameter->state;
-        channel_count = parameter->channel_count;
-    } else {
+    }
+
+    if (!is_version2_active) {
         const auto* parameter =
-            reinterpret_cast<const BiquadFilterInfo::ParameterVersion1*>(effect_info.GetParameter());
-        if (!parameter) {
-            LOG_ERROR(Service_Audio, "Biquad filter parameter is null");
-            return;
-        }
-        param_state = parameter->state;
+            reinterpret_cast<const BiquadFilterInfo::ParameterVersion1*>(raw_data);
+
+        state = parameter->state;
         channel_count = parameter->channel_count;
     }
 

@@ -271,24 +271,34 @@ void CommandBuffer::GenerateBiquadFilterCommand(const s32 node_id, EffectInfoBas
     const auto state{reinterpret_cast<VoiceState::BiquadFilterState*>(
         effect_info.GetStateBuffer() + channel * sizeof(VoiceState::BiquadFilterState))};
 
+    // This is a simple fix for Metroid Prime Remastered as it can throw the emulator both a v1 and v2 parameter. I wasn't sure a proper way to use this so did a simple heuristic check.
+    // This should mostly work as since the binary data is misaligned state and channel_count should almost always be a corrupted value
+    bool is_version2_active = false;
     if (behavior->IsEffectInfoVersion2Supported()) {
-        const auto& p{
+        const auto& p2{
             *reinterpret_cast<BiquadFilterInfo::ParameterVersion2*>(effect_info.GetParameter())};
 
-        if (!IsChannelCountValid(p.channel_count) || channel < 0 || channel >= p.channel_count) {
-            return;
+        if (p2.state <= EffectInfoBase::ParameterState::Updated &&
+            p2.channel_count > 0) {
+            is_version2_active = true;
+
+            if (!IsChannelCountValid(p2.channel_count) || channel < 0 || channel >= p2.channel_count) {
+                return;
+            }
+
+            cmd.input = buffer_offset + p2.inputs[channel];
+            cmd.output = buffer_offset + p2.outputs[channel];
+
+            // Convert float coefficients to Q2.14 fixed-point as expected by the legacy DSP path.
+            cmd.biquad.b[0] = ToQ14Clamped(p2.b[0]);
+            cmd.biquad.b[1] = ToQ14Clamped(p2.b[1]);
+            cmd.biquad.b[2] = ToQ14Clamped(p2.b[2]);
+            cmd.biquad.a[0] = ToQ14Clamped(p2.a[0]);
+            cmd.biquad.a[1] = ToQ14Clamped(p2.a[1]);
         }
+    }
 
-        cmd.input = buffer_offset + p.inputs[channel];
-        cmd.output = buffer_offset + p.outputs[channel];
-
-        // Convert float coefficients to Q2.14 fixed-point as expected by the legacy DSP path.
-        cmd.biquad.b[0] = ToQ14Clamped(p.b[0]);
-        cmd.biquad.b[1] = ToQ14Clamped(p.b[1]);
-        cmd.biquad.b[2] = ToQ14Clamped(p.b[2]);
-        cmd.biquad.a[0] = ToQ14Clamped(p.a[0]);
-        cmd.biquad.a[1] = ToQ14Clamped(p.a[1]);
-    } else {
+    if (!is_version2_active) {
         const auto& p{
             *reinterpret_cast<BiquadFilterInfo::ParameterVersion1*>(effect_info.GetParameter())};
 
