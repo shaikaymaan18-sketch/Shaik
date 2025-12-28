@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 // SPDX-FileCopyrightText: Copyright 2021 yuzu Emulator Project
 // SPDX-FileCopyrightText: Copyright 2014 The Android Open Source Project
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -88,8 +85,6 @@ private:
     s32 next_callback_ticket{};
     s32 current_callback_ticket{};
     std::condition_variable_any callback_condition;
-
-    u64 position;
 
     Service::Nvidia::NvCore::NvMap& nvmap;
 };
