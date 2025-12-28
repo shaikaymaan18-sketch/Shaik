@@ -941,7 +941,7 @@ void BufferQueueProducer::Transact(u32 code, std::span<const u8> parcel_data,
 
     const auto serialized = parcel_out.Serialize();
     std::memcpy(parcel_reply.data(), serialized.data(),
-                std::min(parcel_reply.size(), serialized.size()));
+                (std::min)(parcel_reply.size(), serialized.size()));
 }
 
 Kernel::KReadableEvent* BufferQueueProducer::GetNativeHandle(u32 type_id) {
