@@ -290,15 +290,13 @@ void CommandBuffer::GenerateBiquadFilterCommand(const s32 node_id, EffectInfoBas
         const auto& parameter{
             *reinterpret_cast<BiquadFilterInfo::ParameterVersion1*>(effect_info.GetParameter())};
 
-        if (!IsChannelCountValid(parameter.channel_count) || channel < 0 || channel >= parameter.channel_count) {
-            return;
+        if (IsChannelCountValid(parameter.channel_count) && channel >= 0 && channel < parameter.channel_count) {
+            cmd.input = buffer_offset + parameter.inputs[channel];
+            cmd.output = buffer_offset + parameter.outputs[channel];
+
+            cmd.biquad.b = parameter.b;
+            cmd.biquad.a = parameter.a;
         }
-
-        cmd.input = buffer_offset + parameter.inputs[channel];
-        cmd.output = buffer_offset + parameter.outputs[channel];
-
-        cmd.biquad.b = parameter.b;
-        cmd.biquad.a = parameter.a;
     }
 
     // Effects always use the fixed-point coefficient path on the DSP.
