@@ -268,9 +268,9 @@ class SettingsFragment : Fragment() {
     ) { uri ->
         if (uri != null) {
             val pathSetting = settingsViewModel.clickedItem as? PathSetting ?: return@registerForActivityResult
-            val realPath = PathUtil.getPathFromUri(uri)
-            if (realPath != null) {
-                handleSelectedPath(pathSetting, realPath)
+            val rawPath = PathUtil.getPathFromUri(uri)
+            if (rawPath != null) {
+                handleSelectedPath(pathSetting, rawPath)
             } else {
                 Toast.makeText(
                     requireContext(),
@@ -374,6 +374,8 @@ class SettingsFragment : Fragment() {
         pathSetting.setPath(path)
         NativeConfig.saveGlobalConfig()
 
+        NativeConfig.reloadGlobalConfig()
+
         val messageResId = if (pathSetting.pathType == PathSetting.PathType.SAVE_DATA) {
             R.string.save_directory_set
         } else {
@@ -416,7 +418,7 @@ class SettingsFragment : Fragment() {
                 }
             }
             .setNegativeButton(R.string.cancel) { _, _ ->
-                setPathAndNotify(pathSetting, defaultPath)
+                // just dismiss
             }
             .show()
     }
