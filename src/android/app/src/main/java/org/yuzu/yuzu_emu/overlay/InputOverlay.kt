@@ -668,14 +668,14 @@ class InputOverlay(context: Context, attrs: AttributeSet?) :
         }
     }
 
-    fun refreshControls() {
+    fun refreshControls(gameless: Boolean = false) {
         // Remove all the overlay buttons from the HashSet.
         overlayButtons.clear()
         overlayDpads.clear()
         overlayJoysticks.clear()
 
         // Add all the enabled overlay items back to the HashSet.
-        if (BooleanSetting.SHOW_INPUT_OVERLAY.getBoolean()) {
+        if (gameless || BooleanSetting.SHOW_INPUT_OVERLAY.getBoolean()) {
             addOverlayControls(layout)
         }
         invalidate()

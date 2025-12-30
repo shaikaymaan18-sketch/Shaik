@@ -201,6 +201,10 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
         super.onCreate(savedInstanceState)
         updateOrientation()
 
+        if (args.overlayGamelessEditMode) {
+            return
+        }
+
         val intent = requireActivity().intent
         val intentUri: Uri? = intent.data
         intentGame = null
@@ -558,6 +562,11 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
             return
         }
 
+        if (args.overlayGamelessEditMode) {
+            setupOverlayGamelessEditMode()
+            return
+        }
+
         if (game == null) {
             Log.warning(
                 "[EmulationFragment] Game not yet initialized in onViewCreated - will be set up by async intent handler"
@@ -566,6 +575,39 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
         }
 
         completeViewSetup()
+    }
+
+
+    private fun setupOverlayGamelessEditMode() {
+        binding.surfaceInputOverlay.post {
+            binding.surfaceInputOverlay.refreshControls(gameless = true)
+        }
+
+        binding.doneControlConfig.setOnClickListener {
+            finishOverlayGamelessEditMode()
+        }
+
+        binding.doneControlConfig.visibility = View.VISIBLE
+        binding.surfaceInputOverlay.setIsInEditMode(true)
+        binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+        binding.surfaceInputOverlay.visibility = View.VISIBLE
+        binding.loadingIndicator.visibility = View.GONE
+
+        // in gameless edit mode, back = done
+        requireActivity().onBackPressedDispatcher.addCallback(
+            viewLifecycleOwner,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    finishOverlayGamelessEditMode()
+                }
+            }
+        )
+    }
+
+    private fun finishOverlayGamelessEditMode() {
+        binding.surfaceInputOverlay.setIsInEditMode(false)
+        NativeConfig.saveGlobalConfig()
+        requireActivity().finish()
     }
 
     private fun completeViewSetup() {
@@ -900,9 +942,12 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
                 b.surfaceInputOverlay.setVisible(visible = false, gone = false)
             }
         } else {
-            b.surfaceInputOverlay.setVisible(
+            val shouldShowOverlay = if (args.overlayGamelessEditMode) {
+                true
+            } else {
                 showInputOverlay && emulationViewModel.emulationStarted.value
-            )
+            }
+            b.surfaceInputOverlay.setVisible(shouldShowOverlay)
             if (!isInFoldableLayout) {
                 if (newConfig.orientation == Configuration.ORIENTATION_PORTRAIT) {
                     b.surfaceInputOverlay.layout = OverlayLayout.Portrait

@@ -10,6 +10,7 @@ import androidx.preference.PreferenceManager
 import org.yuzu.yuzu_emu.NativeLibrary
 import org.yuzu.yuzu_emu.R
 import org.yuzu.yuzu_emu.YuzuApplication
+import org.yuzu.yuzu_emu.activities.EmulationActivity
 import org.yuzu.yuzu_emu.features.input.NativeInput
 import org.yuzu.yuzu_emu.features.input.model.AnalogDirection
 import org.yuzu.yuzu_emu.features.input.model.NativeAnalog
@@ -294,6 +295,16 @@ class SettingsFragmentPresenter(
 
     private fun addInputOverlaySettings(sl: ArrayList<SettingsItem>) {
         sl.apply {
+            add(BooleanSetting.SHOW_INPUT_OVERLAY.key)
+            add(
+                LaunchableSetting(
+                    titleId = R.string.edit_overlay_layout,
+                    descriptionId = R.string.edit_overlay_layout_description,
+                    launchIntent = { context ->
+                        EmulationActivity.launchForOverlayEdit(context)
+                    }
+                )
+            )
             add(BooleanSetting.ENABLE_INPUT_OVERLAY_AUTO_HIDE.key)
             add(IntSetting.INPUT_OVERLAY_AUTO_HIDE.key)
             add(BooleanSetting.HIDE_OVERLAY_ON_CONTROLLER_INPUT.key)
