@@ -1576,6 +1576,8 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
             findItem(R.id.menu_dpad_slide).isChecked = BooleanSetting.DPAD_SLIDE.getBoolean()
             findItem(R.id.menu_show_overlay).isChecked =
                 BooleanSetting.SHOW_INPUT_OVERLAY.getBoolean()
+            findItem(R.id.menu_snap_to_grid).isChecked =
+                BooleanSetting.OVERLAY_SNAP_TO_GRID.getBoolean()
             findItem(R.id.menu_haptics).isChecked = BooleanSetting.HAPTIC_FEEDBACK.getBoolean()
             findItem(R.id.menu_touchscreen).isChecked = BooleanSetting.TOUCHSCREEN.getBoolean()
         }
@@ -1601,6 +1603,13 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
                     binding.drawerLayout.close()
                     binding.surfaceInputOverlay.requestFocus()
                     startConfiguringControls()
+                    true
+                }
+
+                R.id.menu_snap_to_grid -> {
+                    it.isChecked = !it.isChecked
+                    BooleanSetting.OVERLAY_SNAP_TO_GRID.setBoolean(it.isChecked)
+                    binding.surfaceInputOverlay.invalidate()
                     true
                 }
 

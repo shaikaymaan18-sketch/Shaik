@@ -8,6 +8,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Point
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
@@ -60,6 +62,12 @@ class InputOverlay(context: Context, attrs: AttributeSet?) :
     private var hasMoved = false
     private val moveThreshold = 20f
 
+    private val gridPaint = Paint().apply {
+        color = Color.argb(60, 255, 255, 255)
+        strokeWidth = 1f
+        style = Paint.Style.STROKE
+    }
+
     private lateinit var windowInsets: WindowInsets
 
     var layout = OverlayLayout.Landscape
@@ -91,6 +99,12 @@ class InputOverlay(context: Context, attrs: AttributeSet?) :
 
     override fun draw(canvas: Canvas) {
         super.draw(canvas)
+
+        // Draw grid when in edit mode and snap-to-grid is enabled
+        if (inEditMode && BooleanSetting.OVERLAY_SNAP_TO_GRID.getBoolean()) {
+            drawGrid(canvas)
+        }
+
         for (button in overlayButtons) {
             button.draw(canvas)
         }
@@ -99,6 +113,26 @@ class InputOverlay(context: Context, attrs: AttributeSet?) :
         }
         for (joystick in overlayJoysticks) {
             joystick.draw(canvas)
+        }
+    }
+
+    private fun drawGrid(canvas: Canvas) {
+        val gridSize = IntSetting.OVERLAY_GRID_SIZE.getInt()
+        val width = canvas.width
+        val height = canvas.height
+
+        // Draw vertical lines
+        var x = 0
+        while (x <= width) {
+            canvas.drawLine(x.toFloat(), 0f, x.toFloat(), height.toFloat(), gridPaint)
+            x += gridSize
+        }
+
+        // Draw horizontal lines
+        var y = 0
+        while (y <= height) {
+            canvas.drawLine(0f, y.toFloat(), width.toFloat(), y.toFloat(), gridPaint)
+            y += gridSize
         }
     }
 
@@ -713,6 +747,8 @@ class InputOverlay(context: Context, attrs: AttributeSet?) :
             scaleDialog?.dismiss()
             scaleDialog = null
         }
+
+        invalidate()
     }
 
     private fun showScaleDialog(
@@ -867,6 +903,7 @@ class InputOverlay(context: Context, attrs: AttributeSet?) :
     }
 
     companion object {
+
         // Increase this number every time there is a breaking change to every overlay layout
         const val OVERLAY_VERSION = 1
 

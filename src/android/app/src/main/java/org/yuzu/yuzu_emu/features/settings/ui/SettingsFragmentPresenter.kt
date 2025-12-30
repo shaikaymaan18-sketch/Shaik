@@ -296,6 +296,8 @@ class SettingsFragmentPresenter(
     private fun addInputOverlaySettings(sl: ArrayList<SettingsItem>) {
         sl.apply {
             add(BooleanSetting.SHOW_INPUT_OVERLAY.key)
+            add(BooleanSetting.OVERLAY_SNAP_TO_GRID.key)
+            add(IntSetting.OVERLAY_GRID_SIZE.key)
             add(
                 LaunchableSetting(
                     titleId = R.string.edit_overlay_layout,
@@ -305,6 +307,7 @@ class SettingsFragmentPresenter(
                     }
                 )
             )
+            add(HeaderSetting(R.string.input_overlay_behavior))
             add(BooleanSetting.ENABLE_INPUT_OVERLAY_AUTO_HIDE.key)
             add(IntSetting.INPUT_OVERLAY_AUTO_HIDE.key)
             add(BooleanSetting.HIDE_OVERLAY_ON_CONTROLLER_INPUT.key)

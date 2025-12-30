@@ -374,6 +374,23 @@ abstract class SettingsItem(
             )
             put(
                 SwitchSetting(
+                    BooleanSetting.OVERLAY_SNAP_TO_GRID,
+                    titleId = R.string.overlay_snap_to_grid,
+                    descriptionId = R.string.overlay_snap_to_grid_description
+                )
+            )
+            put(
+                SliderSetting(
+                    IntSetting.OVERLAY_GRID_SIZE,
+                    titleId = R.string.overlay_grid_size,
+                    descriptionId = R.string.overlay_grid_size_description,
+                    min = 16,
+                    max = 128,
+                    units = "px"
+                )
+            )
+            put(
+                SwitchSetting(
                     BooleanSetting.ENABLE_INPUT_OVERLAY_AUTO_HIDE,
                     titleId = R.string.enable_input_overlay_auto_hide,
                 )
