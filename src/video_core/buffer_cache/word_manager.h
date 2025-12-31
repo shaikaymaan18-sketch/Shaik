@@ -11,7 +11,6 @@
 #include <limits>
 #include <span>
 #include <utility>
-#include <immintrin.h>
 
 #include "common/alignment.h"
 #include "common/common_funcs.h"

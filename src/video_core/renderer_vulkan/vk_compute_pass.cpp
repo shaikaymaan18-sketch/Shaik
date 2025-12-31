@@ -822,7 +822,7 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
         
         const VkImageMemoryBarrier pre_barrier{
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = is_first ? VkAccessFlags{} : VK_ACCESS_SHADER_READ_BIT,
+            .srcAccessMask = is_first ? VkAccessFlags{} : static_cast<VkAccessFlags>(VK_ACCESS_SHADER_READ_BIT),
             .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
             .oldLayout = is_first ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_GENERAL,
             .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
