@@ -108,12 +108,15 @@ class GradientBorderCardView @JvmOverloads constructor(
         if (pressed) {
             showGradientBorder = true
             invalidate()
+        } else {
+            showGradientBorder = isFocused || isSelected
+            invalidate()
         }
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (showGradientBorder && !isPressed) {
+        if (showGradientBorder) {
             canvas.drawPath(borderPath, borderPaint)
         }
     }
