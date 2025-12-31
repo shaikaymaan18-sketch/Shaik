@@ -26,10 +26,8 @@ static void RunThread(std::stop_token stop_token, Core::System& system,
     Common::SetCurrentThreadName("GPU");
     Common::SetCurrentThreadPriority(Common::ThreadPriority::Critical);
     system.RegisterHostThread();
-
     auto current_context = context.Acquire();
     VideoCore::RasterizerInterface* const rasterizer = renderer.ReadRasterizer();
-
     CommandDataContainer next;
 
     while (!stop_token.stop_requested()) {
@@ -37,18 +35,29 @@ static void RunThread(std::stop_token stop_token, Core::System& system,
         if (stop_token.stop_requested()) {
             break;
         }
-        if (auto* submit_list = std::get_if<SubmitListCommand>(&next.data)) {
-            scheduler.Push(submit_list->channel, std::move(submit_list->entries));
-        } else if (std::holds_alternative<GPUTickCommand>(next.data)) {
-            system.GPU().TickWork();
-        } else if (const auto* flush = std::get_if<FlushRegionCommand>(&next.data)) {
-            rasterizer->FlushRegion(flush->addr, flush->size);
-        } else if (const auto* invalidate = std::get_if<InvalidateRegionCommand>(&next.data)) {
-            rasterizer->OnCacheInvalidation(invalidate->addr, invalidate->size);
-        } else {
-            ASSERT(false);
-        }
-        state.signaled_fence.store(next.fence);
+
+        std::visit(
+            [&](auto&& cmd) {
+                using T = std::decay_t<decltype(cmd)>;
+
+                if constexpr (std::is_same_v<T, SubmitListCommand>) {
+                    scheduler.Push(cmd.channel, std::move(cmd.entries));
+                } else if constexpr (std::is_same_v<T, GPUTickCommand>) {
+                    system.GPU().TickWork();
+                } else if constexpr (std::is_same_v<T, FlushRegionCommand>) {
+                    rasterizer->FlushRegion(cmd.addr, cmd.size);
+                } else if constexpr (std::is_same_v<T, InvalidateRegionCommand>) {
+                    rasterizer->OnCacheInvalidation(cmd.addr, cmd.size);
+                } else if constexpr (std::is_same_v<T, FlushAndInvalidateRegionCommand>) {
+                    rasterizer->FlushAndInvalidateRegion(cmd.addr, cmd.size);
+                } else if constexpr (!std::is_same_v<T, std::monostate>) {
+                    ASSERT(false);
+                }
+            },
+            next.data);
+
+        state.signaled_fence.store(next.fence, std::memory_order_release);
+
         if (next.block) {
             // We have to lock the write_lock to ensure that the condition_variable wait not get a
             // race between the check and the lock itself.

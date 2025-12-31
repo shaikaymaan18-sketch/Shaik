@@ -614,6 +614,9 @@ public:
 private:
     void Execute();
     void Blend(const ConfigStruct& config, const SlotStruct& slot);
+    void BlendWithColorMatrix(const SlotStruct& slot, u32 source_left, u32 source_right,
+                                u32 source_top, u32 source_bottom, u32 in_surface_width,
+                                u32 out_surface_width, u32 rect_left);
     void ReadProgressiveY8__V8U8_N420(const SlotStruct& slot, std::span<const PlaneOffsets> offsets, std::shared_ptr<const FFmpeg::Frame> frame, bool planar, bool interlaced);
     void ReadInterlacedY8__V8U8_N420(const SlotStruct& slot, std::span<const PlaneOffsets> offsets, std::shared_ptr<const FFmpeg::Frame> frame, bool planar, bool top_field);
     void ReadY8__V8U8_N420(const SlotStruct& slot, std::span<const PlaneOffsets> offsets, std::shared_ptr<const FFmpeg::Frame> frame, bool planar);

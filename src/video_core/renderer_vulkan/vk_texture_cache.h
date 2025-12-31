@@ -48,7 +48,7 @@ public:
 
     void Finish();
 
-    StagingBufferRef UploadStagingBuffer(size_t size);
+    StagingBufferRef UploadStagingBuffer(size_t size, bool deferred = false);
 
     StagingBufferRef DownloadStagingBuffer(size_t size, bool deferred = false);
 
@@ -86,7 +86,10 @@ public:
     }
 
     void AccelerateImageUpload(Image&, const StagingBufferRef&,
-                               std::span<const VideoCommon::SwizzleParameters>);
+                               std::span<const VideoCommon::SwizzleParameters>,
+                               u32 z_start, u32 z_count);
+
+    void ClearImage(Image& image, u32 clear_value);
 
     void InsertUploadMemoryBarrier() {}
 
@@ -122,6 +125,11 @@ public:
     BlitImageHelper& blit_image_helper;
     RenderPassCache& render_pass_cache;
     std::optional<ASTCDecoderPass> astc_decoder_pass;
+
+    std::optional<BlockLinearUnswizzle3DPass> bl3d_unswizzle_pass;
+    vk::Buffer swizzle_table_buffer;
+    VkDeviceSize swizzle_table_size = 0;
+
     std::unique_ptr<MSAACopyPass> msaa_copy_pass;
     const Settings::ResolutionScalingInfo& resolution;
     std::array<std::vector<VkFormat>, VideoCore::Surface::MaxPixelFormat> view_formats;
@@ -159,6 +167,8 @@ public:
     void DownloadMemory(const StagingBufferRef& map,
                         std::span<const VideoCommon::BufferImageCopy> copies);
 
+    void AllocateComputeUnswizzleImage();
+
     [[nodiscard]] VkImage Handle() const noexcept {
         return *(this->*current_image);
     }
@@ -184,6 +194,8 @@ public:
 
     bool ScaleDown(bool ignore = false);
 
+    friend class BlockLinearUnswizzle3DPass;
+
 private:
     bool BlitScaleHelper(bool scale_up);
 
@@ -194,6 +206,12 @@ private:
 
     vk::Image original_image;
     vk::Image scaled_image;
+
+    vk::Buffer compute_unswizzle_buffer;
+    VkDeviceSize compute_unswizzle_buffer_size = 0;
+    bool has_compute_unswizzle_buffer = false;
+
+    void AllocateComputeUnswizzleBuffer();
 
     // Use a pointer to field because it is relative, so that the object can be
     // moved without breaking the reference.

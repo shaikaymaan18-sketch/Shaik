@@ -121,8 +121,12 @@ protected:
     Tegra::MemoryManager& memory_manager;
 
 private:
+    using MethodHandler = void (CDmaPusher::*)(u32 method, u32 arg);
+
     /// Process the command entry
     void ProcessEntries(std::stop_token stop_token);
+    void ExecuteControlMethod(u32 method, u32 arg);
+    void ExecuteThiMethod(u32 method, u32 arg);
 
     /// Invoke command class devices to execute the command based on the current state
     void ExecuteCommand(u32 state_offset, u32 data);
