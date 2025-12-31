@@ -25,9 +25,9 @@ object Settings {
         SECTION_INPUT_PLAYER_SEVEN,
         SECTION_INPUT_PLAYER_EIGHT,
         SECTION_APP_SETTINGS(R.string.app_settings),
+        SECTION_CUSTOM_PATHS(R.string.preferences_custom_paths),
         SECTION_DEBUG(R.string.preferences_debug),
         SECTION_APPLETS(R.string.applets_menu);
-        SECTION_CUSTOM_PATHS(R.string.preferences_custom_paths);
     }
 
     fun getPlayerString(player: Int): String =
