@@ -1996,6 +1996,10 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
     }
 
     fun handleScreenTap(isLongTap: Boolean) {
+        if (binding.surfaceInputOverlay.isGamelessMode()) {
+            return
+        }
+
         val autoHideSeconds = IntSetting.INPUT_OVERLAY_AUTO_HIDE.getInt()
         val shouldProceed = BooleanSetting.SHOW_INPUT_OVERLAY.getBoolean() && BooleanSetting.ENABLE_INPUT_OVERLAY_AUTO_HIDE.getBoolean()
 
@@ -2017,6 +2021,10 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
     }
 
     private fun initializeOverlayAutoHide() {
+        if (binding.surfaceInputOverlay.isGamelessMode()) {
+            return
+        }
+
         val autoHideSeconds = IntSetting.INPUT_OVERLAY_AUTO_HIDE.getInt()
         val autoHideEnabled = BooleanSetting.ENABLE_INPUT_OVERLAY_AUTO_HIDE.getBoolean()
         val showOverlay = BooleanSetting.SHOW_INPUT_OVERLAY.getBoolean()

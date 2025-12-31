@@ -52,6 +52,7 @@ class InputOverlay(context: Context, attrs: AttributeSet?) :
     private val overlayJoysticks: MutableSet<InputOverlayDrawableJoystick> = HashSet()
 
     private var inEditMode = false
+    private var gamelessMode = false
     private var buttonBeingConfigured: InputOverlayDrawableButton? = null
     private var dpadBeingConfigured: InputOverlayDrawableDpad? = null
     private var joystickBeingConfigured: InputOverlayDrawableJoystick? = null
@@ -703,13 +704,18 @@ class InputOverlay(context: Context, attrs: AttributeSet?) :
     }
 
     fun refreshControls(gameless: Boolean = false) {
+        // Store gameless mode if set to true
+        if (gameless) {
+            gamelessMode = true
+        }
+
         // Remove all the overlay buttons from the HashSet.
         overlayButtons.clear()
         overlayDpads.clear()
         overlayJoysticks.clear()
 
         // Add all the enabled overlay items back to the HashSet.
-        if (gameless || BooleanSetting.SHOW_INPUT_OVERLAY.getBoolean()) {
+        if (gamelessMode || BooleanSetting.SHOW_INPUT_OVERLAY.getBoolean()) {
             addOverlayControls(layout)
         }
         invalidate()
@@ -746,10 +752,13 @@ class InputOverlay(context: Context, attrs: AttributeSet?) :
         if (!editMode) {
             scaleDialog?.dismiss()
             scaleDialog = null
+            gamelessMode = false
         }
 
         invalidate()
     }
+
+    fun isGamelessMode(): Boolean = gamelessMode
 
     private fun showScaleDialog(
         button: InputOverlayDrawableButton?,
