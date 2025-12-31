@@ -1,17 +1,20 @@
 # Caveats
 
 <!-- TOC -->
-- [Caveats](#caveats)
-  - [Arch Linux](#arch-linux)
-  - [Gentoo Linux](#gentoo-linux)
-  - [macOS](#macos)
-  - [Solaris](#solaris)
-  - [HaikuOS](#haikuos)
-  - [OpenBSD](#openbsd)
-  - [FreeBSD](#freebsd)
-  - [NetBSD](#netbsd)
-  - [MSYS2](#msys2)
-  - [Windows 8.1 and below](#windows-81-and-below)
+- [Arch Linux](#arch-linux)
+- [Gentoo Linux](#gentoo-linux)
+- [macOS](#macos)
+- [Solaris](#solaris)
+- [HaikuOS](#haikuos)
+- [OpenBSD](#openbsd)
+- [FreeBSD](#freebsd)
+- [NetBSD](#netbsd)
+- [MSYS2](#msys2)
+- [RedoxOS](#redoxos)
+- [Windows](#windows)
+  - [Windows 7, Windows 8 and Windows 8.1](#windows-7-windows-8-and-windows-81)
+  - [Windows Vista and below](#windows-vista-and-below)
+  - [Windows on ARM](#windows-on-arm)
 <!-- /TOC -->
 
 ## Arch Linux
@@ -49,6 +52,7 @@ export PATH="$PATH:$PWD"
 ```
 
 Default MESA is a bit outdated, the following environment variables should be set for a smoother experience:
+
 ```sh
 export MESA_GL_VERSION_OVERRIDE=4.6
 export MESA_GLSL_VERSION_OVERRIDE=460
@@ -94,6 +98,7 @@ Eden is not currently available as a port on FreeBSD, though it is in the works.
 The available OpenSSL port (3.0.17) is out-of-date, and using a bundled static library instead is recommended; to do so, add `-DYUZU_USE_BUNDLED_OPENSSL=ON` to your CMake configure command.
 
 Gamepad/controllers may not work on 15.0, this is due to an outdated SDL not responding well to the new `usbhid(2)` driver. To workaround this simply disable `usbhid(2)` (add the following to `/boot/loader.conf`):
+
 ```sh
 hw.usb.usbhid.enable="0"
 ```
@@ -101,6 +106,7 @@ hw.usb.usbhid.enable="0"
 ## NetBSD
 
 Install `pkgin` if not already `pkg_add pkgin`, see also the general [pkgsrc guide](https://www.netbsd.org/docs/pkgsrc/using.html). For NetBSD 10.1 provide `echo 'PKG_PATH="https://cdn.netbsd.org/pub/pkgsrc/packages/NetBSD/amd64/10.1/All/"' >/etc/pkg_install.conf`. If `pkgin` is taking too much time consider adding the following to `/etc/rc.conf`:
+
 ```sh
 ip6addrctl=YES
 ip6addrctl_policy=ipv4_prefer
@@ -114,9 +120,10 @@ System provides a default `g++-10` which doesn't support the current C++ codebas
 
 Make may error out when generating C++ headers of SPIRV shaders, hence it's recommended to use `gmake` over the default system one.
 
-[parallel/spirv-tools](https://iso.us.netbsd.org/pub/pkgsrc/current/pkgsrc/parallel/spirv-tools/index.html) isn't available in binary form and must be build from source.
+[parallel/spirv-tools](https://iso.us.netbsd.org/pub/pkgsrc/current/pkgsrc/parallel/spirv-tools/index.html) isn't available in binary form and must be built from source.
 
-Such that glslang is not available on NetBSD, to circumvent this simply build glslang by yourself:
+glslang is not available on NetBSD, to circumvent this simply build glslang by yourself:
+
 ```sh
 pkgin python313
 git clone --depth=1 https://github.com/KhronosGroup/glslang.git
@@ -129,13 +136,15 @@ cmake --install build
 
 However, pkgsrc is highly recommended, see [getting pkgsrc](https://iso.us.netbsd.org/pub/pkgsrc/current/pkgsrc/doc/pkgsrc.html#getting). You must get `current` not the `2025Q2` version.
 
-# DragonFlyBSD
+## DragonFlyBSD
 
 If `libstdc++.so.6` is not found (`GLIBCXX_3.4.30`) then attempt:
+
 ```sh
 rm /usr/local/lib/gcc11/libstdc++.so.6
 ln -s /usr/local/lib/gcc14/libstdc++.so /usr/local/lib/gcc11/libstdc++.so.6
 ```
+
 This may have unforeseen consequences of which we don't need to worry about for now.
 
 Default `g++` (and the libstdc++) is too outdated - so install `gcc14` and redirect CMake to the new compiler toolchain  `-DCMAKE_CXX_COMPILER=gcc14 -DCMAKE_C_COMPILER=g++14`.
@@ -146,13 +155,9 @@ If build hangs, use `hammer2 bulkfree`.
 
 ## MSYS2
 
-`qt6-static` isn't supported yet.
+Only the `MINGW64` environment is tested (or `CLANGARM64` on ARM); however, all of the others should work (in theory) sans `MINGW32`.
 
-Only the `MINGW64` environment is tested; however, all of the others should work (in theory) sans `MINGW32`.
-
-Currently, only FFmpeg can be used as a system dependency; the others will result in linker errors.
-
-When packaging an MSYS2 build, you will need to copy all dependent DLLs recursively alongside the `windeployqt6`; for example:
+When packaging an MSYS2 build that is NOT fully static, you will need to copy all dependent DLLs recursively alongside the `windeployqt6`; for example:
 
 ```sh
 # MSYS_TOOLCHAIN is typically just mingw64
