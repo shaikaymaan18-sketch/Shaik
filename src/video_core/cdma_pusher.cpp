@@ -36,67 +36,112 @@ void CDmaPusher::ProcessEntries(std::stop_token stop_token) {
     u32 mask{};
     bool incrementing{};
 
+    MethodHandler current_handler = (current_class == ChClassId::Control) 
+                                    ? &CDmaPusher::ExecuteControlMethod 
+                                    : &CDmaPusher::ExecuteThiMethod;
+
     while (!stop_token.stop_requested()) {
         {
             std::unique_lock l{command_mutex};
-            command_cv.wait(l, stop_token,
-                            [this]() { return command_lists.size() > 0; });
-            if (stop_token.stop_requested()) {
-                return;
-            }
+            command_cv.wait(l, stop_token, [this]() { return !command_lists.empty(); });
+            if (stop_token.stop_requested()) return;
 
             command_list = std::move(command_lists.front());
             command_lists.pop_front();
         }
 
-        size_t i = 0;
-        for (const auto value : command_list) {
-            i++;
+        auto it = command_list.begin();
+        const auto end = command_list.end();
+
+        while (it != end) {
             if (mask != 0) {
                 const auto lbs = static_cast<u32>(std::countr_zero(mask));
                 mask &= ~(1U << lbs);
-                ExecuteCommand(method_offset + lbs, value.raw);
-                continue;
-            } else if (count != 0) {
-                --count;
-                ExecuteCommand(method_offset, value.raw);
-                if (incrementing) {
-                    ++method_offset;
-                }
+                (this->*current_handler)(method_offset + lbs, (*it).raw);
+                ++it;
                 continue;
             }
+
+            if (count != 0) {
+                const u32 batch_size = std::min<u32>(count, static_cast<u32>(std::distance(it, end)));
+                
+                if (incrementing) {
+                    for (u32 j = 0; j < batch_size; ++j) {
+                        (this->*current_handler)(method_offset++, (*it).raw);
+                        ++it;
+                    }
+                } else {
+                    for (u32 j = 0; j < batch_size; ++j) {
+                        (this->*current_handler)(method_offset, (*it).raw);
+                        ++it;
+                    }
+                }
+                count -= batch_size;
+                continue;
+            }
+
+            const auto value = *it;
             const auto mode = value.submission_mode.Value();
+            ++it;
+
             switch (mode) {
-            case ChSubmissionMode::SetClass: {
+            case ChSubmissionMode::SetClass:
                 mask = value.value & 0x3f;
                 method_offset = value.method_offset;
                 current_class = static_cast<ChClassId>((value.value >> 6) & 0x3ff);
+                current_handler = (current_class == ChClassId::Control) 
+                                  ? &CDmaPusher::ExecuteControlMethod 
+                                  : &CDmaPusher::ExecuteThiMethod;
                 break;
-            }
             case ChSubmissionMode::Incrementing:
-            case ChSubmissionMode::NonIncrementing:
                 count = value.value;
                 method_offset = value.method_offset;
-                incrementing = mode == ChSubmissionMode::Incrementing;
+                incrementing = true;
+                break;
+            case ChSubmissionMode::NonIncrementing:
+                count = value.value;
+                method_offset = value.value;
+                method_offset = value.method_offset;
+                incrementing = false;
                 break;
             case ChSubmissionMode::Mask:
                 mask = value.value;
                 method_offset = value.method_offset;
                 break;
-            case ChSubmissionMode::Immediate: {
-                const u32 data = value.value & 0xfff;
-                method_offset = value.method_offset;
-                ExecuteCommand(method_offset, data);
+            case ChSubmissionMode::Immediate:
+                (this->*current_handler)(value.method_offset, value.value & 0xfff);
                 break;
-            }
             default:
-                LOG_ERROR(HW_GPU, "Bad command at index {} (bytes {:#X}), buffer size {}", i - 1,
-                          (i - 1) * sizeof(u32), command_list.size());
-                UNIMPLEMENTED_MSG("ChSubmission mode {} is not implemented!",
-                                  static_cast<u32>(mode));
                 break;
             }
         }
+    }
+}
+
+void CDmaPusher::ExecuteControlMethod(u32 method, u32 arg) {
+    // Control class specifically targets the host processor
+    host_processor->ProcessMethod(static_cast<Host1x::Control::Method>(method), arg);
+}
+
+void CDmaPusher::ExecuteThiMethod(u32 method, u32 arg) {
+    // THI (Tegra Host Interface) methods handle syncpoints and sub-processing
+    thi_regs.reg_array[method] = arg;
+
+    switch (static_cast<ThiMethod>(method)) {
+    case ThiMethod::IncSyncpt: {
+        const auto syncpoint_id = static_cast<u32>(arg & 0xFF);
+        auto& syncpoint_manager = host1x.GetSyncpointManager();
+        syncpoint_manager.IncrementGuest(syncpoint_id);
+        syncpoint_manager.IncrementHost(syncpoint_id);
+        break;
+    }
+    case ThiMethod::SetMethod1:
+        // Indirect method call
+        ProcessMethod(thi_regs.method_0, arg);
+        break;
+    default:
+        // Most methods are just simple register writes, which we did above
+        break;
     }
 }
 

@@ -24,6 +24,14 @@ if (NOT DEFINED ARCHITECTURE)
     message(FATAL_ERROR "Architecture didn't make it out of scope, did you delete DetectArchitecture.cmake?")
 endif()
 
+# Disable Warnings as Errors for MSVC
+if (MSVC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3 /WX-")
+    # Add specific warning suppressions for Qt6 compatibility
+    add_compile_options(/wd4996)  # Suppress deprecated function warnings
+    add_compile_options(/wd4267)  # Suppress size_t conversion warnings
+endif()
+
 # Needed for FFmpeg w/ VAAPI and DRM
 if (PLATFORM_OPENBSD)
     # OpenBSD 7.8 broke libcxx when upgrading, so we must define the PSTL backend manually
@@ -295,6 +303,29 @@ endif()
 # TODO: Compat list download
 if (NOT EXISTS ${PROJECT_BINARY_DIR}/${compat_json})
     file(WRITE ${PROJECT_BINARY_DIR}/${compat_json} "")
+endif()
+
+if(MSVC)
+    # Enable debug information for all build types
+    # This ensures PDB files are generated even in Release builds
+    add_compile_options(
+        /Zi  # Generate complete debugging information
+    )
+    
+    add_link_options(
+        /DEBUG:FULL  # Generate full debug info in PDB
+        /OPT:REF     # Keep optimizations but preserve debug info
+        /OPT:ICF     # Identical COMDAT folding (optimization)
+    )
+    
+    # Ensure PDB files are generated for all configurations
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /Zi")
+    set(CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL} /Zi")
+    
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEBUG:FULL")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /DEBUG:FULL")
+    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /DEBUG:FULL")
 endif()
 
 if (YUZU_LEGACY)

@@ -11,6 +11,7 @@
 #include <limits>
 #include <span>
 #include <utility>
+#include <immintrin.h>
 
 #include "common/alignment.h"
 #include "common/common_funcs.h"
@@ -182,12 +183,19 @@ public:
         return cpu_addr;
     }
 
-    static u64 ExtractBits(u64 word, size_t page_start, size_t page_end) {
-        constexpr size_t number_bits = sizeof(u64) * 8;
-        const size_t limit_page_end = number_bits - (std::min)(page_end, number_bits);
-        u64 bits = (word >> page_start) << page_start;
-        bits = (bits << limit_page_end) >> limit_page_end;
-        return bits;
+    static constexpr u64 ExtractBits(u64 word, size_t page_start, size_t page_end) {
+        constexpr size_t number_bits = 64;
+        
+        if (page_start >= number_bits) return 0;
+        if (page_end >= number_bits) page_end = number_bits;
+        if (page_start >= page_end) return 0;
+        
+        const size_t num_bits = page_end - page_start;
+        
+        if (num_bits == number_bits) return word;
+        
+        const u64 mask = ((1ULL << num_bits) - 1ULL) << page_start;
+        return word & mask;
     }
 
     static std::pair<size_t, size_t> GetWordPage(VAddr address) {
@@ -201,31 +209,86 @@ public:
     void IterateWords(size_t offset, size_t size, Func&& func) const {
         using FuncReturn = std::invoke_result_t<Func, std::size_t, u64>;
         static constexpr bool BOOL_BREAK = std::is_same_v<FuncReturn, bool>;
-        const size_t start = static_cast<size_t>(std::max<s64>(static_cast<s64>(offset), 0LL));
-        const size_t end = static_cast<size_t>(std::max<s64>(static_cast<s64>(offset + size), 0LL));
-        if (start >= SizeBytes() || end <= start) {
+        
+        // Early exit for invalid ranges
+        if (size == 0) return;
+        
+        const size_t size_bytes = SizeBytes();
+        if (offset >= size_bytes) return;
+        
+        // Clamp end to valid range (avoid signed arithmetic)
+        const size_t end = (offset + size > size_bytes) ? size_bytes : (offset + size);
+        if (end <= offset) return;
+        
+        // Calculate word indices (single call, cache results)
+        const size_t start_word = offset / BYTES_PER_WORD;
+        const size_t start_page = (offset / BYTES_PER_PAGE) % PAGES_PER_WORD;
+        
+        const size_t end_word = (end - 1) / BYTES_PER_WORD;  // Inclusive end
+        const size_t end_page = ((end - 1) / BYTES_PER_PAGE) % PAGES_PER_WORD;
+        
+        const size_t num_words = NumWords();
+        
+        // Fast path: single word case
+        if (start_word == end_word) {
+            const u64 mask = ExtractBits(~0ULL, start_page, end_page + 1);
+            if constexpr (BOOL_BREAK) {
+                func(start_word, mask);
+            } else {
+                func(start_word, mask);
+            }
             return;
         }
-        auto [start_word, start_page] = GetWordPage(start);
-        auto [end_word, end_page] = GetWordPage(end + BYTES_PER_PAGE - 1ULL);
-        const size_t num_words = NumWords();
-        start_word = (std::min)(start_word, num_words);
-        end_word = (std::min)(end_word, num_words);
-        const size_t diff = end_word - start_word;
-        end_word += (end_page + PAGES_PER_WORD - 1ULL) / PAGES_PER_WORD;
-        end_word = (std::min)(end_word, num_words);
-        end_page += diff * PAGES_PER_WORD;
-        constexpr u64 base_mask{~0ULL};
-        for (size_t word_index = start_word; word_index < end_word; word_index++) {
-            const u64 mask = ExtractBits(base_mask, start_page, end_page);
-            start_page = 0;
-            end_page -= PAGES_PER_WORD;
+        
+        // Multi-word case
+        size_t current_word = start_word;
+        
+        // First word (partial)
+        {
+            const u64 first_mask = ExtractBits(~0ULL, start_page, PAGES_PER_WORD);
             if constexpr (BOOL_BREAK) {
-                if (func(word_index, mask)) {
-                    return;
-                }
+                if (func(current_word, first_mask)) return;
             } else {
-                func(word_index, mask);
+                func(current_word, first_mask);
+            }
+            current_word++;
+        }
+        
+        // Middle words (full mask) - optimized loop
+        constexpr u64 full_mask = ~0ULL;
+        const size_t last_full_word = end_word;  // Last word needs special handling
+        
+        // Unroll by 4 for better throughput
+        for (; current_word + 3 < last_full_word; current_word += 4) {
+            if constexpr (BOOL_BREAK) {
+                if (func(current_word, full_mask)) return;
+                if (func(current_word + 1, full_mask)) return;
+                if (func(current_word + 2, full_mask)) return;
+                if (func(current_word + 3, full_mask)) return;
+            } else {
+                func(current_word, full_mask);
+                func(current_word + 1, full_mask);
+                func(current_word + 2, full_mask);
+                func(current_word + 3, full_mask);
+            }
+        }
+        
+        // Remaining full words
+        for (; current_word < last_full_word; current_word++) {
+            if constexpr (BOOL_BREAK) {
+                if (func(current_word, full_mask)) return;
+            } else {
+                func(current_word, full_mask);
+            }
+        }
+        
+        // Last word (partial)
+        if (current_word <= end_word && current_word < num_words) {
+            const u64 last_mask = ExtractBits(~0ULL, 0, end_page + 1);
+            if constexpr (BOOL_BREAK) {
+                func(current_word, last_mask);
+            } else {
+                func(current_word, last_mask);
             }
         }
     }

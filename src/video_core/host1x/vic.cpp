@@ -6,6 +6,7 @@
 
 #include <array>
 #include <tuple>
+#include <algorithm>
 #include <stdint.h>
 
 extern "C" {
@@ -302,116 +303,146 @@ void Vic::ReadY8__V8U8_N420(const SlotStruct& slot, std::span<const PlaneOffsets
 }
 
 void Vic::Blend(const ConfigStruct& config, const SlotStruct& slot) {
-    constexpr auto add_one([](u32 v) -> u32 { return v != 0 ? v + 1 : 0; });
+    // Simplified add_one - compiler will inline this
+    auto add_one = [](u32 v) -> u32 { return v + (v != 0); };
 
-    auto source_left{add_one(u32(slot.config.source_rect_left.Value()))};
-    auto source_right{add_one(u32(slot.config.source_rect_right.Value()))};
-    auto source_top{add_one(u32(slot.config.source_rect_top.Value()))};
-    auto source_bottom{add_one(u32(slot.config.source_rect_bottom.Value()))};
+    // Calculate all rectangles
+    u32 source_left = add_one(u32(slot.config.source_rect_left.Value()));
+    u32 source_right = add_one(u32(slot.config.source_rect_right.Value()));
+    u32 source_top = add_one(u32(slot.config.source_rect_top.Value()));
+    u32 source_bottom = add_one(u32(slot.config.source_rect_bottom.Value()));
 
-    const auto dest_left{add_one(u32(slot.config.dest_rect_left.Value()))};
-    const auto dest_right{add_one(u32(slot.config.dest_rect_right.Value()))};
-    const auto dest_top{add_one(u32(slot.config.dest_rect_top.Value()))};
-    const auto dest_bottom{add_one(u32(slot.config.dest_rect_bottom.Value()))};
+    const u32 dest_left = add_one(u32(slot.config.dest_rect_left.Value()));
+    const u32 dest_right = add_one(u32(slot.config.dest_rect_right.Value()));
+    const u32 dest_top = add_one(u32(slot.config.dest_rect_top.Value()));
+    const u32 dest_bottom = add_one(u32(slot.config.dest_rect_bottom.Value()));
 
-    auto rect_left{add_one(config.output_config.target_rect_left.Value())};
-    auto rect_right{add_one(config.output_config.target_rect_right.Value())};
-    auto rect_top{add_one(config.output_config.target_rect_top.Value())};
-    auto rect_bottom{add_one(config.output_config.target_rect_bottom.Value())};
+    u32 rect_left = add_one(config.output_config.target_rect_left.Value());
+    u32 rect_right = add_one(config.output_config.target_rect_right.Value());
+    u32 rect_top = add_one(config.output_config.target_rect_top.Value());
+    u32 rect_bottom = add_one(config.output_config.target_rect_bottom.Value());
 
-    rect_left = (std::max)(rect_left, dest_left);
-    rect_right = (std::min)(rect_right, dest_right);
-    rect_top = (std::max)(rect_top, dest_top);
-    rect_bottom = (std::min)(rect_bottom, dest_bottom);
+    // Clamp rectangles in one pass
+    rect_left = std::max(rect_left, dest_left);
+    rect_right = std::min(rect_right, dest_right);
+    rect_top = std::max(rect_top, dest_top);
+    rect_bottom = std::min(rect_bottom, dest_bottom);
 
-    source_left = (std::max)(source_left, rect_left);
-    source_right = (std::min)(source_right, rect_right);
-    source_top = (std::max)(source_top, rect_top);
-    source_bottom = (std::min)(source_bottom, rect_bottom);
+    source_left = std::max(source_left, rect_left);
+    source_right = std::min(source_right, rect_right);
+    source_top = std::max(source_top, rect_top);
+    source_bottom = std::min(source_bottom, rect_bottom);
 
-    if (source_left >= source_right || source_top >= source_bottom) {
+    // Early exit
+    if (source_left >= source_right || source_top >= source_bottom) [[unlikely]] {
         return;
     }
 
-    const auto out_surface_width{config.output_surface_config.out_surface_width + 1};
-    [[maybe_unused]] const auto out_surface_height{config.output_surface_config.out_surface_height +
-                                                   1};
-    const auto in_surface_width{slot.surface_config.slot_surface_width + 1};
+    const u32 out_surface_width = config.output_surface_config.out_surface_width + 1;
+    const u32 out_surface_height = config.output_surface_config.out_surface_height + 1;
+    const u32 in_surface_width = slot.surface_config.slot_surface_width + 1;
 
-    source_bottom = (std::min)(source_bottom, out_surface_height);
-    source_right = (std::min)(source_right, out_surface_width);
+    source_bottom = std::min(source_bottom, out_surface_height);
+    source_right = std::min(source_right, out_surface_width);
 
-    // TODO Alpha blending. No games I've seen use more than a single surface or supply an alpha
-    // below max, so it's ignored for now.
+    const u32 width = source_right - source_left;
+    const u32 height = source_bottom - source_top;
 
-    if (!slot.color_matrix.matrix_enable) {
-        const auto copy_width = (std::min)(source_right - source_left, rect_right - rect_left);
-
-        for (u32 y = source_top; y < source_bottom; y++) {
-            const auto dst_line = y * out_surface_width;
-            const auto src_line = y * in_surface_width;
-            std::memcpy(&output_surface[dst_line + rect_left],
-                        &slot_surface[src_line + source_left], copy_width * sizeof(Pixel));
+    // Fast path: no color matrix (just copy)
+    if (!slot.color_matrix.matrix_enable) [[likely]] {
+        const u32 copy_bytes = width * sizeof(Pixel);
+        Pixel* dst = &output_surface[source_top * out_surface_width + rect_left];
+        const Pixel* src = &slot_surface[source_top * in_surface_width + source_left];
+        
+        const size_t dst_stride = out_surface_width * sizeof(Pixel);
+        const size_t src_stride = in_surface_width * sizeof(Pixel);
+        
+        for (u32 y = 0; y < height; y++) {
+            std::memcpy(dst, src, copy_bytes);
+            dst = reinterpret_cast<Pixel*>(reinterpret_cast<u8*>(dst) + dst_stride);
+            src = reinterpret_cast<const Pixel*>(reinterpret_cast<const u8*>(src) + src_stride);
         }
-    } else {
-        // clang-format off
-        // Colour conversion is enabled, this is a 3x4 * 4x1 matrix multiplication, resulting in a 3x1 matrix.
-        // | r0c0 r0c1 r0c2 r0c3 |   | R |   | R |
-        // | r1c0 r1c1 r1c2 r1c3 | * | G | = | G |
-        // | r2c0 r2c1 r2c2 r2c3 |   | B |   | B |
-        //                           | 1 |
-        const auto r0c0 = s32(slot.color_matrix.matrix_coeff00.Value());
-        const auto r0c1 = s32(slot.color_matrix.matrix_coeff01.Value());
-        const auto r0c2 = s32(slot.color_matrix.matrix_coeff02.Value());
-        const auto r0c3 = s32(slot.color_matrix.matrix_coeff03.Value());
-        const auto r1c0 = s32(slot.color_matrix.matrix_coeff10.Value());
-        const auto r1c1 = s32(slot.color_matrix.matrix_coeff11.Value());
-        const auto r1c2 = s32(slot.color_matrix.matrix_coeff12.Value());
-        const auto r1c3 = s32(slot.color_matrix.matrix_coeff13.Value());
-        const auto r2c0 = s32(slot.color_matrix.matrix_coeff20.Value());
-        const auto r2c1 = s32(slot.color_matrix.matrix_coeff21.Value());
-        const auto r2c2 = s32(slot.color_matrix.matrix_coeff22.Value());
-        const auto r2c3 = s32(slot.color_matrix.matrix_coeff23.Value());
+        return;
+    }
 
-        const auto shift = s32(slot.color_matrix.matrix_r_shift.Value());
-        const auto clamp_min = s32(slot.config.soft_clamp_low.Value());
-        const auto clamp_max = s32(slot.config.soft_clamp_high.Value());
+    // Color matrix path - optimized
+    BlendWithColorMatrix(slot, source_left, source_right, source_top, source_bottom,
+                        in_surface_width, out_surface_width, rect_left);
+}
 
-        auto MatMul = [&](const Pixel& in_pixel) -> std::tuple<s32, s32, s32, s32> {
-            auto r = s32(in_pixel.r);
-            auto g = s32(in_pixel.g);
-            auto b = s32(in_pixel.b);
+void Vic::BlendWithColorMatrix(const SlotStruct& slot, u32 source_left, u32 source_right,
+                                u32 source_top, u32 source_bottom, u32 in_surface_width,
+                                u32 out_surface_width, u32 rect_left) {
+    // Cache all coefficients
+    const s32 c00 = s32(slot.color_matrix.matrix_coeff00.Value());
+    const s32 c01 = s32(slot.color_matrix.matrix_coeff01.Value());
+    const s32 c02 = s32(slot.color_matrix.matrix_coeff02.Value());
+    const s32 c03 = s32(slot.color_matrix.matrix_coeff03.Value());
 
-            r = in_pixel.r * r0c0 + in_pixel.g * r0c1 + in_pixel.b * r0c2;
-            g = in_pixel.r * r1c0 + in_pixel.g * r1c1 + in_pixel.b * r1c2;
-            b = in_pixel.r * r2c0 + in_pixel.g * r2c1 + in_pixel.b * r2c2;
+    const s32 c10 = s32(slot.color_matrix.matrix_coeff10.Value());
+    const s32 c11 = s32(slot.color_matrix.matrix_coeff11.Value());
+    const s32 c12 = s32(slot.color_matrix.matrix_coeff12.Value());
+    const s32 c13 = s32(slot.color_matrix.matrix_coeff13.Value());
 
-            r >>= shift;
-            g >>= shift;
-            b >>= shift;
+    const s32 c20 = s32(slot.color_matrix.matrix_coeff20.Value());
+    const s32 c21 = s32(slot.color_matrix.matrix_coeff21.Value());
+    const s32 c22 = s32(slot.color_matrix.matrix_coeff22.Value());
+    const s32 c23 = s32(slot.color_matrix.matrix_coeff23.Value());
 
-            r += r0c3;
-            g += r1c3;
-            b += r2c3;
+    const s32 shift = s32(slot.color_matrix.matrix_r_shift.Value());
+    const s32 clamp_low = s32(slot.config.soft_clamp_low.Value());
+    const s32 clamp_high = s32(slot.config.soft_clamp_high.Value());
 
-            r >>= 8;
-            g >>= 8;
-            b >>= 8;
+    const u32 width = source_right - source_left;
 
-            return {r, g, b, s32(in_pixel.a)};
-        };
+    // Process scanlines
+    for (u32 y = source_top; y < source_bottom; y++) {
+        const Pixel* src = &slot_surface[y * in_surface_width + source_left];
+        Pixel* dst = &output_surface[y * out_surface_width + rect_left];
 
-        for (u32 y = source_top; y < source_bottom; y++) {
-            const auto src{y * in_surface_width + source_left};
-            const auto dst{y * out_surface_width + rect_left};
-            for (u32 x = source_left; x < source_right; x++) {
-                auto [r, g, b, a] = MatMul(slot_surface[src + x]);
-                r = std::clamp(r, clamp_min, clamp_max);
-                g = std::clamp(g, clamp_min, clamp_max);
-                b = std::clamp(b, clamp_min, clamp_max);
-                a = std::clamp(a, clamp_min, clamp_max);
-                output_surface[dst + x] = {u16(r), u16(g), u16(b), u16(a)};
+        // Process 4 pixels at a time with manual unrolling
+        u32 x = 0;
+        const u32 width_aligned = width & ~3u;
+        
+        for (; x < width_aligned; x += 4) {
+            // Unroll 4 pixels
+            for (u32 i = 0; i < 4; i++) {
+                const Pixel& in = src[x + i];
+
+                // Matrix multiply
+                s32 r = (s32(in.r) * c00 + s32(in.g) * c01 + s32(in.b) * c02) >> shift;
+                s32 g = (s32(in.r) * c10 + s32(in.g) * c11 + s32(in.b) * c12) >> shift;
+                s32 b = (s32(in.r) * c20 + s32(in.g) * c21 + s32(in.b) * c22) >> shift;
+
+                // Add bias and normalize
+                r = (r + c03) >> 8;
+                g = (g + c13) >> 8;
+                b = (b + c23) >> 8;
+
+                // Clamp and store
+                dst[x + i].r = u16(std::clamp(r, clamp_low, clamp_high));
+                dst[x + i].g = u16(std::clamp(g, clamp_low, clamp_high));
+                dst[x + i].b = u16(std::clamp(b, clamp_low, clamp_high));
+                dst[x + i].a = in.a;  // Alpha passthrough - no clamp needed
             }
+        }
+
+        // Handle remaining pixels
+        for (; x < width; x++) {
+            const Pixel& in = src[x];
+
+            s32 r = (s32(in.r) * c00 + s32(in.g) * c01 + s32(in.b) * c02) >> shift;
+            s32 g = (s32(in.r) * c10 + s32(in.g) * c11 + s32(in.b) * c12) >> shift;
+            s32 b = (s32(in.r) * c20 + s32(in.g) * c21 + s32(in.b) * c22) >> shift;
+
+            r = (r + c03) >> 8;
+            g = (g + c13) >> 8;
+            b = (b + c23) >> 8;
+
+            dst[x].r = u16(std::clamp(r, clamp_low, clamp_high));
+            dst[x].g = u16(std::clamp(g, clamp_low, clamp_high));
+            dst[x].b = u16(std::clamp(b, clamp_low, clamp_high));
+            dst[x].a = in.a;
         }
     }
 }

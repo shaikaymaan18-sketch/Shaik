@@ -14,6 +14,7 @@
 #include "video_core/texture_cache/types.h"
 #include "video_core/vulkan_common/vulkan_memory_allocator.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
+#include "video_core/renderer_vulkan/vk_staging_buffer_pool.h"
 
 namespace VideoCommon {
 struct SwizzleParameters;
@@ -25,7 +26,6 @@ class Device;
 class StagingBufferPool;
 class Scheduler;
 class Image;
-struct StagingBufferRef;
 
 class ComputePass {
 public:
@@ -130,6 +130,26 @@ private:
     ComputePassDescriptorQueue& compute_pass_descriptor_queue;
     MemoryAllocator& memory_allocator;
 };
+
+class BlockLinearUnswizzle3DPass final : public ComputePass {
+public:
+    explicit BlockLinearUnswizzle3DPass(const Device& device_, Scheduler& scheduler_,
+                             DescriptorPool& descriptor_pool_,
+                             StagingBufferPool& staging_buffer_pool_,
+                             ComputePassDescriptorQueue& compute_pass_descriptor_queue_);
+    ~BlockLinearUnswizzle3DPass();
+    
+    void Unswizzle(Image& image,
+                   const StagingBufferRef& swizzled,
+                   std::span<const VideoCommon::SwizzleParameters> swizzles,
+                   u32 z_start, u32 z_count);
+
+private:
+    Scheduler& scheduler;
+    StagingBufferPool& staging_buffer_pool;
+    ComputePassDescriptorQueue& compute_pass_descriptor_queue;
+};
+
 
 class MSAACopyPass final : public ComputePass {
 public:

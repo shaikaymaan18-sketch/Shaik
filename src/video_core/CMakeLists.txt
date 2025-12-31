@@ -390,4 +390,35 @@ if (ANDROID AND ARCHITECTURE_arm64)
     target_link_libraries(video_core PRIVATE adrenotools)
 endif()
 
+#[[
+if (MSVC)
+    set(AVX2_FLAGS "/arch:AVX2")
+    # Note: MSVC enables SSE2 by default on x64; 
+    # for x86 you'd use /arch:SSE2, but it's rarely needed now.
+    set(SSE2_FLAGS "") 
+else()
+    set(AVX2_FLAGS "-mavx2")
+    set(SSE2_FLAGS "-msse2")
+endif()
+]]
+
+include(CheckCXXCompilerFlag)
+
+check_cxx_compiler_flag("${AVX2_FLAGS}" COMPILER_SUPPORTS_AVX2)
+
+if (COMPILER_SUPPORTS_AVX2)
+    set_source_files_properties(textures/decoders.cpp 
+        PROPERTIES COMPILE_OPTIONS "${AVX2_FLAGS}"
+    )
+    target_compile_definitions(video_core PRIVATE HAS_AVX2)
+else()
+    check_cxx_compiler_flag("${SSE2_FLAGS}" COMPILER_SUPPORTS_SSE2)
+    if (COMPILER_SUPPORTS_SSE2)
+        set_source_files_properties(textures/decoders.cpp 
+            PROPERTIES COMPILE_OPTIONS "${SSE2_FLAGS}"
+        )
+        target_compile_definitions(video_core PRIVATE HAS_SSE2)
+    endif()
+endif()
+
 create_target_directory_groups(video_core)
