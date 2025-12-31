@@ -35,6 +35,6 @@ class PathSetting(
     fun isUsingDefaultPath(): Boolean = getCurrentPath() == getDefaultPath()
 
     companion object {
-        const val TYPE_PATH = 13
+        const val TYPE_PATH = 14
     }
 }
