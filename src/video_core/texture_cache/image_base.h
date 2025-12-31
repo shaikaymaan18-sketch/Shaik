@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // SPDX-FileCopyrightText: Copyright 2020 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -50,6 +53,13 @@ struct ImageViewInfo;
 struct AliasedImage {
     std::vector<ImageCopy> copies;
     ImageId id;
+};
+
+struct SparseBinding {
+    GPUVAddr gpu_addr;      // Virtual GPU address of this tile
+    DAddr device_addr;      // Physical device memory address
+    u64 tile_index;         // Linear tile index in the texture
+    Extent3D tile_coord;    // 3D coordinate of this tile
 };
 
 struct NullImageParams {};
@@ -115,6 +125,10 @@ struct ImageBase {
     std::vector<AliasedImage> aliased_images;
     std::vector<ImageId> overlapping_images;
     ImageMapId map_view_id{};
+    
+    boost::container::small_vector<u64, 16> dirty_offsets;
+    std::unordered_map<GPUVAddr, SparseBinding> sparse_bindings;
+    u32 sparse_tile_size = 65536;
 };
 
 struct ImageMapView {
