@@ -1098,22 +1098,6 @@ void TextureCache<P>::RefreshContents(Image& image, ImageId image_id) {
     
     image.flags &= ~ImageFlagBits::CpuModified;
     TrackImage(image, image_id);
-
-    /*// If it's sparse and remapped, we treat it as a partial update trigger
-    if (image.info.is_sparse && True(image.flags & ImageFlagBits::Remapped)) {
-        image.flags &= ~ImageFlagBits::Remapped;
-        
-        if (!image.dirty_offsets.empty() && !image.sparse_bindings.empty()) {
-            constexpr u64 page_size = 64_KiB;
-            size_t dirty_size = image.dirty_offsets.size() * page_size;
-            
-            auto staging = runtime.UploadStagingBuffer(dirty_size);
-            UploadSparseDirtyTiles(image, staging);
-            runtime.InsertUploadMemoryBarrier();
-            
-            return;
-        }
-    }*/
     
     if (image.info.num_samples > 1 && !runtime.CanUploadMSAA()) {
         LOG_WARNING(HW_GPU, "MSAA image uploads are not implemented");
@@ -1137,87 +1121,6 @@ void TextureCache<P>::RefreshContents(Image& image, ImageId image_id) {
     auto staging = runtime.UploadStagingBuffer(MapSizeBytes(image));
     UploadImageContents(image, staging);
     runtime.InsertUploadMemoryBarrier();
-}
-
-template <class P>
-template <typename StagingBuffer>
-void TextureCache<P>::UploadSparseDirtyTiles(Image& image, StagingBuffer& staging) {
-    using namespace VideoCommon;
-    using namespace Tegra::Texture;
-
-    std::vector<BufferImageCopy> all_copies;
-    size_t total_upload_size = 0;
-    
-    for (u64 dirty_tile_index : image.dirty_offsets) {
-        SparseBinding* binding = nullptr;
-        for (auto& [addr, bind] : image.sparse_bindings) {
-            if (bind.tile_index == dirty_tile_index) {
-                binding = &bind;
-                break;
-            }
-        }
-        
-        if (!binding) {
-            continue;
-        }
-        
-        const auto& coord = binding->tile_coord;
-        
-        // Calculate tile dimensions
-        const u32 tile_width_blocks = 128;
-        const u32 tile_height_blocks = 32;
-        const u32 tile_width = std::min(tile_width_blocks * 4, image.info.size.width - coord.width);
-        const u32 tile_height = std::min(tile_height_blocks * 4, image.info.size.height - coord.height);
-        const u32 tile_depth = std::min(1u, image.info.size.depth - coord.depth);
-        
-        const u32 bytes_per_block = BytesPerBlock(image.info.format);
-        const u32 blocks_wide = (tile_width + 3) / 4;
-        const u32 blocks_high = (tile_height + 3) / 4;
-        const size_t tile_unswizzled_size = blocks_wide * blocks_high * tile_depth * bytes_per_block;
-        
-        if (total_upload_size + tile_unswizzled_size > staging.mapped_span.size()) {
-            LOG_ERROR(HW_GPU, "Staging buffer too small");
-            break;
-        }
-        
-        std::array<u8, 65536> tile_swizzled_data;
-        gpu_memory->ReadBlockUnsafe(binding->gpu_addr, tile_swizzled_data.data(), image.sparse_tile_size);
-
-        // Get output span
-        auto tile_output = staging.mapped_span.subspan(total_upload_size, tile_unswizzled_size);
-
-        // Unswizzle the tile
-        auto result = UnswizzleSparseTextureTile(tile_output, tile_swizzled_data, 
-                                                 image.info, tile_width, tile_height, tile_depth);
-
-        // Create the copy descriptor
-        BufferImageCopy copy{
-            .buffer_offset = total_upload_size,
-            .buffer_size = tile_unswizzled_size,
-            .buffer_row_length = result.buffer_row_length,
-            .buffer_image_height = result.buffer_image_height,
-            .image_subresource = {
-                .base_level = 0,
-                .base_layer = 0,
-                .num_layers = 1,
-            },
-            .image_offset = {
-                static_cast<s32>(coord.width),
-                static_cast<s32>(coord.height),
-                static_cast<s32>(coord.depth)
-            },
-            .image_extent = {tile_width, tile_height, tile_depth}
-        };
-        
-        all_copies.push_back(copy);
-        total_upload_size += tile_unswizzled_size;
-    }
-    
-    if (!all_copies.empty()) {
-        image.UploadMemory(staging, all_copies);
-    }
-    
-    image.dirty_offsets.clear();
 }
 
 template <class P>
@@ -1503,9 +1406,9 @@ void TextureCache<P>::TickAsyncUnswizzle() {
     if (unswizzle_queue.empty()) {
         return;
     }
-    
+
     // Don't process every frame - allow more data to accumulate
-    if (++current_unswizzle_frame < 2) return;
+    //if (++current_unswizzle_frame < 2) return;
     
     PendingUnswizzle& task = unswizzle_queue.front();
     Image& image = slot_images[task.image_id];
@@ -1529,8 +1432,8 @@ void TextureCache<P>::TickAsyncUnswizzle() {
     }
 
     // ToDo: Make these configurable
-    static constexpr size_t CHUNK_SIZE = 64_MiB;
-    static constexpr u32 SLICES_PER_BATCH = 512u;
+    static constexpr size_t CHUNK_SIZE = 16_MiB;
+    static constexpr u32 SLICES_PER_BATCH = 64u;
     
     // Read data
     if (task.current_offset < task.total_size) {
@@ -1569,7 +1472,7 @@ void TextureCache<P>::TickAsyncUnswizzle() {
         unswizzle_queue.pop_front();
     }
     
-    current_unswizzle_frame = 0;
+    //current_unswizzle_frame = 0;
 }
 
 template <class P>

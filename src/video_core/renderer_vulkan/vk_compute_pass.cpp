@@ -801,8 +801,14 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
     const u32 gy = Common::DivCeil(blocks_y, 8u);
     const u32 gz = Common::DivCeil(z_count, 1u);
     
+    const u32 bytes_per_block = 1u << pc.bytes_per_block_log2;
+    const VkDeviceSize output_slice_size =
+        static_cast<VkDeviceSize>(blocks_x) * blocks_y * bytes_per_block;
+    const VkDeviceSize barrier_size = output_slice_size * z_count;
+    
     scheduler.RequestOutsideRenderPassOperationContext();
-    scheduler.Record([this, &image, set, descriptor_data, pc, gx, gy, gz, z_start, z_count](vk::CommandBuffer cmdbuf) {
+    scheduler.Record([this, &image, set, descriptor_data, pc, gx, gy, gz, z_start, z_count,
+                      barrier_size](vk::CommandBuffer cmdbuf) {
         const VkBuffer out_buffer = *image.compute_unswizzle_buffer;
         const VkImage dst_image = image.Handle();
         const VkImageAspectFlags aspect = image.AspectMask();
@@ -818,19 +824,26 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
         // Single barrier for compute -> transfer (buffer ready, image transition)
         const VkBufferMemoryBarrier buffer_barrier{
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .pNext = nullptr,
             .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
             .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .buffer = out_buffer,
             .offset = 0,
-            .size = VK_WHOLE_SIZE,
+            .size = barrier_size,
         };
         
+        // Image layout transition
         const VkImageMemoryBarrier pre_barrier{
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = nullptr,
             .srcAccessMask = is_first ? VkAccessFlags{} : static_cast<VkAccessFlags>(VK_ACCESS_SHADER_READ_BIT),
             .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
             .oldLayout = is_first ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_GENERAL,
             .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .image = dst_image,
             .subresourceRange = {aspect, 0, 1, 0, 1},
         };
@@ -845,19 +858,25 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
 
         const VkBufferImageCopy copy{
             .bufferOffset = 0,
+            .bufferRowLength = 0,
+            .bufferImageHeight = 0,
             .imageSubresource = {aspect, 0, 0, 1},
-            .imageOffset = {0, 0, (s32)z_start},
+            .imageOffset = {0, 0, static_cast<s32>(z_start)},
             .imageExtent = {image.info.size.width, image.info.size.height, z_count},
         };
-        cmdbuf.CopyBufferToImage(out_buffer, dst_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, copy);
+        cmdbuf.CopyBufferToImage(out_buffer, dst_image, 
+                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, copy);
 
         // Post-copy transition
         const VkImageMemoryBarrier post_barrier{
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = nullptr,
             .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
             .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .image = dst_image,
             .subresourceRange = {aspect, 0, 1, 0, 1},
         };
