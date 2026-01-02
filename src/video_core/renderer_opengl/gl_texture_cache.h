@@ -229,6 +229,8 @@ public:
 
     bool ScaleDown(bool ignore = false);
 
+    u64 allocation_tick;
+
 private:
     void CopyBufferToImage(const VideoCommon::BufferImageCopy& copy, size_t buffer_offset);
 

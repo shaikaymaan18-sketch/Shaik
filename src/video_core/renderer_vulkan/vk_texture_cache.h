@@ -196,6 +196,8 @@ public:
     bool ScaleUp(bool ignore = false);
 
     bool ScaleDown(bool ignore = false);
+
+    u64 allocation_tick;
     
     friend class BlockLinearUnswizzle3DPass;
 
@@ -214,7 +216,7 @@ private:
     VkDeviceSize compute_unswizzle_buffer_size = 0;
     bool has_compute_unswizzle_buffer = false;
 
-    void AllocateComputeUnswizzleBuffer();
+    void AllocateComputeUnswizzleBuffer(u32 max_slices);
 
     // Use a pointer to field because it is relative, so that the object can be
     // moved without breaking the reference.

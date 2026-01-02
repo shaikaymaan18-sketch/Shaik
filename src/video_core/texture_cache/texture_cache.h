@@ -98,6 +98,13 @@ void TextureCache<P>::RunGarbageCollector() {
         }
         --num_iterations;
         auto& image = slot_images[image_id];
+        
+        // Never delete recently allocated sparse textures (within 3 frames)
+        const bool is_recently_allocated = image.allocation_tick >= frame_tick - 3;
+        if (is_recently_allocated && image.info.is_sparse) {
+            return false;
+        }
+        
         if (True(image.flags & ImageFlagBits::IsDecoding)) {
             // This image is still being decoded, deleting it will invalidate the slot
             // used by the async decoder thread.
@@ -153,7 +160,13 @@ void TextureCache<P>::RunGarbageCollector() {
     if (total_used_memory >= expected_memory) {
         lru_cache.ForEachItemBelow(frame_tick, [&](ImageId image_id) {
             auto& image = slot_images[image_id];
-            if (image.info.is_sparse && image.guest_size_bytes >= 256_MiB) {
+            // Only target sparse textures that are old enough
+            if (image.info.is_sparse && 
+                image.guest_size_bytes >= 256_MiB &&
+                image.allocation_tick < frame_tick - 3) {
+                LOG_DEBUG(HW_GPU, "GC targeting old sparse texture at 0x{:X} ({} MiB, age: {} frames)", 
+                         image.gpu_addr, image.guest_size_bytes / (1024 * 1024),
+                         frame_tick - image.allocation_tick);
                 return Cleanup(image_id);
             }
             return false;
@@ -1428,6 +1441,11 @@ void TextureCache<P>::TickAsyncUnswizzle() {
         return;
     }
     
+    if(current_unswizzle_frame > 0) {
+        current_unswizzle_frame--;
+        return;
+    }
+    
     PendingUnswizzle& task = unswizzle_queue.front();
     Image& image = slot_images[task.image_id];
     
@@ -1492,6 +1510,9 @@ void TextureCache<P>::TickAsyncUnswizzle() {
         if (total_used_memory >= expected_memory) {
             RunGarbageCollector();
         }
+        
+        // Wait 4 frames to process the next entry
+        current_unswizzle_frame = 4u;
     }
 }
 
@@ -1534,24 +1555,29 @@ ImageId TextureCache<P>::InsertImage(const ImageInfo& info, GPUVAddr gpu_addr,
     }
     ASSERT_MSG(cpu_addr, "Tried to insert an image to an invalid gpu_addr=0x{:x}", gpu_addr);
     
-    // For large sparse textures, aggressively clean up old allocation at same address
+    // For large sparse textures, aggressively clean up old allocations at same address
     if (info.is_sparse && CalculateGuestSizeInBytes(info) >= 256_MiB) {
         const auto alloc_it = image_allocs_table.find(gpu_addr);
         if (alloc_it != image_allocs_table.end()) {
             const ImageAllocId alloc_id = alloc_it->second;
             auto& alloc_images = slot_image_allocs[alloc_id].images;
             
-            // Immediately delete old images at this address before allocating new one
+            // Collect old images at this address that were created more than 2 frames ago
             boost::container::small_vector<ImageId, 4> to_delete;
             for (ImageId old_image_id : alloc_images) {
                 Image& old_image = slot_images[old_image_id];
-                if (old_image.info.is_sparse && old_image.gpu_addr == gpu_addr) {
+                if (old_image.info.is_sparse && 
+                    old_image.gpu_addr == gpu_addr &&
+                    old_image.allocation_tick < frame_tick - 2) {  // Try not to delete fresh textures
                     to_delete.push_back(old_image_id);
                 }
             }
             
+            // Delete old images immediately
             for (ImageId old_id : to_delete) {
                 Image& old_image = slot_images[old_id];
+                LOG_INFO(HW_GPU, "Immediately deleting old sparse texture at 0x{:X} ({} MiB)", 
+                         gpu_addr, old_image.guest_size_bytes / (1024 * 1024));
                 if (True(old_image.flags & ImageFlagBits::Tracked)) {
                     UntrackImage(old_image, old_id);
                 }
@@ -1577,13 +1603,23 @@ ImageId TextureCache<P>::JoinImages(const ImageInfo& info, GPUVAddr gpu_addr, DA
     ImageInfo new_info = info;
     const size_t size_bytes = CalculateGuestSizeInBytes(new_info);
     
+    // Proactive cleanup for large sparse texture allocations
     if (new_info.is_sparse && size_bytes >= 256_MiB) {
         const u64 estimated_alloc_size = size_bytes;
-
+        
         if (total_used_memory + estimated_alloc_size >= critical_memory) {
-            LOG_WARNING(HW_GPU, "Large sparse texture allocation ({} MiB) - running aggressive GC",
-                       size_bytes / (1024 * 1024));
+            LOG_WARNING(HW_GPU, "Large sparse texture allocation ({} MiB) - running aggressive GC. "
+                       "Current memory: {} MiB, Critical: {} MiB",
+                       size_bytes / (1024 * 1024),
+                       total_used_memory / (1024 * 1024),
+                       critical_memory / (1024 * 1024));
             RunGarbageCollector();
+            
+            // If still over threshold after GC, try one more aggressive pass
+            if (total_used_memory + estimated_alloc_size >= critical_memory) {
+                LOG_WARNING(HW_GPU, "Still critically low on memory, running second GC pass");
+                RunGarbageCollector();
+            }
         }
     }
     
@@ -1682,6 +1718,8 @@ ImageId TextureCache<P>::JoinImages(const ImageInfo& info, GPUVAddr gpu_addr, DA
 
     const ImageId new_image_id = slot_images.insert(runtime, new_info, gpu_addr, cpu_addr);
     Image& new_image = slot_images[new_image_id];
+    
+    new_image.allocation_tick = frame_tick;
 
     if (!gpu_memory->IsContinuousRange(new_image.gpu_addr, new_image.guest_size_bytes) &&
         new_info.is_sparse) {

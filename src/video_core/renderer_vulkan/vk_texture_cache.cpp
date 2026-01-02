@@ -1620,7 +1620,7 @@ Image::Image(const VideoCommon::NullImageParams& params) : VideoCommon::ImageBas
 
 Image::~Image() = default;
 
-void Image::AllocateComputeUnswizzleBuffer() {
+void Image::AllocateComputeUnswizzleBuffer(u32 max_slices) {
     if (has_compute_unswizzle_buffer)
         return;
 
@@ -1633,7 +1633,7 @@ void Image::AllocateComputeUnswizzleBuffer() {
     // BCn is 4x4x1 blocks
     const u32 blocks_x = (info.size.width  + block_width  - 1) / block_width;
     const u32 blocks_y = (info.size.height + block_height - 1) / block_height;
-    const u32 blocks_z = info.size.depth;
+    const u32 blocks_z = std::min(max_slices, info.size.depth);
 
     const u64 block_count =
         static_cast<u64>(blocks_x) *

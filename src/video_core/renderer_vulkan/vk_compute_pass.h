@@ -17,12 +17,15 @@
 #include "video_core/texture_cache/types.h"
 #include "video_core/vulkan_common/vulkan_memory_allocator.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
+#include "video_core/texture_cache/accelerated_swizzle.h"
 
 namespace VideoCommon {
 struct SwizzleParameters;
 }
 
 namespace Vulkan {
+
+using VideoCommon::Accelerated::BlockLinearSwizzle3DParams;
 
 class Device;
 class StagingBufferPool;
@@ -146,6 +149,14 @@ public:
                    const StagingBufferRef& swizzled,
                    std::span<const VideoCommon::SwizzleParameters> swizzles,
                    u32 z_start, u32 z_count);
+                   
+    void UnswizzleChunk(
+        Image& image,
+        const StagingBufferRef& swizzled,
+        const VideoCommon::SwizzleParameters& sw,
+        const BlockLinearSwizzle3DParams& params,
+        u32 blocks_x, u32 blocks_y,
+        u32 z_start, u32 z_count);
 
 private:
     Scheduler& scheduler;
