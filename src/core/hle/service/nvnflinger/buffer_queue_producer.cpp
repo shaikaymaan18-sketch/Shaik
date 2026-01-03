@@ -950,8 +950,7 @@ void BufferQueueProducer::Transact(u32 code, std::span<const u8> parcel_data,
 
         const s32 request = parcel_in.Read<s32>();
         if (request <= 0) {
-            // parcel_out.Write(Status::BadValue);
-            parcel_out.Write<s32>(0);
+            parcel_out.Write<s32>(Status::None);
             break;
         }
 
