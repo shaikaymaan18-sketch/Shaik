@@ -981,6 +981,7 @@ void BufferQueueProducer::Transact(u32 code, std::span<const u8> parcel_data,
         const s32 limit = std::min(request, valid_index);
         parcel_out.Write(Status::NoError);
         parcel_out.Write<s32>(limit);
+        break;
         for (s32 i = 0; i < limit; ++i) {
             parcel_out.Write(buffer_history_snapshot[i]);
         }
