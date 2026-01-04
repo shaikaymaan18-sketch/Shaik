@@ -879,6 +879,29 @@ TextureCacheRuntime::TextureCacheRuntime(const Device& device_, Scheduler& sched
                 view_formats[index_a].push_back(view_info.format);
             }
         }
+
+        switch (image_format) {
+        case PixelFormat::R32G32B32A32_UINT:
+            view_formats[index_a].push_back(VK_FORMAT_R32G32B32A32_SFLOAT);
+            break;
+        case PixelFormat::R32_UINT:
+            view_formats[index_a].push_back(VK_FORMAT_R32_SFLOAT);
+            break;
+        case PixelFormat::R32G32_UINT:
+            view_formats[index_a].push_back(VK_FORMAT_R32G32_SFLOAT);
+            break;
+        case PixelFormat::R16G16B16A16_UINT:
+            view_formats[index_a].push_back(VK_FORMAT_R16G16B16A16_SFLOAT);
+            break;
+        case PixelFormat::R16_UINT:
+            view_formats[index_a].push_back(VK_FORMAT_R16_SFLOAT);
+            break;
+        case PixelFormat::A8B8G8R8_UINT:
+            view_formats[index_a].push_back(VK_FORMAT_R8G8B8A8_UNORM);
+            break;
+        default:
+            break;
+        }
     }
 
     bl3d_unswizzle_pass.emplace(device, scheduler, descriptor_pool,
@@ -2133,7 +2156,32 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
             std::ranges::transform(swizzle, swizzle.begin(), ConvertGreenRed);
         }
     }
-    const auto format_info = MaxwellToVK::SurfaceFormat(*device, FormatType::Optimal, true, format);
+    
+    // Hacky fix for reinterpretation for UINT vs FLOAT
+    PixelFormat view_format = format;
+    if (!info.IsRenderTarget()) {
+        switch (format) {
+        case PixelFormat::R32G32B32A32_UINT:
+            view_format = PixelFormat::R32G32B32A32_FLOAT;
+            break;
+        case PixelFormat::R32_UINT:
+            view_format = PixelFormat::R32_FLOAT;
+            break;
+        case PixelFormat::R32G32_UINT:
+            view_format = PixelFormat::R32G32_FLOAT;
+            break;
+        case PixelFormat::R16G16B16A16_UINT:
+            view_format = PixelFormat::R16G16B16A16_FLOAT;
+            break;
+        case PixelFormat::R16_UINT:
+            view_format = PixelFormat::R16_FLOAT;
+            break;
+        default:
+            break;
+        }
+    }
+
+    const auto format_info = MaxwellToVK::SurfaceFormat(*device, FormatType::Optimal, true, view_format);
     if (ImageUsageFlags(format_info, format) != image.UsageFlags()) {
         LOG_WARNING(Render_Vulkan,
                     "Image view format {} has different usage flags than image format {}", format,
