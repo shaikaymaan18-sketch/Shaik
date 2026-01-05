@@ -70,10 +70,29 @@ TextureCache<P>::TextureCache(Runtime& runtime_, Tegra::MaxwellDeviceMemoryManag
             (std::max)((std::min)(device_local_memory - min_vacancy_critical, min_spacing_critical),
                      DEFAULT_CRITICAL_MEMORY));
         minimum_memory = static_cast<u64>((device_local_memory - mem_threshold) / 2);
+        
+        const u64 device_memory = static_cast<u64>(device_local_memory);
+        if (device_memory <= 4_GiB) {
+            chunk_size = 16_MiB;
+            slices_per_batch = 16;
+        } else if (device_memory <= 8_GiB) {
+            chunk_size = 32_MiB;
+            slices_per_batch = 32;
+        } else {
+            chunk_size = 64_MiB;
+            slices_per_batch = 64;
+        }
+        
+        lowmemorydevice = True(device_memory <= 4_GiB);
     } else {
         expected_memory = DEFAULT_EXPECTED_MEMORY + 512_MiB;
         critical_memory = DEFAULT_CRITICAL_MEMORY + 1_GiB;
         minimum_memory = 0;
+        
+        chunk_size = 32_MiB;
+        slices_per_batch = 32;
+        
+        lowmemorydevice = true;
     }
 }
 
@@ -1131,6 +1150,10 @@ void TextureCache<P>::RefreshContents(Image& image, ImageId image_id) {
     }
     
     image.flags &= ~ImageFlagBits::CpuModified;
+    if( lowmemorydevice && image.info.format == PixelFormat::BC1_RGBA_UNORM && MapSizeBytes(image) >= 256_MiB ) {
+        return;
+    }
+    
     TrackImage(image, image_id);
     
     if (image.info.num_samples > 1 && !runtime.CanUploadMSAA()) {
@@ -1465,17 +1488,13 @@ void TextureCache<P>::TickAsyncUnswizzle() {
         task.initialized = true;
     }
     
-    // ToDo: Make these configurable
-    static constexpr size_t CHUNK_SIZE = 48_MiB;
-    static constexpr u32 SLICES_PER_BATCH = 48u;
-
     // Read data
     if (task.current_offset < task.total_size) {
         const size_t remaining = task.total_size - task.current_offset;
         
-        size_t copy_amount = std::min(CHUNK_SIZE, remaining);
+        size_t copy_amount = std::min(chunk_size, remaining);
         
-        if (remaining > CHUNK_SIZE) {
+        if (remaining > chunk_size) {
             copy_amount = (copy_amount / task.bytes_per_slice) * task.bytes_per_slice;
             if (copy_amount == 0) copy_amount = task.bytes_per_slice;
         }
@@ -1490,7 +1509,7 @@ void TextureCache<P>::TickAsyncUnswizzle() {
     const u32 complete_slices = static_cast<u32>(bytes_ready / task.bytes_per_slice);
     const bool is_final_batch = task.current_offset >= task.total_size;
     
-    if (complete_slices >= SLICES_PER_BATCH || (is_final_batch && complete_slices > 0)) {
+    if (complete_slices >= slices_per_batch || (is_final_batch && complete_slices > 0)) {
         const u32 z_start = static_cast<u32>(task.last_submitted_offset / task.bytes_per_slice);
         const u32 z_count = std::min(complete_slices, image.info.size.depth - z_start);
         

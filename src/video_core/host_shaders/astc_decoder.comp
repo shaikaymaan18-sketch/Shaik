@@ -61,6 +61,13 @@ const uint encoding_values[22] = uint[](
     (JUST_BITS | (5u << 8u)), (QUINT | (3u << 8u)), (TRIT | (4u << 8u)), (JUST_BITS | (6u << 8u)),
     (QUINT | (4u << 8u)), (TRIT | (5u << 8u)), (JUST_BITS | (7u << 8u)), (QUINT | (5u << 8u)),
     (TRIT | (6u << 8u)), (JUST_BITS | (8u << 8u)));
+    
+// Precomputed weight tables
+const uint WEIGHT_TABLE_1BIT[2] = uint[](0, 64);
+const uint WEIGHT_TABLE_2BIT[4] = uint[](0, 21, 43, 64);
+const uint WEIGHT_TABLE_3BIT[8] = uint[](0, 9, 18, 27, 37, 46, 55, 64);
+const uint WEIGHT_TABLE_4BIT[16] = uint[](0, 4, 8, 12, 17, 21, 25, 29, 35, 39, 43, 47, 52, 56, 60, 64);
+const uint WEIGHT_TABLE_5BIT[32] = uint[](0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64);
 
 // Input ASTC texture globals
 int total_bitsread = 0;
@@ -730,18 +737,30 @@ uint UnquantizeTexelWeight(EncodingData val) {
     const uint encoding = Encoding(val);
     const uint bitlen = NumBits(val);
     const uint bitval = BitValue(val);
+
+    if (encoding == JUST_BITS) {
+        switch (bitlen) {
+            case 1: return WEIGHT_TABLE_1BIT[bitval];
+            case 2: return WEIGHT_TABLE_2BIT[bitval];
+            case 3: return WEIGHT_TABLE_3BIT[bitval];
+            case 4: return WEIGHT_TABLE_4BIT[bitval];
+            case 5: return WEIGHT_TABLE_5BIT[bitval];
+            default: return FastReplicateTo6(bitval, bitlen);
+        }
+    }
+    
     const uint A = ReplicateBitTo7((bitval & 1));
     uint B = 0, C = 0, D = 0;
     uint result = 0;
-    const uint bitlen_0_results[5] = {0, 16, 32, 48, 64};
+    
     switch (encoding) {
-    case JUST_BITS:
-        return FastReplicateTo6(bitval, bitlen);
     case TRIT: {
         D = QuintTritValue(val);
         switch (bitlen) {
-        case 0:
-            return bitlen_0_results[D * 2];
+        case 0: {
+            const uint trit_base[3] = uint[](0, 32, 64);
+            return trit_base[D];
+        }
         case 1: {
             C = 50;
             break;
@@ -758,16 +777,16 @@ uint UnquantizeTexelWeight(EncodingData val) {
             B = (cb << 5) | cb;
             break;
         }
-        default:
-            break;
         }
         break;
     }
     case QUINT: {
         D = QuintTritValue(val);
         switch (bitlen) {
-        case 0:
-            return bitlen_0_results[D];
+        case 0: {
+            const uint quint_base[5] = uint[](0, 16, 32, 48, 64);
+            return quint_base[D];
+        }
         case 1: {
             C = 28;
             break;
@@ -782,14 +801,17 @@ uint UnquantizeTexelWeight(EncodingData val) {
         break;
     }
     }
-    if (encoding != JUST_BITS && bitlen > 0) {
+    
+    if (bitlen > 0) {
         result = D * C + B;
         result ^= A;
         result = (A & 0x20) | (result >> 2);
     }
+    
     if (result > 32) {
         result += 1;
     }
+    
     return result;
 }
 
@@ -1159,10 +1181,11 @@ void DecompressBlock(ivec3 coord) {
 }
 
 uint SwizzleOffset(uvec2 pos) {
-    const uint x = pos.x;
-    const uint y = pos.y;
-    return ((x % 64) / 32) * 256 + ((y % 8) / 2) * 64 +
-            ((x % 32) / 16) * 32 + (y % 2) * 16 + (x % 16);
+    return ((pos.x & 32u) << 3u) | 
+           ((pos.y & 6u)  << 5u) | 
+           ((pos.x & 16u) << 1u) | 
+           ((pos.y & 1u)  << 4u) | 
+           (pos.x & 15u);
 }
 
 void main() {

@@ -623,7 +623,7 @@ void ASTCDecoderPass::Assemble(Image& image, const StagingBufferRef& map,
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .pNext = nullptr,
             .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
             .newLayout = VK_IMAGE_LAYOUT_GENERAL,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -638,9 +638,8 @@ void ASTCDecoderPass::Assemble(Image& image, const StagingBufferRef& map,
             },
         };
         cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                               VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, image_barrier);
+                               VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, image_barrier);
     });
-    scheduler.Finish();
 }
 
 constexpr u32 BL3D_BINDING_SWIZZLE_TABLE = 0;
