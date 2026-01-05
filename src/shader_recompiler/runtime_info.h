@@ -100,7 +100,8 @@ struct RuntimeInfo {
     bool y_negate{};
     /// Use storage buffers instead of global pointers on GLASM
     bool glasm_use_storage_buffers{};
-
+    bool is_moltenvk{};
+    std::array<VideoCore::Surface::PixelFormat, 8> color_formats{};
     /// Transform feedback state for each varying
     std::array<TransformFeedbackVarying, 256> xfb_varyings{};
     u32 xfb_count{0};
