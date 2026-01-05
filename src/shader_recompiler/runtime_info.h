@@ -8,6 +8,10 @@
 #include <optional>
 #include <vector>
 
+#ifdef __APPLE__
+#include <vulkan/vulkan_core.h>
+#endif
+
 #include "common/common_types.h"
 #include "shader_recompiler/varying_state.h"
 
@@ -104,6 +108,11 @@ struct RuntimeInfo {
     /// Transform feedback state for each varying
     std::array<TransformFeedbackVarying, 256> xfb_varyings{};
     u32 xfb_count{0};
+
+#ifdef __APPLE__
+    bool is_moltenvk{};
+    std::array<VkFormat, 8>  color_formats{}; //for color format change
+#endif
 };
 
 } // namespace Shader
