@@ -262,9 +262,25 @@ Shader::RuntimeInfo MakeRuntimeInfo(std::span<const Shader::IR::Program> program
     }
     info.force_early_z = key.state.early_z != 0;
     info.y_negate = key.state.y_negate != 0;
+        info.force_early_z = key.state.early_z != 0;
+    info.y_negate = key.state.y_negate != 0;
+    // MoltenVK: Check for integer color attachments
+    if (device.IsMoltenVK()) {
+        for (size_t i = 0; i < key.state.attachments.size(); ++i) {
+            const auto format = key.state.attachments[i];
+            if (format == VK_FORMAT_R16G16B16A16_UINT || 
+                format == VK_FORMAT_R16G16B16A16_SINT ||
+                format == VK_FORMAT_R32G32B32A32_UINT || 
+                format == VK_FORMAT_R32G32B32A32_SINT ||
+                format == VK_FORMAT_R8G8B8A8_UINT ||
+                format == VK_FORMAT_R8G8B8A8_SINT) {
+                info.force_integer_frag_color = true;
+                break;
+            }
+        }
+    }
     return info;
 }
-
 size_t GetTotalPipelineWorkers() {
     const size_t max_core_threads =
         std::max<size_t>(static_cast<size_t>(std::thread::hardware_concurrency()), 2ULL) - 1ULL;
