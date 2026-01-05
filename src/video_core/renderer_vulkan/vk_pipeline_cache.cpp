@@ -264,6 +264,7 @@ Shader::RuntimeInfo MakeRuntimeInfo(std::span<const Shader::IR::Program> program
     info.y_negate = key.state.y_negate != 0;
     // MoltenVK: Check for integer color attachments
     if (device.IsMoltenVK()) {
+        info.is_moltenvk = true;
         for (size_t i = 0; i < key.state.attachments.size(); ++i) {
             const auto format = key.state.attachments[i];
             if (format == VK_FORMAT_R16G16B16A16_UINT || 
