@@ -446,7 +446,14 @@ void ConditionalRenderingResolvePass::Resolve(VkBuffer dst_buffer, VkBuffer src_
         const VkDescriptorSet set = descriptor_allocator.Commit();
         device.GetLogical().UpdateDescriptorSet(set, *descriptor_template, descriptor_data);
 
-        cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        // Memory writes can come from graphics or compute stages
+        const VkPipelineStageFlags src_stages_compute =
+            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+            VK_PIPELINE_STAGE_TRANSFER_BIT;
+        cmdbuf.PipelineBarrier(src_stages_compute,
                                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, read_barrier);
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_COMPUTE, *pipeline);
         cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_COMPUTE, *layout, 0, set, {});
@@ -520,7 +527,14 @@ void QueriesPrefixScanPass::Run(VkBuffer accumulation_buffer, VkBuffer dst_buffe
             const VkDescriptorSet set = descriptor_allocator.Commit();
             device.GetLogical().UpdateDescriptorSet(set, *descriptor_template, descriptor_data);
 
-            cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            // Memory writes can come from graphics or compute stages
+            const VkPipelineStageFlags src_stages_scan =
+                VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                VK_PIPELINE_STAGE_TRANSFER_BIT;
+            cmdbuf.PipelineBarrier(src_stages_scan,
                                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, read_barrier);
             cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_COMPUTE, *pipeline);
             cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_COMPUTE, *layout, 0, set, {});
@@ -579,8 +593,15 @@ void ASTCDecoderPass::Assemble(Image& image, const StagingBufferRef& map,
                 .layerCount = VK_REMAINING_ARRAY_LAYERS,
             },
         };
-        cmdbuf.PipelineBarrier(is_initialized ? VK_PIPELINE_STAGE_ALL_COMMANDS_BIT
-                                              : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        // If initialized, memory writes can come from graphics or compute stages
+        const VkPipelineStageFlags src_stages_astc = is_initialized ?
+            (VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+             VK_PIPELINE_STAGE_TRANSFER_BIT) :
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        cmdbuf.PipelineBarrier(src_stages_astc,
                                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, image_barrier);
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_COMPUTE, vk_pipeline);
     });

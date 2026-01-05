@@ -436,13 +436,27 @@ void BufferCacheRuntime::CopyBuffer(VkBuffer dst_buffer, VkBuffer src_buffer,
     scheduler.RequestOutsideRenderPassOperationContext();
     scheduler.Record([src_buffer, dst_buffer, vk_copies, barrier](vk::CommandBuffer cmdbuf) {
         if (barrier) {
-            cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            // Buffer writes can come from vertex input, shaders, or compute
+            const VkPipelineStageFlags src_stages =
+                VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |
+                VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+                VK_PIPELINE_STAGE_TRANSFER_BIT;
+            cmdbuf.PipelineBarrier(src_stages,
                                    VK_PIPELINE_STAGE_TRANSFER_BIT, 0, READ_BARRIER);
         }
         cmdbuf.CopyBuffer(src_buffer, dst_buffer, VideoCommon::FixSmallVectorADL(vk_copies));
         if (barrier) {
+            // Buffer reads can go to vertex input, shaders, or compute
+            const VkPipelineStageFlags dst_stages =
+                VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |
+                VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
             cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                   VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, WRITE_BARRIER);
+                                   dst_stages, 0, WRITE_BARRIER);
         }
     });
 }
@@ -456,7 +470,13 @@ void BufferCacheRuntime::PreCopyBarrier() {
     };
     scheduler.RequestOutsideRenderPassOperationContext();
     scheduler.Record([](vk::CommandBuffer cmdbuf) {
-        cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+        const VkPipelineStageFlags src_stages =
+            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |
+            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+            VK_PIPELINE_STAGE_TRANSFER_BIT;
+        cmdbuf.PipelineBarrier(src_stages, VK_PIPELINE_STAGE_TRANSFER_BIT,
                                0, READ_BARRIER);
     });
 }
@@ -470,7 +490,13 @@ void BufferCacheRuntime::PostCopyBarrier() {
     };
     scheduler.RequestOutsideRenderPassOperationContext();
     scheduler.Record([](vk::CommandBuffer cmdbuf) {
-        cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        const VkPipelineStageFlags dst_stages =
+            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |
+            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, dst_stages,
                                0, WRITE_BARRIER);
     });
 }

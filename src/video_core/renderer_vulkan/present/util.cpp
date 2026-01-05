@@ -170,10 +170,20 @@ void DownloadColorImage(vk::CommandBuffer& cmdbuf, VkImage image, VkBuffer buffe
         .imageOffset{.x = 0, .y = 0, .z = 0},
         .imageExtent{extent},
     };
-    cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+    const VkPipelineStageFlags src_stages_copy =
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+        VK_PIPELINE_STAGE_TRANSFER_BIT;
+    cmdbuf.PipelineBarrier(src_stages_copy, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
                            read_barrier);
     cmdbuf.CopyImageToBuffer(image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer, copy);
-    cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
+    const VkPipelineStageFlags dst_stages_copy =
+        VK_PIPELINE_STAGE_HOST_BIT |
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, dst_stages_copy, 0,
                            memory_write_barrier, nullptr, image_write_barrier);
 }
 

@@ -831,11 +831,26 @@ void BlitScale(Scheduler& scheduler, VkImage src_image, VkImage dst_image, const
                 .subresourceRange = subresource_range,
             },
         };
-        cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+        // Use specific pipeline stages for better parallelism
+        const VkPipelineStageFlags src_stages =
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+            VK_PIPELINE_STAGE_TRANSFER_BIT;
+        cmdbuf.PipelineBarrier(src_stages, VK_PIPELINE_STAGE_TRANSFER_BIT,
                                0, nullptr, nullptr, read_barriers);
         cmdbuf.BlitImage(src_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst_image,
                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, regions, vk_filter);
-        cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        // After transfer, images may be used in graphics, compute, or as attachments
+        const VkPipelineStageFlags dst_stages =
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, dst_stages,
                                0, nullptr, nullptr, write_barriers);
     });
 }
@@ -1092,15 +1107,29 @@ void TextureCacheRuntime::ReinterpretImage(Image& dst, Image& src,
                 .subresourceRange = dst_range.SubresourceRange(dst_aspect_mask),
             },
         };
-        cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+        const VkPipelineStageFlags src_stages_transfer =
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+            VK_PIPELINE_STAGE_TRANSFER_BIT;
+        cmdbuf.PipelineBarrier(src_stages_transfer, VK_PIPELINE_STAGE_TRANSFER_BIT,
                                0, {}, {}, pre_barriers);
 
         cmdbuf.CopyImageToBuffer(src_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, copy_buffer,
                                  vk_in_copies);
-        cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        const VkPipelineStageFlags dst_stages_transfer =
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
+            VK_PIPELINE_STAGE_TRANSFER_BIT;
+        cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, dst_stages_transfer,
                                0, WRITE_BARRIER, nullptr, middle_in_barrier);
 
-        cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+        cmdbuf.PipelineBarrier(src_stages_transfer, VK_PIPELINE_STAGE_TRANSFER_BIT,
                                0, READ_BARRIER, {}, middle_out_barrier);
         cmdbuf.CopyBufferToImage(copy_buffer, dst_image, VK_IMAGE_LAYOUT_GENERAL, vk_out_copies);
         cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
@@ -1230,7 +1259,12 @@ void TextureCacheRuntime::BlitImage(Framebuffer* dst_framebuffer, ImageView& dst
                 .layerCount = VK_REMAINING_ARRAY_LAYERS,
             },
         };
-        cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+        const VkPipelineStageFlags src_stages_resolve =
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+            VK_PIPELINE_STAGE_TRANSFER_BIT;
+        cmdbuf.PipelineBarrier(src_stages_resolve, VK_PIPELINE_STAGE_TRANSFER_BIT,
                                0, nullptr, nullptr, read_barriers);
         if (is_resolve) {
             cmdbuf.ResolveImage(src_image, VK_IMAGE_LAYOUT_GENERAL, dst_image,
@@ -1821,7 +1855,14 @@ void Image::DownloadMemory(std::span<VkBuffer> buffers_span, std::span<size_t> o
                         .layerCount = VK_REMAINING_ARRAY_LAYERS,
                     },
                 };
-                cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                const VkPipelineStageFlags src_stages_download =
+                    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                    VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                    VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
+                    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+                    VK_PIPELINE_STAGE_TRANSFER_BIT;
+                cmdbuf.PipelineBarrier(src_stages_download, VK_PIPELINE_STAGE_TRANSFER_BIT,
                                        0, read_barrier);
 
                 for (size_t index = 0; index < buffers.size(); index++) {
@@ -1853,7 +1894,13 @@ void Image::DownloadMemory(std::span<VkBuffer> buffers_span, std::span<size_t> o
                         .layerCount = VK_REMAINING_ARRAY_LAYERS,
                     },
                 };
-                cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                const VkPipelineStageFlags dst_stages_download =
+                    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+                    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                    VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                    VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+                cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, dst_stages_download,
                                        0, memory_write_barrier, nullptr, image_write_barrier);
             });
             return;

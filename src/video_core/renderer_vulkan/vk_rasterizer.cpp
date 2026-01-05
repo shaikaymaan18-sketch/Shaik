@@ -592,8 +592,16 @@ void RasterizerVulkan::DispatchCompute() {
         .srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT,
         .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
     };
-    scheduler.Record([](vk::CommandBuffer cmdbuf) { cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                               0, READ_BARRIER); });
+    scheduler.Record([](vk::CommandBuffer cmdbuf) {
+        // Memory writes can come from graphics or compute stages
+        const VkPipelineStageFlags src_stages =
+            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        cmdbuf.PipelineBarrier(src_stages, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                               0, READ_BARRIER);
+    });
     scheduler.Record([dim](vk::CommandBuffer cmdbuf) { cmdbuf.Dispatch(dim[0], dim[1], dim[2]); });
 
     // Log compute dispatch

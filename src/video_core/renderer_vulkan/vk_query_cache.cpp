@@ -813,8 +813,15 @@ public:
         };
         scheduler.RequestOutsideRenderPassOperationContext();
         scheduler.Record([](vk::CommandBuffer cmdbuf) {
+            // After transfer, results may be read by host or used in subsequent operations
+            const VkPipelineStageFlags dst_stages_query =
+                VK_PIPELINE_STAGE_HOST_BIT |
+                VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
             cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                   VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, WRITE_BARRIER);
+                                   dst_stages_query, 0, WRITE_BARRIER);
         });
 
         std::scoped_lock lk(flush_guard);
