@@ -83,7 +83,7 @@ TextureCache<P>::TextureCache(Runtime& runtime_, Tegra::MaxwellDeviceMemoryManag
             slices_per_batch = 64;
         }
         
-        lowmemorydevice = True(device_memory <= 4_GiB);
+        lowmemorydevice = True(device_memory <= 8_GiB);
     } else {
         expected_memory = DEFAULT_EXPECTED_MEMORY + 512_MiB;
         critical_memory = DEFAULT_CRITICAL_MEMORY + 1_GiB;
