@@ -71,11 +71,11 @@ TextureCache<P>::TextureCache(Runtime& runtime_, Tegra::MaxwellDeviceMemoryManag
                      DEFAULT_CRITICAL_MEMORY));
         minimum_memory = static_cast<u64>((device_local_memory - mem_threshold) / 2);
         
-        const u64 device_memory = static_cast<u64>(device_local_memory);
-        if (device_memory <= 4_GiB) {
+        const u64 device_memory_u64 = static_cast<u64>(device_local_memory);
+        if (device_memory_u64 <= 4_GiB) {
             chunk_size = 16_MiB;
             slices_per_batch = 16;
-        } else if (device_memory <= 8_GiB) {
+        } else if (device_memory_u64 <= 8_GiB) {
             chunk_size = 32_MiB;
             slices_per_batch = 32;
         } else {
@@ -83,7 +83,9 @@ TextureCache<P>::TextureCache(Runtime& runtime_, Tegra::MaxwellDeviceMemoryManag
             slices_per_batch = 64;
         }
         
-        lowmemorydevice = True(device_memory <= 8_GiB);
+        if (device_memory_u64 <= 8_GiB) {
+            lowmemorydevice = true;
+        }
     } else {
         expected_memory = DEFAULT_EXPECTED_MEMORY + 512_MiB;
         critical_memory = DEFAULT_CRITICAL_MEMORY + 1_GiB;
