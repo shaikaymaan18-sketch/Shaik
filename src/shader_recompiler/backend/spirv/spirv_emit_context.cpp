@@ -1695,12 +1695,8 @@ void EmitContext::DefineOutputs(const IR::Program& program) {
             frag_color[index] = DefineOutput(*this, output_type, std::nullopt);
             Decorate(frag_color[index], spv::Decoration::Location, index);
             Name(frag_color[index], fmt::format("frag_color{}", index));
-        } else {
-            frag_color[index] = DefineOutput(*this, F32[4], std::nullopt);
-            Decorate(frag_color[index], spv::Decoration::Location, index);
-            Name(frag_color[index], fmt::format("frag_color{}", index));
-                        }
         }
+                break;
         if (info.stores_frag_depth) {
             frag_depth = DefineOutput(*this, F32[1], std::nullopt);
             Decorate(frag_depth, spv::Decoration::BuiltIn, spv::BuiltIn::FragDepth);
