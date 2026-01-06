@@ -266,16 +266,7 @@ Shader::RuntimeInfo MakeRuntimeInfo(std::span<const Shader::IR::Program> program
     if (device.IsMoltenVK()) {
         info.is_moltenvk = true;
         for (size_t i = 0; i < key.state.attachments.size(); ++i) {
-            const auto format = key.state.attachments[i];
-            if (format == VK_FORMAT_R16G16B16A16_UINT || 
-                format == VK_FORMAT_R16G16B16A16_SINT ||
-                format == VK_FORMAT_R32G32B32A32_UINT || 
-                format == VK_FORMAT_R32G32B32A32_SINT ||
-                format == VK_FORMAT_R8G8B8A8_UINT ||
-                format == VK_FORMAT_R8G8B8A8_SINT) {
-                info.force_integer_frag_color = true;
-                break;
-            }
+            info.color_formats.push_back(key.state.attachments[i]);
         }
     }
     return info;
