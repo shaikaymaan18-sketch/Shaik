@@ -7,6 +7,7 @@
 #include <map>
 #include <optional>
 #include <vector>
+#include <vulkan/vulkan_core.h>
 
 #include "common/common_types.h"
 #include "shader_recompiler/varying_state.h"
@@ -101,7 +102,7 @@ struct RuntimeInfo {
     /// Use storage buffers instead of global pointers on GLASM
     bool glasm_use_storage_buffers{};
     bool is_moltenvk{};
-    std::array<VideoCore::Surface::PixelFormat, 8> color_formats{};
+    std::array<VkFormat, 8> color_formats{}; //for color format change
     /// Transform feedback state for each varying
     std::array<TransformFeedbackVarying, 256> xfb_varyings{};
     u32 xfb_count{0};
