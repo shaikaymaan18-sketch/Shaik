@@ -265,9 +265,6 @@ Shader::RuntimeInfo MakeRuntimeInfo(std::span<const Shader::IR::Program> program
     // MoltenVK: Check for integer color attachments
     #ifdef __APPLE__
         info.is_moltenvk = true;
-        for (size_t i = 0; i < key.state.attachments.size(); ++i) {
-            info.color_formats[i] = key.state.attachments[i];
-        }
     #endif
     return info;
 }
