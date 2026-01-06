@@ -1665,28 +1665,28 @@ void EmitContext::DefineOutputs(const IR::Program& program) {
             Id output_type = F32[4];  // Default to float
             if (runtime_info.is_moltenvk && index < runtime_info.color_formats.size()) {
                 const auto& format = runtime_info.color_formats[index];
-                // Check if the render target format is an integer format
+                   // Check if the render target format is an integer format
                 const bool is_integer_format = (
-                    format == PixelFormat::R8_UINT || 
-                    format == PixelFormat::R8_SINT ||
-                    format == PixelFormat::R16_UINT || 
-                    format == PixelFormat::R16_SINT ||
-                    format == PixelFormat::R32_UINT || 
-                    format == PixelFormat::R32_SINT ||
-                    format == PixelFormat::R8G8_UINT || 
-                    format == PixelFormat::R8G8_SINT ||
-                    format == PixelFormat::R16G16_UINT || 
-                    format == PixelFormat::R16G16_SINT ||
-                    format == PixelFormat::R32G32_UINT || 
-                    format == PixelFormat::R32G32_SINT ||
-                    format == PixelFormat::R8G8B8A8_UINT || 
-                    format == PixelFormat::R8G8B8A8_SINT ||
-                    format == PixelFormat::R16G16B16A16_UINT || 
-                    format == PixelFormat::R16G16B16A16_SINT ||
-                    format == PixelFormat::R32G32B32A32_UINT || 
-                    format == PixelFormat::R32G32B32A32_SINT ||
-                    format == PixelFormat::A8B8G8R8_UINT || 
-                    format == PixelFormat::A8B8G8R8_SINT
+                    format == VK_FORMAT_R8_UINT || 
+                    format == VK_FORMAT_R8_SINT ||
+                    format == VK_FORMAT_R16_UINT || 
+                    format == VK_FORMAT_R16_SINT ||
+                    format == VK_FORMAT_R32_UINT || 
+                    format == VK_FORMAT_R32_SINT ||
+                    format == VK_FORMAT_R8G8_UINT || 
+                    format == VK_FORMAT_R8G8_SINT ||
+                    format == VK_FORMAT_R16G16_UINT || 
+                    format == VK_FORMAT_R16G16_SINT ||
+                    format == VK_FORMAT_R32G32_UINT || 
+                    format == VK_FORMAT_R32G32_SINT ||
+                    format == VK_FORMAT_R8G8B8A8_UINT || 
+                    format == VK_FORMAT_R8G8B8A8_SINT ||
+                    format == VK_FORMAT_R16G16B16A16_UINT || 
+                    format == VK_FORMAT_R16G16B16A16_SINT ||
+                    format == VK_FORMAT_R32G32B32A32_UINT || 
+                    format == VK_FORMAT_R32G32B32A32_SINT ||
+                    format == VK_FORMAT_A8B8G8R8_UINT_PACK32 || 
+                    format == VK_FORMAT_A8B8G8R8_SINT_PACK32
                 );
                 if (is_integer_format) {
                     output_type = U32[4];  // Use unsigned int vec4 for integer formats
