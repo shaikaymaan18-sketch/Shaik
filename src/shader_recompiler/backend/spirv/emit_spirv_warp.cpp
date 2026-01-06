@@ -7,7 +7,12 @@
 namespace Shader::Backend::SPIRV {
 namespace {
 Id SubgroupScope(EmitContext& ctx) {
+#ifdef __APPLE__
+    // MoltenVK doesn't support Subgroup scope for compute shaders
+    return ctx.Const(static_cast<u32>(spv::Scope::Workgroup));
+#else
     return ctx.Const(static_cast<u32>(spv::Scope::Subgroup));
+#endif
 }
 
 Id GetThreadId(EmitContext& ctx) {
