@@ -263,12 +263,12 @@ Shader::RuntimeInfo MakeRuntimeInfo(std::span<const Shader::IR::Program> program
     info.force_early_z = key.state.early_z != 0;
     info.y_negate = key.state.y_negate != 0;
     // MoltenVK: Check for integer color attachments
-    if (device.IsMoltenVK()) {
+    #ifdef __APPLE__
         info.is_moltenvk = true;
         for (size_t i = 0; i < key.state.attachments.size(); ++i) {
-            info.color_formats.push_back(key.state.attachments[i]);
+            info.color_formats[i] = key.state.attachments[i];
         }
-    }
+    #endif
     return info;
 }
 size_t GetTotalPipelineWorkers() {
