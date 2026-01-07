@@ -1681,6 +1681,7 @@ void EmitContext::DefineOutputs(const IR::Program& program) {
             // Metal requires fragment shader outputs to match render target formats.
             // On other platforms, always use F32[4] (float vec4) as usual.
             Id output_type = F32[4];  // Default to float
+            #ifdef __APPLE__
             if (runtime_info.is_moltenvk && index < runtime_info.color_formats.size()) {
                 const auto& format = runtime_info.color_formats[index];
                 // Check if the render target format is an integer format
@@ -1710,6 +1711,7 @@ void EmitContext::DefineOutputs(const IR::Program& program) {
                     output_type = U32[4];  // Use unsigned int vec4 for integer formats
                 }
             }
+            #endif // __APPLE__
             frag_color[index] = DefineOutput(*this, output_type, std::nullopt);
             Decorate(frag_color[index], spv::Decoration::Location, index);
             Name(frag_color[index], fmt::format("frag_color{}", index));
