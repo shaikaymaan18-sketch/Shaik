@@ -301,6 +301,7 @@ public:
     }
 
     bool ShouldBoostClocks() const;
+    bool IsSteamDeck() const;
 
     /// Returns uniform buffer alignment requirement.
     VkDeviceSize GetUniformBufferAlignment() const {

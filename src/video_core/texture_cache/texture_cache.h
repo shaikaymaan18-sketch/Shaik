@@ -71,21 +71,10 @@ TextureCache<P>::TextureCache(Runtime& runtime_, Tegra::MaxwellDeviceMemoryManag
                      DEFAULT_CRITICAL_MEMORY));
         minimum_memory = static_cast<u64>((device_local_memory - mem_threshold) / 2);
         
-        const u64 device_memory_u64 = static_cast<u64>(device_local_memory);
-        if (device_memory_u64 <= 4_GiB) {
-            chunk_size = 16_MiB;
-            slices_per_batch = 16;
-        } else if (device_memory_u64 <= 8_GiB) {
-            chunk_size = 32_MiB;
-            slices_per_batch = 32;
-        } else {
-            chunk_size = 64_MiB;
-            slices_per_batch = 64;
-        }
-        
-        if (device_memory_u64 <= 8_GiB) {
-            lowmemorydevice = true;
-        }
+        chunk_size = 64_MiB;
+        slices_per_batch = 64;
+
+        lowmemorydevice = runtime.IsSteamDeck();
     } else {
         expected_memory = DEFAULT_EXPECTED_MEMORY + 512_MiB;
         critical_memory = DEFAULT_CRITICAL_MEMORY + 1_GiB;

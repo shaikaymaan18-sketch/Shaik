@@ -775,6 +775,7 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
 
     constexpr u32 SLICES_PER_CHUNK = 64;
     
+    scheduler.RequestOutsideRenderPassOperationContext();
     for (u32 z_offset = 0; z_offset < z_count; z_offset += SLICES_PER_CHUNK) {
         const u32 current_chunk_slices = std::min(SLICES_PER_CHUNK, z_count - z_offset);
         const u32 current_z_start = z_start + z_offset;
@@ -826,9 +827,9 @@ void BlockLinearUnswizzle3DPass::UnswizzleChunk(
     const void* descriptor_data = compute_pass_descriptor_queue.UpdateData();
     const VkDescriptorSet set = descriptor_allocator.Commit();
 
-    const u32 gx = Common::DivCeil(blocks_x, 32u);
+    const u32 gx = Common::DivCeil(blocks_x, 8u);
     const u32 gy = Common::DivCeil(blocks_y, 8u);
-    const u32 gz = Common::DivCeil(z_count, 1u);
+    const u32 gz = Common::DivCeil(z_count, 4u);
     
     const u32 bytes_per_block = 1u << pc.bytes_per_block_log2;
     const VkDeviceSize output_slice_size =
@@ -836,14 +837,18 @@ void BlockLinearUnswizzle3DPass::UnswizzleChunk(
     const VkDeviceSize barrier_size = output_slice_size * z_count;
     
     const bool is_first_chunk = (z_start == 0);
-    
-    scheduler.RequestOutsideRenderPassOperationContext();
-    scheduler.Record([this, &image, set, descriptor_data, pc, gx, gy, gz, z_start, z_count,
-                      barrier_size, is_first_chunk](vk::CommandBuffer cmdbuf) {
-        const VkBuffer out_buffer = *image.compute_unswizzle_buffer;
-        const VkImage dst_image = image.Handle();
-        const VkImageAspectFlags aspect = image.AspectMask();
 
+    const VkBuffer out_buffer = *image.compute_unswizzle_buffer;
+    const VkImage dst_image = image.Handle();
+    const VkImageAspectFlags aspect = image.AspectMask();
+    const u32 image_width = image.info.size.width;
+    const u32 image_height = image.info.size.height;
+
+    scheduler.Record([this, set, descriptor_data, pc, gx, gy, gz, z_start, z_count,
+                      barrier_size, is_first_chunk, out_buffer, dst_image, aspect,
+                      image_width, image_height
+                      ](vk::CommandBuffer cmdbuf) {
+        
         device.GetLogical().UpdateDescriptorSet(set, *descriptor_template, descriptor_data);
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_COMPUTE, *pipeline);
         cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_COMPUTE, *layout, 0, set, {});
@@ -893,7 +898,7 @@ void BlockLinearUnswizzle3DPass::UnswizzleChunk(
             .bufferImageHeight = 0,
             .imageSubresource = {aspect, 0, 0, 1},
             .imageOffset = {0, 0, static_cast<s32>(z_start)}, // Write to correct Z
-            .imageExtent = {image.info.size.width, image.info.size.height, z_count},
+            .imageExtent = {image_width, image_height, z_count},
         };
         cmdbuf.CopyBufferToImage(out_buffer, dst_image, 
                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, copy);

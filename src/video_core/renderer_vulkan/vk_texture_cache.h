@@ -81,6 +81,8 @@ public:
     void ReinterpretImage(Image& dst, Image& src, std::span<const VideoCommon::ImageCopy> copies);
 
     void ConvertImage(Framebuffer* dst, ImageView& dst_view, ImageView& src_view);
+    
+    bool IsSteamDeck() const;
 
     bool CanAccelerateImageUpload(Image&) const noexcept {
         return false;

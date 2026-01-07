@@ -81,12 +81,12 @@ layout(binding = BINDING_INPUT_BUFFER, std430) buffer InputBufferU32  { uint   u
 layout(binding = BINDING_INPUT_BUFFER, std430) buffer InputBufferU64  { uvec2  u64data[];  };
 layout(binding = BINDING_INPUT_BUFFER, std430) buffer InputBufferU128 { uvec4  u128data[]; };
 
-layout(binding = BINDING_OUTPUT_BUFFER, std430) buffer OutputBuffer {
+layout(binding = BINDING_OUTPUT_BUFFER, std430) writeonly buffer OutputBuffer {
     uint out_u32[];
 };
 
 // --- Constants ---
-layout(local_size_x = 32, local_size_y = 8, local_size_z = 1) in;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
 
 const uint GOB_SIZE_X = 64;
 const uint GOB_SIZE_Y = 8;
@@ -100,9 +100,18 @@ const uint GOB_SIZE_SHIFT   = GOB_SIZE_X_SHIFT + GOB_SIZE_Y_SHIFT + GOB_SIZE_Z_S
 const uvec2 SWIZZLE_MASK = uvec2(GOB_SIZE_X - 1u, GOB_SIZE_Y - 1u);
 
 // --- Helpers ---
+shared uint swizzle_cache[64 * 8]; // Cache 64x8 GOB worth of swizzle data
+
 uint SwizzleOffset(uvec2 pos) {
     pos &= SWIZZLE_MASK;
-    return swizzle_table[pos.y * 64u + pos.x];
+    uint local_id = gl_LocalInvocationIndex;
+    
+    if (local_id < 512u) {
+        swizzle_cache[local_id] = swizzle_table[local_id];
+    }
+    barrier();
+    
+    return swizzle_cache[pos.y * 64u + pos.x];
 }
 
 uvec4 ReadTexel(uint offset) {
@@ -152,12 +161,23 @@ void main() {
     uint block_index = block_coord.x +
                        (block_coord.y * pc.blocks_dim.x) +
                        (block_coord.z * pc.blocks_dim.x * pc.blocks_dim.y);
-    uint out_idx = block_index * (bytes_per_block >> 2u);
 
-    out_u32[out_idx]     = texel.x;
-    out_u32[out_idx + 1] = texel.y;
-    if (pc.bytes_per_block_log2 == 4u) {
-        out_u32[out_idx + 2] = texel.z;
-        out_u32[out_idx + 3] = texel.w;
+    if (bytes_per_block == 16u) {
+        // BC6H/BC7
+        uvec4 out_data[1];
+        out_data[0] = texel;
+        out_u32[block_index * 4u] = texel.x;
+        out_u32[block_index * 4u + 1u] = texel.y;
+        out_u32[block_index * 4u + 2u] = texel.z;
+        out_u32[block_index * 4u + 3u] = texel.w;
+    } else if (bytes_per_block == 8u) {
+        // BC1/BC4
+        uint out_idx = block_index * 2u;
+        out_u32[out_idx] = texel.x;
+        out_u32[out_idx + 1u] = texel.y;
+    } else {
+        uint out_idx = block_index * (bytes_per_block >> 2u);
+        out_u32[out_idx] = texel.x;
+        if (bytes_per_block > 4u) out_u32[out_idx + 1u] = texel.y;
     }
 }

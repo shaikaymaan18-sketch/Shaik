@@ -350,4 +350,8 @@ u64 Device::GetCurrentDedicatedVideoMemory() const {
     return static_cast<u64>(cur_avail_mem_kb) * 1_KiB;
 }
 
+bool Device::IsSteamDeck() const {
+    return false;
+}
+
 } // namespace OpenGL

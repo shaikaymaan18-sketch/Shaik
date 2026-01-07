@@ -693,6 +693,10 @@ bool TextureCacheRuntime::HasNativeASTC() const noexcept {
     return device.HasASTC();
 }
 
+bool TextureCacheRuntime::IsSteamDeck() const {
+    return device.IsSteamDeck();
+}
+
 Image::Image(TextureCacheRuntime& runtime_, const VideoCommon::ImageInfo& info_, GPUVAddr gpu_addr_,
              VAddr cpu_addr_)
     : VideoCommon::ImageBase(info_, gpu_addr_, cpu_addr_), runtime{&runtime_} {

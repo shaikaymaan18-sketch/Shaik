@@ -195,6 +195,8 @@ public:
     bool HasLmemPerfBug() const {
         return has_lmem_perf_bug;
     }
+    
+    bool IsSteamDeck() const;
 
 private:
     static bool TestVariableAoffi();
