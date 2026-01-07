@@ -674,7 +674,24 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
         const size_t stage_index{index - 1};
         infos[stage_index] = &program.info;
 
-        const auto runtime_info{MakeRuntimeInfo(programs, key, program, previous_stage)};
+auto runtime_info{MakeRuntimeInfo(programs, key, program, previous_stage)};
+
+#ifdef __APPLE__
+// MoltenVK: Populate color attachment formats for integer RT handling
+if (program.stage == Shader::Stage::Fragment) {
+    for (size_t i = 0; i < 8; ++i) {
+        if (key.state.color_formats[i] != 0) {
+            const auto rt_format = static_cast<Tegra::RenderTargetFormat>(key.state.color_formats[i]);
+            const auto pixel_format = VideoCore::Surface::PixelFormatFromRenderTargetFormat(rt_format);
+            if (pixel_format != VideoCore::Surface::PixelFormat::Invalid) {
+                const auto format_info = MaxwellToVK::SurfaceFormat(device, FormatType::Optimal, false, pixel_format);
+                runtime_info.color_formats[i] = format_info.format;
+            }
+        }
+    }
+}
+#endif
+
         ConvertLegacyToGeneric(program, runtime_info);
         const std::vector<u32> code{EmitSPIRV(profile, runtime_info, program, binding, this->optimize_spirv_output)};
         device.SaveShader(code);
