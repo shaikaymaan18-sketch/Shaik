@@ -7,7 +7,10 @@
 #include <map>
 #include <optional>
 #include <vector>
+
+#ifdef __APPLE__
 #include <vulkan/vulkan_core.h>
+#endif
 
 #include "common/common_types.h"
 #include "shader_recompiler/varying_state.h"
