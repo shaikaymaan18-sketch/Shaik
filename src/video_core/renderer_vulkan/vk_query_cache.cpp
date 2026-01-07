@@ -155,7 +155,7 @@ public:
         }
 
         ReserveHostQuery();
-
+/*
         // Ensure outside render pass
         scheduler.RequestOutsideRenderPassOperationContext();
 
@@ -167,7 +167,7 @@ public:
 
         // Manually restart the render pass (required for vkCmdClearAttachments, etc.)
         scheduler.RequestRenderpass(texture_cache.GetFramebuffer());
-
+*/
         // Begin query inside the newly started render pass
         scheduler.Record([query_pool = current_query_pool,
                                  query_index = current_bank_slot](vk::CommandBuffer cmdbuf) {
