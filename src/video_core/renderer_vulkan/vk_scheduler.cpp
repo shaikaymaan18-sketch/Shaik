@@ -340,13 +340,11 @@ void Scheduler::EndRenderPass()
 
         query_cache->CounterEnable(VideoCommon::QueryType::ZPassPixelCount64, false);
         query_cache->NotifySegment(false);
-
         Record([num_images = num_renderpass_images,
                        images = renderpass_images,
                        ranges = renderpass_image_ranges](vk::CommandBuffer cmdbuf) {
             std::array<VkImageMemoryBarrier, 9> barriers;
             VkPipelineStageFlags src_stages = 0;
-
             for (size_t i = 0; i < num_images; ++i) {
                 const VkImageSubresourceRange& range = ranges[i];
                 const bool is_color = (range.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) != 0;
@@ -364,28 +362,28 @@ void Scheduler::EndRenderPass()
 
                 if (is_color) {
                     // Color attachments can be read as textures or used as attachments again
-                    src_access |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-                    src_stages |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                    src_access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                    this_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
                     new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                     dst_access = VK_ACCESS_SHADER_READ_BIT
                                  | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT
                                  | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
                 } else if (is_depth_stencil) {
                     // Depth attachments can be read as textures or used as attachments again
-                    src_access |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-                    src_stages |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
-                                  | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+                    src_access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                    this_stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+                                 | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
                     new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                     dst_access = VK_ACCESS_SHADER_READ_BIT
                                  | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
                                  | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
                 } else {
                     // Fallback to GENERAL for unknown usage
-                    src_access |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                                  | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-                    src_stages |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
-                                  | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT
-                                  | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                    src_access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                                 | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                    this_stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+                                 | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT
+                                 | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
                     new_layout = VK_IMAGE_LAYOUT_GENERAL;
                     dst_access = VK_ACCESS_SHADER_READ_BIT
                                  | VK_ACCESS_SHADER_WRITE_BIT
@@ -394,7 +392,7 @@ void Scheduler::EndRenderPass()
                                  | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
                                  | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
                 }
-
+                src_stages |= this_stage;
                 barriers[i] = VkImageMemoryBarrier{
                         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
                         .pNext = nullptr,
