@@ -1491,13 +1491,29 @@ void QueryCacheRuntime::Barriers(bool is_prebarrier) {
     impl->scheduler.RequestOutsideRenderPassOperationContext();
     if (is_prebarrier) {
         impl->scheduler.Record([](vk::CommandBuffer cmdbuf) {
-            cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            // Query data can be written by graphics or compute stages
+            const VkPipelineStageFlags src_stages_query =
+                VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
+                VK_PIPELINE_STAGE_TRANSFER_BIT;
+            cmdbuf.PipelineBarrier(src_stages_query,
                                    VK_PIPELINE_STAGE_TRANSFER_BIT, 0, READ_BARRIER);
         });
     } else {
         impl->scheduler.Record([](vk::CommandBuffer cmdbuf) {
+            // Query results may be read by host or used in shaders/indirect commands
+            const VkPipelineStageFlags dst_stages_query =
+                VK_PIPELINE_STAGE_HOST_BIT |
+                VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT |
+                VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
             cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                   VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, WRITE_BARRIER);
+                                   dst_stages_query, 0, WRITE_BARRIER);
         });
     }
 }
