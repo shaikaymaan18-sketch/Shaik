@@ -160,11 +160,12 @@ void DownloadColorImage(vk::CommandBuffer& cmdbuf, VkImage image, VkBuffer buffe
             .layerCount = VK_REMAINING_ARRAY_LAYERS,
         },
     };
+    // Host will read the downloaded data
     static constexpr VkMemoryBarrier memory_write_barrier{
         .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
         .pNext = nullptr,
-        .srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
+        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
     };
     const VkBufferImageCopy copy{
         .bufferOffset = 0,
