@@ -475,8 +475,6 @@ private:
     u64 minimum_memory;
     u64 expected_memory;
     u64 critical_memory;
-    size_t chunk_size;
-    size_t slices_per_batch;
     bool lowmemorydevice = false;
 
     struct BufferDownload {

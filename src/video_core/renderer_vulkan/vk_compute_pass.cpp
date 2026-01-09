@@ -755,15 +755,14 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
     u32 z_start, u32 z_count)
 {
     using namespace VideoCommon::Accelerated;
-
-    // Leaving this hear incase instances are found where slices_needed causes device loss
+    
+    // Leaving this here incase instances are found where slices_needed causes device loss
     // Tune this for a balance between speed and size, I don't own a deck so can't self tune it
-    // constexpr u32 MAX_BATCH_SLICES = 64;
+    const u32 MAX_BATCH_SLICES = std::min(z_count, image.info.size.depth);
     
     if (!image.has_compute_unswizzle_buffer) {
         // Allocate exactly what this batch needs
-        const u32 slices_needed = std::min(z_count, image.info.size.depth);
-        image.AllocateComputeUnswizzleBuffer(slices_needed);
+        image.AllocateComputeUnswizzleBuffer(MAX_BATCH_SLICES);
     }
 
     ASSERT(swizzles.size() == 1);
@@ -772,12 +771,10 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
 
     const u32 blocks_x = (image.info.size.width  + 3) / 4;
     const u32 blocks_y = (image.info.size.height + 3) / 4;
-
-    constexpr u32 SLICES_PER_CHUNK = 64;
     
     scheduler.RequestOutsideRenderPassOperationContext();
-    for (u32 z_offset = 0; z_offset < z_count; z_offset += SLICES_PER_CHUNK) {
-        const u32 current_chunk_slices = std::min(SLICES_PER_CHUNK, z_count - z_offset);
+    for (u32 z_offset = 0; z_offset < z_count; z_offset += MAX_BATCH_SLICES) {
+        const u32 current_chunk_slices = std::min(MAX_BATCH_SLICES, z_count - z_offset);
         const u32 current_z_start = z_start + z_offset;
         
         UnswizzleChunk(image, swizzled, sw, params, blocks_x, blocks_y,
@@ -848,7 +845,11 @@ void BlockLinearUnswizzle3DPass::UnswizzleChunk(
                       barrier_size, is_first_chunk, out_buffer, dst_image, aspect,
                       image_width, image_height
                       ](vk::CommandBuffer cmdbuf) {
-        
+                          
+        if (dst_image == VK_NULL_HANDLE || out_buffer == VK_NULL_HANDLE) {
+            return;
+        }
+       
         device.GetLogical().UpdateDescriptorSet(set, *descriptor_template, descriptor_data);
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_COMPUTE, *pipeline);
         cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_COMPUTE, *layout, 0, set, {});

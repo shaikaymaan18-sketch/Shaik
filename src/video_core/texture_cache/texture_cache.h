@@ -70,18 +70,12 @@ TextureCache<P>::TextureCache(Runtime& runtime_, Tegra::MaxwellDeviceMemoryManag
             (std::max)((std::min)(device_local_memory - min_vacancy_critical, min_spacing_critical),
                      DEFAULT_CRITICAL_MEMORY));
         minimum_memory = static_cast<u64>((device_local_memory - mem_threshold) / 2);
-        
-        chunk_size = 64_MiB;
-        slices_per_batch = 64;
 
         lowmemorydevice = runtime.IsSteamDeck();
     } else {
         expected_memory = DEFAULT_EXPECTED_MEMORY + 512_MiB;
         critical_memory = DEFAULT_CRITICAL_MEMORY + 1_GiB;
         minimum_memory = 0;
-        
-        chunk_size = 32_MiB;
-        slices_per_batch = 32;
         
         lowmemorydevice = true;
     }
@@ -1479,18 +1473,38 @@ void TextureCache<P>::TickAsyncUnswizzle() {
         task.initialized = true;
     }
     
+    size_t CHUNK_SIZE;
+    switch (Settings::values.gpu_unzwizzle_stream_size.GetValue()) {
+        case Settings::GpuUnswizzle::VeryLow: CHUNK_SIZE = 4_MiB; break;
+        case Settings::GpuUnswizzle::Low:     CHUNK_SIZE = 8_MiB; break;
+        case Settings::GpuUnswizzle::Normal:  CHUNK_SIZE = 16_MiB; break;
+        case Settings::GpuUnswizzle::Medium:  CHUNK_SIZE = 32_MiB; break;
+        case Settings::GpuUnswizzle::High:    CHUNK_SIZE = 64_MiB; break;
+        default:                              CHUNK_SIZE = 16_MiB;
+    }
+
+    u32 SLICES_PER_BATCH;
+    switch (Settings::values.gpu_unzwizzle_chunk_size.GetValue()) {
+        case Settings::GpuUnswizzleChunk::VeryLow: SLICES_PER_BATCH = 32; break;
+        case Settings::GpuUnswizzleChunk::Low:     SLICES_PER_BATCH = 64; break;
+        case Settings::GpuUnswizzleChunk::Normal:  SLICES_PER_BATCH = 128; break;
+        case Settings::GpuUnswizzleChunk::Medium:  SLICES_PER_BATCH = 256; break;
+        case Settings::GpuUnswizzleChunk::High:    SLICES_PER_BATCH = 512; break;
+        default:                                   SLICES_PER_BATCH = 128;
+    }
+    
     // Read data
     if (task.current_offset < task.total_size) {
         const size_t remaining = task.total_size - task.current_offset;
         
-        size_t copy_amount = std::min(chunk_size, remaining);
-        
-        if (remaining > chunk_size) {
+        size_t copy_amount = std::min(CHUNK_SIZE, remaining);
+
+        if (remaining > CHUNK_SIZE) {
             copy_amount = (copy_amount / task.bytes_per_slice) * task.bytes_per_slice;
             if (copy_amount == 0) copy_amount = task.bytes_per_slice;
         }
         
-        gpu_memory->ReadBlockUnsafe(image.gpu_addr + task.current_offset, 
+        gpu_memory->ReadBlock(image.gpu_addr + task.current_offset, 
                               task.staging_buffer.mapped_span.data() + task.current_offset, 
                               copy_amount);
         task.current_offset += copy_amount;
@@ -1500,7 +1514,7 @@ void TextureCache<P>::TickAsyncUnswizzle() {
     const u32 complete_slices = static_cast<u32>(bytes_ready / task.bytes_per_slice);
     const bool is_final_batch = task.current_offset >= task.total_size;
     
-    if (complete_slices >= slices_per_batch || (is_final_batch && complete_slices > 0)) {
+    if (complete_slices >= SLICES_PER_BATCH || (is_final_batch && complete_slices > 0)) {
         const u32 z_start = static_cast<u32>(task.last_submitted_offset / task.bytes_per_slice);
         const u32 z_count = std::min(complete_slices, image.info.size.depth - z_start);
         
@@ -1516,10 +1530,6 @@ void TextureCache<P>::TickAsyncUnswizzle() {
         runtime.FreeDeferredStagingBuffer(task.staging_buffer);
         image.flags &= ~ImageFlagBits::IsDecoding;
         unswizzle_queue.pop_front();
-        
-        if (total_used_memory >= expected_memory) {
-            RunGarbageCollector();
-        }
         
         // Wait 4 frames to process the next entry
         current_unswizzle_frame = 4u;

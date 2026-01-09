@@ -280,6 +280,8 @@ class SettingsFragmentPresenter(
             add(IntSetting.FAST_GPU_TIME.key)
             add(BooleanSetting.SKIP_CPU_INNER_INVALIDATION.key)
             add(BooleanSetting.RENDERER_ASYNCHRONOUS_SHADERS.key)
+            add(IntSetting.GPU_UNZWIZZLE_STREAM_SIZE.key)
+            add(IntSetting.GPU_UNZWIZZLE_CHUNK_SIZE.key)
 
             add(HeaderSetting(R.string.extensions))
 

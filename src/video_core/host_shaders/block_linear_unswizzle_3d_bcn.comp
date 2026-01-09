@@ -100,18 +100,9 @@ const uint GOB_SIZE_SHIFT   = GOB_SIZE_X_SHIFT + GOB_SIZE_Y_SHIFT + GOB_SIZE_Z_S
 const uvec2 SWIZZLE_MASK = uvec2(GOB_SIZE_X - 1u, GOB_SIZE_Y - 1u);
 
 // --- Helpers ---
-shared uint swizzle_cache[64 * 8]; // Cache 64x8 GOB worth of swizzle data
-
 uint SwizzleOffset(uvec2 pos) {
     pos &= SWIZZLE_MASK;
-    uint local_id = gl_LocalInvocationIndex;
-    
-    if (local_id < 512u) {
-        swizzle_cache[local_id] = swizzle_table[local_id];
-    }
-    barrier();
-    
-    return swizzle_cache[pos.y * 64u + pos.x];
+    return swizzle_table[pos.y * 64u + pos.x];
 }
 
 uvec4 ReadTexel(uint offset) {
