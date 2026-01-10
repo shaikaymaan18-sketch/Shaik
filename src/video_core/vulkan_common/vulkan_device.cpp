@@ -694,6 +694,8 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
                               VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
         dynamic_state3_blending = false;
         dynamic_state3_enables = false;
+        features.shader_float16_int8.shaderFloat16 = false;
+        features.shader_float16_int8.shaderInt8 = false;
         break;
     case Settings::ExtendedDynamicState::EDS1:
         // Level 1: Enable EDS1, disable EDS2 and EDS3
@@ -703,6 +705,8 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
                               VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
         dynamic_state3_blending = false;
         dynamic_state3_enables = false;
+        features.shader_float16_int8.shaderFloat16 = false;
+        features.shader_float16_int8.shaderInt8 = false;
         break;
     case Settings::ExtendedDynamicState::EDS2:
         // Level 2: Enable EDS1 + EDS2, disable EDS3
@@ -710,10 +714,14 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
                               VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
         dynamic_state3_blending = false;
         dynamic_state3_enables = false;
+        features.shader_float16_int8.shaderFloat16 = false;
+        features.shader_float16_int8.shaderInt8 = false;
         break;
     case Settings::ExtendedDynamicState::EDS3:
     default:
         // Level 3: Enable all (EDS1 + EDS2 + EDS3)
+        features.shader_float16_int8.shaderFloat16 = false;
+        features.shader_float16_int8.shaderInt8 = false;
         break;
     }
 
