@@ -61,7 +61,7 @@ const uint encoding_values[22] = uint[](
     (JUST_BITS | (5u << 8u)), (QUINT | (3u << 8u)), (TRIT | (4u << 8u)), (JUST_BITS | (6u << 8u)),
     (QUINT | (4u << 8u)), (TRIT | (5u << 8u)), (JUST_BITS | (7u << 8u)), (QUINT | (5u << 8u)),
     (TRIT | (6u << 8u)), (JUST_BITS | (8u << 8u)));
-    
+
 // Input ASTC texture globals
 int total_bitsread = 0;
 uvec4 local_buff;
@@ -747,7 +747,7 @@ uint UnquantizeTexelWeight(EncodingData val) {
                 return FastReplicateTo6(z, bitlen);
         }
     }
-    
+
     // Brain screaming at me that division is expensive, probably ultra wrong so have this here incase
     /*if (encoding == JUST_BITS) {
         uint z = bitval;
@@ -770,11 +770,11 @@ uint UnquantizeTexelWeight(EncodingData val) {
                 return FastReplicateTo6(z, bitlen);
         }
     }*/
-    
+
     const uint A = ReplicateBitTo7((bitval & 1));
     uint B = 0, C = 0, D = 0;
     uint result = 0;
-    
+
     switch (encoding) {
     case TRIT: {
         D = QuintTritValue(val);
@@ -823,17 +823,17 @@ uint UnquantizeTexelWeight(EncodingData val) {
         break;
     }
     }
-    
+
     if (bitlen > 0) {
         result = D * C + B;
         result ^= A;
         result = (A & 0x20) | (result >> 2);
     }
-    
+
     if (result > 32) {
         result += 1;
     }
-    
+
     return result;
 }
 
@@ -1203,10 +1203,10 @@ void DecompressBlock(ivec3 coord) {
 }
 
 uint SwizzleOffset(uvec2 pos) {
-    return ((pos.x & 32u) << 3u) | 
-           ((pos.y & 6u)  << 5u) | 
-           ((pos.x & 16u) << 1u) | 
-           ((pos.y & 1u)  << 4u) | 
+    return ((pos.x & 32u) << 3u) |
+           ((pos.y & 6u)  << 5u) |
+           ((pos.x & 16u) << 1u) |
+           ((pos.y & 1u)  << 4u) |
            (pos.x & 15u);
 }
 
