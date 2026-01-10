@@ -62,13 +62,6 @@ const uint encoding_values[22] = uint[](
     (QUINT | (4u << 8u)), (TRIT | (5u << 8u)), (JUST_BITS | (7u << 8u)), (QUINT | (5u << 8u)),
     (TRIT | (6u << 8u)), (JUST_BITS | (8u << 8u)));
     
-// Precomputed weight tables
-const uint WEIGHT_TABLE_1BIT[2] = uint[](0, 64);
-const uint WEIGHT_TABLE_2BIT[4] = uint[](0, 21, 43, 64);
-const uint WEIGHT_TABLE_3BIT[8] = uint[](0, 9, 18, 27, 37, 46, 55, 64);
-const uint WEIGHT_TABLE_4BIT[16] = uint[](0, 4, 8, 12, 17, 21, 25, 29, 35, 39, 43, 47, 52, 56, 60, 64);
-const uint WEIGHT_TABLE_5BIT[32] = uint[](0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64);
-
 // Input ASTC texture globals
 int total_bitsread = 0;
 uvec4 local_buff;
@@ -739,13 +732,14 @@ uint UnquantizeTexelWeight(EncodingData val) {
     const uint bitval = BitValue(val);
 
     if (encoding == JUST_BITS) {
+        uint z = bitval;
         switch (bitlen) {
-            case 1: return WEIGHT_TABLE_1BIT[bitval];
-            case 2: return WEIGHT_TABLE_2BIT[bitval];
-            case 3: return WEIGHT_TABLE_3BIT[bitval];
-            case 4: return WEIGHT_TABLE_4BIT[bitval];
-            case 5: return WEIGHT_TABLE_5BIT[bitval];
-            default: return FastReplicateTo6(bitval, bitlen);
+            case 1: return z * 64;
+            case 2: return uint(floor(float(z) * 21.5f));
+            case 3: return uint(floor(float(z) * 9.25f));
+            case 4: return uint(floor(float(z) * 4.125f));
+            case 5: return uint(floor(float(z) * 2.0625f));
+            default: return FastReplicateTo6(z, bitlen);
         }
     }
     

@@ -152,23 +152,12 @@ void main() {
     uint block_index = block_coord.x +
                        (block_coord.y * pc.blocks_dim.x) +
                        (block_coord.z * pc.blocks_dim.x * pc.blocks_dim.y);
+    uint out_idx = block_index * (bytes_per_block >> 2u);
 
-    if (bytes_per_block == 16u) {
-        // BC6H/BC7
-        uvec4 out_data[1];
-        out_data[0] = texel;
-        out_u32[block_index * 4u] = texel.x;
-        out_u32[block_index * 4u + 1u] = texel.y;
-        out_u32[block_index * 4u + 2u] = texel.z;
-        out_u32[block_index * 4u + 3u] = texel.w;
-    } else if (bytes_per_block == 8u) {
-        // BC1/BC4
-        uint out_idx = block_index * 2u;
-        out_u32[out_idx] = texel.x;
-        out_u32[out_idx + 1u] = texel.y;
-    } else {
-        uint out_idx = block_index * (bytes_per_block >> 2u);
-        out_u32[out_idx] = texel.x;
-        if (bytes_per_block > 4u) out_u32[out_idx + 1u] = texel.y;
+    out_u32[out_idx]     = texel.x;
+    out_u32[out_idx + 1u] = texel.y;
+    if (pc.bytes_per_block_log2 == 4u) {
+        out_u32[out_idx + 2u] = texel.z;
+        out_u32[out_idx + 3u] = texel.w;
     }
 }

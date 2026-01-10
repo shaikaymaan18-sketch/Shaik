@@ -756,8 +756,6 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
 {
     using namespace VideoCommon::Accelerated;
     
-    // Leaving this here incase instances are found where slices_needed causes device loss
-    // Tune this for a balance between speed and size, I don't own a deck so can't self tune it
     const u32 MAX_BATCH_SLICES = std::min(z_count, image.info.size.depth);
     
     if (!image.has_compute_unswizzle_buffer) {
@@ -874,9 +872,10 @@ void BlockLinearUnswizzle3DPass::UnswizzleChunk(
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .pNext = nullptr,
             .srcAccessMask = is_first_chunk ? VkAccessFlags{} : 
-                            static_cast<VkAccessFlags>(VK_ACCESS_SHADER_READ_BIT),
+                            static_cast<VkAccessFlags>(VK_ACCESS_TRANSFER_WRITE_BIT),
             .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .oldLayout = is_first_chunk ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_GENERAL,
+            .oldLayout = is_first_chunk ? VK_IMAGE_LAYOUT_UNDEFINED : 
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,

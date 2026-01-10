@@ -1510,14 +1510,15 @@ void TextureCache<P>::TickAsyncUnswizzle() {
         task.current_offset += copy_amount;
     }
     
+    const bool is_final_batch = task.current_offset >= task.total_size;
     const size_t bytes_ready = task.current_offset - task.last_submitted_offset;
     const u32 complete_slices = static_cast<u32>(bytes_ready / task.bytes_per_slice);
-    const bool is_final_batch = task.current_offset >= task.total_size;
     
     if (complete_slices >= SLICES_PER_BATCH || (is_final_batch && complete_slices > 0)) {
         const u32 z_start = static_cast<u32>(task.last_submitted_offset / task.bytes_per_slice);
-        const u32 z_count = std::min(complete_slices, image.info.size.depth - z_start);
-        
+        const u32 slices_to_process = std::min(complete_slices, SLICES_PER_BATCH);
+        const u32 z_count = std::min(slices_to_process, image.info.size.depth - z_start);
+
         if (z_count > 0) {
             const auto uploads = FullUploadSwizzles(task.info);
             runtime.AccelerateImageUpload(image, task.staging_buffer, FixSmallVectorADL(uploads), z_start, z_count);
@@ -1526,7 +1527,10 @@ void TextureCache<P>::TickAsyncUnswizzle() {
     }
     
     // Check if complete
-    if (is_final_batch && task.last_submitted_offset >= task.total_size) {
+    const u32 slices_submitted = static_cast<u32>(task.last_submitted_offset / task.bytes_per_slice);
+    const bool all_slices_submitted = slices_submitted >= image.info.size.depth;
+    
+    if (is_final_batch && all_slices_submitted) {
         runtime.FreeDeferredStagingBuffer(task.staging_buffer);
         image.flags &= ~ImageFlagBits::IsDecoding;
         unswizzle_queue.pop_front();
