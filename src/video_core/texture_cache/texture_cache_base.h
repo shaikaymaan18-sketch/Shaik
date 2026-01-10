@@ -224,7 +224,7 @@ public:
 
     /// Remove images in a region
     void UnmapGPUMemory(size_t as_id, GPUVAddr gpu_addr, size_t size, DAddr dev_addr);
-    
+
     /// Basic sparse binding
     std::optional<SparseBinding> CalculateSparseBinding(
         const Image& image, GPUVAddr gpu_addr, DAddr dev_addr);
@@ -327,7 +327,7 @@ private:
 
     /// Refresh the contents (pixel data) of an image
     void RefreshContents(Image& image, ImageId image_id);
-    
+
     /// Sparse texture partial upload
     template <typename StagingBuffer>
     void UploadSparseDirtyTiles(Image& image, StagingBuffer& staging);

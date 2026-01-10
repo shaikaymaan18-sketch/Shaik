@@ -81,7 +81,7 @@ public:
     void ReinterpretImage(Image& dst, Image& src, std::span<const VideoCommon::ImageCopy> copies);
 
     void ConvertImage(Framebuffer* dst, ImageView& dst_view, ImageView& src_view);
-    
+
     bool IsSteamDeck() const;
 
     bool CanAccelerateImageUpload(Image&) const noexcept {
@@ -130,7 +130,7 @@ public:
     BlitImageHelper& blit_image_helper;
     RenderPassCache& render_pass_cache;
     std::optional<ASTCDecoderPass> astc_decoder_pass;
-    
+
     std::optional<BlockLinearUnswizzle3DPass> bl3d_unswizzle_pass;
     vk::Buffer swizzle_table_buffer;
     VkDeviceSize swizzle_table_size = 0;
@@ -171,7 +171,7 @@ public:
 
     void DownloadMemory(const StagingBufferRef& map,
                         std::span<const VideoCommon::BufferImageCopy> copies);
-                        
+
     void AllocateComputeUnswizzleImage();
 
     [[nodiscard]] VkImage Handle() const noexcept {
@@ -200,7 +200,7 @@ public:
     bool ScaleDown(bool ignore = false);
 
     u64 allocation_tick;
-    
+
     friend class BlockLinearUnswizzle3DPass;
 
 private:
@@ -213,7 +213,7 @@ private:
 
     vk::Image original_image;
     vk::Image scaled_image;
-    
+
     vk::Buffer compute_unswizzle_buffer;
     VkDeviceSize compute_unswizzle_buffer_size = 0;
     bool has_compute_unswizzle_buffer = false;

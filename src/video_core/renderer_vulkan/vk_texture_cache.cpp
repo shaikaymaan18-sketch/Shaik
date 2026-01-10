@@ -880,14 +880,14 @@ TextureCacheRuntime::TextureCacheRuntime(const Device& device_, Scheduler& sched
             }
         }
     }
-    
+
     bl3d_unswizzle_pass.emplace(device, scheduler, descriptor_pool,
                             staging_buffer_pool, compute_pass_descriptor_queue);
 
     // --- Create swizzle table buffer ---
     {
         auto table = Tegra::Texture::MakeSwizzleTable();
-        
+
         swizzle_table_size = static_cast<VkDeviceSize>(table.size() * sizeof(table[0]));
 
         auto staging = staging_buffer_pool.Request(swizzle_table_size, MemoryUsage::Upload);
@@ -896,19 +896,19 @@ TextureCacheRuntime::TextureCacheRuntime(const Device& device_, Scheduler& sched
         VkBufferCreateInfo ci{
             .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
             .size = swizzle_table_size,
-            .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | 
-                     VK_BUFFER_USAGE_TRANSFER_DST_BIT | 
+            .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                     VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                      VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
         };
         swizzle_table_buffer = memory_allocator.CreateBuffer(ci, MemoryUsage::DeviceLocal);
 
         scheduler.RequestOutsideRenderPassOperationContext();
-        scheduler.Record([staging_buf = staging.buffer, 
-                          dst_buf = *swizzle_table_buffer, 
+        scheduler.Record([staging_buf = staging.buffer,
+                          dst_buf = *swizzle_table_buffer,
                           size = swizzle_table_size,
                           src_off = staging.offset](vk::CommandBuffer cmdbuf) {
-            
+
             const VkBufferCopy region{
                 .srcOffset = src_off,
                 .dstOffset = 0,

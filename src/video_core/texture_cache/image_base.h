@@ -125,7 +125,7 @@ struct ImageBase {
     std::vector<AliasedImage> aliased_images;
     std::vector<ImageId> overlapping_images;
     ImageMapId map_view_id{};
-    
+
     boost::container::small_vector<u64, 16> dirty_offsets;
     std::unordered_map<GPUVAddr, SparseBinding> sparse_bindings;
     u32 sparse_tile_size = 65536;

@@ -512,13 +512,13 @@ struct Values {
 
     SwitchableSetting<bool> use_asynchronous_shaders{linkage, false, "use_asynchronous_shaders",
                                                      Category::RendererHacks};
-                                                     
+
     SwitchableSetting<GpuUnswizzle> gpu_unzwizzle_stream_size{linkage,
                                                   GpuUnswizzle::Medium,
                                                   "gpu_unzwizzle_stream_size",
                                                   Category::RendererHacks,
                                                   Specialization::Default};
-                                                  
+
     SwitchableSetting<GpuUnswizzleChunk> gpu_unzwizzle_chunk_size{linkage,
                                                   GpuUnswizzleChunk::Medium,
                                                   "gpu_unzwizzle_chunk_size",

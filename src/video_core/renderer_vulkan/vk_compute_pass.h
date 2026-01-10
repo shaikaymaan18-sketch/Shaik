@@ -144,12 +144,12 @@ public:
                              StagingBufferPool& staging_buffer_pool_,
                              ComputePassDescriptorQueue& compute_pass_descriptor_queue_);
     ~BlockLinearUnswizzle3DPass();
-    
+
     void Unswizzle(Image& image,
                    const StagingBufferRef& swizzled,
                    std::span<const VideoCommon::SwizzleParameters> swizzles,
                    u32 z_start, u32 z_count);
-                   
+
     void UnswizzleChunk(
         Image& image,
         const StagingBufferRef& swizzled,
