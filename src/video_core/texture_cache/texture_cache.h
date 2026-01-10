@@ -1600,7 +1600,7 @@ ImageId TextureCache<P>::InsertImage(const ImageInfo& info, GPUVAddr gpu_addr,
             // Delete old images immediately
             for (ImageId old_id : to_delete) {
                 Image& old_image = slot_images[old_id];
-                LOG_INFO(HW_GPU, "Immediately deleting old sparse texture at 0x{:X} ({} MiB)", 
+                LOG_DEBUG(HW_GPU, "Immediately deleting old sparse texture at 0x{:X} ({} MiB)", 
                          gpu_addr, old_image.guest_size_bytes / (1024 * 1024));
                 if (True(old_image.flags & ImageFlagBits::Tracked)) {
                     UntrackImage(old_image, old_id);
@@ -1632,7 +1632,7 @@ ImageId TextureCache<P>::JoinImages(const ImageInfo& info, GPUVAddr gpu_addr, DA
         const u64 estimated_alloc_size = size_bytes;
         
         if (total_used_memory + estimated_alloc_size >= critical_memory) {
-            LOG_WARNING(HW_GPU, "Large sparse texture allocation ({} MiB) - running aggressive GC. "
+            LOG_DEBUG(HW_GPU, "Large sparse texture allocation ({} MiB) - running aggressive GC. "
                        "Current memory: {} MiB, Critical: {} MiB",
                        size_bytes / (1024 * 1024),
                        total_used_memory / (1024 * 1024),
@@ -1641,7 +1641,7 @@ ImageId TextureCache<P>::JoinImages(const ImageInfo& info, GPUVAddr gpu_addr, DA
             
             // If still over threshold after GC, try one more aggressive pass
             if (total_used_memory + estimated_alloc_size >= critical_memory) {
-                LOG_WARNING(HW_GPU, "Still critically low on memory, running second GC pass");
+                LOG_DEBUG(HW_GPU, "Still critically low on memory, running second GC pass");
                 RunGarbageCollector();
             }
         }
