@@ -657,6 +657,15 @@ abstract class SettingsItem(
             )
             put(
                 SingleChoiceSetting(
+                    IntSetting.GPU_UNZWIZZLE_MAXTEXTURE_SIZE,
+                    titleId = R.string.gpu_unzwizzle_maxtexture_size,
+                    descriptionId = R.string.gpu_unzwizzle_maxtexture_size_description,
+                    choicesId = R.array.gpuTextureSizeSwizzleEntries,
+                    valuesId = R.array.gpuTextureSizeSwizzleValues
+                )
+            )
+            put(
+                SingleChoiceSetting(
                     IntSetting.GPU_UNZWIZZLE_STREAM_SIZE,
                     titleId = R.string.gpu_unzwizzle_stream_size,
                     descriptionId = R.string.gpu_unzwizzle_stream_size_description,

@@ -77,6 +77,33 @@ TextureCache<P>::TextureCache(Runtime& runtime_, Tegra::MaxwellDeviceMemoryManag
     }
 
     lowmemorydevice = Settings::values.enable_low_memory.GetValue();
+
+    switch (Settings::values.gpu_unzwizzle_texture_size.GetValue()) {
+        case Settings::GpuUnswizzleSize::VerySmall:    gpu_unswizzle_maxsize = 16_MiB; break;
+        case Settings::GpuUnswizzleSize::Small:        gpu_unswizzle_maxsize = 32_MiB; break;
+        case Settings::GpuUnswizzleSize::Normal:       gpu_unswizzle_maxsize = 128_MiB; break;
+        case Settings::GpuUnswizzleSize::Large:        gpu_unswizzle_maxsize = 256_MiB; break;
+        case Settings::GpuUnswizzleSize::VeryLarge:    gpu_unswizzle_maxsize = 512_MiB; break;
+        default:                                       gpu_unswizzle_maxsize = 128_MiB; break;
+    }
+
+    switch (Settings::values.gpu_unzwizzle_stream_size.GetValue()) {
+        case Settings::GpuUnswizzle::VeryLow: swizzle_chunk_size = 4_MiB; break;
+        case Settings::GpuUnswizzle::Low:     swizzle_chunk_size = 8_MiB; break;
+        case Settings::GpuUnswizzle::Normal:  swizzle_chunk_size = 16_MiB; break;
+        case Settings::GpuUnswizzle::Medium:  swizzle_chunk_size = 32_MiB; break;
+        case Settings::GpuUnswizzle::High:    swizzle_chunk_size = 64_MiB; break;
+        default:                              swizzle_chunk_size = 16_MiB;
+    }
+
+    switch (Settings::values.gpu_unzwizzle_chunk_size.GetValue()) {
+        case Settings::GpuUnswizzleChunk::VeryLow: swizzle_slices_per_batch = 32; break;
+        case Settings::GpuUnswizzleChunk::Low:     swizzle_slices_per_batch = 64; break;
+        case Settings::GpuUnswizzleChunk::Normal:  swizzle_slices_per_batch = 128; break;
+        case Settings::GpuUnswizzleChunk::Medium:  swizzle_slices_per_batch = 256; break;
+        case Settings::GpuUnswizzleChunk::High:    swizzle_slices_per_batch = 512; break;
+        default:                                   swizzle_slices_per_batch = 128;
+    }
 }
 
 template <class P>
@@ -1152,7 +1179,7 @@ void TextureCache<P>::RefreshContents(Image& image, ImageId image_id) {
         image.info.type == ImageType::e3D &&
         image.info.resources.levels == 1 &&
         image.info.resources.layers == 1 &&
-        MapSizeBytes(image) >= 128_MiB &&
+        MapSizeBytes(image) >= gpu_unswizzle_maxsize &&
         False(image.flags & ImageFlagBits::GpuModified)) {
 
         QueueAsyncUnswizzle(image, image_id);
@@ -1471,33 +1498,13 @@ void TextureCache<P>::TickAsyncUnswizzle() {
         task.initialized = true;
     }
 
-    size_t CHUNK_SIZE;
-    switch (Settings::values.gpu_unzwizzle_stream_size.GetValue()) {
-        case Settings::GpuUnswizzle::VeryLow: CHUNK_SIZE = 4_MiB; break;
-        case Settings::GpuUnswizzle::Low:     CHUNK_SIZE = 8_MiB; break;
-        case Settings::GpuUnswizzle::Normal:  CHUNK_SIZE = 16_MiB; break;
-        case Settings::GpuUnswizzle::Medium:  CHUNK_SIZE = 32_MiB; break;
-        case Settings::GpuUnswizzle::High:    CHUNK_SIZE = 64_MiB; break;
-        default:                              CHUNK_SIZE = 16_MiB;
-    }
-
-    u32 SLICES_PER_BATCH;
-    switch (Settings::values.gpu_unzwizzle_chunk_size.GetValue()) {
-        case Settings::GpuUnswizzleChunk::VeryLow: SLICES_PER_BATCH = 32; break;
-        case Settings::GpuUnswizzleChunk::Low:     SLICES_PER_BATCH = 64; break;
-        case Settings::GpuUnswizzleChunk::Normal:  SLICES_PER_BATCH = 128; break;
-        case Settings::GpuUnswizzleChunk::Medium:  SLICES_PER_BATCH = 256; break;
-        case Settings::GpuUnswizzleChunk::High:    SLICES_PER_BATCH = 512; break;
-        default:                                   SLICES_PER_BATCH = 128;
-    }
-
     // Read data
     if (task.current_offset < task.total_size) {
         const size_t remaining = task.total_size - task.current_offset;
 
-        size_t copy_amount = std::min(CHUNK_SIZE, remaining);
+        size_t copy_amount = std::min(swizzle_chunk_size, remaining);
 
-        if (remaining > CHUNK_SIZE) {
+        if (remaining > swizzle_chunk_size) {
             copy_amount = (copy_amount / task.bytes_per_slice) * task.bytes_per_slice;
             if (copy_amount == 0) copy_amount = task.bytes_per_slice;
         }
@@ -1512,9 +1519,9 @@ void TextureCache<P>::TickAsyncUnswizzle() {
     const size_t bytes_ready = task.current_offset - task.last_submitted_offset;
     const u32 complete_slices = static_cast<u32>(bytes_ready / task.bytes_per_slice);
 
-    if (complete_slices >= SLICES_PER_BATCH || (is_final_batch && complete_slices > 0)) {
+    if (complete_slices >= swizzle_slices_per_batch || (is_final_batch && complete_slices > 0)) {
         const u32 z_start = static_cast<u32>(task.last_submitted_offset / task.bytes_per_slice);
-        const u32 slices_to_process = std::min(complete_slices, SLICES_PER_BATCH);
+        const u32 slices_to_process = std::min(complete_slices, swizzle_slices_per_batch);
         const u32 z_count = std::min(slices_to_process, image.info.size.depth - z_start);
 
         if (z_count > 0) {

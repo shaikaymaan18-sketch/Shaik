@@ -150,6 +150,7 @@ ENUM(ConsoleMode, Handheld, Docked);
 ENUM(AppletMode, HLE, LLE);
 ENUM(SpirvOptimizeMode, Never, OnLoad, Always);
 ENUM(GpuOverclock, Normal, Medium, High)
+ENUM(GpuUnswizzleSize, VerySmall, Small, Normal, Large, VeryLarge)
 ENUM(GpuUnswizzle, VeryLow, Low, Normal, Medium, High)
 ENUM(GpuUnswizzleChunk, VeryLow, Low, Normal, Medium, High)
 ENUM(TemperatureUnits, Celsius, Fahrenheit)

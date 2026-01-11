@@ -289,6 +289,12 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent)
            tr("Overclocks the emulated GPU to increase dynamic resolution and render "
               "distance.\nUse 256 for maximal performance and 512 for maximal graphics fidelity."));
     INSERT(Settings,
+           gpu_unzwizzle_texture_size,
+           tr("GPU Unswizzle Max Texture Size"),
+           tr("Sets the maximum size (MiB) for GPU-based texture unswizzling.\n"
+              "While the GPU is faster for medium and large textures, the CPU may be more efficient for very small ones.\n"
+              "Adjust this to find the balance between GPU acceleration and CPU overhead."));
+    INSERT(Settings,
            gpu_unzwizzle_stream_size,
            tr("GPU Unswizzle Stream Size"),
            tr("Sets the maximum amount of texture data (in MiB) processed per frame.\n"
@@ -729,13 +735,21 @@ std::unique_ptr<ComboboxTranslationMap> ComboboxEnumeration(QObject* parent)
                               PAIR(GpuOverclock, Medium, tr("Medium (256)")),
                               PAIR(GpuOverclock, High, tr("High (512)")),
                           }});
+    translations->insert({Settings::EnumMetadata<Settings::GpuUnswizzleSize>::Index(),
+                          {
+                              PAIR(GpuUnswizzleSize, VerySmall, tr("Very Small (16 MB)")),
+                              PAIR(GpuUnswizzleSize, Small, tr("Small (32 MB)")),
+                              PAIR(GpuUnswizzleSize, Normal, tr("Normal (128 MB)")),
+                              PAIR(GpuUnswizzleSize, Large, tr("Large (256 MB)")),
+                              PAIR(GpuUnswizzleSize, VeryLarge, tr("Very Large (512 MB)")),
+                          }});
     translations->insert({Settings::EnumMetadata<Settings::GpuUnswizzle>::Index(),
                           {
-                              PAIR(GpuUnswizzle, VeryLow, tr("Very Low (4)")),
-                              PAIR(GpuUnswizzle, Low, tr("Low (8)")),
-                              PAIR(GpuUnswizzle, Normal, tr("Normal (16)")),
-                              PAIR(GpuUnswizzle, Medium, tr("Medium (32)")),
-                              PAIR(GpuUnswizzle, High, tr("High (64)")),
+                              PAIR(GpuUnswizzle, VeryLow, tr("Very Low (4 MB)")),
+                              PAIR(GpuUnswizzle, Low, tr("Low (8 MB)")),
+                              PAIR(GpuUnswizzle, Normal, tr("Normal (16 MB)")),
+                              PAIR(GpuUnswizzle, Medium, tr("Medium (32 MB)")),
+                              PAIR(GpuUnswizzle, High, tr("High (64 MB)")),
                           }});
     translations->insert({Settings::EnumMetadata<Settings::GpuUnswizzleChunk>::Index(),
                           {
