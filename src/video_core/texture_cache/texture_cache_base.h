@@ -328,10 +328,6 @@ private:
     /// Refresh the contents (pixel data) of an image
     void RefreshContents(Image& image, ImageId image_id);
 
-    /// Sparse texture partial upload
-    template <typename StagingBuffer>
-    void UploadSparseDirtyTiles(Image& image, StagingBuffer& staging);
-
     /// Upload data from guest to an image
     template <typename StagingBuffer>
     void UploadImageContents(Image& image, StagingBuffer& staging_buffer);

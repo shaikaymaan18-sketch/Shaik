@@ -124,8 +124,6 @@ public:
                                std::span<const VideoCommon::SwizzleParameters> swizzles,
                                u32 z_start, u32 z_count);
 
-    void ClearImage(Image& image, u32 clear_value);
-
     void InsertUploadMemoryBarrier();
 
     void TransitionImageLayout(Image& image) {}

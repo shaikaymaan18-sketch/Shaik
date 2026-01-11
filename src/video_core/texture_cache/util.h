@@ -30,11 +30,6 @@ struct OverlapResult {
     SubresourceExtent resources;
 };
 
-struct SparseTileUnswizzleResult {
-    u32 buffer_row_length;
-    u32 buffer_image_height;
-};
-
 [[nodiscard]] u32 CalculateGuestSizeInBytes(const ImageInfo& info) noexcept;
 
 [[nodiscard]] u32 CalculateUnswizzledSizeBytes(const ImageInfo& info) noexcept;
