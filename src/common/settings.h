@@ -580,6 +580,8 @@ struct Values {
                                                   "gpu_unswizzle_chunk_size",
                                                   Category::RendererHacks,
                                                   Specialization::Default};
+    SwitchableSetting<bool> hack_fix_shadowarray{linkage, false, "hack_fix_shadowarray",
+                                                     Category::RendererHacks};
 
     SwitchableSetting<bool> gpu_unswizzle_enabled{linkage, false, "gpu_unswizzle_enabled",
                                                   Category::RendererHacks};

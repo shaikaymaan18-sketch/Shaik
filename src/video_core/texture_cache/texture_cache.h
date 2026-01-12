@@ -52,8 +52,53 @@ TextureCache<P>::TextureCache(Runtime& runtime_, Tegra::MaxwellDeviceMemoryManag
 
     // Make sure the first index is reserved for the null resources
     // This way the null resource becomes a compile time constant
-    void(slot_images.insert(NullImageParams{}));
-    void(slot_image_views.insert(runtime, NullImageViewParams{}));
+    if( Settings::values.hack_fix_shadowarray.GetValue() ) {
+        ImageInfo null_image_info;
+        null_image_info.type = ImageType::e2D;
+        null_image_info.format = PixelFormat::A8B8G8R8_UNORM;
+        null_image_info.size = Extent3D{1, 1, 1};
+        null_image_info.resources.levels = 1;
+        null_image_info.resources.layers = 1;
+        null_image_info.num_samples = 1;
+        null_image_info.layer_stride = 0;
+        null_image_info.maybe_unaligned_layer_stride = 0;
+        null_image_info.num_samples = 1;
+        null_image_info.tile_width_spacing = 0;
+
+        const ImageId null_image_id = slot_images.insert(runtime, null_image_info, 0, 0);
+
+        // Upload white pixel (0xFFFFFFFF) to the image
+        Image& null_image = slot_images[null_image_id];
+        auto staging = runtime.UploadStagingBuffer(4); // 1 pixel = 4 bytes
+        std::memset(staging.mapped_span.data(), 0xFF, 4); // White pixel
+
+        BufferImageCopy copy{
+            .buffer_offset = 0,
+            .buffer_size = 4,
+            .buffer_row_length = 1,
+            .buffer_image_height = 1,
+            .image_subresource = {.base_level = 0, .base_layer = 0, .num_layers = 1},
+            .image_offset = {0, 0, 0},
+            .image_extent = {1, 1, 1},
+        };
+
+        null_image.UploadMemory(staging, std::array{copy});
+        runtime.InsertUploadMemoryBarrier();
+
+        // Create image view for the null texture
+        SubresourceRange null_range{
+            .base = {.level = 0, .layer = 0},
+            .extent = {.levels = 1, .layers = 1},
+        };
+        ImageViewInfo null_view_info(ImageViewType::e2D, PixelFormat::A8B8G8R8_UNORM, null_range);
+
+        void(slot_image_views.insert(runtime, null_view_info, null_image_id, null_image, slot_images));
+    }
+    else {
+        void(slot_images.insert(NullImageParams{}));
+        void(slot_image_views.insert(runtime, NullImageViewParams{}));
+    }
+
     void(slot_samplers.insert(runtime, sampler_descriptor));
 
     if constexpr (HAS_DEVICE_MEMORY_INFO) {

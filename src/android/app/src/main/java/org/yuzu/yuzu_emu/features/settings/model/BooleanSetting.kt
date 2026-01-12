@@ -39,6 +39,7 @@ enum class BooleanSetting(override val key: String) : AbstractBooleanSetting {
     USE_CUSTOM_RTC("custom_rtc_enabled"),
     BLACK_BACKGROUNDS("black_backgrounds"),
     INVERT_CONFIRM_BACK_CONTROLLER_BUTTONS("invert_confirm_back_controller_buttons"),
+    HACK_FIX_SHADOWARRAY("fix_shadow_array_handles"),
 
     ENABLE_FOLDER_BUTTON("enable_folder_button"),
     ENABLE_QLAUNCH_BUTTON("enable_qlaunch_button"),

@@ -375,13 +375,37 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
                 add_image(desc, false);
             }
         }
+        bool fix_shadows = Settings::values.hack_fix_shadowarray.GetValue();
         for (const auto& desc : info.texture_descriptors) {
-            for (u32 index = 0; index < desc.count; ++index) {
-                const auto handle{read_handle(desc, index)};
-                views[view_index++] = {handle.first};
+            u32 last_valid_first = 0;
+            u32 last_valid_second = 0;
 
-                VideoCommon::SamplerId sampler{texture_cache.GetGraphicsSamplerId(handle.second)};
-                samplers[sampler_index++] = sampler;
+            for (u32 index = 0; index < desc.count; ++index) {
+                auto handle = read_handle(desc, index);
+
+                if (fix_shadows) {
+                    if (handle.first != 0) {
+                        last_valid_first = handle.first;
+                        last_valid_second = handle.second;
+                    } else if (last_valid_first != 0) {
+                        handle.first = last_valid_first;
+                        handle.second = last_valid_second;
+                    }
+                }
+
+                if (handle.first == 0) {
+                    views[view_index++] = {
+                        .index = 0,
+                        .blacklist = false,
+                        .id = {}
+                    };
+                    samplers[sampler_index++] = VideoCommon::NULL_SAMPLER_ID;
+                } else {
+                    views[view_index++] = {handle.first};
+                    VideoCommon::SamplerId sampler{
+                        texture_cache.GetGraphicsSamplerId(handle.second)};
+                    samplers[sampler_index++] = sampler;
+                }
             }
         }
         if constexpr (Spec::has_images) {
@@ -407,6 +431,9 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
     if constexpr (Spec::enabled_stages[4]) {
         config_stage(4);
     }
+
+    // Data exists in the slot the shadows want but it seems this outputs a invalid image for all of them.
+    // The problem is either inside this function or the texture_descriptors above is pulling junk data
     texture_cache.FillGraphicsImageViews<Spec::has_images>(std::span(views.data(), view_index));
 
     VideoCommon::ImageViewInOut* texture_buffer_it{views.data()};

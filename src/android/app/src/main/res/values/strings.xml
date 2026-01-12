@@ -524,7 +524,8 @@
     <string name="gpu_unswizzle_chunk_size">GPU Unswizzle Chunk Size</string>
     <string name="gpu_unswizzle_chunk_size_description">Defines the number of depth slices processed per batch for 3D textures. Increasing this improves throughput efficiency on powerful GPUs but may cause stuttering or driver timeouts on weaker hardware.</string>
     <string name="gpu_unswizzle_default_button">Default</string>
-
+    <string name="hack_fix_shadowarray">Fix Shadow Array Handles [EXPERIMENTAL]</string>
+    <string name="hack_fix_shadowarray_description">Reuse the last valid texture handle within a descriptor array if a slot is null. Fixes black shadows or missing textures in games that rely on array broadcasting (e.g., Cascaded Shadow Maps).</string>
 
     <string name="extensions">Extensions</string>
 

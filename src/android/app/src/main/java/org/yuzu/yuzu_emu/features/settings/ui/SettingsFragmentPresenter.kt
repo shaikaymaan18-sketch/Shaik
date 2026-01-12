@@ -274,6 +274,7 @@ class SettingsFragmentPresenter(
             add(BooleanSetting.FIX_BLOOM_EFFECTS.key)
             add(BooleanSetting.RENDERER_ASYNCHRONOUS_SHADERS.key)
             add(SettingsItem.GPU_UNSWIZZLE_COMBINED)
+            add(BooleanSetting.HACK_FIX_SHADOWARRAY.key)
 
             add(HeaderSetting(R.string.extensions))
 

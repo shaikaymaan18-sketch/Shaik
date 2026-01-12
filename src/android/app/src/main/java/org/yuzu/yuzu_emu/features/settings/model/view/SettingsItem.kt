@@ -720,6 +720,13 @@ abstract class SettingsItem(
                     descriptionId = R.string.gpu_unswizzle_chunk_size_description,
                     choicesId = R.array.gpuSwizzleChunkEntries,
                     valuesId = R.array.gpuSwizzleChunkValues
+               )
+            )
+            put(
+                SwitchSetting(
+                    BooleanSetting.HACK_FIX_SHADOWARRAY,
+                    titleId = R.string.hack_fix_shadowarray,
+                    descriptionId = R.string.hack_fix_shadowarray_description
                 )
             )
             put(

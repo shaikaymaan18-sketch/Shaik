@@ -252,6 +252,10 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent) {
            tr("Determines the number of depth slices processed in a single dispatch.\n"
               "Increasing this can improve throughput on high-end GPUs but may cause TDR or driver "
               "timeouts on weaker hardware."));
+    INSERT(Settings,
+           hack_fix_shadowarray,
+           tr("Fix Shadow Array Handles [EXPERIMENTAL]"),
+           tr("Reuse the last valid texture handle within a descriptor array if a slot is null. Fixes black shadows or missing textures in games that rely on array broadcasting (e.g., Cascaded Shadow Maps)."));
 
     INSERT(Settings, use_vulkan_driver_pipeline_cache, tr("Use Vulkan pipeline cache"),
            tr("Enables GPU vendor-specific pipeline cache.\nThis option can improve shader loading "
