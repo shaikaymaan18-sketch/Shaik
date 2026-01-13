@@ -109,8 +109,6 @@ public:
     void ConvertImage(Framebuffer* dst, ImageView& dst_view, ImageView& src_view) {
         UNIMPLEMENTED();
     }
-    
-    bool IsSteamDeck() const;
 
     bool CanImageBeCopied(const Image& dst, const Image& src);
 

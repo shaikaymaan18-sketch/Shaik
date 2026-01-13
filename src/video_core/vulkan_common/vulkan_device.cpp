@@ -935,13 +935,6 @@ bool Device::ShouldBoostClocks() const {
     return validated_driver && !is_steam_deck && !is_debugging;
 }
 
-bool Device::IsSteamDeck() const {
-    const auto vendor_id = properties.properties.vendorID;
-    const auto device_id = properties.properties.deviceID;
-    return (vendor_id == 0x1002 && device_id == 0x163F) ||
-                               (vendor_id == 0x1002 && device_id == 0x1435);
-}
-
 bool Device::HasTimelineSemaphore() const {
     if (GetDriverID() == VK_DRIVER_ID_QUALCOMM_PROPRIETARY ||
         GetDriverID() == VK_DRIVER_ID_MESA_TURNIP) {

@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 // SPDX-FileCopyrightText: Copyright 2019 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -198,8 +195,6 @@ public:
     bool HasLmemPerfBug() const {
         return has_lmem_perf_bug;
     }
-    
-    bool IsSteamDeck() const;
 
 private:
     static bool TestVariableAoffi();

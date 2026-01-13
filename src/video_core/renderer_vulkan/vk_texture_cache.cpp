@@ -1398,10 +1398,6 @@ void TextureCacheRuntime::ConvertImage(Framebuffer* dst, ImageView& dst_view, Im
     }
 }
 
-bool TextureCacheRuntime::IsSteamDeck() const {
-    return device.IsSteamDeck();
-}
-
 VkFormat TextureCacheRuntime::GetSupportedFormat(VkFormat requested_format,
                                                 VkFormatFeatureFlags required_features) const {
     if (requested_format == VK_FORMAT_A8B8G8R8_SRGB_PACK32 &&

@@ -82,8 +82,6 @@ public:
 
     void ConvertImage(Framebuffer* dst, ImageView& dst_view, ImageView& src_view);
 
-    bool IsSteamDeck() const;
-
     bool CanAccelerateImageUpload(Image&) const noexcept {
         return false;
     }
