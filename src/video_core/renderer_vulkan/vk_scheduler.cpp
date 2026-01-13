@@ -44,14 +44,14 @@ Scheduler::Scheduler(const Device& device_, StateTracker& state_tracker_)
       master_semaphore{std::make_unique<MasterSemaphore>(device)},
       command_pool{std::make_unique<CommandPool>(*master_semaphore, device)} {
 
-    // PRE-OPTIMIZATION: Warm up the pool to prevent mid-frame spikes
+    /*// PRE-OPTIMIZATION: Warm up the pool to prevent mid-frame spikes
     {
         std::scoped_lock rl{reserve_mutex};
         chunk_reserve.reserve(2048); // Prevent vector resizing
         for (int i = 0; i < 1024; ++i) {
             chunk_reserve.push_back(std::make_unique<CommandChunk>());
         }
-    }
+    }*/
 
     AcquireNewChunk();
     AllocateWorkerCommandBuffer();

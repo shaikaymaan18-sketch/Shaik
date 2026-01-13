@@ -223,11 +223,7 @@ public:
     void UnmapMemory(DAddr cpu_addr, size_t size);
 
     /// Remove images in a region
-    void UnmapGPUMemory(size_t as_id, GPUVAddr gpu_addr, size_t size, DAddr dev_addr);
-
-    /// Basic sparse binding
-    std::optional<SparseBinding> CalculateSparseBinding(
-        const Image& image, GPUVAddr gpu_addr, DAddr dev_addr);
+    void UnmapGPUMemory(size_t as_id, GPUVAddr gpu_addr, size_t size);
 
     /// Blit an image with the given parameters
     bool BlitImage(const Tegra::Engines::Fermi2D::Surface& dst,

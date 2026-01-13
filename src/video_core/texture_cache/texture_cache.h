@@ -143,7 +143,8 @@ void TextureCache<P>::RunGarbageCollector() {
         }
 
         // Prioritize large sparse textures for cleanup
-        const bool is_large_sparse = image.info.is_sparse &&
+        const bool is_large_sparse = lowmemorydevice &&
+                                     image.info.is_sparse &&
                                      image.guest_size_bytes >= 256_MiB;
 
         if (!aggressive_mode && !is_large_sparse &&
@@ -192,7 +193,8 @@ void TextureCache<P>::RunGarbageCollector() {
         lru_cache.ForEachItemBelow(frame_tick, [&](ImageId image_id) {
             auto& image = slot_images[image_id];
             // Only target sparse textures that are old enough
-            if (image.info.is_sparse &&
+            if (lowmemorydevice &&
+                image.info.is_sparse &&
                 image.guest_size_bytes >= 256_MiB &&
                 image.allocation_tick < frame_tick - 3) {
                 LOG_DEBUG(HW_GPU, "GC targeting old sparse texture at 0x{:X} ({} MiB, age: {} frames)",
@@ -683,36 +685,7 @@ void TextureCache<P>::UnmapMemory(DAddr cpu_addr, size_t size) {
 }
 
 template <class P>
-std::optional<SparseBinding> TextureCache<P>::CalculateSparseBinding(
-    const Image& image, GPUVAddr gpu_addr, DAddr dev_addr) {
-
-    if (!image.info.is_sparse) {
-        return std::nullopt;
-    }
-
-    const u64 offset = gpu_addr - image.gpu_addr;
-    const u64 tile_index = offset / image.sparse_tile_size;
-
-    const u32 tile_width_blocks = 128;
-    const u32 tile_height_blocks = 32;
-
-    const u32 width_in_tiles = (image.info.size.width / 4 + tile_width_blocks - 1) / tile_width_blocks;
-    const u32 height_in_tiles = (image.info.size.height / 4 + tile_height_blocks - 1) / tile_height_blocks;
-
-    const u32 tile_x = static_cast<u32>((tile_index % width_in_tiles) * tile_width_blocks * 4);
-    const u32 tile_y = static_cast<u32>(((tile_index / width_in_tiles) % height_in_tiles) * tile_height_blocks * 4);
-    const u32 tile_z = static_cast<u32>(tile_index / (width_in_tiles * height_in_tiles));
-
-    return SparseBinding{
-        .gpu_addr = gpu_addr,
-        .device_addr = dev_addr,
-        .tile_index = tile_index,
-        .tile_coord = {tile_x, tile_y, tile_z}
-    };
-}
-
-template <class P>
-void TextureCache<P>::UnmapGPUMemory(size_t as_id, GPUVAddr gpu_addr, size_t size, DAddr dev_addr) {
+void TextureCache<P>::UnmapGPUMemory(size_t as_id, GPUVAddr gpu_addr, size_t size) {
     boost::container::small_vector<ImageId, 16> deleted_images;
     ForEachImageInRegionGPU(as_id, gpu_addr, size,
                             [&](ImageId id, Image&) { deleted_images.push_back(id); });
@@ -728,15 +701,6 @@ void TextureCache<P>::UnmapGPUMemory(size_t as_id, GPUVAddr gpu_addr, size_t siz
             continue;
         }
         image.flags |= ImageFlagBits::Remapped;
-
-        if (image.info.is_sparse && dev_addr != 0) {
-            // Calculate and store the binding
-            auto binding = CalculateSparseBinding(image, gpu_addr, dev_addr);
-            if (binding) {
-                image.sparse_bindings[gpu_addr] = *binding;
-                image.dirty_offsets.push_back(binding->tile_index);
-            }
-        }
     }
 }
 
@@ -1587,7 +1551,7 @@ ImageId TextureCache<P>::InsertImage(const ImageInfo& info, GPUVAddr gpu_addr,
     ASSERT_MSG(cpu_addr, "Tried to insert an image to an invalid gpu_addr=0x{:x}", gpu_addr);
 
     // For large sparse textures, aggressively clean up old allocations at same address
-    if (info.is_sparse && CalculateGuestSizeInBytes(info) >= 256_MiB) {
+    if (lowmemorydevice && info.is_sparse && CalculateGuestSizeInBytes(info) >= 256_MiB) {
         const auto alloc_it = image_allocs_table.find(gpu_addr);
         if (alloc_it != image_allocs_table.end()) {
             const ImageAllocId alloc_id = alloc_it->second;
@@ -1635,7 +1599,7 @@ ImageId TextureCache<P>::JoinImages(const ImageInfo& info, GPUVAddr gpu_addr, DA
     const size_t size_bytes = CalculateGuestSizeInBytes(new_info);
 
     // Proactive cleanup for large sparse texture allocations
-    if (new_info.is_sparse && size_bytes >= 256_MiB) {
+    if (lowmemorydevice && new_info.is_sparse && size_bytes >= 256_MiB) {
         const u64 estimated_alloc_size = size_bytes;
 
         if (total_used_memory + estimated_alloc_size >= critical_memory) {
@@ -2690,7 +2654,6 @@ void TextureCache<P>::SynchronizeAliases(ImageId image_id) {
 template <class P>
 void TextureCache<P>::PrepareImage(ImageId image_id, bool is_modification, bool invalidate) {
     Image& image = slot_images[image_id];
-    runtime.TransitionImageLayout(image);
     if (invalidate) {
         image.flags &= ~(ImageFlagBits::CpuModified | ImageFlagBits::GpuModified);
         if (False(image.flags & ImageFlagBits::Tracked)) {
