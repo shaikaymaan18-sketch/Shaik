@@ -233,8 +233,11 @@ add_executable(yuzu
 
     data_dialog.h data_dialog.cpp data_dialog.ui
     data_widget.ui
+<<<<<<< HEAD
     ryujinx_dialog.h ryujinx_dialog.cpp ryujinx_dialog.ui
     main_window.h main_window.cpp
+=======
+>>>>>>> parent of 39f226a853 ([qt] Ryujinx save data link (#2815))
 )
 
 set_target_properties(yuzu PROPERTIES OUTPUT_NAME "eden")

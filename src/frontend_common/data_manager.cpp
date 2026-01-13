@@ -4,13 +4,14 @@
 #include "data_manager.h"
 #include "common/assert.h"
 #include "common/fs/path_util.h"
+#include <filesystem>
 #include <fmt/format.h>
 
 namespace FrontendCommon::DataManager {
 
 namespace fs = std::filesystem;
 
-const fs::path GetDataDir(DataDir dir, const std::string &user_id)
+const std::string GetDataDir(DataDir dir, const std::string &user_id)
 {
     const fs::path nand_dir = Common::FS::GetEdenPath(Common::FS::EdenPath::NANDDir);
     const fs::path save_dir = Common::FS::GetEdenPath(Common::FS::EdenPath::SaveDir);
@@ -33,11 +34,6 @@ const fs::path GetDataDir(DataDir dir, const std::string &user_id)
     }
 
     return "";
-}
-
-const std::string GetDataDirString(DataDir dir, const std::string &user_id)
-{
-    return GetDataDir(dir, user_id).string();
 }
 
 u64 ClearDir(DataDir dir, const std::string &user_id)
@@ -67,7 +63,7 @@ u64 DataDirSize(DataDir dir)
     if (!fs::exists(data_dir))
         return 0;
 
-    for (const auto &entry : fs::recursive_directory_iterator(data_dir)) {
+    for (const auto& entry : fs::recursive_directory_iterator(data_dir)) {
         if (!entry.is_directory()) {
             size += entry.file_size();
         }
@@ -76,4 +72,4 @@ u64 DataDirSize(DataDir dir)
     return size;
 }
 
-} // namespace FrontendCommon::DataManager
+}

@@ -33,26 +33,22 @@ enum class EdenPath {
     IconsDir,       // Where Icons for Windows shortcuts are stored.
 };
 
-// migration/compat dirs
-enum EmuPath {
-    CitronDir,
+enum LegacyPath {
+    CitronDir, // Citron Directories for migration
     CitronConfigDir,
     CitronCacheDir,
 
-    SudachiDir,
+    SudachiDir, // Sudachi Directories for migration
     SudachiConfigDir,
     SudachiCacheDir,
 
-    YuzuDir,
+    YuzuDir, // Yuzu Directories for migration
     YuzuConfigDir,
     YuzuCacheDir,
 
-    SuyuDir,
+    SuyuDir, // Suyu Directories for migration
     SuyuConfigDir,
     SuyuCacheDir,
-
-    // used exclusively for save data linking
-    RyujinxDir,
 };
 
 /**
@@ -234,7 +230,7 @@ void SetAppDirectory(const std::string& app_directory);
  *
  * @returns The filesystem path associated with the LegacyPath enum.
  */
-[[nodiscard]] const std::filesystem::path& GetLegacyPath(EmuPath legacy_path);
+[[nodiscard]] const std::filesystem::path& GetLegacyPath(LegacyPath legacy_path);
 
 /**
  * Gets the filesystem path associated with the EdenPath enum as a UTF-8 encoded std::string.
@@ -252,7 +248,7 @@ void SetAppDirectory(const std::string& app_directory);
  *
  * @returns The filesystem path associated with the LegacyPath enum as a UTF-8 encoded std::string.
  */
-[[nodiscard]] std::string GetLegacyPathString(EmuPath legacy_path);
+[[nodiscard]] std::string GetLegacyPathString(LegacyPath legacy_path);
 
 /**
  * Sets a new filesystem path associated with the EdenPath enum.

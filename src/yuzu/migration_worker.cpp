@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "migration_worker.h"
-#include "common/fs/symlink.h"
 
 #include <QMap>
 #include <boost/algorithm/string/predicate.hpp>
@@ -43,7 +42,7 @@ void MigrationWorker::process()
     try {
         fs::remove_all(eden_dir);
     } catch (fs::filesystem_error &_) {
-        // ignore because linux does stupid crap sometimes
+        // ignore because linux does stupid crap sometimes.
     }
 
     switch (strategy) {
@@ -52,7 +51,7 @@ void MigrationWorker::process()
 
         // Windows 11 has random permission nonsense to deal with.
         try {
-            Common::FS::CreateSymlink(legacy_user_dir, eden_dir);
+            fs::create_directory_symlink(legacy_user_dir, eden_dir);
         } catch (const fs::filesystem_error &e) {
             emit error(tr("Linking the old directory failed. You may need to re-run with "
                           "administrative privileges on Windows.\nOS gave error: %1")
@@ -64,11 +63,11 @@ void MigrationWorker::process()
         // are already children of the root directory
 #ifndef WIN32
         if (fs::is_directory(legacy_config_dir)) {
-            Common::FS::CreateSymlink(legacy_config_dir, config_dir);
+            fs::create_directory_symlink(legacy_config_dir, config_dir);
         }
 
         if (fs::is_directory(legacy_cache_dir)) {
-            Common::FS::CreateSymlink(legacy_cache_dir, cache_dir);
+            fs::create_directory_symlink(legacy_cache_dir, cache_dir);
         }
 #endif
 

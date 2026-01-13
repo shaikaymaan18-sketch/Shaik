@@ -25,7 +25,11 @@ enum class FirmwareInstallResult {
 
 inline const QString GetFirmwareInstallResultString(FirmwareInstallResult result)
 {
+<<<<<<< HEAD
     return LOOKUP_ENUM(result, FwInstallSuccess);
+=======
+    return QtCommon::StringLookup::Lookup(static_cast<StringLookup::StringKey>((int) result + (int) QtCommon::StringLookup::FwInstallSuccess));
+>>>>>>> parent of 39f226a853 ([qt] Ryujinx save data link (#2815))
 }
 
 /**
@@ -35,7 +39,12 @@ inline const QString GetFirmwareInstallResultString(FirmwareInstallResult result
  */
 inline const QString GetKeyInstallResultString(FirmwareManager::KeyInstallResult result)
 {
+<<<<<<< HEAD
     return LOOKUP_ENUM(result, KeyInstallSuccess);
+=======
+    // this can probably be made into a common function of sorts
+    return QtCommon::StringLookup::Lookup(static_cast<StringLookup::StringKey>((int) result + (int) QtCommon::StringLookup::KeyInstallSuccess));
+>>>>>>> parent of 39f226a853 ([qt] Ryujinx save data link (#2815))
 }
 
 void InstallFirmware(const QString &location, bool recursive);

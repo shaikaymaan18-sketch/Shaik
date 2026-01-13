@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef FRONTEND_H
-#define FRONTEND_H
+#ifndef QT_FRONTEND_UTIL_H
+#define QT_FRONTEND_UTIL_H
 
 #include <QGuiApplication>
 #include "qt_common/qt_common.h"
@@ -140,4 +140,4 @@ const QString GetExistingDirectory(const QString &caption = QString(),
                                     Options options = Option::ShowDirsOnly);
 
 } // namespace QtCommon::Frontend
-#endif // FRONTEND_H
+#endif // QT_FRONTEND_UTIL_H

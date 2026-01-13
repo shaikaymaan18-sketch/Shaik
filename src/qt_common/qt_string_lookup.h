@@ -52,6 +52,7 @@ enum StringKey {
     MigrationTooltipClearOld,
     MigrationTooltipLinkOld,
 
+<<<<<<< HEAD
     // ryujinx
     KvdbNonexistent,
     KvdbNoHeader,
@@ -66,6 +67,12 @@ enum StringKey {
 static const constexpr frozen::map<StringKey, frozen::string, 29> strings = {
     // 0-4
     {DataManagerSavesTooltip,
+=======
+};
+
+static const frozen::map<StringKey, frozen::string, 21> strings = {
+    {SavesTooltip,
+>>>>>>> parent of 39f226a853 ([qt] Ryujinx save data link (#2815))
      QT_TR_NOOP("Contains game save data. DO NOT REMOVE UNLESS YOU KNOW WHAT YOU'RE DOING!")},
     {DataManagerShadersTooltip,
      QT_TR_NOOP("Contains Vulkan and OpenGL pipeline caches. Generally safe to remove.")},
@@ -74,7 +81,6 @@ static const constexpr frozen::map<StringKey, frozen::string, 29> strings = {
     {DataManagerModsTooltip, QT_TR_NOOP("Contains game mods, patches, and cheats.")},
 
     // Key install
-    // 5-9
     {KeyInstallSuccess, QT_TR_NOOP("Decryption Keys were successfully installed")},
     {KeyInstallInvalidDir, QT_TR_NOOP("Unable to read key directory, aborting")},
     {KeyInstallErrorFailedCopy, QT_TR_NOOP("One or more keys failed to copy.")},
@@ -86,7 +92,6 @@ static const constexpr frozen::map<StringKey, frozen::string, 29> strings = {
          "re-dump keys.")},
 
     // fw install
-    // 10-14
     {FwInstallSuccess, QT_TR_NOOP("Successfully installed firmware version %1")},
     {FwInstallNoNCAs, QT_TR_NOOP("Unable to locate potential firmware NCA files")},
     {FwInstallFailedDelete, QT_TR_NOOP("Failed to delete one or more firmware files.")},
@@ -106,7 +111,10 @@ static const constexpr frozen::map<StringKey, frozen::string, 29> strings = {
          "redump firmware if necessary.")},
 
     // migrator
+<<<<<<< HEAD
     // 17-22
+=======
+>>>>>>> parent of 39f226a853 ([qt] Ryujinx save data link (#2815))
     {MigrationPromptPrefix, QT_TR_NOOP("Eden has detected user data for the following emulators:")},
     {MigrationPrompt,
      QT_TR_NOOP("Would you like to migrate your data for use in Eden?\n"
@@ -125,6 +133,7 @@ static const constexpr frozen::map<StringKey, frozen::string, 29> strings = {
     {MigrationTooltipLinkOld,
      QT_TR_NOOP("Creates a filesystem link between the old directory and Eden directory.\n"
                 "This is recommended if you want to share data between emulators.")},
+<<<<<<< HEAD
 
     // why am I writing these comments again
     // 23-28
@@ -134,6 +143,8 @@ static const constexpr frozen::map<StringKey, frozen::string, 29> strings = {
     {KvdbMisaligned, QT_TR_NOOP("Invalid byte alignment on Ryujinx title database.")},
     {KvdbNoImens, QT_TR_NOOP("No items found in Ryujinx title database.")},
     {RyujinxNoSaveId, QT_TR_NOOP("Title %1 not found in Ryujinx title database.")},
+=======
+>>>>>>> parent of 39f226a853 ([qt] Ryujinx save data link (#2815))
 };
 
 static inline const QString Lookup(StringKey key)

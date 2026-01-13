@@ -10,9 +10,15 @@
 typedef struct Emulator {
     const char *m_name;
 
+<<<<<<< HEAD
     Common::FS::EmuPath e_user_dir;
     Common::FS::EmuPath e_config_dir;
     Common::FS::EmuPath e_cache_dir;
+=======
+    LegacyPath e_user_dir;
+    LegacyPath e_config_dir;
+    LegacyPath e_cache_dir;
+>>>>>>> parent of 39f226a853 ([qt] Ryujinx save data link (#2815))
 
     const std::string get_user_dir() const {
         return Common::FS::GetLegacyPath(e_user_dir).string();
