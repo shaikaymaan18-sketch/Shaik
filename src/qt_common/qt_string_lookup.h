@@ -51,28 +51,10 @@ enum StringKey {
     MigrationTooltipKeepOld,
     MigrationTooltipClearOld,
     MigrationTooltipLinkOld,
-
-<<<<<<< HEAD
-    // ryujinx
-    KvdbNonexistent,
-    KvdbNoHeader,
-    KvdbInvalidMagic,
-    KvdbMisaligned,
-    KvdbNoImens,
-    RyujinxNoSaveId,
-};
-
-// NB: the constexpr check always succeeds (in clangd at least) if size arg < size
-// always triple-check the size arg
-static const constexpr frozen::map<StringKey, frozen::string, 29> strings = {
-    // 0-4
-    {DataManagerSavesTooltip,
-=======
 };
 
 static const frozen::map<StringKey, frozen::string, 21> strings = {
     {SavesTooltip,
->>>>>>> parent of 39f226a853 ([qt] Ryujinx save data link (#2815))
      QT_TR_NOOP("Contains game save data. DO NOT REMOVE UNLESS YOU KNOW WHAT YOU'RE DOING!")},
     {DataManagerShadersTooltip,
      QT_TR_NOOP("Contains Vulkan and OpenGL pipeline caches. Generally safe to remove.")},
