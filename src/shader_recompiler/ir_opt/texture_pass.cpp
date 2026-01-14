@@ -352,12 +352,12 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
     case IR::Opcode::BitFieldUExtract: {
         const IR::Value base{inst->Arg(0)};
         const IR::Value offset{inst->Arg(1)};
-        const IR::Value count{inst->Arg(2)};
 
         if (auto res = Track(base, env)) {
             if (offset.IsImmediate()) {
-                res->offset += (offset.U32() / 8);
-                res->shift_left = offset.U32() % 32;
+                const u32 total_bits = offset.U32();
+                res->offset += (total_bits / 8);
+                res->shift_left = total_bits % 32;
             }
             return res;
         }
