@@ -244,9 +244,179 @@ std::optional<u32> TryGetConstant(IR::Value& value, Environment& env) {
 }
 
 std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environment& env) {
-    switch (inst->GetOpcode()) {
+    const auto opcode = inst->GetOpcode();
+
+    switch (opcode) {
     default:
+        LOG_DEBUG(Render_Vulkan, "TryGetConstBuffer: Unhandled opcode {}", static_cast<int>(opcode));
         return std::nullopt;
+    case IR::Opcode::BitCastU16F16:
+    case IR::Opcode::BitCastF16U16:
+    case IR::Opcode::BitCastU32F32:
+    case IR::Opcode::BitCastF32U32:
+    case IR::Opcode::BitCastU64F64:
+    case IR::Opcode::BitCastF64U64:
+        return Track(inst->Arg(0), env);
+    case IR::Opcode::ConvertU32U64:
+    case IR::Opcode::ConvertU64U32:
+        return Track(inst->Arg(0), env);
+    case IR::Opcode::SelectU1:
+    case IR::Opcode::SelectU8:
+    case IR::Opcode::SelectU16:
+    case IR::Opcode::SelectU32:
+    case IR::Opcode::SelectU64:
+    case IR::Opcode::SelectF16:
+    case IR::Opcode::SelectF32:
+    case IR::Opcode::SelectF64: {
+        if (auto result = Track(inst->Arg(1), env)) {
+            return result;
+        }
+        if (auto result = Track(inst->Arg(2), env)) {
+            return result;
+        }
+        LOG_DEBUG(Render_Vulkan, "Select operation failed both branches");
+        return std::nullopt;
+    }
+    case IR::Opcode::IAdd32: {
+        const IR::Value op1{inst->Arg(0)};
+        const IR::Value op2{inst->Arg(1)};
+
+        if (op2.IsImmediate()) {
+            if (auto res = Track(op1, env)) {
+                res->offset += op2.U32();
+                return res;
+            }
+        }
+        if (op1.IsImmediate()) {
+            if (auto res = Track(op2, env)) {
+                res->offset += op1.U32();
+                return res;
+            }
+        }
+
+        if (auto result = Track(op1, env)) {
+            return result;
+        }
+        if (auto result = Track(op2, env)) {
+            return result;
+        }
+        return std::nullopt;
+    }
+    case IR::Opcode::IAdd64: {
+        const IR::Value op1{inst->Arg(0)};
+        const IR::Value op2{inst->Arg(1)};
+
+        if (op2.IsImmediate()) {
+            if (auto res = Track(op1, env)) {
+                res->offset += static_cast<u32>(op2.U64());
+                return res;
+            }
+        }
+        if (op1.IsImmediate()) {
+            if (auto res = Track(op2, env)) {
+                res->offset += static_cast<u32>(op1.U64());
+                return res;
+            }
+        }
+
+        if (auto result = Track(op1, env)) {
+            return result;
+        }
+        if (auto result = Track(op2, env)) {
+            return result;
+        }
+        return std::nullopt;
+    }
+    case IR::Opcode::ShiftRightLogical32: {
+        const IR::Value base{inst->Arg(0)};
+        const IR::Value shift{inst->Arg(1)};
+        if (auto res = Track(base, env)) {
+            if (shift.IsImmediate()) {
+                res->offset += (shift.U32() / 8);
+            }
+            return res;
+        }
+        return std::nullopt;
+    }
+    case IR::Opcode::ShiftRightLogical64: {
+        const IR::Value base{inst->Arg(0)};
+        const IR::Value shift{inst->Arg(1)};
+        if (auto res = Track(base, env)) {
+            if (shift.IsImmediate()) {
+                res->offset += (shift.U32() / 8);
+            }
+            return res;
+        }
+        return std::nullopt;
+    }
+    case IR::Opcode::BitFieldUExtract: {
+        const IR::Value base{inst->Arg(0)};
+        const IR::Value offset{inst->Arg(1)};
+        const IR::Value count{inst->Arg(2)};
+
+        if (auto res = Track(base, env)) {
+            if (offset.IsImmediate()) {
+                res->offset += (offset.U32() / 8);
+                res->shift_left = offset.U32() % 32;
+            }
+            return res;
+        }
+        return std::nullopt;
+    }
+    case IR::Opcode::PackUint2x32: {
+        const IR::Value composite{inst->Arg(0)};
+        if (composite.IsImmediate()) {
+            return std::nullopt;
+        }
+        IR::Inst* const composite_inst{composite.InstRecursive()};
+        if (composite_inst->GetOpcode() == IR::Opcode::CompositeConstructU32x2) {
+            std::optional lhs{Track(composite_inst->Arg(0), env)};
+            std::optional rhs{Track(composite_inst->Arg(1), env)};
+            if (!lhs || !rhs) {
+                return std::nullopt;
+            }
+            if (lhs->has_secondary || rhs->has_secondary) {
+                return std::nullopt;
+            }
+            if (lhs->count > 1 || rhs->count > 1) {
+                return std::nullopt;
+            }
+            return ConstBufferAddr{
+                .index = lhs->index,
+                .offset = lhs->offset,
+                .shift_left = lhs->shift_left,
+                .secondary_index = rhs->index,
+                .secondary_offset = rhs->offset,
+                .secondary_shift_left = rhs->shift_left,
+                .dynamic_offset = {},
+                .count = 1,
+                .has_secondary = true,
+            };
+        }
+        return std::nullopt;
+    }
+    case IR::Opcode::UnpackUint2x32:
+        return Track(inst->Arg(0), env);
+    case IR::Opcode::CompositeConstructU32x2:
+        if (auto result = Track(inst->Arg(0), env)) {
+            return result;
+        }
+        if (auto result = Track(inst->Arg(1), env)) {
+            return result;
+        }
+        return std::nullopt;
+    case IR::Opcode::CompositeExtractU32x2: {
+        const IR::Value composite{inst->Arg(0)};
+        const IR::Value index_val{inst->Arg(1)};
+
+        if (auto res = Track(composite, env)) {
+            if (index_val.IsImmediate()) {
+                res->offset += index_val.U32() * 4;
+            }
+            return res;
+        }
+        return std::nullopt;
+    }
     case IR::Opcode::BitwiseOr32: {
         std::optional lhs{TrackCached(inst->Arg(0), env)};
         std::optional rhs{TrackCached(inst->Arg(1), env)};
@@ -259,9 +429,23 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         if (lhs->count > 1 || rhs->count > 1) {
             return std::nullopt;
         }
-        if (lhs->shift_left > 0 || lhs->index > rhs->index || lhs->offset > rhs->offset) {
+
+        bool lhs_is_low = true;
+
+        if (lhs->index == rhs->index) {
+            if (lhs->offset > rhs->offset) {
+                lhs_is_low = false;
+            } else if (lhs->offset == rhs->offset) {
+                if (lhs->shift_left > rhs->shift_left) {
+                    lhs_is_low = false;
+                }
+            }
+        }
+
+        if (!lhs_is_low) {
             std::swap(lhs, rhs);
         }
+
         return ConstBufferAddr{
             .index = lhs->index,
             .offset = lhs->offset,
@@ -284,7 +468,6 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
             lhs->shift_left = shift.U32();
         }
         return lhs;
-        break;
     }
     case IR::Opcode::BitwiseAnd32: {
         IR::Value op1{inst->Arg(0)};
@@ -310,10 +493,11 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         }
         std::optional lhs{TrackCached(op1, env)};
         if (lhs) {
-            lhs->shift_left = static_cast<u32>(std::countr_zero(op2.U32()));
+            if (op2.IsImmediate()) {
+                lhs->shift_left = static_cast<u32>(std::countr_zero(op2.U32()));
+            }
         }
         return lhs;
-        break;
     }
     case IR::Opcode::GetCbufU32x2:
     case IR::Opcode::GetCbufU32:
@@ -367,15 +551,42 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
     };
 }
 
+// TODO:xbzk: shall be dropped when Track method cover all bindless stuff
+static ConstBufferAddr last_valid_addr = ConstBufferAddr{
+    .index = 0,
+    .offset = 0,
+    .shift_left = 0,
+    .secondary_index = 0,
+    .secondary_offset = 0,
+    .secondary_shift_left = 0,
+    .dynamic_offset = {},
+    .count = 1,
+    .has_secondary = false,
+};
+
 TextureInst MakeInst(Environment& env, IR::Block* block, IR::Inst& inst) {
     ConstBufferAddr addr;
     if (IsBindless(inst)) {
         const std::optional<ConstBufferAddr> track_addr{TrackCached(inst.Arg(0), env)};
 
         if (!track_addr) {
-            throw NotImplementedException("Failed to track bindless texture constant buffer");
+            //throw NotImplementedException("Failed to track bindless texture constant buffer");
+            LOG_DEBUG(Render_Vulkan, "!!! TRACKING FAILED !!! Using fallback - last_valid: cbuf[{}][{}]",
+                     last_valid_addr.index, last_valid_addr.offset);
+            addr = last_valid_addr; // TODO:xbzk: shall be dropped when Track method cover all bindless stuff
         } else {
             addr = *track_addr;
+
+            if (addr.count == 1 && addr.dynamic_offset.IsEmpty()) {
+                u32 handle = GetTextureHandle(env, addr);
+                LOG_DEBUG(Render_Vulkan, "SUCCESS: cbuf[{}][{}] = HANDLE 0x{:08X}",
+                         addr.index, addr.offset, handle);
+            } else {
+                LOG_DEBUG(Render_Vulkan, "SUCCESS: cbuf[{}][{}] (dynamic, count={})",
+                         addr.index, addr.offset, addr.count);
+            }
+
+            last_valid_addr = addr; // TODO:xbzk: shall be dropped when Track method cover all bindless stuff
         }
     } else {
         addr = ConstBufferAddr{
@@ -590,12 +801,21 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
         program.info.image_descriptors,
     };
     for (TextureInst& texture_inst : to_replace) {
-        // TODO: Handle arrays
         IR::Inst* const inst{texture_inst.inst};
+
+        LOG_DEBUG(Render_Vulkan, "Pre Processing texture inst: opcode={}",
+                 inst->GetOpcode());
+
+        // TODO: Handle arrays
         inst->ReplaceOpcode(IndexedInstruction(*inst));
 
         const auto& cbuf{texture_inst.cbuf};
         auto flags{inst->Flags<IR::TextureInstInfo>()};
+
+        LOG_DEBUG(Render_Vulkan, "Post Processing texture inst: opcode={}, type={}, cbuf[{}][{}]",
+                 inst->GetOpcode(), static_cast<int>(flags.type.Value()),
+                 cbuf.index, cbuf.offset);
+
         bool is_multisample{false};
         switch (inst->GetOpcode()) {
         case IR::Opcode::ImageQueryDimensions:
@@ -646,6 +866,7 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
         case IR::Opcode::ImageAtomicXor32:
         case IR::Opcode::ImageAtomicExchange32:
         case IR::Opcode::ImageWrite: {
+            LOG_DEBUG(Render_Vulkan, "  -> Image read/write path");
             if (cbuf.has_secondary) {
                 throw NotImplementedException("Unexpected separate sampler");
             }
@@ -679,7 +900,9 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
             break;
         }
         default:
+            LOG_DEBUG(Render_Vulkan, "  -> Default path, adding descriptor");
             if (flags.type == TextureType::Buffer) {
+                LOG_DEBUG(Render_Vulkan, "  -> Adding TextureBufferDescriptor");
                 index = descriptors.Add(TextureBufferDescriptor{
                     .has_secondary = cbuf.has_secondary,
                     .cbuf_index = cbuf.index,
@@ -692,6 +915,7 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
                     .size_shift = DESCRIPTOR_SIZE_SHIFT,
                 });
             } else {
+                LOG_DEBUG(Render_Vulkan, "  -> Adding TextureDescriptor at cbuf[{}][{}]", cbuf.index, cbuf.offset);
                 index = descriptors.Add(TextureDescriptor{
                     .type = flags.type,
                     .is_depth = flags.is_depth != 0,
@@ -706,6 +930,7 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
                     .count = cbuf.count,
                     .size_shift = DESCRIPTOR_SIZE_SHIFT,
                 });
+                LOG_DEBUG(Render_Vulkan, "  -> Assigned descriptor index {}", index);
             }
             break;
         }

@@ -188,13 +188,42 @@ inline void PushImageDescriptors(TextureCache& texture_cache,
     const u32 num_image_buffers = Shader::NumDescriptors(info.image_buffer_descriptors);
     views += num_texture_buffers;
     views += num_image_buffers;
+    bool fix_shadows = Settings::values.hack_fix_shadowarray.GetValue();
     for (const auto& desc : info.texture_descriptors) {
+        VideoCommon::ImageViewId fallback_view_id = VideoCommon::NULL_IMAGE_VIEW_ID;
+        VideoCommon::SamplerId fallback_sampler_id = VideoCommon::NULL_SAMPLER_ID;
+
+        const VideoCommon::ImageViewInOut* temp_views = views;
+        const VideoCommon::SamplerId* temp_samplers = samplers;
+
+        if (fix_shadows) {
+            for (u32 index = 0; index < desc.count; ++index) {
+                if (temp_views[index].id != VideoCommon::NULL_IMAGE_VIEW_ID) {
+                    fallback_view_id = temp_views[index].id;
+                    fallback_sampler_id = temp_samplers[index];
+                    break;
+                }
+            }
+        }
+
         for (u32 index = 0; index < desc.count; ++index) {
             const VideoCommon::ImageViewId image_view_id{(views++)->id};
             const VideoCommon::SamplerId sampler_id{*(samplers++)};
-            ImageView& image_view{texture_cache.GetImageView(image_view_id)};
+
+            VideoCommon::ImageViewId actual_view_id = image_view_id;
+            VideoCommon::SamplerId actual_sampler_id = sampler_id;
+
+            if (fix_shadows &&
+                image_view_id == VideoCommon::NULL_IMAGE_VIEW_ID &&
+                fallback_view_id != VideoCommon::NULL_IMAGE_VIEW_ID) {
+                actual_view_id = fallback_view_id;
+                actual_sampler_id = fallback_sampler_id;
+            }
+
+            ImageView& image_view{texture_cache.GetImageView(actual_view_id)};
+
             const VkImageView vk_image_view{image_view.Handle(desc.type)};
-            const Sampler& sampler{texture_cache.GetSampler(sampler_id)};
+            const Sampler& sampler{texture_cache.GetSampler(actual_sampler_id)};
             const bool use_fallback_sampler{sampler.HasAddedAnisotropy() &&
                                             !image_view.SupportsAnisotropy()};
             const VkSampler vk_sampler{use_fallback_sampler ? sampler.HandleWithDefaultAnisotropy()

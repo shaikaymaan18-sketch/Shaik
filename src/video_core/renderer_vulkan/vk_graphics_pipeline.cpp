@@ -393,6 +393,9 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
                     }
                 }
 
+                LOG_DEBUG(Render_Vulkan, "Stage {} Texture: cbuf[{}][{}] -> handle 0x{:08X}",
+                stage, desc.cbuf_index, desc.cbuf_offset + (index << desc.size_shift), handle.first);
+
                 if (handle.first == 0) {
                     views[view_index++] = {
                         .index = 0,
@@ -432,8 +435,6 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
         config_stage(4);
     }
 
-    // Data exists in the slot the shadows want but it seems this outputs a invalid image for all of them.
-    // The problem is either inside this function or the texture_descriptors above is pulling junk data
     texture_cache.FillGraphicsImageViews<Spec::has_images>(std::span(views.data(), view_index));
 
     VideoCommon::ImageViewInOut* texture_buffer_it{views.data()};
@@ -501,7 +502,9 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
         buffer_cache.BindHostStageBuffers(stage);
         PushImageDescriptors(texture_cache, guest_descriptor_queue, stage_infos[stage], rescaling,
                              samplers_it, views_it);
-        const auto& info{stage_infos[stage]};
+        LOG_DEBUG(Render_Vulkan, "=== Preparing Stage {} ===", stage);
+        const Shader::Info& info{stage_infos[stage]};
+        LOG_DEBUG(Render_Vulkan, "Stage {} has {} texture descriptors", stage, info.texture_descriptors.size());
         if (info.uses_render_area) {
             render_area.uses_render_area = true;
             render_area.words = {static_cast<float>(regs.surface_clip.width),
