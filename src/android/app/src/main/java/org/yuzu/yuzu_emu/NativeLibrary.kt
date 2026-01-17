@@ -463,6 +463,7 @@ object NativeLibrary {
      *
      * @param String URL
      */
+    @Keep
     @JvmStatic
     fun openExternalUrl(url: String) {
         WebBrowser.openExternal(url)
