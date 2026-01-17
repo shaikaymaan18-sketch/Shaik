@@ -22,6 +22,18 @@
 
 namespace Shader::Optimization {
 namespace {
+struct ConstBufferAddr {
+    u32 index;
+    u32 offset;
+    u32 shift_left;
+    u32 secondary_index;
+    u32 secondary_offset;
+    u32 secondary_shift_left;
+    IR::U32 dynamic_offset;
+    u32 count;
+    bool has_secondary;
+};
+
 struct TextureInst {
     ConstBufferAddr cbuf;
     IR::Inst* inst;
@@ -167,80 +179,62 @@ bool IsBindless(const IR::Inst& inst) {
 bool IsTextureInstruction(const IR::Inst& inst) {
     return IndexedInstruction(inst) != IR::Opcode::Void;
 }
-// Per-pass caches
-
-static inline u32 ReadCbufCached(Environment& env, u32 index, u32 offset) {
-    const CbufWordKey k{index, offset};
-    if (auto it = env.cbuf_word_cache.find(k); it != env.cbuf_word_cache.end()) return it->second;
-    const u32 v = env.ReadCbufValue(index, offset);
-    env.cbuf_word_cache.emplace(k, v);
-    return v;
-}
-
-static inline u32 GetTextureHandleCached(Environment& env, const ConstBufferAddr& cbuf) {
-    const u32 sec_idx  = cbuf.has_secondary ? cbuf.secondary_index  : cbuf.index;
-    const u32 sec_off  = cbuf.has_secondary ? cbuf.secondary_offset : cbuf.offset;
-    const HandleKey hk{cbuf.index, cbuf.offset, cbuf.shift_left,
-                        sec_idx, sec_off, cbuf.secondary_shift_left, cbuf.has_secondary};
-    if (auto it = env.handle_cache.find(hk); it != env.handle_cache.end()) return it->second;
-
-    const u32 lhs = ReadCbufCached(env, cbuf.index, cbuf.offset) << cbuf.shift_left;
-    const u32 rhs = ReadCbufCached(env, sec_idx,   sec_off)      << cbuf.secondary_shift_left;
-    const u32 handle = lhs | rhs;
-    env.handle_cache.emplace(hk, handle);
-    return handle;
-}
-
-// Cached variants of existing helpers
-static inline TextureType ReadTextureTypeCached(Environment& env, const ConstBufferAddr& cbuf) {
-    return env.ReadTextureType(GetTextureHandleCached(env, cbuf));
-}
-static inline TexturePixelFormat ReadTexturePixelFormatCached(Environment& env,
-                                                                const ConstBufferAddr& cbuf) {
-    return env.ReadTexturePixelFormat(GetTextureHandleCached(env, cbuf));
-}
-static inline bool IsTexturePixelFormatIntegerCached(Environment& env,
-                                                        const ConstBufferAddr& cbuf) {
-    return env.IsTexturePixelFormatInteger(GetTextureHandleCached(env, cbuf));
-}
-
-
-std::optional<ConstBufferAddr> Track(const IR::Value& value, Environment& env);
-static inline std::optional<ConstBufferAddr> TrackCached(const IR::Value& v, Environment& env) {
-    if (const IR::Inst* key = v.InstRecursive()) {
-        if (auto it = env.track_cache.find(key); it != env.track_cache.end()) return it->second;
-        auto found = Track(v, env);
-        if (found) env.track_cache.emplace(key, *found);
-        return found;
-    }
-    return Track(v, env);
-}
 
 std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environment& env);
 
 std::optional<ConstBufferAddr> Track(const IR::Value& value, Environment& env) {
-    return IR::BreadthFirstSearch(value, [&env](const IR::Inst* inst) { return TryGetConstBuffer(inst, env); });
+    return IR::BreadthFirstSearch(
+        value, [&env](const IR::Inst* inst) -> std::optional<ConstBufferAddr> {
+            const auto opcode = inst->GetOpcode();
+
+            // I feel like Phi is already detected and handled but its here anyway
+            if (opcode == IR::Opcode::Phi) {
+                for (size_t i = 0; i < inst->NumArgs(); ++i) {
+                    if (auto result = Track(inst->Arg(i), env)) {
+                        return result;
+                    }
+                }
+                return std::nullopt;
+            }
+
+            return TryGetConstBuffer(inst, env);
+        });
 }
 
 std::optional<u32> TryGetConstant(IR::Value& value, Environment& env) {
+    if (value.IsImmediate()) {
+        return value.U32();
+    }
+
     const IR::Inst* inst = value.InstRecursive();
-    if (inst->GetOpcode() != IR::Opcode::GetCbufU32) {
-        return std::nullopt;
+    const auto opcode = inst->GetOpcode();
+
+    if (opcode == IR::Opcode::GetCbufU32) {
+        const IR::Value index{inst->Arg(0)};
+        const IR::Value offset{inst->Arg(1)};
+
+        if (!index.IsImmediate() || !offset.IsImmediate()) {
+            return std::nullopt;
+        }
+
+        const auto index_number = index.U32();
+        const auto offset_number = offset.U32();
+
+        return env.ReadCbufValue(index_number, offset_number);
     }
-    const IR::Value index{inst->Arg(0)};
-    const IR::Value offset{inst->Arg(1)};
-    if (!index.IsImmediate()) {
-        return std::nullopt;
+
+    if (opcode == IR::Opcode::GetCbufU32x2) {
+        const IR::Value index{inst->Arg(0)};
+        const IR::Value offset{inst->Arg(1)};
+
+        if (!index.IsImmediate() || !offset.IsImmediate()) {
+            return std::nullopt;
+        }
+
+        return env.ReadCbufValue(index.U32(), offset.U32());
     }
-    if (!offset.IsImmediate()) {
-        return std::nullopt;
-    }
-    const auto index_number = index.U32();
-    if (index_number != 1) {
-        return std::nullopt;
-    }
-    const auto offset_number = offset.U32();
-    return ReadCbufCached(env, index_number, offset_number);
+
+    return std::nullopt;
 }
 
 std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environment& env) {
@@ -250,6 +244,11 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
     default:
         LOG_DEBUG(Render_Vulkan, "TryGetConstBuffer: Unhandled opcode {}", static_cast<int>(opcode));
         return std::nullopt;
+    case IR::Opcode::Identity:
+        return Track(inst->Arg(0), env);
+    case IR::Opcode::INeg32:
+    case IR::Opcode::INeg64:
+        return Track(inst->Arg(0), env);
     case IR::Opcode::BitCastU16F16:
     case IR::Opcode::BitCastF16U16:
     case IR::Opcode::BitCastU32F32:
@@ -327,17 +326,40 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         }
         return std::nullopt;
     }
-    case IR::Opcode::ShiftRightLogical32: {
-        const IR::Value base{inst->Arg(0)};
-        const IR::Value shift{inst->Arg(1)};
-        if (auto res = Track(base, env)) {
-            if (shift.IsImmediate()) {
-                res->offset += (shift.U32() / 8);
+    case IR::Opcode::ISub32: {
+        const IR::Value op1{inst->Arg(0)};
+        const IR::Value op2{inst->Arg(1)};
+
+        if (op2.IsImmediate()) {
+            if (auto res = Track(op1, env)) {
+                res->offset -= op2.U32();
+                return res;
             }
-            return res;
+        }
+
+        if (auto result = Track(op1, env)) {
+            return result;
         }
         return std::nullopt;
     }
+
+    case IR::Opcode::ISub64: {
+        const IR::Value op1{inst->Arg(0)};
+        const IR::Value op2{inst->Arg(1)};
+
+        if (op2.IsImmediate()) {
+            if (auto res = Track(op1, env)) {
+                res->offset -= static_cast<u32>(op2.U64());
+                return res;
+            }
+        }
+
+        if (auto result = Track(op1, env)) {
+            return result;
+        }
+        return std::nullopt;
+    }
+    case IR::Opcode::ShiftRightLogical32:
     case IR::Opcode::ShiftRightLogical64: {
         const IR::Value base{inst->Arg(0)};
         const IR::Value shift{inst->Arg(1)};
@@ -350,6 +372,10 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         return std::nullopt;
     }
     case IR::Opcode::BitFieldUExtract: {
+        if (inst->NumArgs() < 2) {
+            LOG_ERROR(Render_Vulkan, "BitFieldUExtract has insufficient arguments");
+            return std::nullopt;
+        }
         const IR::Value base{inst->Arg(0)};
         const IR::Value offset{inst->Arg(1)};
 
@@ -405,7 +431,8 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
             return result;
         }
         return std::nullopt;
-    case IR::Opcode::CompositeExtractU32x2: {
+    case IR::Opcode::CompositeExtractU32x2:
+    case IR::Opcode::CompositeExtractU32x4: {
         const IR::Value composite{inst->Arg(0)};
         const IR::Value index_val{inst->Arg(1)};
 
@@ -418,8 +445,8 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         return std::nullopt;
     }
     case IR::Opcode::BitwiseOr32: {
-        std::optional lhs{TrackCached(inst->Arg(0), env)};
-        std::optional rhs{TrackCached(inst->Arg(1), env)};
+        std::optional lhs{Track(inst->Arg(0), env)};
+        std::optional rhs{Track(inst->Arg(1), env)};
         if (!lhs || !rhs) {
             return std::nullopt;
         }
@@ -430,19 +457,17 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
             return std::nullopt;
         }
 
-        bool lhs_is_low = true;
-
-        if (lhs->index == rhs->index) {
-            if (lhs->offset > rhs->offset) {
-                lhs_is_low = false;
-            } else if (lhs->offset == rhs->offset) {
-                if (lhs->shift_left > rhs->shift_left) {
-                    lhs_is_low = false;
-                }
+        auto is_lower_bits = [](const ConstBufferAddr& a, const ConstBufferAddr& b) {
+            if (a.index != b.index) {
+                return a.index < b.index;
             }
-        }
+            if (a.offset != b.offset) {
+                return a.offset < b.offset;
+            }
+            return a.shift_left < b.shift_left;
+        };
 
-        if (!lhs_is_low) {
+        if (!is_lower_bits(*lhs, *rhs)) {
             std::swap(lhs, rhs);
         }
 
@@ -458,12 +483,13 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
             .has_secondary = true,
         };
     }
-    case IR::Opcode::ShiftLeftLogical32: {
+    case IR::Opcode::ShiftLeftLogical32:
+    case IR::Opcode::ShiftLeftLogical64: {
         const IR::Value shift{inst->Arg(1)};
         if (!shift.IsImmediate()) {
             return std::nullopt;
         }
-        std::optional lhs{TrackCached(inst->Arg(0), env)};
+        std::optional lhs{Track(inst->Arg(0), env)};
         if (lhs) {
             lhs->shift_left = shift.U32();
         }
@@ -491,7 +517,7 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
                 return std::nullopt;
             } while (false);
         }
-        std::optional lhs{TrackCached(op1, env)};
+        std::optional lhs{Track(op1, env)};
         if (lhs) {
             if (op2.IsImmediate()) {
                 lhs->shift_left = static_cast<u32>(std::countr_zero(op2.U32()));
@@ -499,18 +525,41 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         }
         return lhs;
     }
-    case IR::Opcode::GetCbufU32x2:
-    case IR::Opcode::GetCbufU32:
-        break;
-    }
-    const IR::Value index{inst->Arg(0)};
-    const IR::Value offset{inst->Arg(1)};
-    if (!index.IsImmediate()) {
-        // Reading a bindless texture from variable indices is valid
-        // but not supported here at the moment
+    case IR::Opcode::BitwiseXor32: {
+        if (auto result = Track(inst->Arg(0), env)) {
+            return result;
+        }
+        if (auto result = Track(inst->Arg(1), env)) {
+            return result;
+        }
         return std::nullopt;
     }
-    if (offset.IsImmediate()) {
+    case IR::Opcode::IMul32: {
+        const IR::Value op1{inst->Arg(0)};
+        const IR::Value op2{inst->Arg(1)};
+
+        if (op2.IsImmediate()) {
+            if (auto res = Track(op1, env)) {
+                res->offset *= op2.U32();
+                return res;
+            }
+        }
+        if (op1.IsImmediate()) {
+            if (auto res = Track(op2, env)) {
+                res->offset *= op1.U32();
+                return res;
+            }
+        }
+        return std::nullopt;
+    }
+    case IR::Opcode::GetCbufU32x2: {
+        const IR::Value index{inst->Arg(0)};
+        const IR::Value offset{inst->Arg(1)};
+
+        if (!index.IsImmediate() || !offset.IsImmediate()) {
+            return std::nullopt;
+        }
+
         return ConstBufferAddr{
             .index = index.U32(),
             .offset = offset.U32(),
@@ -523,32 +572,197 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
             .has_secondary = false,
         };
     }
-    IR::Inst* const offset_inst{offset.InstRecursive()};
-    if (offset_inst->GetOpcode() != IR::Opcode::IAdd32) {
+    case IR::Opcode::GetCbufU32:
+        break;
+    }
+
+    // Handle GetCbufU32 - supports both immediate and dynamic buffer indices
+    const IR::Value index{inst->Arg(0)};
+    const IR::Value offset{inst->Arg(1)};
+
+    // Handle immediate index with immediate offset (most common case)
+    if (index.IsImmediate() && offset.IsImmediate()) {
+        return ConstBufferAddr{
+            .index = index.U32(),
+            .offset = offset.U32(),
+            .shift_left = 0,
+            .secondary_index = 0,
+            .secondary_offset = 0,
+            .secondary_shift_left = 0,
+            .dynamic_offset = {},
+            .count = 1,
+            .has_secondary = false,
+        };
+    }
+
+    constexpr u32 BASE_DYNAMIC_ARRAY_SIZE = 8;
+    constexpr u32 FULLY_DYNAMIC_ARRAY_SIZE = 16;  // Larger for fully dynamic
+
+    // Handle immediate index with dynamic offset (common for array indexing)
+    if (index.IsImmediate() && !offset.IsImmediate()) {
+        IR::Inst* const offset_inst{offset.InstRecursive()};
+
+        // Check if offset is a simple addition with a base
+        if (offset_inst->GetOpcode() == IR::Opcode::IAdd32) {
+            u32 base_offset{};
+            IR::U32 dynamic_offset;
+            if (offset_inst->Arg(0).IsImmediate()) {
+                base_offset = offset_inst->Arg(0).U32();
+                dynamic_offset = IR::U32{offset_inst->Arg(1)};
+            } else if (offset_inst->Arg(1).IsImmediate()) {
+                base_offset = offset_inst->Arg(1).U32();
+                dynamic_offset = IR::U32{offset_inst->Arg(0)};
+            } else {
+                // Both parts of add are dynamic - treat as fully dynamic with base 0
+                LOG_DEBUG(Render_Vulkan, "Both offset components are dynamic, using base offset 0");
+                u32 array_size = (base_offset == 0 && !dynamic_offset.IsEmpty())
+                 ? FULLY_DYNAMIC_ARRAY_SIZE
+                 : BASE_DYNAMIC_ARRAY_SIZE;
+
+                return ConstBufferAddr{
+                    .index = index.U32(),
+                    .offset = 0,
+                    .shift_left = 0,
+                    .secondary_index = 0,
+                    .secondary_offset = 0,
+                    .secondary_shift_left = 0,
+                    .dynamic_offset = IR::U32{offset},  // Use the entire IAdd32 result
+                    .count = array_size,
+                    .has_secondary = false,
+                };
+            }
+
+            u32 array_size = (base_offset == 0 && !dynamic_offset.IsEmpty())
+             ? FULLY_DYNAMIC_ARRAY_SIZE
+             : BASE_DYNAMIC_ARRAY_SIZE;
+
+            return ConstBufferAddr{
+                .index = index.U32(),
+                .offset = base_offset,
+                .shift_left = 0,
+                .secondary_index = 0,
+                .secondary_offset = 0,
+                .secondary_shift_left = 0,
+                .dynamic_offset = dynamic_offset,
+                .count = array_size,
+                .has_secondary = false,
+            };
+        }
+
+        // Offset is fully dynamic without being an IAdd32 (e.g., direct variable, multiplication, etc.)
+        LOG_DEBUG(Render_Vulkan, "Fully dynamic offset (opcode: {}) in bindless texture",
+                  static_cast<int>(offset_inst->GetOpcode()));
+
+        return ConstBufferAddr{
+            .index = index.U32(),
+            .offset = 0,  // No base offset
+            .shift_left = 0,
+            .secondary_index = 0,
+            .secondary_offset = 0,
+            .secondary_shift_left = 0,
+            .dynamic_offset = IR::U32{offset},  // Use the entire offset value
+            .count = 8,
+            .has_secondary = false,
+        };
+    }
+
+    // Handle dynamic buffer index (variable cbuf index)
+    // This occurs when selecting from multiple constant buffers at runtime
+    if (!index.IsImmediate()) {
+        LOG_DEBUG(Render_Vulkan, "Dynamic constant buffer index in bindless texture - attempting to track");
+
+        // Try to track the index to see if it resolves to a constant
+        if (auto index_result = TryGetConstant(const_cast<IR::Value&>(index), env)) {
+            // Index resolved to a constant through tracking
+            if (offset.IsImmediate()) {
+                return ConstBufferAddr{
+                    .index = *index_result,
+                    .offset = offset.U32(),
+                    .shift_left = 0,
+                    .secondary_index = 0,
+                    .secondary_offset = 0,
+                    .secondary_shift_left = 0,
+                    .dynamic_offset = {},
+                    .count = 1,
+                    .has_secondary = false,
+                };
+            } else {
+                // Offset is dynamic - handle different patterns
+                IR::Inst* const offset_inst{offset.InstRecursive()};
+
+                if (offset_inst->GetOpcode() == IR::Opcode::IAdd32) {
+                    u32 base_offset{};
+                    IR::U32 dynamic_offset;
+                    if (offset_inst->Arg(0).IsImmediate()) {
+                        base_offset = offset_inst->Arg(0).U32();
+                        dynamic_offset = IR::U32{offset_inst->Arg(1)};
+                    } else if (offset_inst->Arg(1).IsImmediate()) {
+                        base_offset = offset_inst->Arg(1).U32();
+                        dynamic_offset = IR::U32{offset_inst->Arg(0)};
+                    } else {
+                        // Both parts are dynamic
+                        LOG_DEBUG(Render_Vulkan, "Dynamic index resolved but both offset parts are dynamic");
+                        base_offset = 0;
+                        dynamic_offset = IR::U32{offset};
+                    }
+
+                    u32 array_size = (base_offset == 0 && !dynamic_offset.IsEmpty())
+                     ? FULLY_DYNAMIC_ARRAY_SIZE
+                     : BASE_DYNAMIC_ARRAY_SIZE;
+
+                    return ConstBufferAddr{
+                        .index = *index_result,
+                        .offset = base_offset,
+                        .shift_left = 0,
+                        .secondary_index = 0,
+                        .secondary_offset = 0,
+                        .secondary_shift_left = 0,
+                        .dynamic_offset = dynamic_offset,
+                        .count = array_size,
+                        .has_secondary = false,
+                    };
+                } else {
+                    // Fully dynamic offset (not an IAdd32)
+                    LOG_DEBUG(Render_Vulkan, "Dynamic index resolved but offset is fully dynamic (opcode: {})",
+                             static_cast<int>(offset_inst->GetOpcode()));
+
+                    return ConstBufferAddr{
+                        .index = *index_result,
+                        .offset = 0,
+                        .shift_left = 0,
+                        .secondary_index = 0,
+                        .secondary_offset = 0,
+                        .secondary_shift_left = 0,
+                        .dynamic_offset = IR::U32{offset},
+                        .count = 8,
+                        .has_secondary = false,
+                    };
+                }
+            }
+        }
+
+        // Could not resolve dynamic buffer index
+        LOG_DEBUG(Render_Vulkan, "Unable to resolve dynamic constant buffer index for bindless texture");
         return std::nullopt;
     }
-    u32 base_offset{};
-    IR::U32 dynamic_offset;
-    if (offset_inst->Arg(0).IsImmediate()) {
-        base_offset = offset_inst->Arg(0).U32();
-        dynamic_offset = IR::U32{offset_inst->Arg(1)};
-    } else if (offset_inst->Arg(1).IsImmediate()) {
-        base_offset = offset_inst->Arg(1).U32();
-        dynamic_offset = IR::U32{offset_inst->Arg(0)};
-    } else {
-        return std::nullopt;
+
+    return std::nullopt;
+}
+
+u32 GetTextureHandle(Environment& env, const ConstBufferAddr& cbuf) {
+    const u32 secondary_index{cbuf.has_secondary ? cbuf.secondary_index : cbuf.index};
+    const u32 secondary_offset{cbuf.has_secondary ? cbuf.secondary_offset : cbuf.offset};
+
+    if (cbuf.shift_left >= 32 || cbuf.secondary_shift_left >= 32) {
+        LOG_ERROR(Render_Vulkan, "Invalid shift amount in texture handle: {} or {}",
+                  cbuf.shift_left, cbuf.secondary_shift_left);
+        return 0;
     }
-    return ConstBufferAddr{
-        .index = index.U32(),
-        .offset = base_offset,
-        .shift_left = 0,
-        .secondary_index = 0,
-        .secondary_offset = 0,
-        .secondary_shift_left = 0,
-        .dynamic_offset = dynamic_offset,
-        .count = 8,
-        .has_secondary = false,
-    };
+
+    const u32 lhs_raw{env.ReadCbufValue(cbuf.index, cbuf.offset) << cbuf.shift_left};
+    const u32 rhs_raw{env.ReadCbufValue(secondary_index, secondary_offset)
+                      << cbuf.secondary_shift_left};
+    return lhs_raw | rhs_raw;
 }
 
 // TODO:xbzk: shall be dropped when Track method cover all bindless stuff
@@ -567,12 +781,16 @@ static ConstBufferAddr last_valid_addr = ConstBufferAddr{
 TextureInst MakeInst(Environment& env, IR::Block* block, IR::Inst& inst) {
     ConstBufferAddr addr;
     if (IsBindless(inst)) {
-        const std::optional<ConstBufferAddr> track_addr{TrackCached(inst.Arg(0), env)};
+        const auto opcode = inst.GetOpcode();
+        LOG_DEBUG(Render_Vulkan, "=== MakeInst: BINDLESS {} (stage: {}) ===",
+                 static_cast<int>(opcode), static_cast<int>(env.ShaderStage()));
+
+        const std::optional<ConstBufferAddr> track_addr{Track(inst.Arg(0), env)};
 
         if (!track_addr) {
             //throw NotImplementedException("Failed to track bindless texture constant buffer");
-            LOG_DEBUG(Render_Vulkan, "!!! TRACKING FAILED !!! Using fallback - last_valid: cbuf[{}][{}]",
-                     last_valid_addr.index, last_valid_addr.offset);
+            LOG_ERROR(Render_Vulkan, "Failed to track bindless texture for opcode {} in stage {}. This may cause rendering issues.",
+                      static_cast<int>(opcode), static_cast<int>(env.ShaderStage()));
             addr = last_valid_addr; // TODO:xbzk: shall be dropped when Track method cover all bindless stuff
         } else {
             addr = *track_addr;
@@ -608,24 +826,15 @@ TextureInst MakeInst(Environment& env, IR::Block* block, IR::Inst& inst) {
     };
 }
 
-u32 GetTextureHandle(Environment& env, const ConstBufferAddr& cbuf) {
-    const u32 secondary_index{cbuf.has_secondary ? cbuf.secondary_index : cbuf.index};
-    const u32 secondary_offset{cbuf.has_secondary ? cbuf.secondary_offset : cbuf.offset};
-    const u32 lhs_raw{env.ReadCbufValue(cbuf.index, cbuf.offset) << cbuf.shift_left};
-    const u32 rhs_raw{env.ReadCbufValue(secondary_index, secondary_offset)
-                      << cbuf.secondary_shift_left};
-    return lhs_raw | rhs_raw;
-}
-
-    [[maybe_unused]]TextureType ReadTextureType(Environment& env, const ConstBufferAddr& cbuf) {
+TextureType ReadTextureType(Environment& env, const ConstBufferAddr& cbuf) {
     return env.ReadTextureType(GetTextureHandle(env, cbuf));
 }
 
-    [[maybe_unused]]TexturePixelFormat ReadTexturePixelFormat(Environment& env, const ConstBufferAddr& cbuf) {
+TexturePixelFormat ReadTexturePixelFormat(Environment& env, const ConstBufferAddr& cbuf) {
     return env.ReadTexturePixelFormat(GetTextureHandle(env, cbuf));
 }
 
-    [[maybe_unused]]bool IsTexturePixelFormatInteger(Environment& env, const ConstBufferAddr& cbuf) {
+bool IsTexturePixelFormatInteger(Environment& env, const ConstBufferAddr& cbuf) {
     return env.IsTexturePixelFormatInteger(GetTextureHandle(env, cbuf));
 }
 
@@ -776,10 +985,6 @@ void PatchTexelFetch(IR::Block& block, IR::Inst& inst, TexturePixelFormat pixel_
 } // Anonymous namespace
 
 void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo& host_info) {
-    // reset per-pass caches
-    env.cbuf_word_cache.clear();
-    env.handle_cache.clear();
-    env.track_cache.clear();
     TextureInstVector to_replace;
     for (IR::Block* const block : program.post_order_blocks) {
         for (IR::Inst& inst : block->Instructions()) {
@@ -790,9 +995,11 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
         }
     }
     // Sort instructions to visit textures by constant buffer index, then by offset
-    std::ranges::sort(to_replace, [](const auto& a, const auto& b) {
-        if (a.cbuf.index != b.cbuf.index) return a.cbuf.index < b.cbuf.index;
-        return a.cbuf.offset < b.cbuf.offset;
+    std::ranges::sort(to_replace, [](const auto& lhs, const auto& rhs) {
+        if (lhs.cbuf.index != rhs.cbuf.index) {
+            return lhs.cbuf.index < rhs.cbuf.index;
+        }
+        return lhs.cbuf.offset < rhs.cbuf.offset;
     });
     Descriptors descriptors{
         program.info.texture_buffer_descriptors,
@@ -819,14 +1026,14 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
         bool is_multisample{false};
         switch (inst->GetOpcode()) {
         case IR::Opcode::ImageQueryDimensions:
-            flags.type.Assign(ReadTextureTypeCached(env, cbuf));
+            flags.type.Assign(ReadTextureType(env, cbuf));
             inst->SetFlags(flags);
             break;
         case IR::Opcode::ImageSampleImplicitLod:
             if (flags.type != TextureType::Color2D) {
                 break;
             }
-            if (ReadTextureTypeCached(env, cbuf) == TextureType::Color2DRect) {
+            if (ReadTextureType(env, cbuf) == TextureType::Color2DRect) {
                 PatchImageSampleImplicitLod(*texture_inst.block, *texture_inst.inst);
             }
             break;
@@ -840,7 +1047,7 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
             if (flags.type != TextureType::Color1D) {
                 break;
             }
-            if (ReadTextureTypeCached(env, cbuf) == TextureType::Buffer) {
+            if (ReadTextureType(env, cbuf) == TextureType::Buffer) {
                 // Replace with the bound texture type only when it's a texture buffer
                 // If the instruction is 1D and the bound type is 2D, don't change the code and let
                 // the rasterizer robustness handle it
@@ -872,7 +1079,7 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
             }
             const bool is_written{inst->GetOpcode() != IR::Opcode::ImageRead};
             const bool is_read{inst->GetOpcode() != IR::Opcode::ImageWrite};
-            const bool is_integer{IsTexturePixelFormatIntegerCached(env, cbuf)};
+            const bool is_integer{IsTexturePixelFormatInteger(env, cbuf)};
             if (flags.type == TextureType::Buffer) {
                 index = descriptors.Add(ImageBufferDescriptor{
                     .format = flags.image_format,
@@ -940,16 +1147,16 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
         if (cbuf.count > 1) {
             const auto insert_point{IR::Block::InstructionList::s_iterator_to(*inst)};
             IR::IREmitter ir{*texture_inst.block, insert_point};
-            const IR::U32 shift{ir.Imm32(DESCRIPTOR_SIZE_SHIFT)};
-            inst->SetArg(0, ir.UMin(ir.ShiftRightLogical(cbuf.dynamic_offset, shift),
-                        ir.Imm32(DESCRIPTOR_SIZE - 1)));
+            const IR::U32 shift{ir.Imm32(std::countr_zero(DESCRIPTOR_SIZE))};
+            inst->SetArg(0, ir.UMin(ir.ShiftRightArithmetic(cbuf.dynamic_offset, shift),
+                                    ir.Imm32(DESCRIPTOR_SIZE - 1)));
         } else {
             inst->SetArg(0, IR::Value{});
         }
 
         if (!host_info.support_snorm_render_buffer && inst->GetOpcode() == IR::Opcode::ImageFetch &&
             flags.type == TextureType::Buffer) {
-            const auto pixel_format = ReadTexturePixelFormatCached(env, cbuf);
+            const auto pixel_format = ReadTexturePixelFormat(env, cbuf);
             if (IsPixelFormatSNorm(pixel_format)) {
                 PatchTexelFetch(*texture_inst.block, *texture_inst.inst, pixel_format);
             }
