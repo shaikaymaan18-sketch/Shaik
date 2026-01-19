@@ -12,6 +12,12 @@
 #include "core/hle/service/ns/ns_types.h"
 #include "core/hle/service/service.h"
 
+#include <memory>
+
+namespace PlayTime {
+class PlayTimeManager;
+}
+
 namespace Service::NS {
 
 struct PlayStatistics {
@@ -55,6 +61,8 @@ private:
         Out<s32> out_entries, u8 flag, Common::UUID user_id,
         OutArray<ApplicationPlayStatistics, BufferAttr_HipcMapAlias> out_stats,
         InArray<u64, BufferAttr_HipcMapAlias> application_ids);
+
+    std::unique_ptr<PlayTime::PlayTimeManager> play_time_manager;
 };
 
 } // namespace Service::NS

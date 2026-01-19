@@ -10,10 +10,12 @@
 #include "core/hle/service/ns/query_service.h"
 #include "core/hle/service/service.h"
 #include "core/launch_timestamp_cache.h"
+#include "frontend_common/play_time_manager.h"
 
 namespace Service::NS {
 
-IQueryService::IQueryService(Core::System& system_) : ServiceFramework{system_, "pdm:qry"} {
+IQueryService::IQueryService(Core::System& system_) : ServiceFramework{system_, "pdm:qry"},
+    play_time_manager{std::make_unique<PlayTime::PlayTimeManager>()} {
     // clang-format off
     static const FunctionInfo functions[] = {
         {0, nullptr, "QueryAppletEvent"},
@@ -76,7 +78,7 @@ Result IQueryService::QueryApplicationPlayStatisticsForSystem(
         const u64 app_id = application_ids[i];
         ApplicationPlayStatistics stats{};
         stats.application_id = app_id;
-        stats.play_time_ns = Core::LaunchTimestampCache::GetLaunchTimestamp(app_id) * 1'000'000'000ULL;
+        stats.play_time_ns = play_time_manager->GetPlayTime(app_id) * 1'000'000'000ULL;
         stats.launch_count = Core::LaunchTimestampCache::GetLaunchCount(app_id);
         out_stats[i] = stats;
         ++written;
