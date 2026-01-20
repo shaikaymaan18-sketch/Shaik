@@ -121,6 +121,7 @@ void FSR::CreatePipelines() {
 void FSR::UpdateDescriptorSets(VkImageView image_view, size_t image_index) {
     Images& images = m_dynamic_images[image_index];
     std::vector<VkDescriptorImageInfo> image_infos;
+    image_infos.reserve(2);
     std::vector<VkWriteDescriptorSet> updates{
         CreateWriteDescriptorSet(image_infos, *m_sampler, image_view, images.descriptor_sets[Easu], 0),
         CreateWriteDescriptorSet(image_infos, *m_sampler, *images.image_views[Easu], images.descriptor_sets[Rcas], 0)

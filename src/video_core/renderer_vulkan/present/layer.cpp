@@ -102,10 +102,10 @@ void Layer::ConfigureDraw(PresentPushConstants* out_push_constants,
     VkImageView source_image_view =
         texture_info ? texture_info->image_view : *raw_image_views[image_index];
 
-    if (std::holds_alternative<FXAA>(anti_alias)) {
-        std::get<FXAA>(anti_alias).Draw(scheduler, image_index, &source_image, &source_image_view);
-    } else if (std::holds_alternative<SMAA>(anti_alias)) {
-        std::get<SMAA>(anti_alias).Draw(scheduler, image_index, &source_image, &source_image_view);
+    if (auto* fxaa = std::get_if<FXAA>(anti_alias)) {
+        fxaa->Draw(scheduler, image_index, &source_image, &source_image_view);
+    } else if (auto* smaa = std::get_if<SMAA>(anti_alias)) {
+        smaa->Draw(scheduler, image_index, &source_image, &source_image_view);
     }
 
     auto crop_rect = Tegra::NormalizeCrop(framebuffer, texture_width, texture_height);
@@ -115,8 +115,7 @@ void Layer::ConfigureDraw(PresentPushConstants* out_push_constants,
     };
 
     if (fsr) {
-        source_image_view = fsr->Draw(scheduler, image_index, source_image, source_image_view,
-                                      render_extent, crop_rect);
+        source_image_view = fsr->Draw(scheduler, image_index, source_image, source_image_view, render_extent, crop_rect);
         crop_rect = {0, 0, 1, 1};
     }
 
