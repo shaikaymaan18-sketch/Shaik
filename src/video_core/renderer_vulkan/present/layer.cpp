@@ -102,9 +102,9 @@ void Layer::ConfigureDraw(PresentPushConstants* out_push_constants,
     VkImageView source_image_view =
         texture_info ? texture_info->image_view : *raw_image_views[image_index];
 
-    if (auto* fxaa = std::get_if<FXAA>(anti_alias)) {
+    if (auto* fxaa = std::get_if<FXAA>(&anti_alias)) {
         fxaa->Draw(scheduler, image_index, &source_image, &source_image_view);
-    } else if (auto* smaa = std::get_if<SMAA>(anti_alias)) {
+    } else if (auto* smaa = std::get_if<SMAA>(&anti_alias)) {
         smaa->Draw(scheduler, image_index, &source_image, &source_image_view);
     }
 
