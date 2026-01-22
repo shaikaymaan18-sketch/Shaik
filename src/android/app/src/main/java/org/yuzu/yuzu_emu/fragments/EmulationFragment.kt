@@ -1909,9 +1909,7 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
     }
 
     private fun setInsets() {
-        ViewCompat.setOnApplyWindowInsetsListener(
-            binding.inGameMenu
-        ) { v: View, windowInsets: WindowInsetsCompat ->
+        val applyInsets: (View, WindowInsetsCompat) -> WindowInsetsCompat = { v, windowInsets ->
             val cutInsets: Insets = windowInsets.getInsets(WindowInsetsCompat.Type.displayCutout())
             var left = 0
             var right = 0
@@ -1924,6 +1922,18 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
             v.setPadding(left, cutInsets.top, right, 0)
 
             windowInsets
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(
+            binding.inGameMenu
+        ) { v: View, windowInsets: WindowInsetsCompat ->
+            applyInsets(v, windowInsets)
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(
+            binding.quickSettingsSheet
+        ) { v: View, windowInsets: WindowInsetsCompat ->
+            applyInsets(v, windowInsets)
         }
     }
 

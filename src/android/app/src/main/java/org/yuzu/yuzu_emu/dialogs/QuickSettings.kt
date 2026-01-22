@@ -4,10 +4,12 @@
 package org.yuzu.yuzu_emu.dialogs
 
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.RadioGroup
 import android.widget.TextView
+import androidx.drawerlayout.widget.DrawerLayout
 import com.google.android.material.color.MaterialColors
 import org.yuzu.yuzu_emu.R
 import org.yuzu.yuzu_emu.YuzuApplication
@@ -131,6 +133,10 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
             setting.setBoolean(isChecked)
             saveSettings()
         }
+
+        switchContainer.setOnClickListener {
+            switchView.toggle()
+        }
         container.addView(itemView)
     }
 
@@ -176,6 +182,19 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
                 saveSettings()
                 valueDisplay.text = "$intValue$units"
             }
+        }
+
+        slider.setOnTouchListener { _, event ->
+            val drawer = emulationFragment.view?.findViewById<DrawerLayout>(R.id.drawer_layout)
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    drawer?.requestDisallowInterceptTouchEvent(true)
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    drawer?.requestDisallowInterceptTouchEvent(false)
+                }
+            }
+            false
         }
 
         container.addView(itemView)
