@@ -98,6 +98,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import kotlin.or
 
 class EmulationFragment : Fragment(), SurfaceHolder.Callback {
     private lateinit var emulationState: EmulationState
@@ -1909,7 +1910,9 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
     }
 
     private fun setInsets() {
-        val applyInsets: (View, WindowInsetsCompat) -> WindowInsetsCompat = { v, windowInsets ->
+        ViewCompat.setOnApplyWindowInsetsListener(
+            binding.inGameMenu
+        ) { v: View, windowInsets: WindowInsetsCompat ->
             val cutInsets: Insets = windowInsets.getInsets(WindowInsetsCompat.Type.displayCutout())
             var left = 0
             var right = 0
@@ -1924,16 +1927,24 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
             windowInsets
         }
 
-        ViewCompat.setOnApplyWindowInsetsListener(
-            binding.inGameMenu
-        ) { v: View, windowInsets: WindowInsetsCompat ->
-            applyInsets(v, windowInsets)
-        }
-
-        ViewCompat.setOnApplyWindowInsetsListener(
-            binding.quickSettingsSheet
-        ) { v: View, windowInsets: WindowInsetsCompat ->
-            applyInsets(v, windowInsets)
+        ViewCompat.setOnApplyWindowInsetsListener(binding.quickSettingsSheet) { v, insets ->
+            val systemBarsInsets: Insets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+           if (v.layoutDirection == View.LAYOUT_DIRECTION_LTR) {
+                v.setPadding(
+                    systemBarsInsets.left,
+                    systemBarsInsets.top,
+                    0,
+                    systemBarsInsets.bottom
+                )
+            } else {
+                v.setPadding(
+                    0,
+                    systemBarsInsets.top,
+                    systemBarsInsets.right,
+                    systemBarsInsets.bottom
+                )
+            }
+            insets
         }
     }
 
