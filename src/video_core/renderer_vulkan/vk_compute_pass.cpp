@@ -672,12 +672,6 @@ void ASTCDecoderPass::Assemble(Image& image, const StagingBufferRef& map,
                 .layerCount = VK_REMAINING_ARRAY_LAYERS,
             },
         };
-        // After ASTC decode, image may be used in shaders or as attachment
-        const VkPipelineStageFlags dst_stages_astc =
-            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-            VK_PIPELINE_STAGE_TRANSFER_BIT;
         cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, image_barrier);
     });
