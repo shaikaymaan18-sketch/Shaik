@@ -94,6 +94,16 @@ std::shared_ptr<Applet> WindowSystem::GetMainApplet() {
     return nullptr;
 }
 
+std::shared_ptr<Applet> WindowSystem::GetOverlayDisplayApplet() {
+    std::scoped_lock lk{m_lock};
+
+    if (m_overlay_display) {
+        return m_applets.at(m_overlay_display->aruid.pid);
+    }
+
+    return nullptr;
+}
+
 void WindowSystem::RequestHomeMenuToGetForeground() {
     {
         std::scoped_lock lk{m_lock};

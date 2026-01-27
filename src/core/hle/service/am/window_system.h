@@ -42,6 +42,7 @@ public:
     void TrackApplet(std::shared_ptr<Applet> applet, bool is_application);
     std::shared_ptr<Applet> GetByAppletResourceUserId(u64 aruid);
     std::shared_ptr<Applet> GetMainApplet();
+    std::shared_ptr<Applet> GetOverlayDisplayApplet();
 
 public:
     void RequestHomeMenuToGetForeground();
