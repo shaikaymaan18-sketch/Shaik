@@ -28,7 +28,6 @@ public:
     Settings::RendererBackend api() const;
     void setApi(const Settings::RendererBackend &newApi);
 
-    bool isOpenGL() const;
     bool isVulkan() const;
 
     int device() const;
@@ -38,6 +37,9 @@ public:
 
     int vsyncMode() const;
     void setVsyncMode(int newVsyncMode);
+
+    bool isOpenGL(Settings::RendererBackend api) const;
+    bool isOpenGL() const;
 
 protected:
     void componentComplete();
@@ -63,12 +65,12 @@ private:
     std::vector<std::vector<VkPresentModeKHR>> device_present_modes;
 
     Settings::RendererBackend m_api;
-    bool m_isOpenGL;
     bool m_isVulkan;
 
     int m_device;
     int m_vsyncMode;
 
+    const QString TranslateVSyncMode(VkPresentModeKHR mode, Settings::RendererBackend backend);
 private slots:
     void populateDevices();
     void populateVsync();

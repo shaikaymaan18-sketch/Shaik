@@ -10,6 +10,7 @@
 #include "qt_common/render/context.h"
 #include "qt_common/abstract/frontend.h"
 
+// TODO: Make a separate window?
 struct OpenGLRenderItem : public QQuickItem {
     explicit OpenGLRenderItem(RenderWindow* parent) : QQuickItem(parent) {
         window()->setSurfaceType(QWindow::OpenGLSurface);
@@ -120,7 +121,7 @@ void RenderWindow::OnFrameDisplayed() {
 
 std::unique_ptr<Core::Frontend::GraphicsContext> RenderWindow::CreateSharedContext() const {
 #ifdef HAS_OPENGL
-    if (Settings::values.renderer_backend.GetValue() == Settings::RendererBackend::OpenGL) {
+    if (Settings::IsOpenGL()) {
         auto c = static_cast<OpenGLSharedContext*>(main_context.get());
         // Bind the shared contexts to the main surface in case the backend wants to take over
         // presentation
@@ -148,7 +149,9 @@ bool RenderWindow::initRenderTarget() {
     first_frame = false;
 
     switch (Settings::values.renderer_backend.GetValue()) {
-    case Settings::RendererBackend::OpenGL:
+    case Settings::RendererBackend::OpenGL_GLASM:
+    case Settings::RendererBackend::OpenGL_GLSL:
+    case Settings::RendererBackend::OpenGL_SPIRV:
         if (!initializeOpenGL()) {
             return false;
         }
@@ -170,7 +173,7 @@ bool RenderWindow::initRenderTarget() {
     onFramebufferSizeChanged();
     // BackupGeometry();
 
-    if (Settings::values.renderer_backend.GetValue() == Settings::RendererBackend::OpenGL) {
+    if (Settings::IsOpenGL()) {
         if (!loadOpenGL()) {
             return false;
         }

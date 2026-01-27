@@ -380,4 +380,16 @@ void SetConfiguringGlobal(bool is_global) {
     configuring_global = is_global;
 }
 
+bool IsOpenGL() {
+    const auto backend = Settings::values.renderer_backend.GetValue();
+    switch (backend) {
+    case RendererBackend::OpenGL_GLSL:
+    case RendererBackend::OpenGL_GLASM:
+    case RendererBackend::OpenGL_SPIRV:
+        return true;
+    default:
+        return false;
+    }
+}
+
 } // namespace Settings

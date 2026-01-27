@@ -794,6 +794,8 @@ bool IsFastmemEnabled();
 void SetNceEnabled(bool is_64bit);
 bool IsNceEnabled();
 
+bool IsOpenGL();
+
 bool IsDockedMode();
 
 float Volume();

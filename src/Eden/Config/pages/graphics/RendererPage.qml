@@ -1,4 +1,3 @@
-
 // SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
@@ -15,7 +14,6 @@ PageScrollView {
         gfx.apply()
         api.apply()
         dev.apply()
-        shader.apply()
         vsync.apply()
     }
 
@@ -23,7 +21,6 @@ PageScrollView {
         gfx.sync()
         api.sync()
         dev.sync()
-        shader.sync()
         vsync.sync()
     }
 
@@ -54,13 +51,6 @@ PageScrollView {
 
         ConfigComboBox {
             Layout.fillWidth: true
-            id: shader
-            setting: SettingsInterface.setting("shader_backend")
-            visible: gdi.isOpenGL
-        }
-
-        ConfigComboBox {
-            Layout.fillWidth: true
             id: vsync
             setting: SettingsInterface.setting("use_vsync")
             runtimeModel: gdi.vsyncModes
@@ -70,7 +60,7 @@ PageScrollView {
         SettingsList {
             id: gfx
             category: SettingsCategories.Renderer
-            idExclude: ["vulkan_device", "backend", "shader_backend", "use_vsync"]
+            idExclude: ["vulkan_device", "backend", "use_vsync"]
         }
     }
 }

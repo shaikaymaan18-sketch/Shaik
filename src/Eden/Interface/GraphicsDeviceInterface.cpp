@@ -7,17 +7,17 @@
 #include "common/settings_enums.h"
 #include "qt_common/qt_common.h"
 
-static const QString TranslateVSyncMode(VkPresentModeKHR mode,
+const QString GraphicsDeviceInterface::TranslateVSyncMode(VkPresentModeKHR mode,
                                                     Settings::RendererBackend backend) {
     switch (mode) {
     case VK_PRESENT_MODE_IMMEDIATE_KHR:
-        return backend == Settings::RendererBackend::OpenGL
+        return isOpenGL(backend)
                    ? QtCommon::tr("Off")
                    : QStringLiteral("Immediate (%1)").arg(QtCommon::tr("VSync Off"));
     case VK_PRESENT_MODE_MAILBOX_KHR:
         return QStringLiteral("Mailbox (%1)").arg(QtCommon::tr("Recommended"));
     case VK_PRESENT_MODE_FIFO_KHR:
-        return backend == Settings::RendererBackend::OpenGL
+        return isOpenGL(backend)
                    ? QtCommon::tr("On")
                    : QStringLiteral("FIFO (%1)").arg(QtCommon::tr("VSync On"));
     case VK_PRESENT_MODE_FIFO_RELAXED_KHR:
@@ -98,11 +98,12 @@ void GraphicsDeviceInterface::setApi(const Settings::RendererBackend &newApi)
     m_api = newApi;
     emit apiChanged(m_api);
 
-    m_isOpenGL = newApi == Settings::RendererBackend::OpenGL;
     m_isVulkan = newApi == Settings::RendererBackend::Vulkan;
 
-    emit isOpenGLChanged(m_isOpenGL);
+    emit isOpenGLChanged(isOpenGL());
     emit isVulkanChanged(m_isVulkan);
+
+    populateVsync();
 }
 
 void GraphicsDeviceInterface::componentComplete()
@@ -110,11 +111,6 @@ void GraphicsDeviceInterface::componentComplete()
     VkDeviceInfo::PopulateRecords(records, (QWindow *) window());
     populateDevices();
     populateVsync();
-}
-
-bool GraphicsDeviceInterface::isOpenGL() const
-{
-    return m_isOpenGL;
 }
 
 bool GraphicsDeviceInterface::isVulkan() const
@@ -151,4 +147,19 @@ void GraphicsDeviceInterface::setVsyncMode(int newVsyncMode)
         return;
     m_vsyncMode = newVsyncMode;
     emit vsyncModeChanged(m_vsyncMode);
+}
+
+bool GraphicsDeviceInterface::isOpenGL(Settings::RendererBackend api) const {
+    switch (api) {
+    case Settings::RendererBackend::OpenGL_GLSL:
+    case Settings::RendererBackend::OpenGL_GLASM:
+    case Settings::RendererBackend::OpenGL_SPIRV:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool GraphicsDeviceInterface::isOpenGL() const {
+    return isOpenGL(m_api);
 }

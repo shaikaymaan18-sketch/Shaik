@@ -14,42 +14,46 @@
 namespace SettingsCategories {
 Q_NAMESPACE
 
+#define FWD_CAT(category) category = u32(Settings::Category::category),
 enum class Category {
-    Android = u32(Settings::Category::Android),
-    Audio = u32(Settings::Category::Audio),
-    Core = u32(Settings::Category::Core),
-    Cpu = u32(Settings::Category::Cpu),
-    CpuDebug = u32(Settings::Category::CpuDebug),
-    CpuUnsafe = u32(Settings::Category::CpuUnsafe),
-    Overlay = u32(Settings::Category::Overlay),
-    Renderer = u32(Settings::Category::Renderer),
-    RendererAdvanced = u32(Settings::Category::RendererAdvanced),
-    RendererExtensions = u32(Settings::Category::RendererExtensions),
-    RendererDebug = u32(Settings::Category::RendererDebug),
-    System = u32(Settings::Category::System),
-    SystemAudio = u32(Settings::Category::SystemAudio),
-    DataStorage = u32(Settings::Category::DataStorage),
-    Debugging = u32(Settings::Category::Debugging),
-    DebuggingGraphics = u32(Settings::Category::DebuggingGraphics),
-    GpuDriver = u32(Settings::Category::GpuDriver),
-    Miscellaneous = u32(Settings::Category::Miscellaneous),
-    Network = u32(Settings::Category::Network),
-    WebService = u32(Settings::Category::WebService),
-    AddOns = u32(Settings::Category::AddOns),
-    Controls = u32(Settings::Category::Controls),
-    Ui = u32(Settings::Category::Ui),
-    UiAudio = u32(Settings::Category::UiAudio),
-    UiGeneral = u32(Settings::Category::UiGeneral),
-    UiLayout = u32(Settings::Category::UiLayout),
-    UiGameList = u32(Settings::Category::UiGameList),
-    Screenshots = u32(Settings::Category::Screenshots),
-    Shortcuts = u32(Settings::Category::Shortcuts),
-    Multiplayer = u32(Settings::Category::Multiplayer),
-    Services = u32(Settings::Category::Services),
-    Paths = u32(Settings::Category::Paths),
-    LibraryApplet = u32(Settings::Category::LibraryApplet),
+    FWD_CAT(Android)
+    FWD_CAT(Audio)
+    FWD_CAT(Core)
+    FWD_CAT(Cpu)
+    FWD_CAT(CpuDebug)
+    FWD_CAT(CpuUnsafe)
+    FWD_CAT(Overlay)
+    FWD_CAT(Renderer)
+    FWD_CAT(RendererAdvanced)
+    FWD_CAT(RendererHacks)
+    FWD_CAT(RendererExtensions)
+    FWD_CAT(RendererDebug)
+    FWD_CAT(System)
+    FWD_CAT(SystemAudio)
+    FWD_CAT(DataStorage)
+    FWD_CAT(Debugging)
+    FWD_CAT(DebuggingGraphics)
+    FWD_CAT(GpuDriver)
+    FWD_CAT(Miscellaneous)
+    FWD_CAT(Network)
+    FWD_CAT(WebService)
+    FWD_CAT(AddOns)
+    FWD_CAT(Controls)
+    FWD_CAT(Ui)
+    FWD_CAT(UiAudio)
+    FWD_CAT(UiGeneral)
+    FWD_CAT(UiLayout)
+    FWD_CAT(UiGameList)
+    FWD_CAT(Screenshots)
+    FWD_CAT(Shortcuts)
+    FWD_CAT(Multiplayer)
+    FWD_CAT(Services)
+    FWD_CAT(Paths)
+    FWD_CAT(LibraryApplet)
 };
 Q_ENUM_NS(Category)
+
+#undef FWD_CAT
 }
 
 class SettingsInterface : public QObject {
