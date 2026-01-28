@@ -43,6 +43,9 @@ void EmuThread::run() {
 
     qDebug() << "Starting";
 
+    // FIXME: Cannot make QOpenGLContext current in a different thread
+    // Epic QML stuff causing things to run in different threads than they should.
+    // Find a way to move context to the GPU Thread.
     gpu.Start();
 
     qDebug() << "GPU Ready";
