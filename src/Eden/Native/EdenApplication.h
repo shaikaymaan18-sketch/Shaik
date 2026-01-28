@@ -5,6 +5,8 @@
 #include <QApplication>
 #include "Eden/Interface/QMLConfig.h"
 
+class GameListModel;
+class QQmlApplicationEngine;
 class EdenApplication : public QApplication
 {
     Q_OBJECT
@@ -18,5 +20,10 @@ public slots:
 
 private:
     QMLConfig *config;
+    QQmlApplicationEngine *m_engine;
+
+    GameListModel* gameListModel;
+    QWidget *m_widget;
+
     bool m_shouldReload = false;
 };

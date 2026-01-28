@@ -18,6 +18,10 @@ public:
         : m_config{new QtConfig}
     {}
 
+    virtual ~QMLConfig() {
+        delete m_config;
+    }
+
     Q_INVOKABLE inline void save() {
         m_config->SaveAllValues();
     }

@@ -83,8 +83,10 @@ NativeDialog {
                 }
 
                 Label {
-                    text: MainWindowInterface.lookup(
-                              StringKey["DataManager" + modelData + "Tooltip"])
+                    text: typeof MainWindowInterface
+                          !== 'undefined' ? MainWindowInterface.lookup(
+                                                StringKey["DataManager" + modelData
+                                                          + "Tooltip"]) : ""
 
                     font.pixelSize: 16
                     horizontalAlignment: Text.AlignHCenter

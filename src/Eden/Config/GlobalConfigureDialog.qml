@@ -49,8 +49,7 @@ NativeDialog {
         title: qsTr("Reloading")
         standardButtons: DialogButtonBox.Ok
 
-        onVisibleChanged: if (!visible)
-                              EdenApplication.reload()
+        onClosed: EdenApplication.reload()
     }
 
     onAccepted: {
@@ -66,8 +65,7 @@ NativeDialog {
 
     onApplied: applyConfigs()
 
-    onVisibilityChanged: if (visible)
-                             syncConfigs()
+    onOpened: syncConfigs()
 
     CarboxylTabBar {
         id: tabBar
