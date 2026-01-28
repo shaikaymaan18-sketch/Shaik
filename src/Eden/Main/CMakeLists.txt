@@ -21,6 +21,7 @@ EdenModule(
 
         AboutDialog.qml
         DepsDialog.qml
+        DataDialog.qml
     LIBRARIES
         Eden::Interface
 )

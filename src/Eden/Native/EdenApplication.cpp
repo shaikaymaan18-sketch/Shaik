@@ -17,7 +17,9 @@
 #include "common/settings_enums.h"
 #include "qt_common/config/uisettings.h"
 #include "qt_common/qt_common.h"
+#include "qt_common/qt_string_lookup.h"
 #include "qt_common/util/content.h"
+#include "qt_common/util/game.h"
 
 #include <QQuickStyle>
 #include <QWidget>
@@ -90,6 +92,20 @@ int EdenApplication::run() {
                                          1,
                                          0,
                                          "SettingsCategories",
+                                         QString());
+
+        qmlRegisterUncreatableMetaObject(QtCommon::StringLookup::staticMetaObject,
+                                         "Eden.Interface",
+                                         1,
+                                         0,
+                                         "StringKey",
+                                         QString());
+
+        qmlRegisterUncreatableMetaObject(QtCommon::Game::staticMetaObject,
+                                         "Eden.Interface",
+                                         1,
+                                         0,
+                                         "DataDirectory",
                                          QString());
 
         // Directory List

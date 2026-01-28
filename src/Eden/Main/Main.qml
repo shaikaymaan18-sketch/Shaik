@@ -48,6 +48,10 @@ ApplicationWindow {
         id: depDialog
     }
 
+    DataDialog {
+        id: dataDialog
+    }
+
     menuBar: MenuBar {
         Menu {
             title: qsTr("&File")
@@ -188,7 +192,7 @@ ApplicationWindow {
             contentWidth: 225
 
             Action {
-                text: qsTr("Install &Decryption Keys")
+                text: qsTr("Install Decryption &Keys")
                 onTriggered: MainWindowInterface.installDecryptionKeys()
             }
 
@@ -209,6 +213,11 @@ ApplicationWindow {
             Action {
                 text: qsTr("&Verify Installed Contents")
                 onTriggered: MainWindowInterface.verifyIntegrity()
+            }
+
+            Action {
+                text: qsTr("&Data Manager")
+                onTriggered: dataDialog.open()
             }
 
             MenuSeparator {}

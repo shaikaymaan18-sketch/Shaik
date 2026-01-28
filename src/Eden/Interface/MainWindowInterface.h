@@ -7,6 +7,7 @@
 #include <QQuickWindow>
 #include "core/hle/service/am/applet_manager.h"
 #include "qt_common/qt_common.h"
+#include "qt_common/qt_string_lookup.h"
 
 namespace InputCommon {
 class InputSubsystem;
@@ -47,6 +48,8 @@ public:
     Q_INVOKABLE void bootGame(const QString& filename, Service::AM::FrontendAppletParameters params,
                               StartGameType type = StartGameType::Normal);
     Q_INVOKABLE bool loadROM(const QString& filename, Service::AM::FrontendAppletParameters params);
+
+    Q_INVOKABLE QString lookup(QtCommon::StringLookup::StringKey key);
 
     bool firmwareGood() const;
     void setFirmwareGood(bool newFirmwareGood);

@@ -11,5 +11,9 @@
         <file>icons/back.svg</file>
         <file>icons/help.svg</file>
         <file alias="icons/eden.svg">../../../dist/dev.eden_emu.eden.svg</file>
+        <file>icons/trash.svg</file>
+        <file>icons/folder.svg</file>
+        <file>icons/download.svg</file>
+        <file>icons/upload.svg</file>
     </qresource>
 </RCC>

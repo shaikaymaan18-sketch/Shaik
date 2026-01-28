@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "data_dialog.h"
@@ -33,8 +33,8 @@ DataDialog::DataDialog(QWidget *parent)
     ui->labels->addItem(label);
 
     WIDGET(tr("Shaders"), Shaders)
-    WIDGET(tr("UserNAND"), UserNand)
-    WIDGET(tr("SysNAND"), SysNand)
+    WIDGET(tr("UserNAND"), UserNAND)
+    WIDGET(tr("SysNAND"), SysNAND)
     WIDGET(tr("Mods"), Mods)
     WIDGET(tr("Saves"), Saves)
 

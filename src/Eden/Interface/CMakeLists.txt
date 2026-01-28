@@ -6,6 +6,7 @@
 
 find_package(Qt6 REQUIRED COMPONENTS Core)
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core)
 
 EdenModule(
     NAME Interface
@@ -30,9 +31,11 @@ EdenModule(
 
 target_link_libraries(EdenInterface PRIVATE Qt6::Core)
 target_link_libraries(EdenInterface PRIVATE Qt6::Widgets)
+target_link_libraries(EdenInterface PRIVATE Qt6::Core)
 
 target_sources(EdenInterface
   PRIVATE
     MainWindowInterface.h MainWindowInterface.cpp
     RenderWindow.h RenderWindow.cpp
+    DataDir.h DataDir.cpp
 )

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef DATA_MANAGER_H
@@ -10,7 +10,7 @@
 
 namespace FrontendCommon::DataManager {
 
-enum class DataDir { Saves, UserNand, SysNand, Mods, Shaders };
+enum class DataDir { Saves, UserNAND, SysNAND, Mods, Shaders };
 
 const std::filesystem::path GetDataDir(DataDir dir, const std::string &user_id = "");
 const std::string GetDataDirString(DataDir dir, const std::string &user_id = "");

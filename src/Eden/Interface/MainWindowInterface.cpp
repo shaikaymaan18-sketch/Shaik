@@ -10,6 +10,7 @@
 #include "frontend_common/content_manager.h"
 
 #include "hid_core/hid_core.h"
+#include "qt_common/qt_string_lookup.h"
 #include "qt_common/util/content.h"
 #include "qt_common/util/game.h"
 
@@ -434,6 +435,10 @@ bool MainWindowInterface::loadROM(const QString& filename, Service::AM::Frontend
     current_game_path = filename;
 
     return true;
+}
+
+QString MainWindowInterface::lookup(QtCommon::StringLookup::StringKey key) {
+    return QtCommon::StringLookup::Lookup(key);
 }
 
 void MainWindowInterface::shutdownGame() {

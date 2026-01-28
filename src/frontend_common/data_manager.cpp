@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "data_manager.h"
@@ -18,9 +18,9 @@ const fs::path GetDataDir(DataDir dir, const std::string &user_id)
     switch (dir) {
     case DataDir::Saves:
         return (save_dir / "user" / "save" / "0000000000000000" / user_id).string();
-    case DataDir::UserNand:
+    case DataDir::UserNAND:
         return (nand_dir / "user" / "Contents" / "registered").string();
-    case DataDir::SysNand:
+    case DataDir::SysNAND:
         // NB: do NOT delete save
         // that contains profile data and other stuff
         return (nand_dir / "system" / "Contents" / "registered").string();

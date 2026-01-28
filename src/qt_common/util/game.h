@@ -7,8 +7,23 @@
 #include <QObject>
 #include <QStandardPaths>
 #include "common/fs/path_util.h"
+#include "frontend_common/data_manager.h"
 
 namespace QtCommon::Game {
+
+Q_NAMESPACE
+
+#define FWD_CAT(category) category = u32(FrontendCommon::DataManager::DataDir::category),
+
+enum DataDir {
+    FWD_CAT(Saves)
+    FWD_CAT(UserNAND)
+    FWD_CAT(SysNAND)
+    FWD_CAT(Mods)
+    FWD_CAT(Shaders)
+};
+
+Q_ENUM_NS(DataDir)
 
 enum class InstalledEntryType {
     Game,

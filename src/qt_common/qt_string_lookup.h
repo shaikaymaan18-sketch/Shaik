@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
@@ -22,8 +22,8 @@ Q_NAMESPACE
 enum StringKey {
     DataManagerSavesTooltip,
     DataManagerShadersTooltip,
-    DataManagerUserNandTooltip,
-    DataManagerSysNandTooltip,
+    DataManagerUserNANDTooltip,
+    DataManagerSysNANDTooltip,
     DataManagerModsTooltip,
 
     // Key install results
@@ -61,6 +61,8 @@ enum StringKey {
     RyujinxNoSaveId,
 };
 
+Q_ENUM_NS(StringKey)
+
 // NB: the constexpr check always succeeds (in clangd at least) if size arg < size
 // always triple-check the size arg
 static const constexpr frozen::map<StringKey, frozen::string, 29> strings = {
@@ -69,8 +71,8 @@ static const constexpr frozen::map<StringKey, frozen::string, 29> strings = {
      QT_TR_NOOP("Contains game save data. DO NOT REMOVE UNLESS YOU KNOW WHAT YOU'RE DOING!")},
     {DataManagerShadersTooltip,
      QT_TR_NOOP("Contains Vulkan and OpenGL pipeline caches. Generally safe to remove.")},
-    {DataManagerUserNandTooltip, QT_TR_NOOP("Contains updates and DLC for games.")},
-    {DataManagerSysNandTooltip, QT_TR_NOOP("Contains firmware and applet data.")},
+    {DataManagerUserNANDTooltip, QT_TR_NOOP("Contains updates and DLC for games.")},
+    {DataManagerSysNANDTooltip, QT_TR_NOOP("Contains firmware and applet data.")},
     {DataManagerModsTooltip, QT_TR_NOOP("Contains game mods, patches, and cheats.")},
 
     // Key install
