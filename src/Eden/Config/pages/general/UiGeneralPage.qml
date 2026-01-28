@@ -41,11 +41,6 @@ PageScrollView {
         }
 
         SectionHeader {
-            text: qsTr("Linux")
-            visible: Qt.platform.os === "linux"
-        }
-
-        SectionHeader {
             text: qsTr("Theming")
         }
 

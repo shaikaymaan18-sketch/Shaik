@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 import QtQuick
 
 import Eden.Config
@@ -8,7 +7,7 @@ import Eden.Config
 GlobalTab {
     property alias swipe: swipe
 
-    tabs: ["Audio"]
+    tabs: [qsTr("Audio")]
 
     GlobalTabSwipeView {
         id: swipe

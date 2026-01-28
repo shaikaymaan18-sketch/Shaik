@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 import QtQuick
 
 import Carboxyl.Contour
 
 Label {
-    font.pixelSize: 16
+    font.pixelSize: 18
+    font.bold: true
 }

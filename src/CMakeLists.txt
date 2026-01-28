@@ -242,6 +242,10 @@ if (ENABLE_WEB_SERVICE)
 endif()
 
 if (ENABLE_QT)
+    # Fix QML imports
+    set(QT_QML_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/qml" CACHE PATH "Install path for QML" FORCE)
+    set(QML_IMPORT_PATH ${CMAKE_BINARY_DIR}/qml CACHE STRING "Extra QML Import Paths" FORCE)
+
     add_subdirectory(qt_common)
 
     function(yuzu_qt_target target)

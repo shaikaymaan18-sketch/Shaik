@@ -53,6 +53,7 @@ void EdenApplication::reload()
     exit(EXIT_RELOAD);
 }
 
+// TODO: this memory leaks like crazy, just do a hard relaunch
 int EdenApplication::run() {
     int ret = EXIT_SUCCESS;
     do {
@@ -75,7 +76,7 @@ int EdenApplication::run() {
         CarboxylApplication *carboxylApp = new CarboxylApplication(*this,
                                                                    &engine,
                                                                    style,
-                                                                   QStringLiteral("Helios"));
+                                                                   QStringLiteral("Graphide"));
         carboxylApp->setParent(this);
 
         /// CONTEXT

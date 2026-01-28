@@ -1,6 +1,6 @@
+
 // SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
@@ -69,6 +69,7 @@ NativeDialog {
                 Label {
                     text: display
                     anchors.fill: parent
+                    font.pixelSize: 14
 
                     verticalAlignment: Text.AlignVCenter
                     horizontalAlignment: Text.AlignHCenter
@@ -113,6 +114,7 @@ NativeDialog {
                         textFormat: Text.RichText
 
                         onLinkActivated: link => Qt.openUrlExternally(link)
+                        font.pixelSize: 14
 
                         MouseArea {
                             anchors.fill: parent
