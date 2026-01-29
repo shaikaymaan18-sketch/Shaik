@@ -278,6 +278,7 @@ class SettingsFragmentPresenter(
 
             add(HeaderSetting(R.string.hacks))
 
+            add(BooleanSetting.USE_ASYNCHRONOUS_GPU_EMULATION.key)
             add(IntSetting.FAST_GPU_TIME.key)
             add(BooleanSetting.SKIP_CPU_INNER_INVALIDATION.key)
             add(BooleanSetting.FIX_BLOOM_EFFECTS.key)
