@@ -88,12 +88,21 @@ void ThreadManager::TickGPU() {
 }
 
 void ThreadManager::InvalidateRegion(DAddr addr, u64 size) {
-    rasterizer->OnCacheInvalidation(addr, size);
+    if (!is_async) {
+        PushCommand(InvalidateRegionCommand(addr, size));
+    } else {
+        rasterizer->OnCacheInvalidation(addr, size);
+    }
 }
 
 void ThreadManager::FlushAndInvalidateRegion(DAddr addr, u64 size) {
-    // Skip flush on asynch mode, as FlushAndInvalidateRegion is not used for anything too important
-    rasterizer->OnCacheInvalidation(addr, size);
+    if (!is_async) {
+        PushCommand(FlushAndInvalidateRegionCommand(addr, size));
+        PushCommand(InvalidateRegionCommand(addr, size));
+    } else {
+        // Skip flush on asynch mode, as FlushAndInvalidateRegion is not used for anything too important
+        rasterizer->OnCacheInvalidation(addr, size);
+    }
 }
 
 u64 ThreadManager::PushCommand(CommandData&& command_data, bool block) {
