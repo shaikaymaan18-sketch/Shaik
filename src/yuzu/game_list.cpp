@@ -495,7 +495,9 @@ void GameList::DonePopulating(const QStringList& watch_list) {
 
     // Block signals to prevent the watcher from triggering a refresh while we are adding paths.
     // This fixes a refresh loop on macOS and improves performance on all platforms.
+#ifdef __APPLE__
     const bool old_signals_blocked = watcher->blockSignals(true);
+#endif
 
     for (int i = 0; i < len; i += SLICE_SIZE) {
         auto chunk = watch_list.mid(i, SLICE_SIZE);
@@ -505,7 +507,9 @@ void GameList::DonePopulating(const QStringList& watch_list) {
         QCoreApplication::processEvents();
     }
 
+#ifdef __APPLE__
     watcher->blockSignals(old_signals_blocked);
+#endif
     tree_view->setEnabled(true);
     int children_total = 0;
     for (int i = 1; i < item_model->rowCount() - 1; ++i) {
