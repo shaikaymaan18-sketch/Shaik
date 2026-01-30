@@ -10,6 +10,9 @@
 #include <ankerl/unordered_dense.h>
 #include <tuple>
 #include <limits>
+#include <unordered_map>
+#include <tuple>
+#include <limits>
 #include <boost/container/small_vector.hpp>
 
 #include "shader_recompiler/environment.h"
@@ -847,15 +850,15 @@ TextureInst MakeInst(Environment& env, IR::Block* block, IR::Inst& inst) {
     };
 }
 
-TextureType ReadTextureType(Environment& env, const ConstBufferAddr& cbuf) {
+[[maybe_unused]] TextureType ReadTextureType(Environment& env, const ConstBufferAddr& cbuf) {
     return env.ReadTextureType(GetTextureHandle(env, cbuf));
 }
 
-TexturePixelFormat ReadTexturePixelFormat(Environment& env, const ConstBufferAddr& cbuf) {
+[[maybe_unused]] TexturePixelFormat ReadTexturePixelFormat(Environment& env, const ConstBufferAddr& cbuf) {
     return env.ReadTexturePixelFormat(GetTextureHandle(env, cbuf));
 }
 
-bool IsTexturePixelFormatInteger(Environment& env, const ConstBufferAddr& cbuf) {
+[[maybe_unused]] bool IsTexturePixelFormatInteger(Environment& env, const ConstBufferAddr& cbuf) {
     return env.IsTexturePixelFormatInteger(GetTextureHandle(env, cbuf));
 }
 
@@ -1052,14 +1055,14 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
         bool is_multisample{false};
         switch (inst->GetOpcode()) {
         case IR::Opcode::ImageQueryDimensions:
-            flags.type.Assign(ReadTextureType(env, cbuf));
+            flags.type.Assign(ReadTextureTypeCached(env, cbuf));
             inst->SetFlags(flags);
             break;
         case IR::Opcode::ImageSampleImplicitLod:
             if (flags.type != TextureType::Color2D) {
                 break;
             }
-            if (ReadTextureType(env, cbuf) == TextureType::Color2DRect) {
+            if (ReadTextureTypeCached(env, cbuf) == TextureType::Color2DRect) {
                 PatchImageSampleImplicitLod(*texture_inst.block, *texture_inst.inst);
             }
             break;
@@ -1073,7 +1076,7 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
             if (flags.type != TextureType::Color1D) {
                 break;
             }
-            if (ReadTextureType(env, cbuf) == TextureType::Buffer) {
+            if (ReadTextureTypeCached(env, cbuf) == TextureType::Buffer) {
                 // Replace with the bound texture type only when it's a texture buffer
                 // If the instruction is 1D and the bound type is 2D, don't change the code and let
                 // the rasterizer robustness handle it
@@ -1105,7 +1108,7 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
             }
             const bool is_written{inst->GetOpcode() != IR::Opcode::ImageRead};
             const bool is_read{inst->GetOpcode() != IR::Opcode::ImageWrite};
-            const bool is_integer{IsTexturePixelFormatInteger(env, cbuf)};
+            const bool is_integer{IsTexturePixelFormatIntegerCached(env, cbuf)};
             if (flags.type == TextureType::Buffer) {
                 index = descriptors.Add(ImageBufferDescriptor{
                     .format = flags.image_format,
@@ -1182,7 +1185,7 @@ void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo
 
         if (!host_info.support_snorm_render_buffer && inst->GetOpcode() == IR::Opcode::ImageFetch &&
             flags.type == TextureType::Buffer) {
-            const auto pixel_format = ReadTexturePixelFormat(env, cbuf);
+            const auto pixel_format = ReadTexturePixelFormatCached(env, cbuf);
             if (IsPixelFormatSNorm(pixel_format)) {
                 PatchTexelFetch(*texture_inst.block, *texture_inst.inst, pixel_format);
             }
