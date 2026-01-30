@@ -494,7 +494,7 @@ void GameList::DonePopulating(const QStringList& watch_list) {
     int len = (std::min)(static_cast<int>(watch_list.size()), LIMIT_WATCH_DIRECTORIES);
 
     // Block signals to prevent the watcher from triggering a refresh while we are adding paths.
-    // This fixes a refresh loop on macOS and improves performance on all platforms.
+    // This fixes a refresh loop on macOS.
 #ifdef __APPLE__
     const bool old_signals_blocked = watcher->blockSignals(true);
 #endif
