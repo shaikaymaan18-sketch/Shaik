@@ -22,18 +22,6 @@
 
 namespace Shader::Optimization {
 namespace {
-struct ConstBufferAddr {
-    u32 index;
-    u32 offset;
-    u32 shift_left;
-    u32 secondary_index;
-    u32 secondary_offset;
-    u32 secondary_shift_left;
-    IR::U32 dynamic_offset;
-    u32 count;
-    bool has_secondary;
-};
-
 struct TextureInst {
     ConstBufferAddr cbuf;
     IR::Inst* inst;
@@ -180,25 +168,58 @@ bool IsTextureInstruction(const IR::Inst& inst) {
     return IndexedInstruction(inst) != IR::Opcode::Void;
 }
 
+// Per-pass caches
+
+static inline u32 ReadCbufCached(Environment& env, u32 index, u32 offset) {
+    const CbufWordKey k{index, offset};
+    if (auto it = env.cbuf_word_cache.find(k); it != env.cbuf_word_cache.end()) return it->second;
+    const u32 v = env.ReadCbufValue(index, offset);
+    env.cbuf_word_cache.emplace(k, v);
+    return v;
+}
+
+static inline u32 GetTextureHandleCached(Environment& env, const ConstBufferAddr& cbuf) {
+    const u32 sec_idx  = cbuf.has_secondary ? cbuf.secondary_index  : cbuf.index;
+    const u32 sec_off  = cbuf.has_secondary ? cbuf.secondary_offset : cbuf.offset;
+    const HandleKey hk{cbuf.index, cbuf.offset, cbuf.shift_left,
+                        sec_idx, sec_off, cbuf.secondary_shift_left, cbuf.has_secondary};
+    if (auto it = env.handle_cache.find(hk); it != env.handle_cache.end()) return it->second;
+
+    const u32 lhs = ReadCbufCached(env, cbuf.index, cbuf.offset) << cbuf.shift_left;
+    const u32 rhs = ReadCbufCached(env, sec_idx,   sec_off)      << cbuf.secondary_shift_left;
+    const u32 handle = lhs | rhs;
+    env.handle_cache.emplace(hk, handle);
+    return handle;
+}
+
+// Cached variants of existing helpers
+static inline TextureType ReadTextureTypeCached(Environment& env, const ConstBufferAddr& cbuf) {
+    return env.ReadTextureType(GetTextureHandleCached(env, cbuf));
+}
+static inline TexturePixelFormat ReadTexturePixelFormatCached(Environment& env,
+                                                                const ConstBufferAddr& cbuf) {
+    return env.ReadTexturePixelFormat(GetTextureHandleCached(env, cbuf));
+}
+static inline bool IsTexturePixelFormatIntegerCached(Environment& env,
+                                                        const ConstBufferAddr& cbuf) {
+    return env.IsTexturePixelFormatInteger(GetTextureHandleCached(env, cbuf));
+}
+
+std::optional<ConstBufferAddr> Track(const IR::Value& value, Environment& env);
+static inline std::optional<ConstBufferAddr> TrackCached(const IR::Value& v, Environment& env) {
+    if (const IR::Inst* key = v.InstRecursive()) {
+        if (auto it = env.track_cache.find(key); it != env.track_cache.end()) return it->second;
+        auto found = Track(v, env);
+        if (found) env.track_cache.emplace(key, *found);
+        return found;
+    }
+    return Track(v, env);
+}
+
 std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environment& env);
 
 std::optional<ConstBufferAddr> Track(const IR::Value& value, Environment& env) {
-    return IR::BreadthFirstSearch(
-        value, [&env](const IR::Inst* inst) -> std::optional<ConstBufferAddr> {
-            const auto opcode = inst->GetOpcode();
-
-            // I feel like Phi is already detected and handled but its here anyway
-            if (opcode == IR::Opcode::Phi) {
-                for (size_t i = 0; i < inst->NumArgs(); ++i) {
-                    if (auto result = Track(inst->Arg(i), env)) {
-                        return result;
-                    }
-                }
-                return std::nullopt;
-            }
-
-            return TryGetConstBuffer(inst, env);
-        });
+    return IR::BreadthFirstSearch(value, [&env](const IR::Inst* inst) { return TryGetConstBuffer(inst, env); });
 }
 
 std::optional<u32> TryGetConstant(IR::Value& value, Environment& env) {
@@ -245,20 +266,20 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         LOG_DEBUG(Render_Vulkan, "TryGetConstBuffer: Unhandled opcode {}", static_cast<int>(opcode));
         return std::nullopt;
     case IR::Opcode::Identity:
-        return Track(inst->Arg(0), env);
+        return TrackCached(inst->Arg(0), env);
     case IR::Opcode::INeg32:
     case IR::Opcode::INeg64:
-        return Track(inst->Arg(0), env);
+        return TrackCached(inst->Arg(0), env);
     case IR::Opcode::BitCastU16F16:
     case IR::Opcode::BitCastF16U16:
     case IR::Opcode::BitCastU32F32:
     case IR::Opcode::BitCastF32U32:
     case IR::Opcode::BitCastU64F64:
     case IR::Opcode::BitCastF64U64:
-        return Track(inst->Arg(0), env);
+        return TrackCached(inst->Arg(0), env);
     case IR::Opcode::ConvertU32U64:
     case IR::Opcode::ConvertU64U32:
-        return Track(inst->Arg(0), env);
+        return TrackCached(inst->Arg(0), env);
     case IR::Opcode::SelectU1:
     case IR::Opcode::SelectU8:
     case IR::Opcode::SelectU16:
@@ -267,10 +288,10 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
     case IR::Opcode::SelectF16:
     case IR::Opcode::SelectF32:
     case IR::Opcode::SelectF64: {
-        if (auto result = Track(inst->Arg(1), env)) {
+        if (auto result = TrackCached(inst->Arg(1), env)) {
             return result;
         }
-        if (auto result = Track(inst->Arg(2), env)) {
+        if (auto result = TrackCached(inst->Arg(2), env)) {
             return result;
         }
         LOG_DEBUG(Render_Vulkan, "Select operation failed both branches");
@@ -281,22 +302,22 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         const IR::Value op2{inst->Arg(1)};
 
         if (op2.IsImmediate()) {
-            if (auto res = Track(op1, env)) {
+            if (auto res = TrackCached(op1, env)) {
                 res->offset += op2.U32();
                 return res;
             }
         }
         if (op1.IsImmediate()) {
-            if (auto res = Track(op2, env)) {
+            if (auto res = TrackCached(op2, env)) {
                 res->offset += op1.U32();
                 return res;
             }
         }
 
-        if (auto result = Track(op1, env)) {
+        if (auto result = TrackCached(op1, env)) {
             return result;
         }
-        if (auto result = Track(op2, env)) {
+        if (auto result = TrackCached(op2, env)) {
             return result;
         }
         return std::nullopt;
@@ -306,22 +327,22 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         const IR::Value op2{inst->Arg(1)};
 
         if (op2.IsImmediate()) {
-            if (auto res = Track(op1, env)) {
+            if (auto res = TrackCached(op1, env)) {
                 res->offset += static_cast<u32>(op2.U64());
                 return res;
             }
         }
         if (op1.IsImmediate()) {
-            if (auto res = Track(op2, env)) {
+            if (auto res = TrackCached(op2, env)) {
                 res->offset += static_cast<u32>(op1.U64());
                 return res;
             }
         }
 
-        if (auto result = Track(op1, env)) {
+        if (auto result = TrackCached(op1, env)) {
             return result;
         }
-        if (auto result = Track(op2, env)) {
+        if (auto result = TrackCached(op2, env)) {
             return result;
         }
         return std::nullopt;
@@ -331,13 +352,13 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         const IR::Value op2{inst->Arg(1)};
 
         if (op2.IsImmediate()) {
-            if (auto res = Track(op1, env)) {
+            if (auto res = TrackCached(op1, env)) {
                 res->offset -= op2.U32();
                 return res;
             }
         }
 
-        if (auto result = Track(op1, env)) {
+        if (auto result = TrackCached(op1, env)) {
             return result;
         }
         return std::nullopt;
@@ -348,13 +369,13 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         const IR::Value op2{inst->Arg(1)};
 
         if (op2.IsImmediate()) {
-            if (auto res = Track(op1, env)) {
+            if (auto res = TrackCached(op1, env)) {
                 res->offset -= static_cast<u32>(op2.U64());
                 return res;
             }
         }
 
-        if (auto result = Track(op1, env)) {
+        if (auto result = TrackCached(op1, env)) {
             return result;
         }
         return std::nullopt;
@@ -363,7 +384,7 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
     case IR::Opcode::ShiftRightLogical64: {
         const IR::Value base{inst->Arg(0)};
         const IR::Value shift{inst->Arg(1)};
-        if (auto res = Track(base, env)) {
+        if (auto res = TrackCached(base, env)) {
             if (shift.IsImmediate()) {
                 res->offset += (shift.U32() / 8);
             }
@@ -379,7 +400,7 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         const IR::Value base{inst->Arg(0)};
         const IR::Value offset{inst->Arg(1)};
 
-        if (auto res = Track(base, env)) {
+        if (auto res = TrackCached(base, env)) {
             if (offset.IsImmediate()) {
                 const u32 total_bits = offset.U32();
                 res->offset += (total_bits / 8);
@@ -396,8 +417,8 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         }
         IR::Inst* const composite_inst{composite.InstRecursive()};
         if (composite_inst->GetOpcode() == IR::Opcode::CompositeConstructU32x2) {
-            std::optional lhs{Track(composite_inst->Arg(0), env)};
-            std::optional rhs{Track(composite_inst->Arg(1), env)};
+            std::optional lhs{TrackCached(composite_inst->Arg(0), env)};
+            std::optional rhs{TrackCached(composite_inst->Arg(1), env)};
             if (!lhs || !rhs) {
                 return std::nullopt;
             }
@@ -422,12 +443,12 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         return std::nullopt;
     }
     case IR::Opcode::UnpackUint2x32:
-        return Track(inst->Arg(0), env);
+        return TrackCached(inst->Arg(0), env);
     case IR::Opcode::CompositeConstructU32x2:
-        if (auto result = Track(inst->Arg(0), env)) {
+        if (auto result = TrackCached(inst->Arg(0), env)) {
             return result;
         }
-        if (auto result = Track(inst->Arg(1), env)) {
+        if (auto result = TrackCached(inst->Arg(1), env)) {
             return result;
         }
         return std::nullopt;
@@ -436,7 +457,7 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         const IR::Value composite{inst->Arg(0)};
         const IR::Value index_val{inst->Arg(1)};
 
-        if (auto res = Track(composite, env)) {
+        if (auto res = TrackCached(composite, env)) {
             if (index_val.IsImmediate()) {
                 res->offset += index_val.U32() * 4;
             }
@@ -445,8 +466,8 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         return std::nullopt;
     }
     case IR::Opcode::BitwiseOr32: {
-        std::optional lhs{Track(inst->Arg(0), env)};
-        std::optional rhs{Track(inst->Arg(1), env)};
+        std::optional lhs{TrackCached(inst->Arg(0), env)};
+        std::optional rhs{TrackCached(inst->Arg(1), env)};
         if (!lhs || !rhs) {
             return std::nullopt;
         }
@@ -489,7 +510,7 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         if (!shift.IsImmediate()) {
             return std::nullopt;
         }
-        std::optional lhs{Track(inst->Arg(0), env)};
+        std::optional lhs{TrackCached(inst->Arg(0), env)};
         if (lhs) {
             lhs->shift_left = shift.U32();
         }
@@ -517,7 +538,7 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
                 return std::nullopt;
             } while (false);
         }
-        std::optional lhs{Track(op1, env)};
+        std::optional lhs{TrackCached(op1, env)};
         if (lhs) {
             if (op2.IsImmediate()) {
                 lhs->shift_left = static_cast<u32>(std::countr_zero(op2.U32()));
@@ -526,10 +547,10 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         return lhs;
     }
     case IR::Opcode::BitwiseXor32: {
-        if (auto result = Track(inst->Arg(0), env)) {
+        if (auto result = TrackCached(inst->Arg(0), env)) {
             return result;
         }
-        if (auto result = Track(inst->Arg(1), env)) {
+        if (auto result = TrackCached(inst->Arg(1), env)) {
             return result;
         }
         return std::nullopt;
@@ -539,13 +560,13 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         const IR::Value op2{inst->Arg(1)};
 
         if (op2.IsImmediate()) {
-            if (auto res = Track(op1, env)) {
+            if (auto res = TrackCached(op1, env)) {
                 res->offset *= op2.U32();
                 return res;
             }
         }
         if (op1.IsImmediate()) {
-            if (auto res = Track(op2, env)) {
+            if (auto res = TrackCached(op2, env)) {
                 res->offset *= op1.U32();
                 return res;
             }
@@ -785,7 +806,7 @@ TextureInst MakeInst(Environment& env, IR::Block* block, IR::Inst& inst) {
         LOG_DEBUG(Render_Vulkan, "=== MakeInst: BINDLESS {} (stage: {}) ===",
                  static_cast<int>(opcode), static_cast<int>(env.ShaderStage()));
 
-        const std::optional<ConstBufferAddr> track_addr{Track(inst.Arg(0), env)};
+        const std::optional<ConstBufferAddr> track_addr{TrackCached(inst.Arg(0), env)};
 
         if (!track_addr) {
             //throw NotImplementedException("Failed to track bindless texture constant buffer");
@@ -985,6 +1006,11 @@ void PatchTexelFetch(IR::Block& block, IR::Inst& inst, TexturePixelFormat pixel_
 } // Anonymous namespace
 
 void TexturePass(Environment& env, IR::Program& program, const HostTranslateInfo& host_info) {
+    // reset per-pass caches
+    env.cbuf_word_cache.clear();
+    env.handle_cache.clear();
+    env.track_cache.clear();
+
     TextureInstVector to_replace;
     for (IR::Block* const block : program.post_order_blocks) {
         for (IR::Inst& inst : block->Instructions()) {
