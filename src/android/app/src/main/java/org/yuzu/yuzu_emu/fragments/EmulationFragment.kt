@@ -690,7 +690,17 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
         })
         binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
 
+        if (!BooleanSetting.ENABLE_QUICK_SETTINGS.getBoolean()) {
+            binding.drawerLayout.setDrawerLockMode(
+                DrawerLayout.LOCK_MODE_LOCKED_CLOSED,
+                binding.quickSettingsSheet
+            )
+        }
+
         updateGameTitle()
+
+        binding.inGameMenu.menu.findItem(R.id.menu_quick_settings)?.isVisible =
+            BooleanSetting.ENABLE_QUICK_SETTINGS.getBoolean()
 
         binding.inGameMenu.menu.findItem(R.id.menu_lock_drawer).apply {
             val lockMode = IntSetting.LOCK_DRAWER.getInt()
@@ -749,10 +759,11 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
                     true
                 }
 
-                R.id.menu_quick_settings -> {
-                    openQuickSettingsMenu()
-                    true
-                }
+            if (BooleanSetting.ENABLE_QUICK_SETTINGS.getBoolean())
+                R.id.menu_quick_settings else 0 -> {
+                openQuickSettingsMenu()
+                true
+            }
 
                 R.id.menu_settings_per_game -> {
                     val action = HomeNavigationDirections.actionGlobalSettingsActivity(
