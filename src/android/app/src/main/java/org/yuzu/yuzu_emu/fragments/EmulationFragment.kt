@@ -1056,11 +1056,13 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
             }
 
             quickSettings.addBooleanSetting(
+                R.string.frame_limit_enable,
                 container,
                 BooleanSetting.RENDERER_USE_SPEED_LIMIT,
             )
 
             quickSettings.addSliderSetting(
+                R.string.frame_limit_slider,
                 container,
                 ShortSetting.RENDERER_SPEED_LIMIT,
                 minValue = 0,
@@ -1069,6 +1071,7 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
             )
 
             quickSettings.addBooleanSetting(
+                R.string.use_docked_mode,
                 container,
                 BooleanSetting.USE_DOCKED_MODE,
             )
@@ -1076,6 +1079,7 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
             quickSettings.addDivider(container)
 
             quickSettings.addIntSetting(
+                R.string.renderer_accuracy,
                 container,
                 IntSetting.RENDERER_ACCURACY,
                 R.array.rendererAccuracyNames,
@@ -1084,6 +1088,7 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
 
 
             quickSettings.addIntSetting(
+                R.string.renderer_scaling_filter,
                 container,
                 IntSetting.RENDERER_SCALING_FILTER,
                 R.array.rendererScalingFilterNames,
@@ -1091,6 +1096,7 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
             )
 
             quickSettings.addSliderSetting(
+                R.string.fsr_sharpness,
                 container,
                 IntSetting.FSR_SHARPENING_SLIDER,
                 minValue = 0,
@@ -1099,6 +1105,7 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
             )
 
             quickSettings.addIntSetting(
+                R.string.renderer_anti_aliasing,
                 container,
                 IntSetting.RENDERER_ANTI_ALIASING,
                 R.array.rendererAntiAliasingNames,
