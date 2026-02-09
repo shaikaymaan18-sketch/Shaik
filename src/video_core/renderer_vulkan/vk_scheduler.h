@@ -125,15 +125,21 @@ public:
         if (master_semaphore->CurrentTick() >= tick) {
             return;
         }
-        static auto next_frame_time = std::chrono::steady_clock::now();
-        auto frame_duration = std::chrono::duration<double>(1.0 / target_fps);
-        next_frame_time += std::chrono::duration_cast<std::chrono::steady_clock::duration>(frame_duration);
-        auto now = std::chrono::steady_clock::now();
+        const auto frame_duration = std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(1.0 / target_fps));
+        const auto now = std::chrono::steady_clock::now();
+        if (next_frame_time == std::chrono::steady_clock::time_point{}) {
+            next_frame_time = now;
+        }
+        next_frame_time += frame_duration;
         if (next_frame_time > now) {
             std::this_thread::sleep_until(next_frame_time);
         } else {
             next_frame_time = now;
         }
+    }
+
+    void ResetFramePacing() {
+        next_frame_time = std::chrono::steady_clock::now();
     }
 
     /// Returns the master timeline semaphore.
@@ -277,6 +283,8 @@ private:
     std::mutex queue_mutex;
     std::condition_variable_any event_cv;
     std::jthread worker_thread;
+
+    std::chrono::steady_clock::time_point next_frame_time{};
 };
 
 } // namespace Vulkan

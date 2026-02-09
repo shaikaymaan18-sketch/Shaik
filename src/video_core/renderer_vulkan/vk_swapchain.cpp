@@ -146,6 +146,9 @@ void Swapchain::Create(
 {
     is_outdated = false;
     is_suboptimal = false;
+
+    scheduler.ResetFramePacing();
+
     width = width_;
     height = height_;
 #ifdef ANDROID
@@ -198,7 +201,7 @@ bool Swapchain::AcquireNextImage() {
         scheduler.Wait(resource_ticks[image_index]);
     } else {
         switch (Settings::values.frame_pacing_mode.GetValue()) {
-        case Settings::FramePacingMode::Default:
+        case Settings::FramePacingMode::Target_Auto:
             scheduler.Wait(resource_ticks[image_index]);
             break;
         case Settings::FramePacingMode::Target_30:

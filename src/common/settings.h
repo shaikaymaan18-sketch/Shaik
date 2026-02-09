@@ -435,8 +435,8 @@ struct Values {
                                                             Category::RendererAdvanced};
 
     SwitchableSetting<FramePacingMode, true> frame_pacing_mode{linkage,
-                                                               FramePacingMode::Default,
-                                                               FramePacingMode::Default,
+                                                               FramePacingMode::Target_Auto,
+                                                               FramePacingMode::Target_Auto,
                                                                FramePacingMode::Target_120,
                                                                "frame_pacing_mode",
                                                                Category::RendererAdvanced};

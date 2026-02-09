@@ -531,7 +531,7 @@
     </integer-array>
 
     <string-array name="framePacingModeNames">
-        <item>@string/frame_pacing_mode_default</item>
+        <item>@string/frame_pacing_mode_target_Auto</item>
         <item>@string/frame_pacing_mode_target_30</item>
         <item>@string/frame_pacing_mode_target_60</item>
         <item>@string/frame_pacing_mode_target_120</item>

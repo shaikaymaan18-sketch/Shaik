@@ -1026,7 +1026,7 @@
     <string name="dma_accuracy_safe">Safe</string>
 
     <!-- Frame Pacing Mode -->
-    <string name="frame_pacing_mode_default">Default</string>
+    <string name="frame_pacing_mode_target_Auto">Auto</string>
     <string name="frame_pacing_mode_target_30">30 FPS</string>
     <string name="frame_pacing_mode_target_60">60 FPS</string>
     <string name="frame_pacing_mode_target_120">120 FPS</string>
