@@ -129,7 +129,7 @@ public:
         master_semaphore->Wait(tick);
     }
 
-    /// Resets the frame pacing state by updating the next frame time to agora
+    /// Resets the frame pacing state by setting the next frame time.
     void ResetFramePacing(double target_fps = 0.0) {
         if (target_fps > 0.0) {
             auto frame_duration = std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(1.0 / target_fps));
