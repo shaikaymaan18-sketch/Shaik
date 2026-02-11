@@ -16,6 +16,7 @@
 
 #include "common/alignment.h"
 #include "common/common_types.h"
+#include "common/settings.h"
 #include "common/polyfill_thread.h"
 #include "video_core/renderer_vulkan/vk_master_semaphore.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
