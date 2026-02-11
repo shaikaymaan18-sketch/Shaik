@@ -111,35 +111,32 @@ public:
         return master_semaphore->IsFree(tick);
     }
 
-    /// Waits for the given tick to trigger on the GPU.
-    void Wait(u64 tick) {
-        if (tick >= master_semaphore->CurrentTick()) {
-            // Make sure we are not waiting for the current tick without signalling
+    /// Waits for the given GPU tick, optionally pacing frames.
+    void Wait(u64 tick, double target_fps = 0.0) {
+        if (Settings::values.use_speed_limit.GetValue() && target_fps > 0.0) {
+            auto frame_duration = std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(1.0 / target_fps));
+            auto now = std::chrono::steady_clock::now();
+            if (now < next_frame_time) {
+                std::this_thread::sleep_until(next_frame_time);
+                next_frame_time += frame_duration;
+            } else {
+                next_frame_time = now + frame_duration;
+            }
+        }
+        if (tick > master_semaphore->CurrentTick() && !chunk->Empty()) {
             Flush();
         }
         master_semaphore->Wait(tick);
     }
 
-    /// Waits until the next game frame based on the current game FPS.
-    void WaitFPS(u64 tick, double target_fps) {
-        if (master_semaphore->CurrentTick() >= tick) {
-            return;
-        }
-        const auto frame_duration = std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(1.0 / target_fps));
-        const auto now = std::chrono::steady_clock::now();
-        if (next_frame_time == std::chrono::steady_clock::time_point{}) {
-            next_frame_time = now;
-        }
-        next_frame_time += frame_duration;
-        if (next_frame_time > now) {
-            std::this_thread::sleep_until(next_frame_time);
+    /// Resets the frame pacing state by updating the next frame time to agora
+    void ResetFramePacing(double target_fps = 0.0) {
+        if (target_fps > 0.0) {
+            auto frame_duration = std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(1.0 / target_fps));
+            next_frame_time = std::chrono::steady_clock::now() + frame_duration;
         } else {
-            next_frame_time = now;
+            next_frame_time = std::chrono::steady_clock::time_point{};
         }
-    }
-
-    void ResetFramePacing() {
-        next_frame_time = std::chrono::steady_clock::now();
     }
 
     /// Returns the master timeline semaphore.

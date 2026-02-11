@@ -147,7 +147,23 @@ void Swapchain::Create(
     is_outdated = false;
     is_suboptimal = false;
 
-    scheduler.ResetFramePacing();
+    switch (Settings::values.frame_pacing_mode.GetValue()) {
+    case Settings::FramePacingMode::Target_Auto:
+        scheduler.ResetFramePacing();
+        break;
+    case Settings::FramePacingMode::Target_30:
+        scheduler.ResetFramePacing(30.0);
+        break;
+    case Settings::FramePacingMode::Target_60:
+        scheduler.ResetFramePacing(60.0);
+        break;
+    case Settings::FramePacingMode::Target_120:
+        scheduler.ResetFramePacing(120.0);
+        break;
+    case Settings::FramePacingMode::Target_240:
+        scheduler.ResetFramePacing(240.0);
+        break;
+    }
 
     width = width_;
     height = height_;
@@ -197,21 +213,22 @@ bool Swapchain::AcquireNextImage() {
         break;
     }
 
-    if (!Settings::values.use_speed_limit.GetValue()) {
-        scheduler.Wait(resource_ticks[image_index]);
-    } else {
+    if (resource_ticks[image_index] != 0 && !scheduler.IsFree(resource_ticks[image_index])) {
         switch (Settings::values.frame_pacing_mode.GetValue()) {
         case Settings::FramePacingMode::Target_Auto:
             scheduler.Wait(resource_ticks[image_index]);
             break;
         case Settings::FramePacingMode::Target_30:
-            scheduler.WaitFPS(resource_ticks[image_index], 30.0);
+            scheduler.Wait(resource_ticks[image_index], 30.0);
             break;
         case Settings::FramePacingMode::Target_60:
-            scheduler.WaitFPS(resource_ticks[image_index], 60.0);
+            scheduler.Wait(resource_ticks[image_index], 60.0);
             break;
         case Settings::FramePacingMode::Target_120:
-            scheduler.WaitFPS(resource_ticks[image_index], 120.0);
+            scheduler.Wait(resource_ticks[image_index], 120.0);
+            break;
+        case Settings::FramePacingMode::Target_240:
+            scheduler.Wait(resource_ticks[image_index], 240.0);
             break;
         }
     }
