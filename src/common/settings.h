@@ -569,7 +569,7 @@ struct Values {
 
     SwitchableSetting<ExtendedDynamicState> dyna_state{linkage,
 #if defined (_WIN32)
-                                           ExtendedDynamicState::Disabled,
+                                           ExtendedDynamicState::EDS2,
 #elif defined (__FreeBSD__)
                                            ExtendedDynamicState::EDS3,
 #elif defined (ANDROID)
