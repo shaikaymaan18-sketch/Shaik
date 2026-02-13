@@ -1507,6 +1507,7 @@ void Optimize(IR::Block& block, const A64::UserConfig& conf, const Optimization:
     if (conf.HasOptimization(OptimizationFlag::MiscIROpt)) {
         Optimization::A64MergeInterpretBlocksPass(block, conf.callbacks);
     }
+    Optimization::IdentityRemovalPass(block);
     if (!conf.HasOptimization(OptimizationFlag::DisableVerification)) {
         Optimization::VerificationPass(block);
     }
