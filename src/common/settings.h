@@ -568,11 +568,7 @@ struct Values {
                                                   Category::RendererHacks};
 
     SwitchableSetting<ExtendedDynamicState> dyna_state{linkage,
-#if defined (ANDROID) || defined (__APPLE__)
                                            ExtendedDynamicState::Disabled,
-#else
-                                           ExtendedDynamicState::EDS2,
-#endif
                                            "dyna_state",
                                            Category::RendererExtensions};
 
