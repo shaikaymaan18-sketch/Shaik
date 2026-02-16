@@ -13,7 +13,7 @@
 #include "common/windows/timer_resolution.h"
 #endif
 
-#if defined(_WIN32) && defined(ARCHITECTURE_x86_64) && defined(__MINGW64__)
+#if defined(_WIN32) && defined(ARCHITECTURE_x86_64)
 #include "common/x64/cpu_detect.h"
 #include "common/x64/rdtsc.h"
 #endif
@@ -288,7 +288,7 @@ void CoreTiming::ThreadLoop() {
             if (next_time) {
                 // There are more events left in the queue, wait until the next event.
                 if (auto wait_time = *next_time - GetGlobalTimeNs().count(); wait_time > 0) {
-#if defined(_WIN32) && defined(ARCHITECTURE_x86_64) && defined(__MINGW64__)
+#if defined(_WIN32) && defined(ARCHITECTURE_x86_64)
                     while (!paused && !event.IsSet() && wait_time > 0) {
                         wait_time = *next_time - GetGlobalTimeNs().count();
                         if (wait_time >= timer_resolution_ns) {
