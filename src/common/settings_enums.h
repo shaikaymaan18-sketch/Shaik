@@ -142,7 +142,25 @@ ENUM(MemoryLayout, Memory_4Gb, Memory_6Gb, Memory_8Gb, Memory_10Gb, Memory_12Gb)
 ENUM(ConfirmStop, Ask_Always, Ask_Based_On_Game, Ask_Never);
 ENUM(FullscreenMode, Borderless, Exclusive);
 ENUM(NvdecEmulation, Off, Cpu, Gpu);
-ENUM(ResolutionSetup, Res1_4X, Res1_2X, Res3_4X, Res1X, Res5_4X, Res3_2X, Res2X, Res3X, Res4X, Res5X, Res6X, Res7X, Res8X);
+// Res1X MUST stay at index 2 to maintain compatibility with various mods.
+enum class ResolutionSetup : s32 {
+    Res1_4X = -1, Res1_2X = 0, Res3_4X = 1,
+    Res1X = 2, Res5_4X = 3, Res3_2X = 4,
+    Res2X = 5, Res3X = 6, Res4X = 7,
+    Res5X = 8, Res6X = 9, Res7X = 10,
+    Res8X = 11 };
+template<> inline std::vector<std::pair<std::string_view, ResolutionSetup>> EnumMetadata<ResolutionSetup>::Canonicalizations() { 
+    return {
+        {"Res1_4X", ResolutionSetup::Res1_4X}, {"Res1_2X", ResolutionSetup::Res1_2X}, {"Res3_4X", ResolutionSetup::Res3_4X},
+        {"Res1X", ResolutionSetup::Res1X}, {"Res5_4X", ResolutionSetup::Res5_4X}, {"Res3_2X", ResolutionSetup::Res3_2X},
+        {"Res2X", ResolutionSetup::Res2X}, {"Res3X", ResolutionSetup::Res3X}, {"Res4X", ResolutionSetup::Res4X},
+        {"Res5X", ResolutionSetup::Res5X}, {"Res6X", ResolutionSetup::Res6X}, {"Res7X", ResolutionSetup::Res7X},
+        {"Res8X", ResolutionSetup::Res8X}
+    }; 
+}
+template<> inline u32 EnumMetadata<ResolutionSetup>::Index() { return 19; }
+template<> inline ResolutionSetup EnumMetadata<ResolutionSetup>::GetFirst() { return ResolutionSetup::Res1_4X; }
+template<> inline ResolutionSetup EnumMetadata<ResolutionSetup>::GetLast() { return ResolutionSetup::Res8X; }
 ENUM(ScalingFilter, NearestNeighbor, Bilinear, Bicubic, Gaussian, Lanczos, ScaleForce, Fsr, Area, ZeroTangent, BSpline, Mitchell, Spline1, Mmpx, MaxEnum);
 ENUM(AntiAliasing, None, Fxaa, Smaa, MaxEnum);
 ENUM(AspectRatio, R16_9, R4_3, R21_9, R16_10, Stretch);
