@@ -64,25 +64,19 @@ void VisitMark(IR::Block& block, IR::Inst& inst) {
                 break;
             }
         }
-
         if (must_patch_outside) {
-          const auto it{IR::Block::InstructionList::s_iterator_to(inst)};
-          IR::Value converted;
-          IR::IREmitter ir{block, it};
-
-          if (Settings::values.rescale_hack.GetValue()) {
+            const auto it{IR::Block::InstructionList::s_iterator_to(inst)};
+            IR::IREmitter ir{block, it};
             IR::Inst* const new_inst{&*block.PrependNewInst(it, inst)};
+            IR::Value new_bitcast;
+            if (Settings::values.rescale_hack.GetValue()) {
+                new_bitcast = IR::Value{new_inst};
+            } else {
+                new_bitcast = ir.ConvertUToF(32, 32, IR::Value{new_inst});
+            }
             const IR::F32 up_factor{ir.FPRecip(ir.ResolutionDownFactor())};
-            converted = ir.FPMul(IR::Value{new_inst}, up_factor);
-          }
-          else {
-            IR::Inst* const new_inst{&*block.PrependNewInst(it, inst)};
-            const IR::F32 new_bitcast{ir.ConvertUToF(32, 32, IR::Value{new_inst})};
-            const IR::F32 up_factor{ir.FPRecip(ir.ResolutionDownFactor())};
-            converted = ir.FPMul(new_bitcast, up_factor);
-          }
-
-          inst.ReplaceUsesWith(converted);
+            const IR::Value converted{ir.FPMul(new_bitcast, up_factor)};
+            inst.ReplaceUsesWith(converted);
         }
         break;
     }
