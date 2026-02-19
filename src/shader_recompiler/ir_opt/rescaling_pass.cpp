@@ -76,9 +76,7 @@ void VisitMark(IR::Block& block, IR::Inst& inst) {
               const IR::F32 new_bitcast{ir.ConvertUToF(32, 32, IR::Value{new_inst})};
             }
             const IR::F32 up_factor{ir.FPRecip(ir.ResolutionDownFactor())};
-            const IR::Value converted{ir.FPMul(Settings::values.rescale_hack.GetValue() ? new_inst : new_bitcast, up_factor)
-};
-
+            const IR::Value converted{ir.FPMul(Settings::values.rescale_hack.GetValue() ? new_inst : new_bitcast, up_factor)};
             inst.ReplaceUsesWith(converted);
         }
         break;
