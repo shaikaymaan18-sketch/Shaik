@@ -356,6 +356,12 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent)
            tr("Fix bloom effects"),
            tr("Removes bloom in Burnout."));
 
+    INSERT(Settings,
+           rescale_hack,
+           tr("Alternative Shader Resolution Rescale"),
+           tr("May fix games with resolution rescale issues by taking advantage of a bug.\n"
+              "Fixes Luigi Mansion 3 line artifacts with AMD GPUs and blinking grey textures with Nvidia GPUs."));
+
     // Renderer (Extensions)
     INSERT(Settings, dyna_state, tr("Extended Dynamic State"),
            tr("Controls the number of features that can be used in Extended Dynamic State.\n"
