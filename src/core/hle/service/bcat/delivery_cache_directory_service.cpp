@@ -21,16 +21,9 @@ static BcatDigest DigestFile(const FileSys::VirtualFile& file) {
     BcatDigest out{};
     const auto bytes = file->ReadAllBytes();
 
-    unsigned int length = 0;
-    EVP_MD_CTX* context = EVP_MD_CTX_new();
+    u32 hash_len = 0;
+    EVP_Digest(bytes.data(), bytes.size(), out.data(), &hash_len, EVP_md5(), nullptr);
 
-    if (!context) return out;
-
-    EVP_DigestInit_ex(context, EVP_md5(), nullptr);
-    EVP_DigestUpdate(context, bytes.data(), bytes.size());
-    EVP_DigestFinal_ex(context, reinterpret_cast<unsigned char*>(out.data()), &length);
-
-    EVP_MD_CTX_free(context);
     return out;
 }
 
