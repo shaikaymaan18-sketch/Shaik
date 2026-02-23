@@ -942,11 +942,19 @@ void KeyManager::DeriveSDSeedLazy() {
 
 static Key128 CalculateCMAC(const u8* source, size_t size, const Key128& key) {
     Key128 out{};
-    EVP_MAC_CTX *ctx = EVP_MAC_CTX_new(EVP_MAC_fetch(NULL, "cmac", NULL));
+
+    static EVP_MAC* mac = EVP_MAC_fetch(nullptr, "cmac", nullptr);
+    if (!mac) return out;
+
+    static EVP_MAC_CTX* ctx = EVP_MAC_CTX_new(mac);
+    if (!ctx) return out;
+
     EVP_MAC_init(ctx, key.data(), key.size() * CHAR_BIT, NULL);
     EVP_MAC_update(ctx, source, size);
+
     size_t len;
     EVP_MAC_final(ctx, out.data(), &len, out.size());
+
     return out;
 }
 

@@ -35,7 +35,7 @@ struct CipherContext {
     EVP_CIPHER* cipher = nullptr;
 };
 
-inline const std::string GetCipherName(Mode mode, u32 key_size) {
+static inline const std::string GetCipherName(Mode mode, u32 key_size) {
     std::string cipher;
     std::size_t effective_bits = key_size * 8;
 
@@ -57,6 +57,34 @@ inline const std::string GetCipherName(Mode mode, u32 key_size) {
     return fmt::format("AES-{}-{}", effective_bits, cipher);
 };
 
+static EVP_CIPHER *GetCipher(Mode mode, u32 key_size) {
+    static auto fetch_cipher = [](Mode m, u32 k) {
+        return EVP_CIPHER_fetch(nullptr, GetCipherName(m, k).c_str(), nullptr);
+    };
+
+    static const struct {
+        EVP_CIPHER* ctr_16 = fetch_cipher(Mode::CTR, 16);
+        EVP_CIPHER* ecb_16 = fetch_cipher(Mode::ECB, 16);
+        EVP_CIPHER* xts_16 = fetch_cipher(Mode::XTS, 16);
+        EVP_CIPHER* ctr_32 = fetch_cipher(Mode::CTR, 32);
+        EVP_CIPHER* ecb_32 = fetch_cipher(Mode::ECB, 32);
+        EVP_CIPHER* xts_32 = fetch_cipher(Mode::XTS, 32);
+    } ciphers = {};
+
+    switch (mode) {
+    case Mode::CTR:
+        return key_size == 16 ? ciphers.ctr_16 : ciphers.ctr_32;
+    case Mode::ECB:
+        return key_size == 16 ? ciphers.ecb_16 : ciphers.ecb_32;
+    case Mode::XTS:
+        return key_size == 16 ? ciphers.xts_16 : ciphers.xts_32;
+    default:
+        UNIMPLEMENTED();
+    }
+
+    return nullptr;
+}
+
 // TODO: WHY TEMPLATE???????
 template <typename Key, std::size_t KeySize>
 Crypto::AESCipher<Key, KeySize>::AESCipher(Key key, Mode mode)
@@ -64,7 +92,12 @@ Crypto::AESCipher<Key, KeySize>::AESCipher(Key key, Mode mode)
 
     ctx->encryption_context = EVP_CIPHER_CTX_new();
     ctx->decryption_context = EVP_CIPHER_CTX_new();
-    ctx->cipher = EVP_CIPHER_fetch(nullptr, GetCipherName(mode, KeySize).c_str(), NULL);
+    ctx->cipher = GetCipher(mode, KeySize);
+    if (ctx->cipher) {
+        EVP_CIPHER_up_ref(ctx->cipher);
+    } else {
+        UNIMPLEMENTED();
+    }
 
     ASSERT_MSG(ctx->encryption_context && ctx->decryption_context && ctx->cipher,
                "OpenSSL cipher context failed init!");

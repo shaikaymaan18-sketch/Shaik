@@ -30,35 +30,24 @@ constexpr u64 NAX_HEADER_PADDING_SIZE = 0x4000;
 template <typename SourceData, typename SourceKey, typename Destination>
 static bool CalculateHMAC256(Destination* out, const SourceKey* key, std::size_t key_length,
                              const SourceData* data, std::size_t data_length) {
-    bool success = false;
-    EVP_MAC* mac = nullptr;
-    EVP_MAC_CTX* ctx = nullptr;
     size_t out_len = 0;
 
-    mac = EVP_MAC_fetch(NULL, "HMAC", NULL);
+    static EVP_MAC* mac = EVP_MAC_fetch(nullptr, "HMAC", nullptr);
     if (!mac) return false;
 
-    ctx = EVP_MAC_CTX_new(mac);
-    if (!ctx) goto cleanup;
+    static EVP_MAC_CTX* ctx = EVP_MAC_CTX_new(mac);
+    if (!ctx) return false;
 
-    {
-        OSSL_PARAM params[2];
-        params[0] = OSSL_PARAM_construct_utf8_string("digest", (char*)"SHA256", 0);
-        params[1] = OSSL_PARAM_construct_end();
+    static OSSL_PARAM params[] = {
+        OSSL_PARAM_construct_utf8_string("digest", (char*)"SHA256", 0),
+        OSSL_PARAM_construct_end()
+    };
 
-        if (!EVP_MAC_init(ctx, reinterpret_cast<const unsigned char*>(key), key_length, params))
-            goto cleanup;
-    }
+    if (!EVP_MAC_init(ctx, reinterpret_cast<const unsigned char*>(key), key_length, params))
+        return false;
 
-    if (EVP_MAC_update(ctx, reinterpret_cast<const unsigned char*>(data), data_length) &&
-        EVP_MAC_final(ctx, reinterpret_cast<unsigned char*>(out), &out_len, 32)) {
-        success = true;
-    }
-
-cleanup:
-    EVP_MAC_CTX_free(ctx);
-    EVP_MAC_free(mac);
-    return success;
+    return EVP_MAC_update(ctx, reinterpret_cast<const unsigned char*>(data), data_length) &&
+           EVP_MAC_final(ctx, reinterpret_cast<unsigned char*>(out), &out_len, 32);
 }
 
 NAX::NAX(VirtualFile file_)
