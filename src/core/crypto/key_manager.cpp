@@ -518,16 +518,26 @@ static std::array<u8, target_size> MGF1(const std::array<u8, in_size>& seed) {
     std::array<u8, in_size + 4> seed_exp{};
     std::memcpy(seed_exp.data(), seed.data(), in_size);
 
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    const EVP_MD* sha256 = EVP_sha256();
+
     std::vector<u8> out;
     size_t i = 0;
     while (out.size() < target_size) {
-        out.resize(out.size() + 0x20);
+        size_t offset = out.size();
+        out.resize(offset + 0x20);
         seed_exp[in_size + 3] = u8(i);
 
         u32 hash_len = 0;
-        EVP_Digest(seed_exp.data(), seed_exp.size(), out.data(), &hash_len, EVP_sha256(), nullptr);
+
+        EVP_DigestInit_ex(ctx, sha256, nullptr);
+        EVP_DigestUpdate(ctx, seed_exp.data(), seed_exp.size());
+        EVP_DigestFinal_ex(ctx, out.data() + offset, &hash_len);
+
         ++i;
     }
+
+    EVP_MD_CTX_free(ctx);
 
     std::array<u8, target_size> target;
     std::memcpy(target.data(), out.data(), target_size);
