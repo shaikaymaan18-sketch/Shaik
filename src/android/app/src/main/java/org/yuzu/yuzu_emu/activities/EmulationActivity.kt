@@ -659,10 +659,9 @@ class EmulationActivity : AppCompatActivity(), SensorEventListener, InputManager
         return this.apply { setActions(pictureInPictureActions) }
     }
 
-    private fun isPictureInPictureSupported(): Boolean {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+    private fun isPictureInPictureSupported() =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
-    }
 
     private fun runPictureInPictureAction(actionName: String, action: () -> Unit) {
         try {
