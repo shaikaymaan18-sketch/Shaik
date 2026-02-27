@@ -2174,6 +2174,7 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
                 return
             }
             if (!emulationCanStart.invoke()) {
+                Log.warning("[EmulationFragment] Resume blocked by emulationCanStart check.")
                 return
             }
             val currentSurface = surface
