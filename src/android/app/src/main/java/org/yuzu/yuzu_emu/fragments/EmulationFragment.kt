@@ -2217,14 +2217,13 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
             if (surface == null) {
                 Log.debug("[EmulationFragment] clearSurface called, but surface already null.")
             } else {
+                if (state == State.RUNNING) {
+                    pause()
+                }
                 NativeLibrary.surfaceDestroyed()
                 surface = null
                 Log.debug("[EmulationFragment] Surface destroyed.")
                 when (state) {
-                    State.RUNNING -> {
-                        state = State.PAUSED
-                    }
-
                     State.PAUSED -> Log.debug(
                         "[EmulationFragment] Surface cleared while emulation paused."
                     )

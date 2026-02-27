@@ -204,9 +204,9 @@ class EmulationActivity : AppCompatActivity(), SensorEventListener, InputManager
     }
 
     override fun onPause() {
-        super.onPause()
         nfcReader.stopScanning()
         stopMotionSensorListener()
+        super.onPause()
     }
 
     override fun onDestroy() {
@@ -339,6 +339,10 @@ class EmulationActivity : AppCompatActivity(), SensorEventListener, InputManager
     }
 
     override fun onSensorChanged(event: SensorEvent) {
+        if (!NativeLibrary.isRunning() || NativeLibrary.isPaused()) {
+            return
+        }
+
         val rotation = this.display?.rotation
         if (rotation == Surface.ROTATION_90) {
             flipMotionOrientation = true
