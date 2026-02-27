@@ -142,6 +142,26 @@
             android:layout_height="match_parent"
             android:fitsSystemWindows="false">
 
+            <ImageView
+                android:id="@+id/paused_frame_image"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/paused_icon"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:layout_gravity="center"
+                android:background="@drawable/circle_white"
+                android:contentDescription="@string/emulation_unpause"
+                android:padding="14dp"
+                android:src="@drawable/ic_pause"
+                android:visibility="gone"
+                app:tint="@android:color/black" />
+
             <com.google.android.material.textview.MaterialTextView
                 android:id="@+id/show_stats_overlay_text"
                 style="@style/TextAppearance.Material3.BodySmall"
