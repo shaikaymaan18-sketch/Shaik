@@ -728,10 +728,10 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
             when (it.itemId) {
                 R.id.menu_pause_emulation -> {
                     if (emulationState.isPaused) {
-                        emulationState.run(false)
+                        emulationState.run(false, userInitiatedResume = true)
                         updatePauseMenuEntry(false)
                     } else {
-                        emulationState.pause()
+                        emulationState.pause(userInitiated = true)
                         updatePauseMenuEntry(true)
                     }
                     binding.inGameMenu.requestFocus()
@@ -2030,6 +2030,7 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
         private val emulationCanStart: () -> Boolean
     ) {
         private var state: State
+        private var userPaused = false
         private var surface: Surface? = null
         lateinit var emulationThread: Thread
 
@@ -2061,7 +2062,7 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
         }
 
         @Synchronized
-        fun pause() {
+        fun pause(userInitiated: Boolean = false) {
             if (state != State.PAUSED) {
                 Log.debug("[EmulationFragment] Pausing emulation.")
 
@@ -2069,16 +2070,29 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
                 NativeLibrary.playTimeManagerStop()
 
                 state = State.PAUSED
+                userPaused = userInitiated
             } else {
+                if (userInitiated) {
+                    userPaused = true
+                }
                 Log.warning("[EmulationFragment] Pause called while already paused.")
             }
         }
 
         @Synchronized
-        fun run(isActivityRecreated: Boolean, programIndex: Int = 0) {
+        fun run(
+            isActivityRecreated: Boolean,
+            programIndex: Int = 0,
+            userInitiatedResume: Boolean = false
+        ) {
+            if (userInitiatedResume) {
+                userPaused = false
+            }
+
             if (isActivityRecreated) {
                 if (NativeLibrary.isRunning()) {
                     state = State.PAUSED
+                    userPaused = false
                 }
             } else {
                 Log.debug("[EmulationFragment] activity resumed or fresh start")
@@ -2134,6 +2148,7 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
                 when (state) {
                     State.RUNNING -> {
                         state = State.PAUSED
+                        userPaused = false
                     }
 
                     State.PAUSED -> Log.warning(
@@ -2163,6 +2178,11 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
                 }
 
                 State.PAUSED -> {
+                    if (userPaused) {
+                        Log.debug("[EmulationFragment] Surface restored while user paused.")
+                        return
+                    }
+
                     Log.debug("[EmulationFragment] Resuming emulation.")
                     NativeLibrary.unpauseEmulation()
                     NativeLibrary.playTimeManagerStart()
