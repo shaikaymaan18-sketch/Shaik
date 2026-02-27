@@ -94,5 +94,7 @@ The following options were a part of Eden at one point, but have since been reti
 
 - `ENABLE_OPENSSL` - MbedTLS was fully replaced with OpenSSL in [#3606](https://git.eden-emu.dev/eden-emu/eden/pulls/3606), because OpenSSL straight-up performs better.
 - `ENABLE_SDL2` - While technically possible to *not* use SDL2 on desktop, this is **NOT** a supported configuration under any means, and adding this matrix to our build system was not worth the effort.
+- `YUZU_USE_CPM` - This option once had a purpose, but that purpose has long since passed us by. *All* builds use CPMUtil to manage dependencies now.
+  - If you want to *force* the usage of system dependencies, use `-DCPMUTIL_FORCE_SYSTEM=ON`.
 
 See `src/dynarmic/CMakeLists.txt` for additional options--usually, these don't need changed
