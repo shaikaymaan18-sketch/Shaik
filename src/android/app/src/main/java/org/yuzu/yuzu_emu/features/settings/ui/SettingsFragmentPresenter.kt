@@ -6,6 +6,7 @@ package org.yuzu.yuzu_emu.features.settings.ui
 import android.annotation.SuppressLint
 import android.os.Build
 import android.widget.Toast
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.yuzu.yuzu_emu.NativeLibrary
 import org.yuzu.yuzu_emu.R
 import org.yuzu.yuzu_emu.YuzuApplication
@@ -30,6 +31,8 @@ import org.yuzu.yuzu_emu.utils.InputHandler
 import org.yuzu.yuzu_emu.utils.NativeConfig
 import org.yuzu.yuzu_emu.utils.DirectoryInitialization
 import org.yuzu.yuzu_emu.utils.FullscreenHelper
+import org.yuzu.yuzu_emu.utils.IconManager
+import org.yuzu.yuzu_emu.utils.IconVariant
 import androidx.core.content.edit
 import androidx.fragment.app.FragmentActivity
 import org.yuzu.yuzu_emu.fragments.MessageDialogFragment
@@ -1061,6 +1064,39 @@ class SettingsFragmentPresenter(
             }
 
             add(HeaderSetting(R.string.app_settings))
+            add(RunnableSetting(
+                    titleId = R.string.change_app_icon,
+                    descriptionId = R.string.change_app_icon_description,
+                    isRunnable = true
+                ) {
+                    val manager = IconManager(context)
+                    val variants = IconVariant.entries
+                    val names = variants.map { context.getString(it.labelRes) }.toTypedArray()
+                    val current = variants.indexOf(manager.activeVariant)
+                    MaterialAlertDialogBuilder(activity!!)
+                        .setTitle(R.string.change_app_icon)
+                        .setSingleChoiceItems(names, current) { dialog, which ->
+                            dialog.dismiss()
+
+                            val selected = variants[which]
+                            if (selected == manager.activeVariant) {
+                                return@setSingleChoiceItems
+                            }
+                            dialog.dismiss()
+
+                            MaterialAlertDialogBuilder(activity!!)
+                            .setTitle(R.string.change_app_icon)
+                            .setMessage(context.getString(R.string.change_app_icon_confirm))
+                            .setPositiveButton(R.string.ok) { _, _ ->
+                                manager.switchIcon(selected)
+                            }
+                            .setNegativeButton(R.string.cancel, null)
+                            .show()
+                        }
+                        .setNegativeButton(R.string.cancel, null)
+                        .show()
+                }
+            )
             add(IntSetting.APP_LANGUAGE.key)
 
             if (NativeLibrary.isUpdateCheckerEnabled()) {

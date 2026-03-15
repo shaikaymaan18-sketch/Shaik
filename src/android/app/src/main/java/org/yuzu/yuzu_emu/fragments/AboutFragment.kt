@@ -28,6 +28,8 @@ import org.yuzu.yuzu_emu.features.settings.ui.SettingsSubscreen
 import org.yuzu.yuzu_emu.model.HomeViewModel
 import org.yuzu.yuzu_emu.utils.ViewUtils.updateMargins
 import org.yuzu.yuzu_emu.NativeLibrary
+import org.yuzu.yuzu_emu.utils.IconManager
+import org.yuzu.yuzu_emu.utils.IconVariant
 
 class AboutFragment : Fragment() {
     private var _binding: FragmentAboutBinding? = null
@@ -57,6 +59,10 @@ class AboutFragment : Fragment() {
         binding.toolbarAbout.setNavigationOnClickListener {
             requireActivity().onBackPressedDispatcher.onBackPressed()
         }
+
+        binding.imageLogo.setImageResource(
+            IconManager(requireContext()).activeVariant.previewRes
+        )
 
         binding.imageLogo.setOnLongClickListener {
             Toast.makeText(

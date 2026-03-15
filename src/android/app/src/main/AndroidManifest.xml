@@ -56,7 +56,19 @@ SPDX-License-Identifier: GPL-3.0-or-later
         <activity
             android:name="org.yuzu.yuzu_emu.ui.main.MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.Yuzu.Splash.Main">
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.Yuzu.Splash.Main.Default">
+            <!-- this 'android:theme' controls the SplashScreen icon -->
+        </activity>
+
+        <activity-alias
+            android:name="org.yuzu.yuzu_emu.ui.main.MainActivity.IconDefault"
+            android:targetActivity="org.yuzu.yuzu_emu.ui.main.MainActivity"
+            android:label="${appNameBase}${appNameSuffix}"
+            android:icon="@mipmap/ic_launcher"
+            android:exported="true"
+            android:enabled="true"
+            android:theme="@style/Theme.Yuzu.Splash.Main.Default">
             <intent-filter>
                 <action android:name="com.miui.gamecenter.GAME_BOOSTER_LAUNCH"/>
                 <action android:name="android.intent.action.MAIN" />
@@ -64,7 +76,33 @@ SPDX-License-Identifier: GPL-3.0-or-later
                 <category android:name="android.intent.category.GAME" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
+
+        <activity-alias
+            android:name="org.yuzu.yuzu_emu.ui.main.MainActivity.IconMono"
+            android:targetActivity="org.yuzu.yuzu_emu.ui.main.MainActivity"
+            android:label="${appNameBase}${appNameSuffix}"
+            android:icon="@mipmap/ic_launcher_mono"
+            android:exported="true"
+            android:enabled="false"
+            android:theme="@style/Theme.Yuzu.Splash.Main.Default">
+            <intent-filter>
+                <action android:name="com.miui.gamecenter.GAME_BOOSTER_LAUNCH"/>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.GAME" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="org.yuzu.yuzu_emu.ui.main.StartActivity"
+            android:exported="true"
+            android:targetActivity="org.yuzu.yuzu_emu.ui.main.MainActivity">
+            <intent-filter>
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <activity
             android:name="org.yuzu.yuzu_emu.features.settings.ui.SettingsActivity"

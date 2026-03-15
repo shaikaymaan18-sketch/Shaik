@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.Yuzu.Splash.Main" parent="Theme.SplashScreen">
+    <style name="Theme.Yuzu.Splash.Main.Default" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/eden_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_eden_launcher_foreground</item>
         <item name="postSplashScreenTheme">@style/Theme.Yuzu.Main</item>

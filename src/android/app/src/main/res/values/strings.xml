@@ -266,6 +266,11 @@
     <string name="notifications_description">Grant the notification permission with the button below.</string>
     <string name="permission_denied">Permission denied</string>
     <string name="permission_denied_description">You denied this permission too many times and now you have to manually grant it in system settings.</string>
+    <string name="change_app_icon">App Icon</string>
+    <string name="change_app_icon_description">Switch launcher icon style</string>
+    <string name="change_app_icon_confirm">Are you sure you want to change icon?\nThe app will be restarted</string>
+    <string name="icon_variant_default">Default</string>
+    <string name="icon_variant_mono">MonoChrome</string>
     <string name="about">About</string>
     <string name="about_description">Build version, credits, and more</string>
     <string name="system_information">System Information</string>
