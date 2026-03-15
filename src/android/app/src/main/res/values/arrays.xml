@@ -611,6 +611,7 @@
         <item>@string/gpu_swizzle_normal</item>
         <item>@string/gpu_swizzle_medium</item>
         <item>@string/gpu_swizzle_high</item>
+        <item>@string/gpu_swizzle_off</item>
     </string-array>
 
     <integer-array name="gpuSwizzleValues">
@@ -619,6 +620,7 @@
         <item>2</item>
         <item>3</item>
         <item>4</item>
+        <item>5</item>
     </integer-array>
     
     <string-array name="gpuSwizzleChunkEntries">
@@ -627,6 +629,7 @@
         <item>@string/gpu_swizzlechunk_normal</item>
         <item>@string/gpu_swizzlechunk_medium</item>
         <item>@string/gpu_swizzlechunk_high</item>
+        <item>@string/gpu_swizzlechunk_off</item>
     </string-array>
 
     <integer-array name="gpuSwizzleChunkValues">
@@ -635,6 +638,7 @@
         <item>2</item>
         <item>3</item>
         <item>4</item>
+        <item>5</item>
     </integer-array>
 
     <string-array name="temperatureUnitEntries">
