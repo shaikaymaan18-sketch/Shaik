@@ -990,6 +990,7 @@
     <string name="gpu_swizzle_normal">Normal (16 MB)</string>
     <string name="gpu_swizzle_medium">Medium (32 MB)</string>
     <string name="gpu_swizzle_high">High (64 MB)</string>
+    <string name="gpu_swizzle_off">Off</string>
 
     <!-- GPU swizzle chunks -->
     <string name="gpu_swizzlechunk_verylow">Very Low (32)</string>
@@ -997,6 +998,7 @@
     <string name="gpu_swizzlechunk_normal">Normal (128)</string>
     <string name="gpu_swizzlechunk_medium">Medium (256)</string>
     <string name="gpu_swizzlechunk_high">High (512)</string>
+    <string name="gpu_swizzlechunk_off">Off</string>
 
     <!-- Temperature Units -->
     <string name="temperature_celsius">Celsius</string>

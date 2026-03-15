@@ -95,6 +95,7 @@ TextureCache<P>::TextureCache(Runtime& runtime_, Tegra::MaxwellDeviceMemoryManag
             case Settings::GpuUnswizzle::Normal:  swizzle_chunk_size = 16_MiB; break;
             case Settings::GpuUnswizzle::Medium:  swizzle_chunk_size = 32_MiB; break;
             case Settings::GpuUnswizzle::High:    swizzle_chunk_size = 64_MiB; break;
+            case Settings::GpuUnswizzle::Off:     swizzle_chunk_size = 0; break;
             default:                              swizzle_chunk_size = 16_MiB;
         }
 
@@ -104,6 +105,7 @@ TextureCache<P>::TextureCache(Runtime& runtime_, Tegra::MaxwellDeviceMemoryManag
             case Settings::GpuUnswizzleChunk::Normal:  swizzle_slices_per_batch = 128; break;
             case Settings::GpuUnswizzleChunk::Medium:  swizzle_slices_per_batch = 256; break;
             case Settings::GpuUnswizzleChunk::High:    swizzle_slices_per_batch = 512; break;
+            case Settings::GpuUnswizzleChunk::Off:     swizzle_slices_per_batch = 0; break;
             default:                                   swizzle_slices_per_batch = 128;
         }
     } else {
@@ -1401,10 +1403,10 @@ void TextureCache<P>::TickAsyncUnswizzle() {
         return;
     }
 
-    if(current_unswizzle_frame > 0) {
+    /*if(current_unswizzle_frame > 0) {
         current_unswizzle_frame--;
         return;
-    }
+    }*/
 
     PendingUnswizzle& task = unswizzle_queue.front();
     Image& image = slot_images[task.image_id];
@@ -1429,7 +1431,10 @@ void TextureCache<P>::TickAsyncUnswizzle() {
     if (task.current_offset < task.total_size) {
         const size_t remaining = task.total_size - task.current_offset;
 
-        size_t copy_amount = (std::min)(swizzle_chunk_size, remaining);
+        size_t copy_amount = 0;
+        if( swizzle_chunk_size == 0 )
+            copy_amount = remaining;
+        else copy_amount = (std::min)(swizzle_chunk_size, remaining);
 
         if (remaining > swizzle_chunk_size) {
             copy_amount = (copy_amount / task.bytes_per_slice) * task.bytes_per_slice;
@@ -1446,7 +1451,11 @@ void TextureCache<P>::TickAsyncUnswizzle() {
     const size_t bytes_ready = task.current_offset - task.last_submitted_offset;
     const u32 complete_slices = static_cast<u32>(bytes_ready / task.bytes_per_slice);
 
-    if (complete_slices >= swizzle_slices_per_batch || (is_final_batch && complete_slices > 0)) {
+    if( swizzle_slices_per_batch <= 0 ) {
+        runtime.AccelerateImageUpload(image, task.staging_buffer, FixSmallVectorADL(FullUploadSwizzles(task.info)), 0, image.info.size.depth);
+        task.last_submitted_offset += (static_cast<size_t>(image.info.size.depth) * task.bytes_per_slice);
+    }
+    else if (complete_slices >= swizzle_slices_per_batch || (is_final_batch && complete_slices > 0)) {
         const u32 z_start = static_cast<u32>(task.last_submitted_offset / task.bytes_per_slice);
         const u32 slices_to_process = (std::min)(complete_slices, swizzle_slices_per_batch);
         const u32 z_count = (std::min)(slices_to_process, image.info.size.depth - z_start);
@@ -1468,7 +1477,7 @@ void TextureCache<P>::TickAsyncUnswizzle() {
         unswizzle_queue.pop_front();
 
         // Wait 4 frames to process the next entry
-        current_unswizzle_frame = 4u;
+        // current_unswizzle_frame = 4u;
     }
 }
 
