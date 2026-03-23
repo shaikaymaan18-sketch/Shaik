@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // SPDX-FileCopyrightText: 2015 Citra Emulator Project
@@ -43,3 +43,8 @@ const std::optional<Common::UUID> GetProfileID();
  * @return A string representation of the selected profile, or an empty string if none were seleeced
  */
 std::string GetProfileIDString();
+
+std::string GetReadablePlayTime(u64 time_seconds);
+std::string GetPlayTimeHours(u64 time_seconds);
+std::string GetPlayTimeMinutes(u64 time_seconds);
+std::string GetPlayTimeSeconds(u64 time_seconds);

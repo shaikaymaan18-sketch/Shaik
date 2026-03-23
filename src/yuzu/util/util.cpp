@@ -12,6 +12,7 @@
 #include "core/frontend/applets/profile_select.h"
 #include "core/hle/service/acc/profile_manager.h"
 #include "frontend_common/data_manager.h"
+#include "qt_common/config/uisettings.h"
 #include "qt_common/qt_common.h"
 #include "yuzu/util/util.h"
 
@@ -148,6 +149,7 @@ bool SaveIconToFile(const std::filesystem::path& icon_path, const QImage& image)
     return false;
 #endif
 }
+
 const std::optional<Common::UUID> GetProfileID() {
     // if there's only a single profile, the user probably wants to use that... right?
     const auto& profiles = QtCommon::system->GetProfileManager().FindExistingProfileUUIDs();
@@ -185,6 +187,7 @@ const std::optional<Common::UUID> GetProfileID() {
 
     return uuid;
 }
+
 std::string GetProfileIDString() {
     const auto uuid = GetProfileID();
     if (!uuid)
@@ -193,4 +196,89 @@ std::string GetProfileIDString() {
     auto user_id = uuid->AsU128();
 
     return fmt::format("{:016X}{:016X}", user_id[1], user_id[0]);
+}
+
+void eraseBetweenStrings(std::string& str, const std::string& start_str,
+                         const std::string& end_str) {
+    size_t start_pos = std::string::npos;
+    size_t end_pos = std::string::npos;
+
+    while ((start_pos = str.find(start_str)) != std::string::npos) {
+        end_pos = str.find(end_str, start_pos + start_str.length());
+
+        if (end_pos != std::string::npos) {
+            size_t erase_length = end_pos + end_str.length() - start_pos;
+            str.erase(start_pos, erase_length);
+        } else {
+            break;
+        }
+    }
+}
+
+void eraseAll(std::string& str, const std::string& sub_str) {
+    size_t pos = std::string::npos;
+    size_t len = sub_str.length();
+    while ((pos = str.find(sub_str)) != std::string::npos) {
+        str.erase(pos, len);
+    }
+}
+
+std::string GetReadablePlayTime(u64 total_seconds) {
+    if (total_seconds <= 0) {
+        return std::string{};
+    }
+
+    if (!UISettings::values.use_custom_play_time_format.GetValue()) {
+        return fmt::format("{:02}:{:02}:{:02}", total_seconds / 3600, (total_seconds % 3600) / 60,
+                           total_seconds % 60);
+    }
+
+    u64 total_days = total_seconds / 86400;
+    u64 total_hours = total_seconds / 3600;
+    u64 total_minutes = total_seconds / 60;
+
+    std::string format = UISettings::values.custom_play_time_format.GetValue();
+
+    if (total_days <= 0) {
+        eraseBetweenStrings(format, "[d]", "[/d]");
+    } else {
+        eraseAll(format, "[d]");
+        eraseAll(format, "[/d]");
+    }
+
+    if (total_hours <= 0) {
+        eraseBetweenStrings(format, "[h]", "[/h]");
+    } else {
+        eraseAll(format, "[h]");
+        eraseAll(format, "[/h]");
+    }
+
+    if (total_minutes <= 0) {
+        eraseBetweenStrings(format, "[m]", "[/m]");
+    } else {
+        eraseAll(format, "[m]");
+        eraseAll(format, "[/m]");
+    }
+
+    return fmt::format(fmt::runtime(format),
+        fmt::arg("d", total_days),
+        fmt::arg("h", total_hours),
+        fmt::arg("m", total_minutes),
+        fmt::arg("s", total_seconds),
+        fmt::arg("H", total_hours % 24),
+        fmt::arg("M", total_minutes % 60),
+        fmt::arg("S", total_seconds % 60)
+    );
+}
+
+std::string GetPlayTimeHours(u64 total_seconds) {
+    return fmt::format("{}", total_seconds / 3600);
+}
+
+std::string GetPlayTimeMinutes(u64 total_seconds) {
+    return fmt::format("{}", (total_seconds % 3600) / 60);
+}
+
+std::string GetPlayTimeSeconds(u64 total_seconds) {
+    return fmt::format("{}", total_seconds % 60);
 }

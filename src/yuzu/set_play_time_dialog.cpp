@@ -4,19 +4,20 @@
 #include "frontend_common/play_time_manager.h"
 #include "ui_set_play_time_dialog.h"
 #include "yuzu/set_play_time_dialog.h"
+#include "yuzu/util/util.h"
 
 SetPlayTimeDialog::SetPlayTimeDialog(QWidget* parent, u64 current_play_time)
     : QDialog(parent), ui{std::make_unique<Ui::SetPlayTimeDialog>()} {
     ui->setupUi(this);
 
     ui->hoursSpinBox->setValue(
-        QString::fromStdString(PlayTime::PlayTimeManager::GetPlayTimeHours(current_play_time))
+        QString::fromStdString(GetPlayTimeHours(current_play_time))
             .toInt());
     ui->minutesSpinBox->setValue(
-        QString::fromStdString(PlayTime::PlayTimeManager::GetPlayTimeMinutes(current_play_time))
+        QString::fromStdString(GetPlayTimeMinutes(current_play_time))
             .toInt());
     ui->secondsSpinBox->setValue(
-        QString::fromStdString(PlayTime::PlayTimeManager::GetPlayTimeSeconds(current_play_time))
+        QString::fromStdString(GetPlayTimeSeconds(current_play_time))
             .toInt());
 
     connect(ui->hoursSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this,
