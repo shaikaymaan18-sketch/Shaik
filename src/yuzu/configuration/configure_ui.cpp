@@ -347,7 +347,6 @@ void ConfigureUi::UpdateCustomPlaytimeGroupBox() {
     ui->use_custom_play_time_format->setEnabled(enableCheckbox);
     ui->custom_play_time_edit->setEnabled(enableTextBox);
     ui->custom_play_time_label->setEnabled(enableTextBox);
-    ui->custom_play_time_help->setEnabled(enableTextBox);
 }
 
 void ConfigureUi::UpdateScreenshotInfo(Settings::AspectRatio ratio_,
