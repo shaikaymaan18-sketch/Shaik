@@ -373,6 +373,10 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent) {
     // Ui Multiplayer
 
     // Ui Games list
+    INSERT(UISettings, use_custom_play_time_format, tr("Use custom play time format"),
+           QString());
+    INSERT(UISettings, custom_play_time_format, tr("Custom play time format"),
+           QString());
 
 #undef INSERT
 

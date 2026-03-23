@@ -16,7 +16,10 @@
 #include <QFileDialog>
 #include <QString>
 #include <QToolButton>
+#include <QPushButton>
 #include <QVariant>
+#include <QDesktopServices>
+#include <QUrl>
 
 #include "common/common_types.h"
 #include "common/fs/path_util.h"
@@ -103,7 +106,7 @@ ConfigureUi::ConfigureUi(Core::System& system_, QWidget* parent)
     InitializeIconSizeComboBox();
     InitializeRowComboBoxes();
 
-    PopulateResolutionComboBox(ui->screenshot_height, this);
+    PopulateResolutionComboBox(ui->screenshot_size_combobox, this);
 
     SetConfiguration();
 
@@ -142,9 +145,14 @@ ConfigureUi::ConfigureUi(Core::System& system_, QWidget* parent)
         }
     });
 
-    connect(ui->screenshot_height, &QComboBox::currentTextChanged, [this]() { UpdateWidthText(); });
+    connect(ui->screenshot_size_combobox, &QComboBox::currentTextChanged, [this]() { UpdateWidthText(); });
 
     UpdateWidthText();
+
+    connect(ui->show_play_time, &QCheckBox::STATE_CHANGED, [this]() { UpdateCustomPlaytimeGroupBox(); });
+    connect(ui->use_custom_play_time_format, &QCheckBox::STATE_CHANGED, [this]() { UpdateCustomPlaytimeGroupBox(); });
+    UpdateCustomPlaytimeGroupBox();
+
 }
 
 ConfigureUi::~ConfigureUi() = default;
@@ -161,11 +169,14 @@ void ConfigureUi::ApplyConfiguration() {
     UISettings::values.row_1_text_id = ui->row_1_text_combobox->currentData().toUInt();
     UISettings::values.row_2_text_id = ui->row_2_text_combobox->currentData().toUInt();
 
+    UISettings::values.use_custom_play_time_format = ui->use_custom_play_time_format->isChecked();
+    UISettings::values.custom_play_time_format = ui->custom_play_time_edit->text().toStdString();
+
     UISettings::values.enable_screenshot_save_as = ui->enable_screenshot_save_as->isChecked();
     Common::FS::SetEdenPath(Common::FS::EdenPath::ScreenshotsDir,
                             ui->screenshot_path_edit->text().toStdString());
 
-    const u32 height = ScreenshotDimensionToInt(ui->screenshot_height->currentText());
+    const u32 height = ScreenshotDimensionToInt(ui->screenshot_size_combobox->currentText());
     UISettings::values.screenshot_height.SetValue(height);
 
     RequestGameListUpdate();
@@ -189,6 +200,13 @@ void ConfigureUi::SetConfiguration() {
     ui->folder_icon_size_combobox->setCurrentIndex(
         ui->folder_icon_size_combobox->findData(UISettings::values.folder_icon_size.GetValue()));
 
+    ui->use_custom_play_time_format->setChecked(
+        UISettings::values.use_custom_play_time_format.GetValue());
+    ui->custom_play_time_edit->setText(QString::fromStdString(
+        UISettings::values.custom_play_time_format.GetValue()));
+
+    UpdateCustomPlaytimeGroupBox();
+
     ui->enable_screenshot_save_as->setChecked(
         UISettings::values.enable_screenshot_save_as.GetValue());
     ui->screenshot_path_edit->setText(QString::fromStdString(
@@ -196,9 +214,9 @@ void ConfigureUi::SetConfiguration() {
 
     const auto height = UISettings::values.screenshot_height.GetValue();
     if (height == 0) {
-        ui->screenshot_height->setCurrentIndex(0);
+        ui->screenshot_size_combobox->setCurrentIndex(0);
     } else {
-        ui->screenshot_height->setCurrentText(QStringLiteral("%1").arg(height));
+        ui->screenshot_size_combobox->setCurrentText(QStringLiteral("%1").arg(height));
     }
 }
 
@@ -303,7 +321,7 @@ void ConfigureUi::OnLanguageChanged(int index) {
 }
 
 void ConfigureUi::UpdateWidthText() {
-    const u32 height = ScreenshotDimensionToInt(ui->screenshot_height->currentText());
+    const u32 height = ScreenshotDimensionToInt(ui->screenshot_size_combobox->currentText());
     const u32 width = UISettings::CalculateWidth(height, ratio);
     if (height == 0) {
         const auto up_factor = GetUpFactor(resolution_setting);
@@ -311,14 +329,25 @@ void ConfigureUi::UpdateWidthText() {
         const u32 width_docked = UISettings::CalculateWidth(height_docked, ratio);
         const u32 height_undocked = Layout::ScreenUndocked::Height * up_factor;
         const u32 width_undocked = UISettings::CalculateWidth(height_undocked, ratio);
-        ui->screenshot_width->setText(tr("Auto (%1 x %2, %3 x %4)", "Screenshot width value")
+        ui->screenshot_size_label->setText(tr("Auto (%1 x %2, %3 x %4)", "Screenshot width value")
                                           .arg(width_undocked)
                                           .arg(height_undocked)
                                           .arg(width_docked)
                                           .arg(height_docked));
     } else {
-        ui->screenshot_width->setText(QStringLiteral("%1 x").arg(width));
+        ui->screenshot_size_label->setText(QStringLiteral("%1 x").arg(width));
     }
+}
+
+void ConfigureUi::UpdateCustomPlaytimeGroupBox() {
+    bool showPlayTime = ui->show_play_time->isChecked();
+    bool useCustomPlayTime = ui->use_custom_play_time_format->isChecked();
+    bool enableCheckbox = showPlayTime;
+    bool enableTextBox = showPlayTime && useCustomPlayTime;
+    ui->use_custom_play_time_format->setEnabled(enableCheckbox);
+    ui->custom_play_time_edit->setEnabled(enableTextBox);
+    ui->custom_play_time_label->setEnabled(enableTextBox);
+    ui->custom_play_time_help->setEnabled(enableTextBox);
 }
 
 void ConfigureUi::UpdateScreenshotInfo(Settings::AspectRatio ratio_,

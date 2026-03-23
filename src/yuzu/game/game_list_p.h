@@ -86,8 +86,7 @@ public:
 
         const auto readable_play_time =
             play_time > 0 ? QObject::tr("Play Time: %1")
-                                .arg(QString::fromStdString(
-                                    PlayTime::PlayTimeManager::GetReadablePlayTime(play_time)))
+                                .arg(QString::fromStdString(GetReadablePlayTime(play_time)))
                           : QObject::tr("Never Played");
 
         const auto enabled_update = [patch_versions]() -> QString {
@@ -274,9 +273,8 @@ public:
 
     void setData(const QVariant& value, int role) override {
         qulonglong time_seconds = value.toULongLong();
-        GameListItem::setData(
-            QString::fromStdString(PlayTime::PlayTimeManager::GetReadablePlayTime(time_seconds)),
-            Qt::DisplayRole);
+        GameListItem::setData(QString::fromStdString(GetReadablePlayTime(time_seconds)),
+                              Qt::DisplayRole);
         GameListItem::setData(value, PlayTimeRole);
     }
 

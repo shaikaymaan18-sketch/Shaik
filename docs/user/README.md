@@ -9,7 +9,7 @@ A copy of this handbook is [available online](https://git.eden-emu.dev/eden-emu/
 ## Basics
 
 - **[The Basics](Basics.md)**
-- **[Quickstart](./QuickStart.md)**
+- **[Quickstart](QuickStart.md)**
 - **[Settings](./Settings.md)**
 - **[Controllers](./Controllers.md)**
     - **[Controller profiles](./Controllers.md#configuring-controller-profiles)**
@@ -26,6 +26,7 @@ A copy of this handbook is [available online](https://git.eden-emu.dev/eden-emu/
 - **[Installing Atmosphere Mods](./InstallingAtmosphereMods.md)**
 - **[Installing Updates & DLCs](./InstallingUpdatesDLC.md)**
 - **[Alter Date & Time](./AlterDateTime.md)**
+- **[Custom Play Time Syntax](./CustomPlayTime.md)**
 
 ## 3rd-party Integration
 

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>363</width>
-    <height>613</height>
+    <height>693</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,50 +18,46 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <widget class="QGroupBox" name="general_groupBox">
+    <widget class="QGroupBox" name="general_group_box">
      <property name="title">
       <string>General</string>
      </property>
-     <layout class="QHBoxLayout" name="horizontalLayout">
+     <layout class="QVBoxLayout" name="verticalLayout_7">
       <item>
-       <layout class="QVBoxLayout" name="verticalLayout_2">
+       <widget class="QLabel" name="label_change_language_info">
+        <property name="text">
+         <string>Note: Changing language will apply your configuration.</string>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="language_qhbox_layout">
         <item>
-         <widget class="QLabel" name="label_change_language_info">
+         <widget class="QLabel" name="language_label">
           <property name="text">
-           <string>Note: Changing language will apply your configuration.</string>
-          </property>
-          <property name="wordWrap">
-           <bool>true</bool>
+           <string>Interface language:</string>
           </property>
          </widget>
         </item>
         <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_2">
-          <item>
-           <widget class="QLabel" name="language_label">
-            <property name="text">
-             <string>Interface language:</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QComboBox" name="language_combobox"/>
-          </item>
-         </layout>
+         <widget class="QComboBox" name="language_combobox"/>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="theme_qhbox_layout">
+        <item>
+         <widget class="QLabel" name="theme_label">
+          <property name="text">
+           <string>Theme:</string>
+          </property>
+         </widget>
         </item>
         <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_3">
-          <item>
-           <widget class="QLabel" name="theme_label">
-            <property name="text">
-             <string>Theme:</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QComboBox" name="theme_combobox"/>
-          </item>
-         </layout>
+         <widget class="QComboBox" name="theme_combobox"/>
         </item>
        </layout>
       </item>
@@ -69,89 +65,88 @@
     </widget>
    </item>
    <item>
-    <widget class="QGroupBox" name="GameListGroupBox">
+    <widget class="QGroupBox" name="game_list_group_box">
      <property name="title">
       <string>Game List</string>
      </property>
-     <layout class="QHBoxLayout" name="GameListHorizontalLayout">
+     <property name="flat">
+      <bool>false</bool>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_3">
       <item>
-       <layout class="QVBoxLayout" name="GeneralVerticalLayout">
+       <widget class="QCheckBox" name="show_compat">
+        <property name="text">
+         <string>Show Compatibility List</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="show_add_ons">
+        <property name="text">
+         <string>Show Add-Ons Column</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="show_size">
+        <property name="text">
+         <string>Show Size Column</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="show_types">
+        <property name="text">
+         <string>Show File Types Column</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="show_play_time">
+        <property name="text">
+         <string>Show Play Time Column</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="folder_icon_size_qhbox_layout">
         <item>
-         <widget class="QCheckBox" name="show_compat">
+         <widget class="QLabel" name="folder_icon_size_label">
           <property name="text">
-           <string>Show Compatibility List</string>
+           <string>Folder Icon Size:</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="show_add_ons">
+         <widget class="QComboBox" name="folder_icon_size_combobox"/>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="row_1_qhbox_layout">
+        <item>
+         <widget class="QLabel" name="row_1_label">
           <property name="text">
-           <string>Show Add-Ons Column</string>
+           <string>Row 1 Text:</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="show_size">
+         <widget class="QComboBox" name="row_1_text_combobox"/>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="row_2_qhbox_layout">
+        <item>
+         <widget class="QLabel" name="row_2_label">
           <property name="text">
-           <string>Show Size Column</string>
+           <string>Row 2 Text:</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="show_types">
-          <property name="text">
-           <string>Show File Types Column</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QCheckBox" name="show_play_time">
-          <property name="text">
-           <string>Show Play Time Column</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <layout class="QHBoxLayout" name="folder_icon_size_qhbox_layout_2">
-          <item>
-           <widget class="QLabel" name="folder_icon_size_label">
-            <property name="text">
-             <string>Folder Icon Size:</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QComboBox" name="folder_icon_size_combobox"/>
-          </item>
-         </layout>
-        </item>
-        <item>
-         <layout class="QHBoxLayout" name="row_1_qhbox_layout">
-          <item>
-           <widget class="QLabel" name="row_1_label">
-            <property name="text">
-             <string>Row 1 Text:</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QComboBox" name="row_1_text_combobox"/>
-          </item>
-         </layout>
-        </item>
-        <item>
-         <layout class="QHBoxLayout" name="row_2_qhbox_layout">
-          <item>
-           <widget class="QLabel" name="row_2_label">
-            <property name="text">
-             <string>Row 2 Text:</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QComboBox" name="row_2_text_combobox"/>
-          </item>
-         </layout>
+         <widget class="QComboBox" name="row_2_text_combobox"/>
         </item>
        </layout>
       </item>
@@ -159,75 +154,101 @@
     </widget>
    </item>
    <item>
-    <widget class="QGroupBox" name="screenshots_GroupBox">
+    <widget class="QGroupBox" name="play_time_group_box">
      <property name="title">
-      <string>Screenshots</string>
+      <string>Custom Play Time Format</string>
      </property>
-     <layout class="QVBoxLayout" name="verticalLayout_4">
+     <layout class="QVBoxLayout" name="verticalLayout_6">
       <item>
-       <layout class="QVBoxLayout" name="verticalLayout_3">
+       <widget class="QCheckBox" name="use_custom_play_time_format">
+        <property name="text">
+         <string>Use Custom Play Time Format</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="custom_play_time_qhbox_layout">
         <item>
-         <widget class="QCheckBox" name="enable_screenshot_save_as">
+         <widget class="QLabel" name="custom_play_time_label">
           <property name="text">
-           <string>Ask Where To Save Screenshots (Windows Only)</string>
+           <string>Custom Play Time Format:</string>
           </property>
          </widget>
         </item>
         <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_4">
+         <widget class="QLineEdit" name="custom_play_time_edit"/>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="screenshots_group_box">
+     <property name="title">
+      <string>Screenshots</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_2">
+      <item>
+       <widget class="QCheckBox" name="enable_screenshot_save_as">
+        <property name="text">
+         <string>Ask Where To Save Screenshots (Windows Only)</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="screenshot_path_layout">
+        <item>
+         <widget class="QLabel" name="label">
+          <property name="text">
+           <string>Screenshots Path: </string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="screenshot_path_edit"/>
+        </item>
+        <item>
+         <widget class="QToolButton" name="screenshot_path_button">
+          <property name="text">
+           <string>...</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QGridLayout" name="gridLayout">
+        <property name="spacing">
+         <number>6</number>
+        </property>
+        <item row="0" column="1">
+         <layout class="QHBoxLayout" name="horizontalLayout_5">
           <item>
-           <widget class="QLabel" name="label">
+           <widget class="QLabel" name="screenshot_size_label">
             <property name="text">
-             <string>Screenshots Path: </string>
+             <string>TextLabel</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLineEdit" name="screenshot_path_edit"/>
-          </item>
-          <item>
-           <widget class="QToolButton" name="screenshot_path_button">
-            <property name="text">
-             <string>...</string>
+           <widget class="QComboBox" name="screenshot_size_combobox">
+            <property name="editable">
+             <bool>true</bool>
             </property>
            </widget>
           </item>
          </layout>
         </item>
-        <item>
-         <layout class="QGridLayout" name="gridLayout">
-          <property name="spacing">
-           <number>6</number>
+        <item row="0" column="0">
+         <widget class="QLabel" name="label_3">
+          <property name="text">
+           <string>Resolution:</string>
           </property>
-          <item row="0" column="1">
-           <layout class="QHBoxLayout" name="horizontalLayout_5">
-            <item>
-             <widget class="QLabel" name="screenshot_width">
-              <property name="text">
-               <string>TextLabel</string>
-              </property>
-              <property name="alignment">
-               <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QComboBox" name="screenshot_height">
-              <property name="editable">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-          <item row="0" column="0">
-           <widget class="QLabel" name="label_3">
-            <property name="text">
-             <string>Resolution:</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
+         </widget>
         </item>
        </layout>
       </item>
