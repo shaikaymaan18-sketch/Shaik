@@ -44,6 +44,9 @@ const std::optional<Common::UUID> GetProfileID();
  */
 std::string GetProfileIDString();
 
+void eraseBetweenStrings(std::string& str, const std::string& start_str, const std::string& end_str);
+void eraseAll(std::string& str, const std::string& sub_str);
+
 std::string GetReadablePlayTime(u64 time_seconds);
 std::string GetPlayTimeHours(u64 time_seconds);
 std::string GetPlayTimeMinutes(u64 time_seconds);
