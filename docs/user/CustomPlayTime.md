@@ -150,7 +150,7 @@ Example output:
 ### Compact Format
 
 ```
-[h]{H}h [/h][m]{M}m [/m][s]{S}s
+[h]{h}h [/h][m]{M}m [/m]{S}s
 ```
 
 Example output:

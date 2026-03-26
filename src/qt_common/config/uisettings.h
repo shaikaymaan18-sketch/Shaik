@@ -234,7 +234,7 @@ struct Values {
     // Play time
     Setting<bool> show_play_time{linkage, true, "show_play_time", Category::UiGameList};
     Setting<bool> use_custom_play_time_format{linkage, false, "use_custom_play_time_format", Category::UiGameList};
-    Setting<std::string> custom_play_time_format{linkage, "", "use_custom_play_time_format", Category::UiGameList};
+    Setting<std::string> custom_play_time_format{linkage, "", "custom_play_time_format", Category::UiGameList};
 
     // misc
     Setting<bool> show_fw_warning{linkage, true, "show_fw_warning", Category::Miscellaneous};
