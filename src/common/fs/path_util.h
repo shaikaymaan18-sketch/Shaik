@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // SPDX-FileCopyrightText: Copyright 2021 yuzu Emulator Project
@@ -20,6 +20,7 @@ enum class EdenPath {
     ConfigDir,      // Where config files are stored.
     CrashDumpsDir,  // Where crash dumps are stored.
     DumpDir,        // Where dumped data is stored.
+    HostDir,        // Where the game has access to the host system.
     KeysDir,        // Where key files are stored.
     LoadDir,        // Where cheat/mod files are stored.
     LogDir,         // Where log files are stored.

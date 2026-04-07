@@ -63,6 +63,8 @@ public:
     Result DestroyStrayLayer(u64 layer_id);
     Result GetDisplayVsyncEvent(OutCopyHandle<Kernel::KReadableEvent> out_vsync_event,
                                 u64 display_id);
+    Result GetDisplayVsyncEventForDebug(OutCopyHandle<Kernel::KReadableEvent> out_vsync_event,
+                                        u64 display_id);
     Result ConvertScalingMode(Out<ConvertedScaleMode> out_scaling_mode, NintendoScaleMode mode);
     Result GetIndirectLayerImageMap(
         Out<u64> out_size, Out<u64> out_stride,
@@ -80,6 +82,7 @@ private:
     std::set<u64> m_open_layer_ids{};
     std::set<u64> m_stray_layer_ids{};
     std::map<u64, Event> m_display_vsync_events{};
+    std::map<u64, Event> m_display_vsync_events_debug{};
     bool m_vsync_event_fetched{false};
 };
 

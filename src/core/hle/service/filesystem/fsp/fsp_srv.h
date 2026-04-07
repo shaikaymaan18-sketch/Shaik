@@ -53,6 +53,7 @@ private:
     Result SetCurrentProcess(ClientProcessId pid);
     Result OpenFileSystemWithPatch(OutInterface<IFileSystem> out_interface,
                                    FileSystemProxyType type, u64 open_program_id);
+    Result OpenHostFileSystem(OutInterface<IFileSystem> out_interface);
     Result OpenSdCardFileSystem(OutInterface<IFileSystem> out_interface);
     Result CreateSaveDataFileSystem(FileSys::SaveDataCreationInfo save_create_struct,
                                     FileSys::SaveDataAttribute save_struct, u128 uid);
@@ -102,6 +103,7 @@ private:
                                                 FileSys::StorageId storage_id, u64 title_id);
     Result OpenDataStorageWithProgramIndex(OutInterface<IStorage> out_interface, u8 program_index);
     Result IsSdCardAccessible(Out<bool> out_is_accessible);
+    Result SetSaveDataRootPath(InBuffer<BufferAttr_HipcMapAlias> path);
     Result DisableAutoSaveDataCreation();
     Result SetGlobalAccessLogMode(AccessLogMode access_log_mode_);
     Result GetGlobalAccessLogMode(Out<AccessLogMode> out_access_log_mode);

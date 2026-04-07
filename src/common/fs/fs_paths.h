@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // SPDX-FileCopyrightText: Copyright 2021 yuzu Emulator Project
@@ -17,6 +17,7 @@
 #define CONFIG_DIR "config"
 #define CRASH_DUMPS_DIR "crash_dumps"
 #define DUMP_DIR "dump"
+#define HOST_DIR "host"
 #define KEYS_DIR "keys"
 #define LOAD_DIR "load"
 #define LOG_DIR "log"
