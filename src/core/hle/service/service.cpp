@@ -105,8 +105,6 @@ Result ServiceFrameworkBase::HandleSyncRequest(Kernel::KServerSession& session,
     switch (ctx.GetCommandType()) {
     case IPC::CommandType::Close:
     case IPC::CommandType::TIPC_Close: {
-        IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(ResultSuccess);
         result = IPC::ResultSessionClosed;
         break;
     }
@@ -132,7 +130,7 @@ Result ServiceFrameworkBase::HandleSyncRequest(Kernel::KServerSession& session,
 
     // If emulation was shutdown, we are closing service threads, do not write the response back to
     // memory that may be shutting down as well.
-    if (system.IsPoweredOn()) {
+    if (system.IsPoweredOn() && result != IPC::ResultSessionClosed) {
         ctx.WriteToOutgoingCommandBuffer();
     }
 

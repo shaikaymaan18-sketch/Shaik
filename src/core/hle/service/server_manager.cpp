@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // SPDX-FileCopyrightText: Copyright 2023 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -381,11 +384,16 @@ Result ServerManager::CompleteSyncRequest(Session* session) {
         R_SUCCEED();
     }
 
+    if (service_res == IPC::ResultSessionClosed) {
+        this->DestroySession(session);
+        R_SUCCEED();
+    }
+
     // Send the reply.
     res = server_session->SendReplyHLE();
 
     // If the session has been closed, we're done.
-    if (res == Kernel::ResultSessionClosed || service_res == IPC::ResultSessionClosed) {
+    if (res == Kernel::ResultSessionClosed) {
         this->DestroySession(session);
         R_SUCCEED();
     }
