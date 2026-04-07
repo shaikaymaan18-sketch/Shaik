@@ -543,6 +543,8 @@ add_library(core STATIC
     hle/service/audio/hardware_opus_decoder_manager.h
     hle/service/audio/hardware_opus_decoder.cpp
     hle/service/audio/hardware_opus_decoder.h
+    hle/service/banana/banana.cpp
+    hle/service/banana/banana.h
     hle/service/bcat/backend/backend.cpp
     hle/service/bcat/backend/backend.h
     hle/service/bcat/bcat.cpp
@@ -714,6 +716,10 @@ add_library(core STATIC
     hle/service/hid/xcd.h
     hle/service/hle_ipc.cpp
     hle/service/hle_ipc.h
+    hle/service/htc/htc.cpp
+    hle/service/htc/htc.h
+    hle/service/htcs/htcs.cpp
+    hle/service/htcs/htcs.h
     hle/service/ipc_helpers.h
     hle/service/kernel_helpers.cpp
     hle/service/kernel_helpers.h
@@ -952,6 +958,8 @@ add_library(core STATIC
     hle/service/os/process.h
     hle/service/pcie/pcie.cpp
     hle/service/pcie/pcie.h
+    hle/service/pcm/pcm.cpp
+    hle/service/pcm/pcm.h
     hle/service/pctl/parental_control_service_factory.cpp
     hle/service/pctl/parental_control_service_factory.h
     hle/service/pctl/parental_control_service.cpp
