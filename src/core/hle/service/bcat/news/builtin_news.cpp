@@ -228,17 +228,58 @@ void WriteCachedJson(std::string_view json) {
 
 std::optional<std::string> DownloadReleasesJson() {
     try {
-        httplib::SSLClient cli{"git.eden-emu.dev", 443};
-        cli.set_connection_timeout(10);
-        cli.set_read_timeout(10);
-
-        // TODO(crueter): automate this in some way...
 #ifdef YUZU_BUNDLED_OPENSSL
-        cli.load_ca_cert_store(kCert, sizeof(kCert));
+        const auto url = "https://git.eden-emu.dev";
+#else
+        const auto url = "git.eden-emu.dev";
 #endif
 
-        if (auto res = cli.Get(GitHubAPI_EdenReleases); res && res->status < 400) {
-            return res->body;
+        // TODO(crueter): This is duplicated between frontend and here.
+        constexpr auto path = GitHubAPI_EdenReleases;
+
+        constexpr std::size_t timeout_seconds = 15;
+
+        std::unique_ptr<httplib::Client> client = std::make_unique<httplib::Client>(url);
+        client->set_connection_timeout(timeout_seconds);
+        client->set_read_timeout(timeout_seconds);
+        client->set_write_timeout(timeout_seconds);
+
+#ifdef YUZU_BUNDLED_OPENSSL
+        client->load_ca_cert_store(kCert, sizeof(kCert));
+#endif
+
+        if (client == nullptr) {
+            LOG_ERROR(Service_BCAT, "Invalid URL {}{}", url, path);
+            return {};
+        }
+
+        httplib::Request request{
+            .method = "GET",
+            .path = path,
+        };
+
+        client->set_follow_location(true);
+        httplib::Result result = client->send(request);
+
+        if (!result) {
+            LOG_ERROR(Service_BCAT, "GET to {}{} returned null", url, path);
+            return {};
+        } else if (result->status < 400) {
+            return result->body;
+        }
+
+        if (result->status >= 400) {
+            LOG_ERROR(Service_BCAT,
+                      "GET to {}{} returned error status code: {}",
+                      url,
+                      path,
+                      result->status);
+            return {};
+        }
+
+        if (!result->headers.contains("content-type")) {
+            LOG_ERROR(Service_BCAT, "GET to {}{} returned no content", url, path);
+            return {};
         }
     } catch (...) {
         LOG_WARNING(Service_BCAT, " failed to download releases");
