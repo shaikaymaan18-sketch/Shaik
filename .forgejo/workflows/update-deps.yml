@@ -1,7 +1,7 @@
 name: update-deps
 
 on:
-  #  saturday at 1pm
+  #  saturday at noon
   schedule:
     - cron: '0 12 * * 6'
   workflow_dispatch:
