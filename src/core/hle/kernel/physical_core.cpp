@@ -97,11 +97,16 @@ void PhysicalCore::RunThread(Kernel::KThread* thread) {
         }
 
         // Determine why we stopped.
-        const bool supervisor_call = True(hr & Core::HaltReason::SupervisorCall);
-        const bool prefetch_abort = True(hr & Core::HaltReason::PrefetchAbort);
-        const bool breakpoint = True(hr & Core::HaltReason::InstructionBreakpoint);
-        const bool data_abort = True(hr & Core::HaltReason::DataAbort);
-        const bool interrupt = True(hr & Core::HaltReason::BreakLoop);
+        // If a step completed successfully, skip other halt reason handlers —
+        // the step takes priority (e.g. step may also set InstructionBreakpoint
+        // if the next instruction happens to be a breakpoint).
+        const bool step_completed = True(hr & Core::HaltReason::StepThread)
+                                    && thread->GetStepState() == StepState::StepPerformed;
+        const bool supervisor_call = !step_completed && True(hr & Core::HaltReason::SupervisorCall);
+        const bool prefetch_abort = !step_completed && True(hr & Core::HaltReason::PrefetchAbort);
+        const bool breakpoint = !step_completed && True(hr & Core::HaltReason::InstructionBreakpoint);
+        const bool data_abort = !step_completed && True(hr & Core::HaltReason::DataAbort);
+        const bool interrupt = !step_completed && True(hr & Core::HaltReason::BreakLoop);
 
         // Since scheduling may occur here, we cannot use any cached
         // state after returning from calls we make.
