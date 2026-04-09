@@ -50,6 +50,14 @@ void PhysicalCore::RunThread(Kernel::KThread* thread) {
     };
 
     const auto ExitContext = [&]() {
+        // Save the JIT context back to the thread so the debugger can
+        // read the current register state. Debug halt paths (step,
+        // breakpoint, watchpoint) return from RunThread without going
+        // through the scheduler's Unload/SaveContext.
+        if (system.DebuggerEnabled()) {
+            interface->GetContext(thread->GetContext());
+        }
+
         // Unlock the thread.
         interface->UnlockThread(thread);
 
@@ -116,6 +124,11 @@ void PhysicalCore::RunThread(Kernel::KThread* thread) {
         if (breakpoint || prefetch_abort) {
             if (breakpoint) {
                 interface->RewindBreakpointInstruction();
+                // RewindBreakpointInstruction sets the JIT state to the
+                // saved breakpoint context. Update the thread context to
+                // match, since ExitContext already saved the post-execution
+                // state.
+                interface->GetContext(thread->GetContext());
             }
             if (system.DebuggerEnabled()) {
                 system.GetDebugger().NotifyThreadStopped(thread);
