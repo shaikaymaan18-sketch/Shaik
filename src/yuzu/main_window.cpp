@@ -25,6 +25,7 @@
 #include "debugger/controller.h"
 
 #include "about_dialog.h"
+#include "backup_manager.h"
 #include "data_dialog.h"
 #include "deps_dialog.h"
 #include "install_dialog.h"
@@ -71,12 +72,15 @@
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QInputDialog>
+#include <QLabel>
+#include <QLineEdit>
 #include <QMimeData>
 #include <QPalette>
 #include <QProgressDialog>
 #include <QScreen>
 #include <QShortcut>
 #include <QStatusBar>
+#include <QVBoxLayout>
 #include <QtConcurrentRun>
 
 // Qt Common //
@@ -418,6 +422,11 @@ MainWindow::MainWindow(bool has_broken_vulkan)
     controller_dialog->refreshConfiguration();
 
     UpdateWindowTitle();
+
+    // initialize backup manager
+    backup_manager = std::make_unique<BackupManager>(this);
+    connect(backup_manager.get(), &BackupManager::BackupFinished, this,
+            &MainWindow::OnBackupFinished);
 
     show();
 
@@ -1624,6 +1633,9 @@ void MainWindow::ConnectMenuEvents() {
     connect_menu(ui->action_About, &MainWindow::OnAbout);
     connect_menu(ui->action_Eden_Dependencies, &MainWindow::OnEdenDependencies);
     connect_menu(ui->action_Data_Manager, &MainWindow::OnDataDialog);
+
+    // backup
+    connect_menu(ui->action_Backup_Settings, &MainWindow::OnBackupSettings);
 }
 
 void MainWindow::UpdateMenuState() {
@@ -3849,6 +3861,92 @@ void MainWindow::OnDataDialog() {
     OnGameListRefresh();
 }
 
+void MainWindow::OnBackupSettings() {
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Automatic Save Backup"));
+    dialog.setMinimumWidth(580);
+
+    auto* layout = new QVBoxLayout(&dialog);
+
+    // enable checkbox
+    auto* enable_check = new QCheckBox(tr("Enable automatic backup on exit"), &dialog);
+    enable_check->setChecked(backup_manager->IsAutoEnabled());
+    layout->addWidget(enable_check);
+
+    layout->addSpacing(8);
+
+    // source (read-only)
+    auto* src_label = new QLabel(tr("Source:"), &dialog);
+    layout->addWidget(src_label);
+    auto* src_field =
+        new QLineEdit(QString::fromStdString(backup_manager->GetSourcePath().string()), &dialog);
+    src_field->setReadOnly(true);
+    layout->addWidget(src_field);
+
+    // auto backups folder (read-only)
+    auto* auto_label = new QLabel(tr("Auto backups folder:"), &dialog);
+    layout->addWidget(auto_label);
+    auto* auto_field = new QLineEdit(
+        QString::fromStdString(backup_manager->GetAutoBasePath().string()), &dialog);
+    auto_field->setReadOnly(true);
+    auto_field->setToolTip(tr("Automatic backups created on exit (last 10 kept)"));
+    layout->addWidget(auto_field);
+
+    // manual backups folder (read-only)
+    auto* manual_label = new QLabel(tr("Manual backups folder:"), &dialog);
+    layout->addWidget(manual_label);
+    auto* manual_field = new QLineEdit(
+        QString::fromStdString(backup_manager->GetManualBasePath().string()), &dialog);
+    manual_field->setReadOnly(true);
+    manual_field->setToolTip(tr("Backups created when you click 'Backup Now'"));
+    layout->addWidget(manual_field);
+
+    layout->addSpacing(12);
+
+    // buttons
+    auto* button_layout = new QHBoxLayout();
+    auto* backup_now_btn = new QPushButton(tr("Backup Now"), &dialog);
+    auto* close_btn = new QPushButton(tr("Close"), &dialog);
+    button_layout->addStretch();
+    button_layout->addWidget(backup_now_btn);
+    button_layout->addWidget(close_btn);
+    layout->addLayout(button_layout);
+
+    // connections
+    connect(enable_check, &QCheckBox::toggled, this,
+            [this](bool checked) { backup_manager->SetAutoEnabled(checked); });
+
+    connect(backup_now_btn, &QPushButton::clicked, this, [this, backup_now_btn] {
+        backup_now_btn->setEnabled(false);
+        backup_now_btn->setText(tr("Backing up..."));
+        backup_manager->BackupAll(true);
+
+        // re-enable after backup finishes
+        auto conn = std::make_shared<QMetaObject::Connection>();
+        *conn = connect(backup_manager.get(), &BackupManager::BackupFinished, this,
+                        [this, backup_now_btn, conn](bool /*success*/, const QString& /*msg*/) {
+                            backup_now_btn->setEnabled(true);
+                            backup_now_btn->setText(tr("Backup Now"));
+                            disconnect(*conn);
+                        });
+    });
+
+    connect(close_btn, &QPushButton::clicked, &dialog, &QDialog::accept);
+
+    dialog.exec();
+}
+
+void MainWindow::OnBackupFinished(bool success, const QString& message) {
+    if (success) {
+        LOG_INFO(Frontend, "Backup finished: {}", message.toStdString());
+    } else {
+        LOG_ERROR(Frontend, "Backup failed: {}", message.toStdString());
+    }
+    if (message_label) {
+        message_label->setText(message);
+    }
+}
+
 void MainWindow::OnToggleFilterBar() {
     game_list->SetFilterVisible(ui->action_Show_Filter_Bar->isChecked());
     if (ui->action_Show_Filter_Bar->isChecked())
@@ -4430,6 +4528,12 @@ void MainWindow::closeEvent(QCloseEvent* event) {
     if (!ConfirmClose()) {
         event->ignore();
         return;
+    }
+
+    // run automatic backup on exit (synchronously so data is safe before quit)
+    if (backup_manager && backup_manager->IsAutoEnabled()) {
+        LOG_INFO(Frontend, "Running automatic save backup on exit");
+        backup_manager->BackupAll();
     }
 
     UpdateUISettings();

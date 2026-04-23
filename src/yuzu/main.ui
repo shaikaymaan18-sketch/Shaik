@@ -225,6 +225,8 @@
     <addaction name="separator"/>
     <addaction name="action_Capture_Screenshot"/>
     <addaction name="menuTAS"/>
+    <addaction name="separator"/>
+    <addaction name="action_Backup_Settings"/>
    </widget>
    <widget class="QMenu" name="menu_Help">
     <property name="title">
@@ -618,6 +620,11 @@
    </property>
    <property name="text">
     <string>Show &amp;Performance Overlay</string>
+   </property>
+  </action>
+  <action name="action_Backup_Settings">
+   <property name="text">
+    <string>Automatic &amp;Backup...</string>
    </property>
   </action>
  </widget>
