@@ -25,9 +25,9 @@ namespace Dynarmic {
 void EmitSpinLockLock(Xbyak::CodeGenerator& code, Xbyak::Reg64 ptr, Xbyak::Reg32 tmp, bool waitpkg) {
     // TODO: this is because we lack regalloc - so better to be safe :(
     if (waitpkg) {
-        code.push(Xbyak::util::eax);
-        code.push(Xbyak::util::ebx);
-        code.push(Xbyak::util::edx);
+        code.push(Xbyak::util::rax);
+        code.push(Xbyak::util::rbx);
+        code.push(Xbyak::util::rdx);
     }
     Xbyak::Label start, loop;
     code.jmp(start, code.T_NEAR);
@@ -58,9 +58,9 @@ void EmitSpinLockLock(Xbyak::CodeGenerator& code, Xbyak::Reg64 ptr, Xbyak::Reg32
     code.test(tmp, tmp);
     code.jnz(loop, code.T_NEAR);
     if (waitpkg) {
-        code.pop(Xbyak::util::edx);
-        code.pop(Xbyak::util::ebx);
-        code.pop(Xbyak::util::eax);
+        code.pop(Xbyak::util::rdx);
+        code.pop(Xbyak::util::rbx);
+        code.pop(Xbyak::util::rax);
     }
 }
 
