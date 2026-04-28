@@ -33,9 +33,7 @@ using TextureInstVector = boost::container::small_vector<TextureInst, 24>;
 constexpr u32 DESCRIPTOR_SIZE = 8;
 constexpr u32 DESCRIPTOR_SIZE_SHIFT = static_cast<u32>(std::countr_zero(DESCRIPTOR_SIZE));
 constexpr u32 DEFAULT_DYNAMIC_DESCRIPTOR_COUNT = 8;
-constexpr u32 DYNAMIC_DESCRIPTOR_CBUF_BYTES = 16 * 1024;
 constexpr u32 MAX_DYNAMIC_DESCRIPTOR_COUNT = 64;
-constexpr u32 TIC_INDEX_MASK = (1U << 20) - 1;
 
 u32 DynamicDescriptorSizeShift(const IR::U32& dynamic_offset) {
     const IR::Inst* const inst{dynamic_offset.InstRecursive()};
@@ -50,54 +48,9 @@ u32 DynamicDescriptorSizeShift(const IR::U32& dynamic_offset) {
     return size_shift < 31 ? size_shift : DESCRIPTOR_SIZE_SHIFT;
 }
 
-bool IsNullTextureHandle(u32 raw_handle) {
-    return (raw_handle & TIC_INDEX_MASK) == 0;
-}
-
-u32 DynamicDescriptorCount(Environment& env, u32 cbuf_index, u32 base_offset, u32 size_shift) {
-    if (size_shift >= 31) {
-        return DEFAULT_DYNAMIC_DESCRIPTOR_COUNT;
-    }
-    if (base_offset >= DYNAMIC_DESCRIPTOR_CBUF_BYTES) {
-        return 1;
-    }
-    const u32 stride{1U << size_shift};
-    const u32 available{DYNAMIC_DESCRIPTOR_CBUF_BYTES - base_offset};
-    const u32 available_count{std::max(1U, available / stride)};
-    const u32 max_count{size_shift == DESCRIPTOR_SIZE_SHIFT
-                            ? std::min(available_count, DEFAULT_DYNAMIC_DESCRIPTOR_COUNT)
-                            : std::min(available_count, MAX_DYNAMIC_DESCRIPTOR_COUNT)};
-    // dynamic handles do not expose an array length, so infer a bounded span from the cbuf payload.
-    u32 previous{env.ReadCbufValue(cbuf_index, base_offset)};
-    const u32 first{previous};
-    bool saw_valid{!IsNullTextureHandle(previous)};
-    bool saw_variation{false};
-    u32 repeat_start{0};
-    u32 repeat_count{1};
-    for (u32 i = 1; i < max_count; ++i) {
-        const u32 value{env.ReadCbufValue(cbuf_index, base_offset + (i << size_shift))};
-        if (IsNullTextureHandle(value) && saw_valid) {
-            return i;
-        }
-        saw_valid |= !IsNullTextureHandle(value);
-        if (value == previous) {
-            ++repeat_count;
-            if (saw_variation && value == first &&
-                repeat_count >= DEFAULT_DYNAMIC_DESCRIPTOR_COUNT) {
-                return repeat_start;
-            }
-            if (saw_variation && repeat_count >= DEFAULT_DYNAMIC_DESCRIPTOR_COUNT &&
-                repeat_start >= DEFAULT_DYNAMIC_DESCRIPTOR_COUNT) {
-                return repeat_start;
-            }
-            continue;
-        }
-        saw_variation = true;
-        previous = value;
-        repeat_start = i;
-        repeat_count = 1;
-    }
-    return max_count;
+u32 DynamicDescriptorCount(u32 size_shift) {
+    return size_shift == DESCRIPTOR_SIZE_SHIFT ? DEFAULT_DYNAMIC_DESCRIPTOR_COUNT
+                                               : MAX_DYNAMIC_DESCRIPTOR_COUNT;
 }
 
 IR::Opcode IndexedInstruction(const IR::Inst& inst) {
@@ -432,7 +385,7 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         .secondary_offset = 0,
         .secondary_shift_left = 0,
         .dynamic_offset = dynamic_offset,
-        .count = DynamicDescriptorCount(env, index.U32(), base_offset, size_shift),
+        .count = DynamicDescriptorCount(size_shift),
         .size_shift = size_shift,
         .has_secondary = false,
     };
