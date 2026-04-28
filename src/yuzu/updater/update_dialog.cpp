@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <QRadioButton>
+#include <QSaveFile>
 #include <QStandardPaths>
+#include <qdesktopservices.h>
 #include "common/logging.h"
 #include "qt_common/abstract/frontend.h"
 #include "qt_common/abstract/progress.h"
 #include "ui_update_dialog.h"
 #include "update_dialog.h"
-#include <QSaveFile>
-#include <qdesktopservices.h>
 
 #include "common/httplib.h"
 
@@ -25,8 +25,10 @@ UpdateDialog::UpdateDialog(const Common::Net::Release& release, QWidget* parent)
     : QDialog(parent), ui(new Ui::UpdateDialog) {
     ui->setupUi(this);
 
-    ui->version->setText(tr("%1 is available for download.").arg(QString::fromStdString(release.title)));
-    ui->url->setText(tr("<a href=\"%1\">View on Forgejo</a>").arg(QString::fromStdString(release.html_url)));
+    ui->version->setText(
+        tr("%1 is available for download.").arg(QString::fromStdString(release.title)));
+    ui->url->setText(
+        tr("<a href=\"%1\">View on Forgejo</a>").arg(QString::fromStdString(release.html_url)));
 
     std::string text{release.body};
     if (auto pos = text.find("# Packages"); pos != std::string::npos) {
@@ -51,14 +53,16 @@ UpdateDialog::UpdateDialog(const Common::Net::Release& release, QWidget* parent)
         u32 i = 0;
         for (const Common::Net::Asset& a : assets) {
             QRadioButton* r = new QRadioButton(tr(a.name.c_str()), this);
-            if (i == 0) r->setChecked(true);
+            connect(r, &QRadioButton::toggled, this, [a, this](bool checked) {
+                if (checked)
+                    m_asset = a;
+            });
+
+            if (i == 0)
+                r->setChecked(true);
             ++i;
 
             ui->radioButtons->addWidget(r);
-
-            connect(r, &QRadioButton::clicked, this, [a, this](bool checked) {
-                m_asset = a;
-            });
         }
 
         connect(this, &QDialog::accepted, this, &UpdateDialog::Download);
@@ -149,10 +153,11 @@ void UpdateDialog::Download() {
     if (response.status >= 400) {
         LOG_ERROR(Frontend, "GET to {}{} returned error status code: {}", m_asset.url, m_asset.path,
                   response.status);
-        QtCommon::Frontend::Critical(
-            tr("Failed to download file"),
-            tr("Could not download from %1%2\nError code: %3")
-                .arg(QString::fromStdString(m_asset.url), QString::fromStdString(m_asset.path), QString::number(response.status)));
+        QtCommon::Frontend::Critical(tr("Failed to download file"),
+                                     tr("Could not download from %1%2\nError code: %3")
+                                         .arg(QString::fromStdString(m_asset.url),
+                                              QString::fromStdString(m_asset.path),
+                                              QString::number(response.status)));
         return;
     }
     if (!response.headers.contains("content-type")) {
