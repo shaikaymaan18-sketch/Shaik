@@ -32,9 +32,8 @@ using TextureInstVector = boost::container::small_vector<TextureInst, 24>;
 
 constexpr u32 DESCRIPTOR_SIZE = 8;
 constexpr u32 DESCRIPTOR_SIZE_SHIFT = static_cast<u32>(std::countr_zero(DESCRIPTOR_SIZE));
-constexpr u32 DEFAULT_DYNAMIC_DESCRIPTOR_COUNT = 8;
 constexpr u32 DYNAMIC_DESCRIPTOR_CBUF_BYTES = 16 * 1024;
-constexpr u32 MAX_DYNAMIC_DESCRIPTOR_COUNT = 64;
+constexpr u32 MAX_DYNAMIC_DESCRIPTOR_COUNT = 1024;
 
 u32 DynamicDescriptorSizeShift(const IR::U32& dynamic_offset) {
     const IR::Inst* const inst{dynamic_offset.InstRecursive()};
@@ -60,9 +59,7 @@ u32 DynamicDescriptorCount(u32 base_offset, u32 size_shift) {
         return 1;
     }
     const u32 available_count{1U + (available - DESCRIPTOR_SIZE) / stride};
-    const u32 desired_count{size_shift == DESCRIPTOR_SIZE_SHIFT ? DEFAULT_DYNAMIC_DESCRIPTOR_COUNT
-                                                                : MAX_DYNAMIC_DESCRIPTOR_COUNT};
-    return std::min(desired_count, available_count);
+    return std::min(MAX_DYNAMIC_DESCRIPTOR_COUNT, available_count);
 }
 
 IR::Opcode IndexedInstruction(const IR::Inst& inst) {
