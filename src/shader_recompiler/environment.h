@@ -64,6 +64,7 @@ struct ConstBufferAddr {
     u32 secondary_shift_left;
     IR::U32 dynamic_offset;
     u32 count;
+    u32 size_shift;
     bool has_secondary;
 };
 
