@@ -16,9 +16,8 @@ namespace Shader::Backend::SPIRV {
 namespace {
 class DescriptorIndex {
 public:
-    explicit DescriptorIndex(EmitContext& ctx_, const IR::Value& index,
-                             spv::Capability capability)
-        : ctx{ctx_}, id{index.IsImmediate() ? ctx.Const(index.U32()) : ctx.Def(index)},
+    explicit DescriptorIndex(EmitContext& ctx, const IR::Value& index, spv::Capability capability)
+        : id{index.IsImmediate() ? ctx.Const(index.U32()) : ctx.Def(index)},
           is_non_uniform{ctx.profile.support_descriptor_nonuniform_indexing &&
                          !index.IsImmediate()} {
         if (!is_non_uniform) {
@@ -29,21 +28,20 @@ public:
         }
         ctx.AddCapability(spv::Capability::ShaderNonUniform);
         ctx.AddCapability(capability);
-        Decorate(id);
+        Decorate(ctx, id);
     }
 
     Id Value() const {
         return id;
     }
 
-    void Decorate(Id object) const {
+    void Decorate(EmitContext& ctx, Id object) const {
         if (is_non_uniform) {
             ctx.Decorate(object, spv::Decoration::NonUniform);
         }
     }
 
 private:
-    EmitContext& ctx;
     Id id;
     bool is_non_uniform;
 };
@@ -226,9 +224,9 @@ Id Texture(EmitContext& ctx, IR::TextureInstInfo info, [[maybe_unused]] const IR
         const DescriptorIndex idx{
             ctx, index, spv::Capability::SampledImageArrayNonUniformIndexing};
         const Id pointer{ctx.OpAccessChain(def.pointer_type, def.id, idx.Value())};
-        idx.Decorate(pointer);
+        idx.Decorate(ctx, pointer);
         const Id object{ctx.OpLoad(def.sampled_type, pointer)};
-        idx.Decorate(object);
+        idx.Decorate(ctx, object);
         return object;
     } else {
         return ctx.OpLoad(def.sampled_type, def.id);
@@ -242,9 +240,9 @@ Id TextureImage(EmitContext& ctx, IR::TextureInstInfo info, const IR::Value& ind
             const DescriptorIndex idx{
                 ctx, index, spv::Capability::UniformTexelBufferArrayNonUniformIndexing};
             const Id ptr{ctx.OpAccessChain(ctx.image_buffer_type, def.id, idx.Value())};
-            idx.Decorate(ptr);
+            idx.Decorate(ctx, ptr);
             const Id object{ctx.OpLoad(ctx.image_buffer_type, ptr)};
-            idx.Decorate(object);
+            idx.Decorate(ctx, object);
             return object;
         }
         return ctx.OpLoad(ctx.image_buffer_type, def.id);
@@ -254,9 +252,9 @@ Id TextureImage(EmitContext& ctx, IR::TextureInstInfo info, const IR::Value& ind
             const DescriptorIndex idx{
                 ctx, index, spv::Capability::SampledImageArrayNonUniformIndexing};
             const Id ptr{ctx.OpAccessChain(def.pointer_type, def.id, idx.Value())};
-            idx.Decorate(ptr);
+            idx.Decorate(ctx, ptr);
             const Id object{ctx.OpLoad(def.sampled_type, ptr)};
-            idx.Decorate(object);
+            idx.Decorate(ctx, object);
             return ctx.OpImage(def.image_type, object);
         }
         return ctx.OpImage(def.image_type, ctx.OpLoad(def.sampled_type, def.id));
@@ -270,9 +268,9 @@ std::pair<Id, bool> Image(EmitContext& ctx, const IR::Value& index, IR::TextureI
             const DescriptorIndex idx{
                 ctx, index, spv::Capability::StorageTexelBufferArrayNonUniformIndexing};
             const Id ptr{ctx.OpAccessChain(def.pointer_type, def.id, idx.Value())};
-            idx.Decorate(ptr);
+            idx.Decorate(ctx, ptr);
             const Id object{ctx.OpLoad(def.image_type, ptr)};
-            idx.Decorate(object);
+            idx.Decorate(ctx, object);
             return {object, def.is_integer};
         }
         return {ctx.OpLoad(def.image_type, def.id), def.is_integer};
@@ -282,9 +280,9 @@ std::pair<Id, bool> Image(EmitContext& ctx, const IR::Value& index, IR::TextureI
             const DescriptorIndex idx{
                 ctx, index, spv::Capability::StorageImageArrayNonUniformIndexing};
             const Id ptr{ctx.OpAccessChain(def.pointer_type, def.id, idx.Value())};
-            idx.Decorate(ptr);
+            idx.Decorate(ctx, ptr);
             const Id object{ctx.OpLoad(def.image_type, ptr)};
-            idx.Decorate(object);
+            idx.Decorate(ctx, object);
             return {object, def.is_integer};
         }
         return {ctx.OpLoad(def.image_type, def.id), def.is_integer};
