@@ -33,6 +33,7 @@ using TextureInstVector = boost::container::small_vector<TextureInst, 24>;
 constexpr u32 DESCRIPTOR_SIZE = 8;
 constexpr u32 DESCRIPTOR_SIZE_SHIFT = static_cast<u32>(std::countr_zero(DESCRIPTOR_SIZE));
 constexpr u32 DEFAULT_DYNAMIC_DESCRIPTOR_COUNT = 8;
+constexpr u32 DYNAMIC_DESCRIPTOR_CBUF_BYTES = 16 * 1024;
 constexpr u32 MAX_DYNAMIC_DESCRIPTOR_COUNT = 64;
 
 u32 DynamicDescriptorSizeShift(const IR::U32& dynamic_offset) {
@@ -45,7 +46,23 @@ u32 DynamicDescriptorSizeShift(const IR::U32& dynamic_offset) {
         return DESCRIPTOR_SIZE_SHIFT;
     }
     const u32 size_shift{shift.U32()};
-    return size_shift < 31 ? size_shift : DESCRIPTOR_SIZE_SHIFT;
+    return size_shift >= DESCRIPTOR_SIZE_SHIFT && size_shift < 31 ? size_shift
+                                                                  : DESCRIPTOR_SIZE_SHIFT;
+}
+
+u32 DynamicDescriptorCount(u32 base_offset, u32 size_shift) {
+    if (size_shift >= 31 || base_offset >= DYNAMIC_DESCRIPTOR_CBUF_BYTES) {
+        return 1;
+    }
+    const u32 stride{1U << size_shift};
+    const u32 available{DYNAMIC_DESCRIPTOR_CBUF_BYTES - base_offset};
+    if (available < DESCRIPTOR_SIZE) {
+        return 1;
+    }
+    const u32 available_count{1U + (available - DESCRIPTOR_SIZE) / stride};
+    const u32 desired_count{size_shift == DESCRIPTOR_SIZE_SHIFT ? DEFAULT_DYNAMIC_DESCRIPTOR_COUNT
+                                                                : MAX_DYNAMIC_DESCRIPTOR_COUNT};
+    return std::min(desired_count, available_count);
 }
 
 IR::Opcode IndexedInstruction(const IR::Inst& inst) {
@@ -378,8 +395,7 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         .secondary_offset = 0,
         .secondary_shift_left = 0,
         .dynamic_offset = dynamic_offset,
-        .count = size_shift == DESCRIPTOR_SIZE_SHIFT ? DEFAULT_DYNAMIC_DESCRIPTOR_COUNT
-                                                     : MAX_DYNAMIC_DESCRIPTOR_COUNT,
+        .count = DynamicDescriptorCount(base_offset, size_shift),
         .has_secondary = false,
     };
 }
