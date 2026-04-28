@@ -255,7 +255,9 @@ Id TextureImage(EmitContext& ctx, IR::TextureInstInfo info, const IR::Value& ind
             idx.Decorate(ctx, ptr);
             const Id object{ctx.OpLoad(def.sampled_type, ptr)};
             idx.Decorate(ctx, object);
-            return ctx.OpImage(def.image_type, object);
+            const Id image{ctx.OpImage(def.image_type, object)};
+            idx.Decorate(ctx, image);
+            return image;
         }
         return ctx.OpImage(def.image_type, ctx.OpLoad(def.sampled_type, def.id));
     }
