@@ -19,6 +19,7 @@ import android.os.Handler
 import android.os.Looper
 import android.text.Editable
 import android.text.InputType
+import android.text.Selection
 import android.util.AttributeSet
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
@@ -57,6 +58,7 @@ class InputOverlay(context: Context, attrs: AttributeSet?) :
     private val overlayDpads: MutableSet<InputOverlayDrawableDpad> = HashSet()
     private val overlayJoysticks: MutableSet<InputOverlayDrawableJoystick> = HashSet()
     private val imeEditable = Editable.Factory.getInstance().newEditable("")
+    private var pendingInitialText: String = ""
 
     private var inEditMode = false
     private var gamelessMode = false
@@ -85,15 +87,24 @@ class InputOverlay(context: Context, attrs: AttributeSet?) :
 
     override fun onCheckIsTextEditor(): Boolean = true
 
+    fun resetImeBuffer(initialText: String = "") {
+        pendingInitialText = initialText
+    }
+
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection {
         imeEditable.clear()
+        if (pendingInitialText.isNotEmpty()) {
+            imeEditable.append(pendingInitialText)
+        }
+        pendingInitialText = ""
+        Selection.setSelection(imeEditable, imeEditable.length)
         outAttrs.inputType =
             InputType.TYPE_CLASS_TEXT or
                 InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or
                 InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
         outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_ACTION_DONE
-        outAttrs.initialSelStart = 0
-        outAttrs.initialSelEnd = 0
+        outAttrs.initialSelStart = imeEditable.length
+        outAttrs.initialSelEnd = imeEditable.length
 
         return object : BaseInputConnection(this, true) {
             override fun getEditable(): Editable = imeEditable

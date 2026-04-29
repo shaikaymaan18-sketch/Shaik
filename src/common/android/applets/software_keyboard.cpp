@@ -109,6 +109,7 @@ void AndroidKeyboard::InitializeKeyboard(
     }
 
     parameters = std::move(initialize_parameters);
+    m_current_text = parameters.initial_text;
 
     LOG_INFO(Frontend,
              "\nKeyboardInitializeParameters:"
@@ -185,9 +186,13 @@ void AndroidKeyboard::ShowInlineKeyboard(
 
     // Pivot to a new thread, as we cannot call GetEnvForThread() from a Fiber.
     m_is_inline_active = true;
-    std::thread([&] {
+    // Pass m_current_text as initial_text so Kotlin receives any text set via InlineTextChanged
+    // before this call (e.g. game pre-fills the field in the same Calc request as appear).
+    std::thread([&, current_text = m_current_text] {
+        Core::Frontend::KeyboardInitializeParameters p = parameters;
+        p.initial_text = current_text;
         GetEnvForThread()->CallStaticVoidMethod(s_software_keyboard_class, s_swkbd_execute_inline,
-                                                ToJKeyboardParams(parameters));
+                                                ToJKeyboardParams(p));
     }).join();
 }
 
@@ -206,6 +211,8 @@ void AndroidKeyboard::InlineTextChanged(
              "\ninput_text={}"
              "\ncursor_position={}",
              Common::UTF16ToUTF8(text_parameters.input_text), text_parameters.cursor_position);
+
+    m_current_text = text_parameters.input_text;
 
     submit_inline_callback(Service::AM::Frontend::SwkbdReplyType::ChangedString,
                            text_parameters.input_text, text_parameters.cursor_position);

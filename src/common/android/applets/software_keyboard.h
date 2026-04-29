@@ -57,7 +57,7 @@ private:
 
 private:
     mutable bool m_is_inline_active{};
-    std::u16string m_current_text;
+    mutable std::u16string m_current_text;
 };
 
 // Should be called in JNI_Load

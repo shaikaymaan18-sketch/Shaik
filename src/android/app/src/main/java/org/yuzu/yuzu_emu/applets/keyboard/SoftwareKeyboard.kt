@@ -20,6 +20,7 @@ import java.io.Serializable
 import org.yuzu.yuzu_emu.NativeLibrary
 import org.yuzu.yuzu_emu.R
 import org.yuzu.yuzu_emu.applets.keyboard.ui.KeyboardDialogFragment
+import org.yuzu.yuzu_emu.overlay.InputOverlay
 
 @Keep
 object SoftwareKeyboard {
@@ -37,6 +38,7 @@ object SoftwareKeyboard {
         val emulationActivity = NativeLibrary.sEmulationActivity.get()
 
         val overlayView = emulationActivity!!.findViewById<View>(R.id.surface_input_overlay)
+        (overlayView as? InputOverlay)?.resetImeBuffer(config.initial_text ?: "")
         overlayView.requestFocus()
         val im =
             overlayView.context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
