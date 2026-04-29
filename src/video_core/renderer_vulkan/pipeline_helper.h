@@ -11,6 +11,7 @@
 #include <boost/container/small_vector.hpp>
 
 #include "common/common_types.h"
+#include "common/logging.h"
 #include "shader_recompiler/backend/spirv/emit_spirv.h"
 #include "shader_recompiler/shader_info.h"
 #include "video_core/renderer_vulkan/vk_texture_cache.h"
@@ -188,8 +189,10 @@ inline void PushImageDescriptors(TextureCache& texture_cache,
     const u32 num_image_buffers = Shader::NumDescriptors(info.image_buffer_descriptors);
     views += num_texture_buffers;
     views += num_image_buffers;
+    u32 texture_array_index{};
     for (const auto& desc : info.texture_descriptors) {
         bool is_rescaled{};
+        u32 rescaled_elements{};
         for (u32 index = 0; index < desc.count; ++index) {
             const VideoCommon::ImageViewId image_view_id{(views++)->id};
             const VideoCommon::SamplerId sampler_id{*(samplers++)};
@@ -203,11 +206,20 @@ inline void PushImageDescriptors(TextureCache& texture_cache,
             guest_descriptor_queue.AddSampledImage(vk_image_view, vk_sampler);
             const bool element_rescaled{texture_cache.IsRescaling(image_view)};
             is_rescaled |= element_rescaled;
+            rescaled_elements += element_rescaled ? 1U : 0U;
         }
         rescaling.PushTexture(is_rescaled);
+        if (desc.count > 1 && rescaled_elements != 0) {
+            LOG_INFO(Render_Vulkan,
+                     "RescaleDiag sampled_array={} count={} rescaled_elements={} aggregate_rescaled={}",
+                     texture_array_index, desc.count, rescaled_elements, is_rescaled);
+        }
+        ++texture_array_index;
     }
+    u32 image_array_index{};
     for (const auto& desc : info.image_descriptors) {
         bool is_rescaled{};
+        u32 rescaled_elements{};
         for (u32 index = 0; index < desc.count; ++index) {
             ImageView& image_view{texture_cache.GetImageView((views++)->id)};
             if (desc.is_written) {
@@ -217,8 +229,15 @@ inline void PushImageDescriptors(TextureCache& texture_cache,
             guest_descriptor_queue.AddImage(vk_image_view);
             const bool element_rescaled{texture_cache.IsRescaling(image_view)};
             is_rescaled |= element_rescaled;
+            rescaled_elements += element_rescaled ? 1U : 0U;
         }
         rescaling.PushImage(is_rescaled);
+        if (desc.count > 1 && rescaled_elements != 0) {
+            LOG_INFO(Render_Vulkan,
+                     "RescaleDiag storage_image_array={} count={} rescaled_elements={} aggregate_rescaled={}",
+                     image_array_index, desc.count, rescaled_elements, is_rescaled);
+        }
+        ++image_array_index;
     }
 }
 

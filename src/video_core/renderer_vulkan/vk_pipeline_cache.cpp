@@ -58,6 +58,112 @@ using VideoCommon::FileEnvironment;
 using VideoCommon::GenericEnvironment;
 using VideoCommon::GraphicsEnvironment;
 
+constexpr std::array ShaderProgramNames{
+    "vertex_a",
+    "vertex_b",
+    "tess_control",
+    "tess_eval",
+    "geometry",
+    "fragment",
+};
+
+constexpr std::array ShaderStageNames{
+    "vertex",
+    "tess_control",
+    "tess_eval",
+    "geometry",
+    "fragment",
+};
+
+constexpr u32 TextureHandleSizeShift = 3;
+
+u32 DynamicSampledTextureArrayCount(const Shader::Info& info) {
+    u32 count{};
+    for (const auto& desc : info.texture_descriptors) {
+        if (desc.count > 1) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+u32 NonDefaultSampledTextureStrideCount(const Shader::Info& info) {
+    u32 count{};
+    for (const auto& desc : info.texture_descriptors) {
+        if (desc.count > 1 && desc.size_shift != TextureHandleSizeShift) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+u32 MaxSampledTextureArrayCount(const Shader::Info& info) {
+    u32 count{};
+    for (const auto& desc : info.texture_descriptors) {
+        count = std::max(count, desc.count);
+    }
+    return count;
+}
+
+u32 MaxSampledTextureSizeShift(const Shader::Info& info) {
+    u32 shift{};
+    for (const auto& desc : info.texture_descriptors) {
+        shift = std::max(shift, desc.size_shift);
+    }
+    return shift;
+}
+
+u32 SampledTextureArrayCountAbove(const Shader::Info& info, u32 threshold) {
+    u32 count{};
+    for (const auto& desc : info.texture_descriptors) {
+        if (desc.count > threshold) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+u32 SampledTextureArrayCountAtLeast(const Shader::Info& info, u32 threshold) {
+    u32 count{};
+    for (const auto& desc : info.texture_descriptors) {
+        if (desc.count >= threshold) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+void LogGraphicsPipelineKey(u64 hash, const GraphicsPipelineCacheKey& key,
+                            bool sampled_nonuniform_enabled) {
+    LOG_INFO(Render_Vulkan,
+             "PipelineDiag hash=0x{:016x} sampled_nonuniform={} shaders=[{}=0x{:016x}, {}=0x{:016x}, {}=0x{:016x}, {}=0x{:016x}, {}=0x{:016x}, {}=0x{:016x}]",
+             hash, sampled_nonuniform_enabled, ShaderProgramNames[0], key.unique_hashes[0],
+             ShaderProgramNames[1], key.unique_hashes[1], ShaderProgramNames[2],
+             key.unique_hashes[2], ShaderProgramNames[3], key.unique_hashes[3],
+             ShaderProgramNames[4], key.unique_hashes[4], ShaderProgramNames[5],
+             key.unique_hashes[5]);
+}
+
+void LogGraphicsPipelineStage(u64 hash, size_t stage_index, u64 shader_hash,
+                              const Shader::Info& info, size_t spirv_words) {
+    const u32 dynamic_sampled_arrays{DynamicSampledTextureArrayCount(info)};
+    if (dynamic_sampled_arrays == 0) {
+        return;
+    }
+    LOG_INFO(Render_Vulkan,
+             "PipelineDiag hash=0x{:016x} stage={} shader=0x{:016x} spirv_words={} sampled_textures={} dynamic_sampled_arrays={} non_default_stride_arrays={} max_sampled_array={} max_sampled_shift={} arrays_gt64={} arrays_gt256={} arrays_1024={} texture_buffers={} image_buffers={} storage_images={} storage_buffers={} constant_buffers={} render_area={}",
+             hash, ShaderStageNames[stage_index], shader_hash, spirv_words,
+             Shader::NumDescriptors(info.texture_descriptors), dynamic_sampled_arrays,
+             NonDefaultSampledTextureStrideCount(info), MaxSampledTextureArrayCount(info),
+             MaxSampledTextureSizeShift(info), SampledTextureArrayCountAbove(info, 64),
+             SampledTextureArrayCountAbove(info, 256), SampledTextureArrayCountAtLeast(info, 1024),
+             Shader::NumDescriptors(info.texture_buffer_descriptors),
+             Shader::NumDescriptors(info.image_buffer_descriptors),
+             Shader::NumDescriptors(info.image_descriptors),
+             Shader::NumDescriptors(info.storage_buffers_descriptors),
+             Shader::NumDescriptors(info.constant_buffer_descriptors), info.uses_render_area);
+}
+
 constexpr u32 CACHE_VERSION = 16;
 constexpr std::array<char, 8> VULKAN_CACHE_MAGIC_NUMBER{'y', 'u', 'z', 'u', 'v', 'k', 'c', 'h'};
 
@@ -714,6 +820,7 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
     bool build_in_parallel) try {
     auto hash = key.Hash();
     LOG_INFO(Render_Vulkan, "0x{:016x}", hash);
+    LogGraphicsPipelineKey(hash, key, profile.support_sampled_image_array_nonuniform_indexing);
     size_t env_index{0};
     std::array<Shader::IR::Program, Maxwell::MaxShaderProgram> programs;
     const bool uses_vertex_a{key.unique_hashes[0] != 0};
@@ -780,6 +887,8 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
         const std::vector<u32> code{EmitSPIRV(profile, runtime_info, program, binding)};
         device.SaveShader(code);
         modules[stage_index] = BuildShader(device, code);
+        LogGraphicsPipelineStage(hash, stage_index, key.unique_hashes[index], program.info,
+                                 code.size());
 
         // Log shader compilation to GPU logger (with SPIR-V binary dump if enabled)
         if (Settings::values.gpu_logging_enabled.GetValue()) {
