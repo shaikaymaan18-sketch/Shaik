@@ -368,11 +368,8 @@ public:
         return GetDriverID() != VK_DRIVER_ID_QUALCOMM_PROPRIETARY;
     }
 
-    bool IsDescriptorNonUniformIndexingSupported() const {
-        return features.descriptor_indexing.shaderSampledImageArrayNonUniformIndexing &&
-               features.descriptor_indexing.shaderStorageImageArrayNonUniformIndexing &&
-               features.descriptor_indexing.shaderUniformTexelBufferArrayNonUniformIndexing &&
-               features.descriptor_indexing.shaderStorageTexelBufferArrayNonUniformIndexing;
+    bool IsSampledImageArrayNonUniformIndexingSupported() const {
+        return features.descriptor_indexing.shaderSampledImageArrayNonUniformIndexing;
     }
 
     /// Returns true if the device supports float64 natively.
