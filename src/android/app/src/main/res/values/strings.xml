@@ -512,7 +512,7 @@
     <string name="emulate_bgr565">Emulate BGR565</string>
     <string name="emulate_bgr565_description">Fixes problems with inverted colors in games or strange artifacts or strange shadows.</string>
     <string name="rescale_hack">Enable Legacy Rescale Pass</string>
-    <string name="rescale_hack_description">Fixes Luigi Mansion 3 artifact lines.</string>
+    <string name="rescale_hack_description">Enables a legacy handling for the rescale configuration pass for games by using a quick rescale path</string>
     <string name="renderer_asynchronous_shaders">Use asynchronous shaders</string>
     <string name="renderer_asynchronous_shaders_description">Compiles shaders asynchronously. This may reduce stutters but may also introduce glitches.</string>
     <string name="gpu_unswizzle_settings">GPU Unswizzle Settings</string>
