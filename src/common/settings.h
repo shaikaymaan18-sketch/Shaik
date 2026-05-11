@@ -394,7 +394,7 @@ struct Values {
 #else
         true,
 #endif
-                                                           "use_asynchronous_gpu_emulation", Category::Renderer};
+        "use_asynchronous_gpu_emulation", Category::Renderer};
     // *nix platforms may have issues with the borderless windowed fullscreen mode.
     // Default to exclusive fullscreen on these platforms for now.
     SwitchableSetting<FullscreenMode, true> fullscreen_mode{linkage,
