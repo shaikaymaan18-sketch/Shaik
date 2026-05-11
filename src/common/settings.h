@@ -389,7 +389,7 @@ struct Values {
                                                   true};
 
     SwitchableSetting<bool> use_asynchronous_gpu_emulation{
-                                                           linkage, false, "use_asynchronous_gpu_emulation", Category::Renderer};
+                                                           linkage, true, "use_asynchronous_gpu_emulation", Category::Renderer};
     // *nix platforms may have issues with the borderless windowed fullscreen mode.
     // Default to exclusive fullscreen on these platforms for now.
     SwitchableSetting<FullscreenMode, true> fullscreen_mode{linkage,
