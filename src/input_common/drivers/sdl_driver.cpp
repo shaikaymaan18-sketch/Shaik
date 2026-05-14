@@ -479,18 +479,18 @@ std::shared_ptr<SDLJoystick> SDLDriver::GetSDLJoystickByGamepadID(SDL_JoystickID
     return *vec_it;
 }
 
-void SDLDriver::InitJoystick(int joystick_index) {
-    SDL_Joystick* sdl_joystick = SDL_OpenJoystick(joystick_index);
+void SDLDriver::InitJoystick(SDL_JoystickID joystick_id) {
+    SDL_Joystick* sdl_joystick = SDL_OpenJoystick(joystick_id);
     SDL_Gamepad* sdl_gamecontroller = nullptr;
     int battery_percent = -1;
     SDL_PowerState battery_state = SDL_POWERSTATE_UNKNOWN;
 
-    if (SDL_IsGamepad(joystick_index)) {
-        sdl_gamecontroller = SDL_OpenGamepad(joystick_index);
+    if (SDL_IsGamepad(joystick_id)) {
+        sdl_gamecontroller = SDL_OpenGamepad(joystick_id);
     }
 
     if (!sdl_joystick) {
-        LOG_ERROR(Input, "Failed to open joystick {}", joystick_index);
+        LOG_ERROR(Input, "Failed to open joystick {}", joystick_id);
         return;
     }
 
@@ -501,7 +501,7 @@ void SDLDriver::InitJoystick(int joystick_index) {
     if (Settings::values.enable_joycon_driver) {
         if (guid.uuid[5] == 0x05 && guid.uuid[4] == 0x7e &&
             (guid.uuid[8] == 0x06 || guid.uuid[8] == 0x07)) {
-            LOG_WARNING(Input, "Preferring joycon driver for device index {}", joystick_index);
+            LOG_WARNING(Input, "Preferring joycon driver for device index {}", joystick_id);
             SDL_CloseJoystick(sdl_joystick);
             return;
         }
@@ -509,7 +509,7 @@ void SDLDriver::InitJoystick(int joystick_index) {
 
     if (Settings::values.enable_procon_driver) {
         if (guid.uuid[5] == 0x05 && guid.uuid[4] == 0x7e && guid.uuid[8] == 0x09) {
-            LOG_WARNING(Input, "Preferring joycon driver for device index {}", joystick_index);
+            LOG_WARNING(Input, "Preferring joycon driver for device index {}", joystick_id);
             SDL_CloseJoystick(sdl_joystick);
             return;
         }
@@ -703,7 +703,7 @@ SDLDriver::SDLDriver(std::string input_engine_) : InputEngine(std::move(input_en
     SDL_JoystickID* joysticks = SDL_GetJoysticks(&joystick_count);
     if (joysticks != nullptr) {
         for (int i = 0; i < joystick_count; ++i) {
-            InitJoystick(static_cast<int>(joysticks[i]));
+            InitJoystick(joysticks[i]);
         }
         SDL_free(joysticks);
     }

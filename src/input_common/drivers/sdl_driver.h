@@ -70,7 +70,7 @@ public:
     bool IsVibrationEnabled(const PadIdentifier& identifier) override;
 
 private:
-    void InitJoystick(int joystick_index);
+    void InitJoystick(SDL_JoystickID joystick_id);
     void CloseJoystick(SDL_Joystick* sdl_joystick);
 
     /// Needs to be called before SDL_QuitSubSystem.
