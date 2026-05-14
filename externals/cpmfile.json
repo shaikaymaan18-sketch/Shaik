@@ -123,13 +123,14 @@
             "BUNDLE_SPEEX ON"
         ]
     },
-    "sdl2": {
+    "sdl3": {
         "ci": true,
-        "package": "SDL2",
-        "name": "SDL2",
-        "repo": "crueter-ci/SDL2",
-        "version": "2.32.10-3c28e8ecc0",
-        "min_version": "2.26.4"
+        "package": "SDL3",
+        "name": "SDL3",
+        "repo": "libsdl-org/SDL",
+        "tag": "release-%VERSION%",
+        "version": "3.4.8",
+        "min_version": "3.4.0"
     },
     "catch2": {
         "package": "Catch2",
@@ -157,22 +158,23 @@
         "find_args": "MODULE",
         "git_version": "4.25"
     },
-    "sdl2_generic": {
-        "package": "SDL2",
+    "sdl3_generic": {
+        "package": "SDL3",
         "repo": "libsdl-org/SDL",
         "tag": "release-%VERSION%",
-        "hash": "d5622d6bb7266f7942a7b8ad43e8a22524893bf0c2ea1af91204838d9b78d32768843f6faa248757427b8404b8c6443776d4afa6b672cd8571a4e0c03a829383",
+        "hash": "",
         "bundled": true,
-        "git_version": "2.32.10",
+        "git_version": "3.4.8",
         "skip_updates": true
     },
-    "sdl2_steamdeck": {
-        "package": "SDL2",
+    "sdl3_steamdeck": {
+        "package": "SDL3",
         "repo": "libsdl-org/SDL",
-        "sha": "cc016b0046",
-        "hash": "b8d9873446cdb922387471df9968e078714683046674ef0d0edddf8e25da65a539a3bae83d635496b970237f90b07b36a69f8d7855d450de59311d6d6e8c3dbc",
+        "tag": "release-%VERSION%",
+        "hash": "",
+        "git_version": "3.4.8",
         "bundled": true,
-        "skip_updates": "true"
+        "skip_updates": true
     },
     "moltenvk": {
         "repo": "V380-Ori/Ryujinx.MoltenVK",
