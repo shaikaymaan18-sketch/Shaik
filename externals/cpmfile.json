@@ -128,7 +128,6 @@
         "package": "SDL3",
         "name": "SDL3",
         "repo": "crueter-ci/SDL3",
-        "tag": "release-%VERSION%",
         "version": "3.4.8-d57c3b685c",
         "min_version": "3.4.0"
     },
@@ -162,7 +161,7 @@
         "package": "SDL3",
         "repo": "libsdl-org/SDL",
         "tag": "release-%VERSION%",
-        "hash": "",
+        "hash": "df5a323af7ac366661a3c0e887969c72584d232f3cc211419d59b0487b620b6b2859d4549c9e8df002ee489290062e466fcfddf7edc0872a37b1f2845e81c0f3",
         "bundled": true,
         "git_version": "3.4.8",
         "skip_updates": true
@@ -171,7 +170,7 @@
         "package": "SDL3",
         "repo": "libsdl-org/SDL",
         "tag": "release-%VERSION%",
-        "hash": "",
+        "hash": "df5a323af7ac366661a3c0e887969c72584d232f3cc211419d59b0487b620b6b2859d4549c9e8df002ee489290062e466fcfddf7edc0872a37b1f2845e81c0f3",
         "git_version": "3.4.8",
         "bundled": true,
         "skip_updates": true
