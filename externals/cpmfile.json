@@ -127,9 +127,9 @@
         "ci": true,
         "package": "SDL3",
         "name": "SDL3",
-        "repo": "libsdl-org/SDL",
+        "repo": "crueter-ci/SDL3",
         "tag": "release-%VERSION%",
-        "version": "3.4.8",
+        "version": "3.4.8-d57c3b685c",
         "min_version": "3.4.0"
     },
     "catch2": {
