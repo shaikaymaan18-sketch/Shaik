@@ -37,7 +37,9 @@ void EmitSpinLockLock(Xbyak::CodeGenerator& code, Xbyak::Reg64 ptr, Xbyak::Reg32
 
         // XBYAK BUG: code.umonitor(ptr); see issue #255
         // replace once xbyak has been fixed
-        code.db(0xF3); code.db(0x0F); code.db(0xAE);
+        code.db(0xF3);
+        if (ptr.getIdx() >= 8) code.db(0x41);
+        code.db(0x0F); code.db(0xAE);
         code.db(uint8_t((3 << 6) | ((6 & 7) << 3) | (ptr.getIdx() & 7)));
 
         // tmp.bit[0] = 0: C0.1 | Slow Wakup | Better Savings
