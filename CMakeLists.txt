@@ -358,10 +358,6 @@ if (CXX_GCC OR CXX_CLANG)
     endif()
 endif()
 
-# Other presets, e.g. steamdeck
-# TODO(crueter): Just have every Linux/Windows use old sdl2
-set(YUZU_SYSTEM_PROFILE "generic" CACHE STRING "CMake and Externals profile to use. One of: generic, steamdeck")
-
 # Configure C++ standard
 # ===========================
 

@@ -123,7 +123,7 @@
             "BUNDLE_SPEEX ON"
         ]
     },
-    "sdl3": {
+    "sdl3-ci": {
         "ci": true,
         "package": "SDL3",
         "name": "SDL3",
@@ -157,22 +157,13 @@
         "find_args": "MODULE",
         "git_version": "4.25"
     },
-    "sdl3_generic": {
+    "sdl3": {
         "package": "SDL3",
         "repo": "libsdl-org/SDL",
         "tag": "release-%VERSION%",
         "hash": "df5a323af7ac366661a3c0e887969c72584d232f3cc211419d59b0487b620b6b2859d4549c9e8df002ee489290062e466fcfddf7edc0872a37b1f2845e81c0f3",
         "bundled": true,
         "git_version": "3.4.8",
-        "skip_updates": true
-    },
-    "sdl3_steamdeck": {
-        "package": "SDL3",
-        "repo": "libsdl-org/SDL",
-        "tag": "release-%VERSION%",
-        "hash": "df5a323af7ac366661a3c0e887969c72584d232f3cc211419d59b0487b620b6b2859d4549c9e8df002ee489290062e466fcfddf7edc0872a37b1f2845e81c0f3",
-        "git_version": "3.4.8",
-        "bundled": true,
         "skip_updates": true
     },
     "moltenvk": {
