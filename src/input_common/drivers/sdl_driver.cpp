@@ -125,11 +125,12 @@ public:
         std::scoped_lock lock{mutex};
         const u64 sensor_timestamp = event.sensor_timestamp != 0 ? event.sensor_timestamp
                                                                  : event.timestamp;
+
         if (last_motion_update == 0) {
             last_motion_update = sensor_timestamp;
             return false;
         }
-        if (sensor_timestamp <= last_motion_update) {
+        if (sensor_timestamp < last_motion_update) {
             return false;
         }
 
