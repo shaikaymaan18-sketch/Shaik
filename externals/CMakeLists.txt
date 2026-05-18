@@ -136,8 +136,7 @@ if(ENABLE_CUBEB)
 endif()
 
 if (NOT ANDROID)
-    if (YUZU_USE_EXTERNAL_SDL3)
-        message(STATUS "Using SDL3 from externals.")
+    if (YUZU_USE_BUNDLED_SDL3)
         if (NOT WIN32)
             # Yuzu itself needs: Atomic Audio Events Joystick Haptic Sensor Threads Timers
             # Since 2.0.18 Atomic+Threads required for HIDAPI/libusb (see https://github.com/libsdl-org/SDL/issues/5095)
@@ -158,16 +157,14 @@ if (NOT ANDROID)
             set(SDL_FILE ON)
         endif()
 
-        AddJsonPackage("sdl3")
-    elseif (YUZU_USE_BUNDLED_SDL3)
+        AddJsonPackage(sdl3)
+    else()
         message(STATUS "Using bundled SDL3")
         if (PLATFORM_FREEBSD)
             set(BUILD_SHARED_LIBS ON)
         endif()
         AddJsonPackage(sdl3-ci)
     endif()
-
-    find_package(SDL3 3.4 REQUIRED)
 
     # Normalize SDL3 link target across package variants.
     # Some SDL3 packages export only SDL3::SDL3-shared or SDL3::SDL3-static.
