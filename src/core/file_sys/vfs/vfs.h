@@ -16,6 +16,12 @@
 #include "core/file_sys/fs_filesystem.h"
 #include "core/file_sys/vfs/vfs_types.h"
 
+#undef CreateFile
+#undef CopyFile
+#undef MoveFile
+#undef DeleteFile
+#undef CreateDirectory
+
 namespace FileSys {
 
 // An enumeration representing what can be at the end of a path in a VfsFilesystem
