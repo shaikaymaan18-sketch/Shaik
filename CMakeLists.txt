@@ -588,9 +588,9 @@ if (ENABLE_QT)
             set(Qt6_DIR "" CACHE PATH "Additional path to search for Qt6 libraries like C:/Qt/6.8.3/msvc2022_64/lib/cmake/Qt6")
         endif()
         list(APPEND CMAKE_PREFIX_PATH "${Qt6_DIR}")
-
-        find_package(Qt6 REQUIRED)
     endif()
+
+    find_package(Qt6 REQUIRED COMPONENTS Core)
 
     if (NOT DEFINED QT_TARGET_PATH)
         get_target_property(qtcore_path Qt6::Core LOCATION_Release)
@@ -633,7 +633,7 @@ if (ENABLE_QT)
         list(APPEND YUZU_QT_COMPONENTS LinguistTools)
     endif()
 
-    find_package(Qt6 REQUIRED COMPONENTS ${YUZU_QT_COMPONENTS})
+    find_package(Qt6 REQUIRED COMPONENTS ${YUZU_QT_COMPONENTS} OPTIONAL_COMPONENTS ${YUZU_QT_OPTIONAL})
     set(QT_MAJOR_VERSION 6)
     # Qt6 sets cxx_std_17 and we need to undo that
     set_target_properties(Qt6::Platform PROPERTIES INTERFACE_COMPILE_FEATURES "")
