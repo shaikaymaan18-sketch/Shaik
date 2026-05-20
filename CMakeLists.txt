@@ -582,32 +582,14 @@ if (ENABLE_QT)
         else()
             AddQt(6.9.3)
         endif()
-
-        set(YUZU_STATIC_BUILD ON)
     else()
         message(STATUS "Using system Qt")
         if (NOT Qt6_DIR)
             set(Qt6_DIR "" CACHE PATH "Additional path to search for Qt6 libraries like C:/Qt/6.8.3/msvc2022_64/lib/cmake/Qt6")
         endif()
         list(APPEND CMAKE_PREFIX_PATH "${Qt6_DIR}")
-    endif()
 
-    find_package(Qt6 CONFIG REQUIRED COMPONENTS Widgets Charts Concurrent)
-
-    if (YUZU_USE_QT_MULTIMEDIA)
-        find_package(Qt6 REQUIRED COMPONENTS Multimedia)
-    endif()
-
-    if (PLATFORM_LINUX OR PLATFORM_FREEBSD)
-        # yes Qt, we get it
-        set(QT_NO_PRIVATE_MODULE_WARNING ON)
-        find_package(Qt6 REQUIRED COMPONENTS DBus OPTIONAL_COMPONENTS GuiPrivate)
-    elseif (UNIX AND NOT APPLE)
-        find_package(Qt6 REQUIRED COMPONENTS DBus Gui)
-    endif()
-
-    if (ENABLE_QT_TRANSLATION)
-        find_package(Qt6 REQUIRED COMPONENTS LinguistTools)
+        find_package(Qt6 REQUIRED)
     endif()
 
     if (NOT DEFINED QT_TARGET_PATH)
@@ -631,16 +613,22 @@ if (ENABLE_QT)
     ## Components ##
 
     # Best practice is to ask for all components at once, so they are from the same version
-    set(YUZU_QT_COMPONENTS Core Widgets Charts Concurrent)
-    if (PLATFORM_LINUX)
+    set(YUZU_QT_COMPONENTS Core Widgets Charts Concurrent Gui)
+    if (PLATFORM_LINUX OR PLATFORM_FREEBSD)
         list(APPEND YUZU_QT_COMPONENTS DBus)
+        # yes Qt, we get it
+        set(QT_NO_PRIVATE_MODULE_WARNING ON)
+        list(APPEND YUZU_QT_OPTIONAL GuiPrivate)
     endif()
+
     if (YUZU_USE_QT_MULTIMEDIA)
         list(APPEND YUZU_QT_COMPONENTS Multimedia)
     endif()
+
     if (YUZU_USE_QT_WEB_ENGINE)
         list(APPEND YUZU_QT_COMPONENTS WebEngineCore WebEngineWidgets)
     endif()
+
     if (ENABLE_QT_TRANSLATION)
         list(APPEND YUZU_QT_COMPONENTS LinguistTools)
     endif()
