@@ -3924,7 +3924,7 @@ void MainWindow::OnBackupSettings() {
         // re-enable after backup finishes
         auto conn = std::make_shared<QMetaObject::Connection>();
         *conn = connect(backup_manager.get(), &BackupManager::BackupFinished, this,
-                        [this, backup_now_btn, conn](bool /*success*/, const QString& /*msg*/) {
+                        [backup_now_btn, conn](bool /*success*/, const QString& /*msg*/) {
                             backup_now_btn->setEnabled(true);
                             backup_now_btn->setText(tr("Backup Now"));
                             disconnect(*conn);
