@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <vector>
 
@@ -12,8 +13,15 @@
 
 namespace Dynarmic::IR {
 class Block;
+class Inst;
 class LocationDescriptor;
+enum class Cond;
+enum class Opcode;
 }  // namespace Dynarmic::IR
+
+namespace Dynarmic::A32 {
+class Coprocessor;
+}  // namespace Dynarmic::A32
 
 namespace Dynarmic::Backend::LoongArch64 {
 
@@ -35,6 +43,13 @@ struct EmittedBlockInfo {
     std::vector<Relocation> relocations;
 };
 
-EmittedBlockInfo EmitLoongArch64(lagoon_assembler_t& as, IR::Block block);
+struct EmitConfig {};
+
+struct EmitContext;
+
+template<IR::Opcode op>
+void EmitIR(lagoon_assembler_t& as, EmitContext& ctx, IR::Inst* inst);
+
+EmittedBlockInfo EmitLoongArch64(lagoon_assembler_t& as, IR::Block block, const EmitConfig& emit_conf);
 
 }  // namespace Dynarmic::Backend::LoongArch64

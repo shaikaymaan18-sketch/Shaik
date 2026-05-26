@@ -92,7 +92,8 @@ EmittedBlockInfo A32AddressSpace::Emit(IR::Block block) {
         ClearCache();
     }
 
-    EmittedBlockInfo block_info = EmitLoongArch64(cb.as, std::move(block));
+    EmitConfig emit_conf{};
+    EmittedBlockInfo block_info = EmitLoongArch64(cb.as, std::move(block), emit_conf);
     Link(block_info);
 
     return block_info;
