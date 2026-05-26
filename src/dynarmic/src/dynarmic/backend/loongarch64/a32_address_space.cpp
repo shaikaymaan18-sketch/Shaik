@@ -6,6 +6,7 @@
 #include "common/assert.h"
 
 #include "dynarmic/backend/loongarch64/a32_jitstate.h"
+#include "dynarmic/backend/loongarch64/abi.h"
 #include "dynarmic/backend/loongarch64/emit_loongarch64.h"
 #include "dynarmic/frontend/A32/a32_location_descriptor.h"
 #include "dynarmic/frontend/A32/translate/a32_translate.h"
@@ -62,8 +63,10 @@ void A32AddressSpace::EmitPrelude() {
         la_st_d(&cb.as, static_cast<la_gpr_t>(i), LA_SP, static_cast<int32_t>(i * 8));
     }
 
-    // Jump to block entry (a0)
-    la_jr(&cb.as, LA_A0);
+    // Set up reserved registers and jump to block entry
+    la_move(&cb.as, Xstate, LA_A1);  // Xstate = state ptr
+    la_move(&cb.as, Xhalt, LA_A2);   // Xhalt  = halt reason ptr
+    la_jr(&cb.as, LA_A0);            // jump to block_entry
 
     prelude_info.return_from_run_code = GetCursorPtr<CodePtr>();
 

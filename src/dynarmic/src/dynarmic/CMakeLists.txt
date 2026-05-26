@@ -306,6 +306,8 @@ if ("loongarch64" IN_LIST ARCHITECTURE)
         backend/loongarch64/emit_context.h
         backend/loongarch64/emit_loongarch64.cpp
         backend/loongarch64/emit_loongarch64.h
+        backend/loongarch64/emit_loongarch64_a32.cpp
+        backend/loongarch64/emit_loongarch64_data_processing.cpp
         backend/loongarch64/a32_address_space.cpp
         backend/loongarch64/a32_address_space.h
         backend/loongarch64/a32_interface.cpp

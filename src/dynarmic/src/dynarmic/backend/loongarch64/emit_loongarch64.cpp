@@ -19,8 +19,40 @@ void EmitIR(lagoon_assembler_t&, EmitContext&, IR::Inst*) {
 }
 
 template<>
+void EmitIR<IR::Opcode::Void>(lagoon_assembler_t&, EmitContext&, IR::Inst*) {}
+
+template<>
+void EmitIR<IR::Opcode::A32GetRegister>(lagoon_assembler_t&, EmitContext& ctx, IR::Inst* inst);
+
+template<>
+void EmitIR<IR::Opcode::A32SetRegister>(lagoon_assembler_t&, EmitContext& ctx, IR::Inst* inst);
+
+template<>
+void EmitIR<IR::Opcode::A32SetCpsrNZC>(lagoon_assembler_t&, EmitContext& ctx, IR::Inst* inst);
+
+template<>
+void EmitIR<IR::Opcode::LogicalShiftLeft32>(lagoon_assembler_t&, EmitContext& ctx, IR::Inst* inst);
+
+template<>
 void EmitIR<IR::Opcode::GetCarryFromOp>(lagoon_assembler_t&, EmitContext& ctx, IR::Inst* inst) {
     ASSERT(ctx.reg_alloc.IsValueLive(inst));
+}
+
+template<>
+void EmitIR<IR::Opcode::GetNZFromOp>(lagoon_assembler_t& as, EmitContext& ctx, IR::Inst* inst) {
+    auto args = ctx.reg_alloc.GetArgumentInfo(inst);
+
+    auto Xvalue = ctx.reg_alloc.ReadX(args[0]);
+    auto Xnz = ctx.reg_alloc.WriteX(inst);
+    RegAlloc::Realize(Xvalue, Xnz);
+
+    // Z flag (bit 30): set if value == 0
+    la_sltui(&as, Xnz->index, Xvalue->index, 1);
+    la_slli_d(&as, Xnz->index, Xnz->index, 30);
+    // N flag (bit 31): set if value < 0 (signed)
+    la_slt(&as, Xscratch0, Xvalue->index, LA_ZERO);
+    la_slli_d(&as, Xscratch0, Xscratch0, 31);
+    la_or(&as, Xnz->index, Xnz->index, Xscratch0);
 }
 
 EmittedBlockInfo EmitLoongArch64(lagoon_assembler_t& as, IR::Block block, const EmitConfig& emit_conf) {
