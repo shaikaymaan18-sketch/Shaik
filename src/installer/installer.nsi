@@ -150,6 +150,8 @@ Section -Post
 
   WriteRegStr HKCU "Software\Classes\.nsp" "" "$(^Name)"
   WriteRegStr HKCU "Software\Classes\.xci" "" "$(^Name)"
+  WriteRegStr HKCU "Software\Classes\.nro" "" "$(^Name)"
+  WriteRegStr HKCU "Software\Classes\.kip" "" "$(^Name)"
   WriteRegStr HKCU "Software\Classes\$(^Name)\DefaultIcon" "" "$INSTDIR\eden.exe,0"
   WriteRegStr HKCU "Software\Classes\$(^Name)\Shell\open\command" "" '"$INSTDIR\eden.exe" %1'
 SectionEnd
@@ -169,6 +171,8 @@ Section Uninstall
 
   DeleteRegKey HKCU "Software\Classes\.nsp"
   DeleteRegKey HKCU "Software\Classes\.xci"
+  DeleteRegKey HKCU "Software\Classes\.nro"
+  DeleteRegKey HKCU "Software\Classes\.kip"
   DeleteRegKey HKCU "Software\Classes\$(^Name)"
 
   DeleteRegKey HKCU "Software\Classes\discord-1397286652128264252"
