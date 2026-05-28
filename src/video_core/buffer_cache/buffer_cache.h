@@ -1621,8 +1621,11 @@ bool BufferCache<P>::SynchronizeBuffer(Buffer& buffer, DAddr device_addr, u32 si
     upload_copies.clear();
     u64 total_size_bytes = 0;
     u64 largest_copy = 0;
-    const DAddr buffer_start = buffer.cpu_addr_cached;
+    DAddr buffer_start = buffer.cpu_addr_cached;
     memory_tracker.ForEachUploadRange(device_addr, size, [&](u64 device_addr_out, u64 range_size) {
+        if (IsRegionGpuModified(device_addr_out, range_size)) {
+            return;
+        }
         upload_copies.push_back(BufferCopy{
             .src_offset = total_size_bytes,
             .dst_offset = device_addr_out - buffer_start,
@@ -1634,7 +1637,7 @@ bool BufferCache<P>::SynchronizeBuffer(Buffer& buffer, DAddr device_addr, u32 si
     if (total_size_bytes == 0) {
         return true;
     }
-    const std::span<BufferCopy> copies_span(upload_copies.data(), upload_copies.size());
+    std::span<BufferCopy> copies_span(upload_copies.data(), upload_copies.size());
     UploadMemory(buffer, total_size_bytes, largest_copy, copies_span);
     any_buffer_uploaded = true;
     return false;
