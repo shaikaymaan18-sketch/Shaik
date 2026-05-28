@@ -1633,7 +1633,7 @@ bool BufferCache<P>::SynchronizeBuffer(Buffer& buffer, DAddr device_addr, u32 si
             .size = sz
         });
         staging_offset += sz;
-        largest_copy = std::max(largest_copy, sz);
+        largest_copy = (std::max)(largest_copy, sz);
     };
     memory_tracker.ForEachUploadRange(device_addr, size, [&](u64 addr, u64 range_size) {
         u64 start = addr;
@@ -1641,7 +1641,7 @@ bool BufferCache<P>::SynchronizeBuffer(Buffer& buffer, DAddr device_addr, u32 si
         gpu_modified_ranges.ForEachInRange(start, range_size, [&](u64 gstart, u64 gsize) {
             u64 gend = gstart + gsize;
             push(start, gstart);
-            start = std::max(start, gend);
+            start = (std::max)(start, gend);
         });
         push(start, end);
         ClearDownload(addr, range_size);
