@@ -1,17 +1,32 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 9ff14c8..72dd753 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -301,6 +301,12 @@ if(ANDROID)
-     )
- endif()
- 
-+# posix_spawn can race with overlayfs in containers, use fork+execve instead.
-+if(NOT WIN32)
-+    string(REPLACE ";" " " _openssl_build_cmd "${OPENSSL_BUILD_COMMAND}")
-+    set(OPENSSL_BUILD_COMMAND sh -c "${_openssl_build_cmd}")
-+endif()
-+
- file(GLOB_RECURSE OPENSSL_SOURCES
-     ${OpenSSL_SOURCE_DIR}/*.[ch]
-     ${OpenSSL_SOURCE_DIR}/*.[ch].in
+--- a/b/CMakeLists.txt	2026-06-01 23:36:05.100736306 -0400
++++ b/CMakeLists.txt	2026-06-01 23:36:05.103332124 -0400
+@@ -313,12 +313,22 @@
+     ${OPENSSL_SHARED_SSL_LIBRARY}
+ )
+ -add_custom_command(
+ -    OUTPUT ${OPENSSL_BUILD_OUTPUT}
+ -    COMMAND ${OPENSSL_BUILD_COMMAND}
+ -    DEPENDS ${OPENSSL_SOURCES}
+ -    WORKING_DIRECTORY ${OpenSSL_BINARY_DIR}
+ -    VERBATIM
+ -)
+ +
+ +if(WIN32)
+ +    add_custom_command(
+ +        OUTPUT ${OPENSSL_BUILD_OUTPUT}
+ +        COMMAND ${OPENSSL_BUILD_COMMAND}
+ +        DEPENDS ${OPENSSL_SOURCES}
+ +        WORKING_DIRECTORY ${OpenSSL_BINARY_DIR}
+ +        VERBATIM
+ +    )
+ +else()
+ +    add_custom_command(
+ +        OUTPUT ${OPENSSL_BUILD_OUTPUT}
+ +        COMMAND cd ${OpenSSL_BINARY_DIR} && ${OPENSSL_BUILD_COMMAND}
+ +        DEPENDS ${OPENSSL_SOURCES}
+ +        VERBATIM
+ +    )
+ +endif()
+  
+  if(PROJECT_IS_TOP_LEVEL)
+     add_custom_target(openssl-build ALL DEPENDS ${OPENSSL_BUILD_OUTPUT})
