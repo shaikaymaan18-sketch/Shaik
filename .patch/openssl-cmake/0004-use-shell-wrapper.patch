@@ -1,32 +1,33 @@
---- a/b/CMakeLists.txt	2026-06-01 23:36:05.100736306 -0400
-+++ b/CMakeLists.txt	2026-06-01 23:36:05.103332124 -0400
-@@ -313,12 +313,22 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 9ff14c8..7837d84 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -312,13 +312,21 @@ set(OPENSSL_BUILD_OUTPUT
+     ${OPENSSL_SHARED_CRYPTO_LIBRARY}
      ${OPENSSL_SHARED_SSL_LIBRARY}
  )
- -add_custom_command(
- -    OUTPUT ${OPENSSL_BUILD_OUTPUT}
- -    COMMAND ${OPENSSL_BUILD_COMMAND}
- -    DEPENDS ${OPENSSL_SOURCES}
- -    WORKING_DIRECTORY ${OpenSSL_BINARY_DIR}
- -    VERBATIM
- -)
- +
- +if(WIN32)
- +    add_custom_command(
- +        OUTPUT ${OPENSSL_BUILD_OUTPUT}
- +        COMMAND ${OPENSSL_BUILD_COMMAND}
- +        DEPENDS ${OPENSSL_SOURCES}
- +        WORKING_DIRECTORY ${OpenSSL_BINARY_DIR}
- +        VERBATIM
- +    )
- +else()
- +    add_custom_command(
- +        OUTPUT ${OPENSSL_BUILD_OUTPUT}
- +        COMMAND cd ${OpenSSL_BINARY_DIR} && ${OPENSSL_BUILD_COMMAND}
- +        DEPENDS ${OPENSSL_SOURCES}
- +        VERBATIM
- +    )
- +endif()
-  
-  if(PROJECT_IS_TOP_LEVEL)
+-add_custom_command(
+-    OUTPUT ${OPENSSL_BUILD_OUTPUT}
+-    COMMAND ${OPENSSL_BUILD_COMMAND}
+-    DEPENDS ${OPENSSL_SOURCES}
+-    WORKING_DIRECTORY ${OpenSSL_BINARY_DIR}
+-    VERBATIM
+-)
++
++if (WIN32)
++    add_custom_command(
++        OUTPUT ${OPENSSL_BUILD_OUTPUT}
++        COMMAND ${OPENSSL_BUILD_COMMAND}
++        DEPENDS ${OPENSSL_SOURCES}
++        WORKING_DIRECTORY ${OpenSSL_BINARY_DIR}
++        VERBATIM)
++else()
++    add_custom_command(
++        OUTPUT ${OPENSSL_BUILD_OUTPUT}
++        COMMAND cd ${OpenSSL_BINARY_DIR} && ${OPENSSL_BUILD_COMMAND}
++        DEPENDS ${OPENSSL_SOURCES}
++        VERBATIM)
++endif()
+ 
+ if(PROJECT_IS_TOP_LEVEL)
      add_custom_target(openssl-build ALL DEPENDS ${OPENSSL_BUILD_OUTPUT})
