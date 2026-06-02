@@ -1,0 +1,17 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 9ff14c8..72dd753 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -301,6 +301,12 @@ if(ANDROID)
+     )
+ endif()
+ 
++# posix_spawn can race with overlayfs in containers, use fork+execve instead.
++if(NOT WIN32)
++    string(REPLACE ";" " " _openssl_build_cmd "${OPENSSL_BUILD_COMMAND}")
++    set(OPENSSL_BUILD_COMMAND sh -c "${_openssl_build_cmd}")
++endif()
++
+ file(GLOB_RECURSE OPENSSL_SOURCES
+     ${OpenSSL_SOURCE_DIR}/*.[ch]
+     ${OpenSSL_SOURCE_DIR}/*.[ch].in
