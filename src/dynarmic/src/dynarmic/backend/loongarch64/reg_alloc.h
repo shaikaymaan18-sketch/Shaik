@@ -5,7 +5,6 @@
 
 #include <array>
 #include <optional>
-#include <random>
 #include <utility>
 #include <vector>
 
@@ -73,12 +72,10 @@ public:
 
 private:
     friend class RegAlloc;
-    explicit Argument(RegAlloc& reg_alloc)
-            : reg_alloc{reg_alloc} {}
+    explicit Argument() {}
 
-    bool allocated = false;
-    RegAlloc& reg_alloc;
     IR::Value value;
+    bool allocated = false;
 };
 
 template<typename T>
@@ -111,10 +108,11 @@ private:
 struct HostLocInfo final {
     std::vector<const IR::Inst*> values;
     size_t locked = 0;
-    bool realized = false;
     size_t uses_this_inst = 0;
     size_t accumulated_uses = 0;
     size_t expected_uses = 0;
+    bool realized = false;
+    size_t lru_counter = 0;
 
     bool Contains(const IR::Inst*) const;
     void SetupScratchLocation();
@@ -127,7 +125,7 @@ public:
     using ArgumentInfo = std::array<Argument, IR::max_arg_count>;
 
     explicit RegAlloc(lagoon_assembler_t& as, std::vector<u32> gpr_order, std::vector<u32> fpr_order)
-            : as{as}, gpr_order{gpr_order}, fpr_order{fpr_order}, rand_gen{std::random_device{}()} {}
+            : as{as}, gpr_order{std::move(gpr_order)}, fpr_order{std::move(fpr_order)} {}
 
     ArgumentInfo GetArgumentInfo(IR::Inst* inst);
     bool IsValueLive(IR::Inst* inst) const;
@@ -146,8 +144,6 @@ public:
 
     void DefineAsExisting(IR::Inst* inst, Argument& arg);
 
-    void SpillAll();
-
     template<typename... Ts>
     static void Realize(Ts&... rs) {
         static_assert((mcl::is_instance_of_template<RAReg, Ts>() && ...));
@@ -165,10 +161,9 @@ private:
     u32 GenerateImmediate(const IR::Value& value);
     template<HostLoc::Kind kind>
     u32 RealizeReadImpl(const IR::Value& value);
-    template<HostLoc::Kind kind>
-    u32 RealizeWriteImpl(const IR::Inst* value);
+    u32 RealizeWriteImpl(const IR::Inst* value, HostLoc::Kind required_kind);
 
-    u32 AllocateRegister(const std::array<HostLocInfo, 32>& regs, const std::vector<u32>& order) const;
+    u32 AllocateRegister(const std::vector<u32>& order, size_t base_offset);
     void SpillGpr(u32 index);
     void SpillFpr(u32 index);
     u32 FindFreeSpill() const;
@@ -181,11 +176,13 @@ private:
     std::vector<u32> gpr_order;
     std::vector<u32> fpr_order;
 
-    std::array<HostLocInfo, 32> gprs;
-    std::array<HostLocInfo, 32> fprs;
-    std::array<HostLocInfo, SpillCount> spills;
+    static constexpr size_t GprCount = 32;
+    static constexpr size_t FprCount = 32;
+    static constexpr size_t GprOffset = 0;
+    static constexpr size_t FprOffset = GprCount;
+    static constexpr size_t SpillOffset = GprCount + FprCount;
 
-    mutable std::mt19937 rand_gen;
+    std::array<HostLocInfo, GprCount + FprCount + SpillCount> hostloc_info;
 };
 
 template<typename T>
@@ -226,9 +223,9 @@ RAReg<T>::~RAReg() {
 template<typename T>
 void RAReg<T>::Realize() {
     if (write && value.IsEmpty()) {
-        reg = T{reg_alloc.RealizeWriteImpl<kind>(nullptr)};
+        reg = T{reg_alloc.RealizeWriteImpl(nullptr, kind)};
     } else {
-        reg = T{write ? reg_alloc.RealizeWriteImpl<kind>(value.GetInst()) : reg_alloc.RealizeReadImpl<kind>(value)};
+        reg = T{write ? reg_alloc.RealizeWriteImpl(value.GetInst(), kind) : reg_alloc.RealizeReadImpl<kind>(value)};
     }
 }
 

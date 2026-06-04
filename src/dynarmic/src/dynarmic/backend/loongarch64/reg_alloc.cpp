@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <limits>
 
 #include "dynarmic/backend/loongarch64/lagoon_cpp.h"
 
@@ -82,7 +83,7 @@ void HostLocInfo::SetupScratchLocation() {
 }
 
 bool HostLocInfo::IsCompletelyEmpty() const {
-    return values.empty() && !locked && !realized && !accumulated_uses && !expected_uses && !uses_this_inst;
+    return values.empty() && !locked && !accumulated_uses && !expected_uses && !uses_this_inst && !realized;
 }
 
 void HostLocInfo::UpdateUses() {
@@ -97,7 +98,7 @@ void HostLocInfo::UpdateUses() {
 }
 
 RegAlloc::ArgumentInfo RegAlloc::GetArgumentInfo(IR::Inst* inst) {
-    ArgumentInfo ret = {Argument{*this}, Argument{*this}, Argument{*this}, Argument{*this}};
+    ArgumentInfo ret = {Argument{}, Argument{}, Argument{}, Argument{}};
     for (size_t i = 0; i < inst->NumArgs(); i++) {
         const IR::Value arg = inst->GetArg(i);
         ret[i].value = arg;
@@ -114,14 +115,8 @@ bool RegAlloc::IsValueLive(IR::Inst* inst) const {
 }
 
 void RegAlloc::UpdateAllUses() {
-    for (auto& gpr : gprs) {
-        gpr.UpdateUses();
-    }
-    for (auto& fpr : fprs) {
-        fpr.UpdateUses();
-    }
-    for (auto& spill : spills) {
-        spill.UpdateUses();
+    for (auto& info : hostloc_info) {
+        info.UpdateUses();
     }
 }
 
@@ -141,17 +136,15 @@ void RegAlloc::DefineAsExisting(IR::Inst* inst, Argument& arg) {
 void RegAlloc::AssertNoMoreUses() const {
     // TODO: Re-enable this assert once all register allocation issues are fixed
     // const auto is_empty = [](const auto& i) { return i.IsCompletelyEmpty(); };
-    // ASSERT(std::all_of(gprs.begin(), gprs.end(), is_empty));
-    // ASSERT(std::all_of(fprs.begin(), fprs.end(), is_empty));
-    // ASSERT(std::all_of(spills.begin(), spills.end(), is_empty));
+    // ASSERT(std::all_of(hostloc_info.begin(), hostloc_info.end(), is_empty));
 }
 
 template<HostLoc::Kind kind>
 u32 RegAlloc::GenerateImmediate(const IR::Value& value) {
     if constexpr (kind == HostLoc::Kind::Gpr) {
-        const u32 new_location_index = AllocateRegister(gprs, gpr_order);
+        const u32 new_location_index = AllocateRegister(gpr_order, GprOffset);
         SpillGpr(new_location_index);
-        gprs[new_location_index].SetupScratchLocation();
+        hostloc_info[GprOffset + new_location_index].SetupScratchLocation();
 
         la_load_immediate64(&as, static_cast<la_gpr_t>(new_location_index),
                             static_cast<int64_t>(value.GetImmediateAsU64()));
@@ -183,7 +176,7 @@ u32 RegAlloc::RealizeReadImpl(const IR::Value& value) {
     ASSERT(!ValueInfo(*current_location).locked);
 
     if constexpr (required_kind == HostLoc::Kind::Gpr) {
-        const u32 new_location_index = AllocateRegister(gprs, gpr_order);
+        const u32 new_location_index = AllocateRegister(gpr_order, GprOffset);
         SpillGpr(new_location_index);
 
         switch (current_location->kind) {
@@ -199,11 +192,11 @@ u32 RegAlloc::RealizeReadImpl(const IR::Value& value) {
             break;
         }
 
-        gprs[new_location_index] = std::exchange(ValueInfo(*current_location), {});
-        gprs[new_location_index].realized = true;
+        hostloc_info[GprOffset + new_location_index] = std::exchange(ValueInfo(*current_location), {});
+        hostloc_info[GprOffset + new_location_index].realized = true;
         return new_location_index;
     } else if constexpr (required_kind == HostLoc::Kind::Fpr) {
-        const u32 new_location_index = AllocateRegister(fprs, fpr_order);
+        const u32 new_location_index = AllocateRegister(fpr_order, FprOffset);
         SpillFpr(new_location_index);
 
         switch (current_location->kind) {
@@ -219,27 +212,26 @@ u32 RegAlloc::RealizeReadImpl(const IR::Value& value) {
             break;
         }
 
-        fprs[new_location_index] = std::exchange(ValueInfo(*current_location), {});
-        fprs[new_location_index].realized = true;
+        hostloc_info[FprOffset + new_location_index] = std::exchange(ValueInfo(*current_location), {});
+        hostloc_info[FprOffset + new_location_index].realized = true;
         return new_location_index;
     } else {
         UNREACHABLE();
     }
 }
 
-template<HostLoc::Kind required_kind>
-u32 RegAlloc::RealizeWriteImpl(const IR::Inst* value) {
+u32 RegAlloc::RealizeWriteImpl(const IR::Inst* value, HostLoc::Kind required_kind) {
     if (value == nullptr) {
         // Scratch register allocation
-        if constexpr (required_kind == HostLoc::Kind::Gpr) {
-            const u32 idx = AllocateRegister(gprs, gpr_order);
+        if (required_kind == HostLoc::Kind::Gpr) {
+            const u32 idx = AllocateRegister(gpr_order, GprOffset);
             SpillGpr(idx);
-            gprs[idx].SetupScratchLocation();
+            hostloc_info[GprOffset + idx].SetupScratchLocation();
             return idx;
-        } else if constexpr (required_kind == HostLoc::Kind::Fpr) {
-            const u32 idx = AllocateRegister(fprs, fpr_order);
+        } else if (required_kind == HostLoc::Kind::Fpr) {
+            const u32 idx = AllocateRegister(fpr_order, FprOffset);
             SpillFpr(idx);
-            fprs[idx].SetupScratchLocation();
+            hostloc_info[FprOffset + idx].SetupScratchLocation();
             return idx;
         }
     }
@@ -254,15 +246,15 @@ u32 RegAlloc::RealizeWriteImpl(const IR::Inst* value) {
         info.expected_uses = value->UseCount();
     };
 
-    if constexpr (required_kind == HostLoc::Kind::Gpr) {
-        const u32 new_location_index = AllocateRegister(gprs, gpr_order);
+    if (required_kind == HostLoc::Kind::Gpr) {
+        const u32 new_location_index = AllocateRegister(gpr_order, GprOffset);
         SpillGpr(new_location_index);
-        setup_location(gprs[new_location_index]);
+        setup_location(hostloc_info[GprOffset + new_location_index]);
         return new_location_index;
-    } else if constexpr (required_kind == HostLoc::Kind::Fpr) {
-        const u32 new_location_index = AllocateRegister(fprs, fpr_order);
+    } else if (required_kind == HostLoc::Kind::Fpr) {
+        const u32 new_location_index = AllocateRegister(fpr_order, FprOffset);
         SpillFpr(new_location_index);
-        setup_location(fprs[new_location_index]);
+        setup_location(hostloc_info[FprOffset + new_location_index]);
         return new_location_index;
     } else {
         UNREACHABLE();
@@ -271,61 +263,79 @@ u32 RegAlloc::RealizeWriteImpl(const IR::Inst* value) {
 
 template u32 RegAlloc::RealizeReadImpl<HostLoc::Kind::Gpr>(const IR::Value& value);
 template u32 RegAlloc::RealizeReadImpl<HostLoc::Kind::Fpr>(const IR::Value& value);
-template u32 RegAlloc::RealizeWriteImpl<HostLoc::Kind::Gpr>(const IR::Inst* value);
-template u32 RegAlloc::RealizeWriteImpl<HostLoc::Kind::Fpr>(const IR::Inst* value);
 
-u32 RegAlloc::AllocateRegister(const std::array<HostLocInfo, 32>& regs, const std::vector<u32>& order) const {
-    const auto empty = std::find_if(order.begin(), order.end(), [&](u32 i) { return regs[i].values.empty() && !regs[i].locked; });
+u32 RegAlloc::AllocateRegister(const std::vector<u32>& order, size_t base_offset) {
+    const auto empty = std::find_if(order.begin(), order.end(), [&](u32 i) {
+        auto& info = hostloc_info[base_offset + i];
+        return info.values.empty() && !info.locked;
+    });
     if (empty != order.end()) {
         return *empty;
     }
 
     std::vector<u32> candidates;
-    std::copy_if(order.begin(), order.end(), std::back_inserter(candidates), [&](u32 i) { return !regs[i].locked; });
+    std::copy_if(order.begin(), order.end(), std::back_inserter(candidates), [&](u32 i) {
+        return !hostloc_info[base_offset + i].locked;
+    });
+    ASSERT(!candidates.empty());
 
-    // TODO: LRU
-    std::uniform_int_distribution<size_t> dis{0, candidates.size() - 1};
-    return candidates[dis(rand_gen)];
+    u32 best = candidates[0];
+    size_t min_lru = hostloc_info[base_offset + best].lru_counter;
+    for (size_t i = 1; i < candidates.size(); ++i) {
+        auto& info = hostloc_info[base_offset + candidates[i]];
+        if (info.lru_counter < min_lru) {
+            min_lru = info.lru_counter;
+            best = candidates[i];
+        }
+    }
+    hostloc_info[base_offset + best].lru_counter++;
+    return best;
 }
 
 void RegAlloc::SpillGpr(u32 index) {
-    ASSERT(!gprs[index].locked && !gprs[index].realized);
-    if (gprs[index].values.empty()) {
+    auto& gpr_info = hostloc_info[GprOffset + index];
+    ASSERT(!gpr_info.locked && !gpr_info.realized);
+    if (gpr_info.values.empty()) {
         return;
     }
     const u32 new_location_index = FindFreeSpill();
     la_st_d(&as, static_cast<la_gpr_t>(index), LA_SP,
             static_cast<int32_t>(spill_offset + new_location_index * spill_slot_size));
-    spills[new_location_index] = std::exchange(gprs[index], {});
+    hostloc_info[SpillOffset + new_location_index] = std::exchange(gpr_info, {});
 }
 
 void RegAlloc::SpillFpr(u32 index) {
-    ASSERT(!fprs[index].locked && !fprs[index].realized);
-    if (fprs[index].values.empty()) {
+    auto& fpr_info = hostloc_info[FprOffset + index];
+    ASSERT(!fpr_info.locked && !fpr_info.realized);
+    if (fpr_info.values.empty()) {
         return;
     }
     const u32 new_location_index = FindFreeSpill();
     la_fst_d(&as, static_cast<la_fpr_t>(index), LA_SP,
              static_cast<int32_t>(spill_offset + new_location_index * spill_slot_size));
-    spills[new_location_index] = std::exchange(fprs[index], {});
+    hostloc_info[SpillOffset + new_location_index] = std::exchange(fpr_info, {});
 }
 
 u32 RegAlloc::FindFreeSpill() const {
-    const auto iter = std::find_if(spills.begin(), spills.end(), [](const HostLocInfo& info) { return info.values.empty(); });
-    ASSERT(iter != spills.end() && "All spill locations are full");
-    return static_cast<u32>(iter - spills.begin());
+    for (size_t i = 0; i < SpillCount; ++i) {
+        if (hostloc_info[SpillOffset + i].values.empty()) {
+            return static_cast<u32>(i);
+        }
+    }
+    UNREACHABLE();
 }
 
 std::optional<HostLoc> RegAlloc::ValueLocation(const IR::Inst* value) const {
-    const auto contains_value = [value](const HostLocInfo& info) {
-        return info.Contains(value);
-    };
-    if (const auto iter = std::find_if(gprs.begin(), gprs.end(), contains_value); iter != gprs.end()) {
-        return HostLoc{HostLoc::Kind::Gpr, static_cast<u32>(iter - gprs.begin())};
-    } else if (const auto iter = std::find_if(fprs.begin(), fprs.end(), contains_value); iter != fprs.end()) {
-        return HostLoc{HostLoc::Kind::Fpr, static_cast<u32>(iter - fprs.begin())};
-    } else if (const auto iter = std::find_if(spills.begin(), spills.end(), contains_value); iter != spills.end()) {
-        return HostLoc{HostLoc::Kind::Spill, static_cast<u32>(iter - spills.begin())};
+    for (size_t i = 0; i < hostloc_info.size(); ++i) {
+        if (hostloc_info[i].Contains(value)) {
+            if (i < GprCount) {
+                return HostLoc{HostLoc::Kind::Gpr, static_cast<u32>(i)};
+            } else if (i < GprCount + FprCount) {
+                return HostLoc{HostLoc::Kind::Fpr, static_cast<u32>(i - GprCount)};
+            } else {
+                return HostLoc{HostLoc::Kind::Spill, static_cast<u32>(i - GprCount - FprCount)};
+            }
+        }
     }
     return std::nullopt;
 }
@@ -333,25 +343,20 @@ std::optional<HostLoc> RegAlloc::ValueLocation(const IR::Inst* value) const {
 HostLocInfo& RegAlloc::ValueInfo(HostLoc host_loc) {
     switch (host_loc.kind) {
     case HostLoc::Kind::Gpr:
-        return gprs[size_t(host_loc.index)];
+        return hostloc_info[GprOffset + host_loc.index];
     case HostLoc::Kind::Fpr:
-        return fprs[size_t(host_loc.index)];
+        return hostloc_info[FprOffset + host_loc.index];
     case HostLoc::Kind::Spill:
-        return spills[size_t(host_loc.index)];
+        return hostloc_info[SpillOffset + host_loc.index];
     }
     UNREACHABLE();
 }
 
 HostLocInfo& RegAlloc::ValueInfo(const IR::Inst* value) {
-    const auto contains_value = [value](const HostLocInfo& info) {
-        return info.Contains(value);
-    };
-    if (const auto iter = std::find_if(gprs.begin(), gprs.end(), contains_value); iter != gprs.end()) {
-        return *iter;
-    } else if (const auto iter = std::find_if(fprs.begin(), fprs.end(), contains_value); iter != fprs.end()) {
-        return *iter;
-    } else if (const auto iter = std::find_if(spills.begin(), spills.end(), contains_value); iter != spills.end()) {
-        return *iter;
+    for (auto& info : hostloc_info) {
+        if (info.Contains(value)) {
+            return info;
+        }
     }
     UNREACHABLE();
 }

@@ -37,10 +37,10 @@ struct Relocation {
 };
 
 struct EmittedBlockInfo {
+    std::vector<Relocation> relocations;
     CodePtr entry_point;
     size_t size;
     size_t cycle_count;
-    std::vector<Relocation> relocations;
 };
 
 struct EmitConfig {};
