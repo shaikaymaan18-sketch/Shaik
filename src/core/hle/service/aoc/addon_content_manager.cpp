@@ -42,8 +42,9 @@ static std::vector<u64> AccumulateAOCTitleIDs(Core::System& system) {
         std::remove_if(
             add_on_content.begin(), add_on_content.end(),
             [&rcu](u64 tid) {
-                return rcu.GetEntry(tid, FileSys::ContentRecordType::Data)->GetStatus() !=
-                       Loader::ResultStatus::Success;
+                auto entry = rcu.GetEntry(tid, FileSys::ContentRecordType::Data);
+                return entry == nullptr ||
+                    entry->GetStatus() != Loader::ResultStatus::Success;
             }),
         add_on_content.end());
     return add_on_content;
@@ -88,8 +89,14 @@ IAddOnContentManager::~IAddOnContentManager() {
     service_context.CloseEvent(aoc_change_event);
 }
 
+void IAddOnContentManager::RefreshAddOnContentList() {
+    add_on_content = AccumulateAOCTitleIDs(system);
+}
+
 Result IAddOnContentManager::CountAddOnContent(Out<u32> out_count, ClientProcessId process_id) {
     LOG_DEBUG(Service_AOC, "called. process_id={}", process_id.pid);
+
+    RefreshAddOnContentList();
 
     const auto current = system.GetApplicationProcessProgramID();
 
@@ -111,6 +118,8 @@ Result IAddOnContentManager::ListAddOnContent(Out<u32> out_count,
                                               u32 offset, u32 count, ClientProcessId process_id) {
     LOG_DEBUG(Service_AOC, "called with offset={}, count={}, process_id={}", offset, count,
               process_id.pid);
+
+    RefreshAddOnContentList();
 
     const auto current = FileSys::GetBaseTitleID(system.GetApplicationProcessProgramID());
 
