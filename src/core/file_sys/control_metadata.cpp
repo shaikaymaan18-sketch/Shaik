@@ -135,18 +135,25 @@ const LanguageEntry& NACP::GetLanguageEntry() const {
         }
     }();
 
-    u32 index = u32(language);
+    const auto index = static_cast<size_t>(language);
 
-    if (index < language_entries.size() && !language_entries[index].GetApplicationName().empty()) {
+    if (index < language_entries.size() &&
+        !language_entries[index].GetApplicationName().empty()) {
         return language_entries[index];
     }
 
     for (const auto& entry : language_entries) {
-        if (!entry.GetApplicationName().empty())
-          return entry;
+        if (!entry.GetApplicationName().empty()) {
+            return entry;
+        }
     }
 
-    return language_entries.at(static_cast<u8>(Language::AmericanEnglish));
+    if (!language_entries.empty()) {
+        return language_entries.front();
+    }
+
+    static const LanguageEntry empty_entry{};
+    return empty_entry;
 }
 
 std::vector<std::string> NACP::GetApplicationNames() const {
