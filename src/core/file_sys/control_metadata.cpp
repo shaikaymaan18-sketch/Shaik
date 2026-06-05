@@ -128,7 +128,7 @@ const LanguageEntry& NACP::GetLanguageEntry() const {
         case Settings::Language::Russian: return Language::Russian;
         case Settings::Language::Spanish: return Language::Spanish;
         case Settings::Language::SpanishLatin: return Language::LatinAmericanSpanish;
-        case Settings::Language::Taiwanese: return Language::SimplifiedChinese;
+        case Settings::Language::Taiwanese: return Language::TraditionalChinese;
         case Settings::Language::Thai: return Language::Thai;
         case Settings::Language::Polish: return Language::Polish;
         default: return Language::AmericanEnglish;
