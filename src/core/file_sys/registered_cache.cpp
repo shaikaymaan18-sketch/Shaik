@@ -1345,7 +1345,19 @@ void ExternalContentProvider::ScanDirectory(const VirtualDir& dir) {
         return;
     }
 
-    for (const auto& file : dir->GetFiles()) {
+    auto files = dir->GetFiles();
+    std::sort(files.begin(), files.end(), [](const VirtualFile& lhs, const VirtualFile& rhs) {
+        if (lhs == nullptr || rhs == nullptr) {
+            return lhs != nullptr;
+        }
+        return lhs->GetName() < rhs->GetName();
+    });
+
+    for (const auto& file : files) {
+        if (file == nullptr) {
+            continue;
+        }
+
         const auto filename = file->GetName();
         const auto dot_pos = filename.find_last_of('.');
 
@@ -1362,7 +1374,15 @@ void ExternalContentProvider::ScanDirectory(const VirtualDir& dir) {
         }
     }
 
-    for (const auto& subdir : dir->GetSubdirectories()) {
+    auto subdirs = dir->GetSubdirectories();
+    std::sort(subdirs.begin(), subdirs.end(), [](const VirtualDir& lhs, const VirtualDir& rhs) {
+        if (lhs == nullptr || rhs == nullptr) {
+            return lhs != nullptr;
+        }
+        return lhs->GetName() < rhs->GetName();
+    });
+
+    for (const auto& subdir : subdirs) {
         ScanDirectory(subdir);
     }
 }
