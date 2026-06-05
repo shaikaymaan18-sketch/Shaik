@@ -1619,6 +1619,7 @@ void BufferCache<P>::TouchBuffer(Buffer& buffer, BufferId buffer_id) noexcept {
 template <class P>
 bool BufferCache<P>::SynchronizeBuffer(Buffer& buffer, DAddr device_addr, u32 size) {
     upload_copies.clear();
+    boost::container::small_vector<std::pair<u64, u64>, 8> uploaded_ranges;
     u64 staging_offset = 0;
     u64 largest_copy = 0;
     DAddr buffer_start = buffer.CpuAddr();
@@ -1632,6 +1633,7 @@ bool BufferCache<P>::SynchronizeBuffer(Buffer& buffer, DAddr device_addr, u32 si
             .dst_offset = start - buffer_start,
             .size = sz
         });
+        uploaded_ranges.emplace_back(start, sz);
         staging_offset += sz;
         largest_copy = (std::max)(largest_copy, sz);
     };
@@ -1644,9 +1646,11 @@ bool BufferCache<P>::SynchronizeBuffer(Buffer& buffer, DAddr device_addr, u32 si
             start = (std::max)(start, gend);
         });
         push(start, end);
+    });
+    for (const auto& [addr, range_size] : uploaded_ranges) {
         ClearDownload(addr, range_size);
         gpu_modified_ranges.Subtract(addr, range_size);
-    });
+    }
     if (upload_copies.empty()) {
         return true;
     }
