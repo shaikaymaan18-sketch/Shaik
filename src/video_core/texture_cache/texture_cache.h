@@ -1509,7 +1509,7 @@ void TextureCache<P>::TickAsyncUnswizzle() {
 
         const bool whole_texture = adaptive_batch == 0xFFFFFFFF;
         const u32 z_start = static_cast<u32>(task.last_submitted_offset / task.bytes_per_slice);
-        const u32 slices_to_process = (std::min)(complete_slices, swizzle_slices_per_batch);
+        const u32 slices_to_process = (std::min)(complete_slices, adaptive_batch);
 
         if (whole_texture) {
             const auto uploads = FullUploadSwizzles(task.info);
