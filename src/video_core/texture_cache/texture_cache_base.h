@@ -421,6 +421,10 @@ private:
 
     void QueueAsyncDecode(Image& image, ImageId image_id);
     void TickAsyncDecode();
+    void EnforceSamplerBudget();
+    void TrimInactiveSamplers(size_t budget);
+    std::optional<size_t> QuerySamplerBudget() const;
+    u32 GetAdaptiveBatchSize(const PendingUnswizzle& task, size_t queue_size) const;
 
     void QueueAsyncUnswizzle(Image& image, ImageId image_id);
     void TickAsyncUnswizzle();
@@ -513,7 +517,6 @@ private:
     std::vector<std::unique_ptr<AsyncDecodeContext>> async_decodes;
 
     std::deque<PendingUnswizzle> unswizzle_queue;
-    u8 current_unswizzle_frame;
 
     // Join caching
     boost::container::small_vector<ImageId, 4> join_overlap_ids;
