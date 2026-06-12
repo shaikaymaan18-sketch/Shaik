@@ -26,7 +26,7 @@ ManifestDPIAware true
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\${PRODUCT_NAME}.exe"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 
-!define BINARY_SOURCE_DIR "..\..\bin"
+!define BINARY_SOURCE_DIR "..\bin"
 
 Name "${PRODUCT_NAME}"
 OutFile "${PRODUCT_NAME}-Windows-${PRODUCT_VERSION}-${ARCH}-${VARIANT}-installer.exe"
@@ -40,11 +40,11 @@ ShowUnInstDetails show
 !include "nsDialogs.nsh"
 
 ; MUI Settings
-!define MUI_ICON "..\..\dist\eden.ico"
+!define MUI_ICON "eden.ico"
 !define MUI_UNICON "${NSISDIR}\Contrib\Graphics\Icons\modern-uninstall.ico"
 
 ; License page
-!insertmacro MUI_PAGE_LICENSE "..\..\LICENSE.txt"
+!insertmacro MUI_PAGE_LICENSE "..\LICENSE.txt"
 ; Desktop Shortcut page
 Page custom desktopShortcutPageCreate desktopShortcutPageLeave
 ; Directory page
