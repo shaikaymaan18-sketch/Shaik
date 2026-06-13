@@ -1419,15 +1419,38 @@ u32 TextureCache<P>::GetAdaptiveBatchSize(const PendingUnswizzle& task, size_t q
             multiplier = 8;
         }
         const u32 dynamic_slices = base_slices * multiplier;
-        return std::min(dynamic_slices, static_cast<u32>(texture_slices));
+        return (std::min)(dynamic_slices, static_cast<u32>(texture_slices));
     }
 
     if (queue_size > MODERATE_BACKLOG) {
         const u32 dynamic_slices = base_slices * 2;
-        return std::min(dynamic_slices, static_cast<u32>(texture_slices));
+        return (std::min)(dynamic_slices, static_cast<u32>(texture_slices));
     }
 
     return base_slices;
+}
+
+template <class P>
+u32 TextureCache<P>::GetAdaptiveChunkSize(const PendingUnswizzle& task, size_t queue_size) const {
+    const u32 base_chunk = swizzle_chunk_size;
+    if (base_chunk == 0)
+        return 0;
+
+    constexpr size_t LARGE_BACKLOG = 4;
+    constexpr size_t MODERATE_BACKLOG = 2;
+    constexpr size_t LARGE_TEXTURE_BYTES = 64_MiB;
+    constexpr size_t HUGE_TEXTURE_BYTES = 256_MiB;
+
+    if (queue_size > LARGE_BACKLOG) {
+        u32 multiplier = 4;
+        if (task.total_size < HUGE_TEXTURE_BYTES)
+            multiplier = 8;
+        return (std::min)(base_chunk * multiplier, static_cast<u32>(task.total_size));
+    }
+    if (queue_size > MODERATE_BACKLOG) {
+        return (std::min)(base_chunk * 2, static_cast<u32>(task.total_size));
+    }
+    return base_chunk;
 }
 
 template <class P>
@@ -1465,9 +1488,12 @@ void TextureCache<P>::TickAsyncUnswizzle() {
         const size_t remaining = task.total_size - task.current_offset;
 
         size_t copy_amount = 0;
-        if( swizzle_chunk_size == 0 )
+        if (swizzle_chunk_size == 0) {
             copy_amount = remaining;
-        else copy_amount = (std::min)(swizzle_chunk_size, remaining);
+        } else {
+            const u32 dynamic_chunk = GetAdaptiveChunkSize(task, unswizzle_queue.size());
+            copy_amount = std::min<size_t>(dynamic_chunk, remaining);
+        }
 
         if (remaining > swizzle_chunk_size) {
             copy_amount = (copy_amount / task.bytes_per_slice) * task.bytes_per_slice;
@@ -1478,6 +1504,10 @@ void TextureCache<P>::TickAsyncUnswizzle() {
                               task.staging_buffer.mapped_span.data() + task.current_offset,
                               copy_amount);
         task.current_offset += copy_amount;
+    }
+
+    if (task.current_offset < task.total_size) {
+        return;
     }
 
     const bool is_final_batch = task.current_offset >= task.total_size;
@@ -1496,12 +1526,13 @@ void TextureCache<P>::TickAsyncUnswizzle() {
         const u32 slices_to_process = (std::min)(complete_slices, adaptive_batch);
 
         if (whole_texture) {
-            const auto uploads = FullUploadSwizzles(task.info);
-            runtime.AccelerateImageUpload(image, task.staging_buffer, FixSmallVectorADL(uploads),
-                                          z_start, slices_to_process);
-            task.last_submitted_offset = task.total_size;
+            runtime.AccelerateImageUpload(image, task.staging_buffer,
+                                          FixSmallVectorADL(FullUploadSwizzles(task.info)), 0,
+                                          image.info.size.depth);
+            task.last_submitted_offset +=
+                (static_cast<size_t>(image.info.size.depth) * task.bytes_per_slice);
         } else if (complete_slices >= slices_to_process || (is_final_batch && complete_slices > 0)) {
-            const u32 z_count = std::min(slices_to_process, task.info.size.depth - z_start);
+            const u32 z_count = (std::min)(slices_to_process, task.info.size.depth - z_start);
             if (z_count > 0) {
                 const auto uploads = FullUploadSwizzles(task.info);
                 runtime.AccelerateImageUpload(image, task.staging_buffer, FixSmallVectorADL(uploads),

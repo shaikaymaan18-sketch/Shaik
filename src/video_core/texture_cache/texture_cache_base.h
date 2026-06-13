@@ -419,6 +419,9 @@ private:
     void QueueAsyncDecode(Image& image, ImageId image_id);
     void TickAsyncDecode();
     u32 GetAdaptiveBatchSize(const PendingUnswizzle& task, size_t queue_size) const;
+
+    u32 GetAdaptiveChunkSize(const PendingUnswizzle &task, size_t queue_size) const;
+
     void EnforceSamplerBudget();
     void TrimInactiveSamplers(size_t budget);
     std::optional<size_t> QuerySamplerBudget() const;
