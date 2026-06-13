@@ -1448,23 +1448,22 @@ u32 TextureCache<P>::GetAdaptiveBatchSize(const PendingUnswizzle& task, size_t q
 
 template <class P>
 u32 TextureCache<P>::GetAdaptiveChunkSize(const PendingUnswizzle& task, size_t queue_size) const {
-    const u32 base_chunk = swizzle_chunk_size;
+    const size_t base_chunk = swizzle_chunk_size;
     if (base_chunk == 0)
         return 0;
 
     constexpr size_t LARGE_BACKLOG = 4;
     constexpr size_t MODERATE_BACKLOG = 2;
-    constexpr size_t LARGE_TEXTURE_BYTES = 64_MiB;
     constexpr size_t HUGE_TEXTURE_BYTES = 256_MiB;
 
     if (queue_size > LARGE_BACKLOG) {
         u32 multiplier = 4;
         if (task.total_size < HUGE_TEXTURE_BYTES)
             multiplier = 8;
-        return (std::min)(base_chunk * multiplier, static_cast<u32>(task.total_size));
+        return (std::min)(base_chunk * multiplier, task.total_size);
     }
     if (queue_size > MODERATE_BACKLOG) {
-        return (std::min)(base_chunk * 2, static_cast<u32>(task.total_size));
+        return (std::min)(base_chunk * 2, task.total_size);
     }
     return base_chunk;
 }
