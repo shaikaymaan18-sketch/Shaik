@@ -1447,7 +1447,7 @@ u32 TextureCache<P>::GetAdaptiveBatchSize(const PendingUnswizzle& task, size_t q
 }
 
 template <class P>
-u32 TextureCache<P>::GetAdaptiveChunkSize(const PendingUnswizzle& task, size_t queue_size) const {
+size_t TextureCache<P>::GetAdaptiveChunkSize(const PendingUnswizzle &task, size_t queue_size) const {
     const size_t base_chunk = swizzle_chunk_size;
     if (base_chunk == 0)
         return 0;
@@ -1506,8 +1506,8 @@ void TextureCache<P>::TickAsyncUnswizzle() {
         if (swizzle_chunk_size == 0) {
             copy_amount = remaining;
         } else {
-            const u32 dynamic_chunk = GetAdaptiveChunkSize(task, unswizzle_queue.size());
-            copy_amount = std::min<size_t>(dynamic_chunk, remaining);
+            const size_t dynamic_chunk = GetAdaptiveChunkSize(task, unswizzle_queue.size());
+            copy_amount = (std::min)(dynamic_chunk, remaining);
         }
 
         if (remaining > swizzle_chunk_size) {
