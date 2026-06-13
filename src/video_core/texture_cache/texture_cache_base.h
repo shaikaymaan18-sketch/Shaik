@@ -421,6 +421,7 @@ private:
 
     void QueueAsyncDecode(Image& image, ImageId image_id);
     void TickAsyncDecode();
+
     void EnforceSamplerBudget();
     void TrimInactiveSamplers(size_t budget);
     std::optional<size_t> QuerySamplerBudget() const;
