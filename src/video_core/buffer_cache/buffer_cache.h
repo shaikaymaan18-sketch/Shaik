@@ -1686,7 +1686,7 @@ void BufferCache<P>::MappedUploadMemory([[maybe_unused]] Buffer& buffer,
         for (BufferCopy& copy : copies) {
             u8* const src_pointer = staging_pointer.data() + copy.src_offset;
             const DAddr device_addr = buffer.CpuAddr() + copy.dst_offset;
-            const bool should_sync = Settings::IsGPULevelHigh() || Settings::IsGPUFenceModeDelayed();
+            const bool should_sync = Settings::IsGPULevelHigh();
             if (should_sync && IsRegionGpuModified(device_addr, copy.size)) {
                 DownloadBufferMemory(buffer, device_addr, copy.size);
             }
