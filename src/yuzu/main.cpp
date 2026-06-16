@@ -19,6 +19,14 @@
 #include <sys/resource.h>
 #endif
 
+#if defined(__APPLE__)
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <vector>
+#endif
+
 #include "main_window.h"
 
 #ifdef _WIN32
@@ -131,6 +139,39 @@ int main(int argc, char* argv[]) {
 #endif // _WIN32
 
 #if defined(__APPLE__)
+    // The chdir below breaks relative ROM paths passed on the command line: the frontend resolves
+    // them against the working directory after it has already changed, so a relative `-g game.xci`
+    // ends up looked for inside the bundle and fails with "The ROM format is not supported". Make
+    // any relative path argument absolute now, while the original working directory still applies.
+    {
+        // Hold the rewritten strings for the lifetime of argv. Reserve so the buffer never moves,
+        // otherwise pointers handed to argv would dangle.
+        static std::vector<std::string> resolved_args;
+        resolved_args.reserve(static_cast<std::size_t>(argc));
+        for (int i = 1; i < argc; ++i) {
+            const std::string_view arg{argv[i]};
+            // These flags take a non-path value, skip it so we never rewrite it.
+            if (arg == "-u" || arg == "-input-profile") {
+                ++i;
+                continue;
+            }
+            // The game path is the token after -g, or any bare (non-flag) token.
+            if (arg == "-g" && i + 1 < argc) {
+                ++i;
+            } else if (!arg.empty() && arg.front() == '-') {
+                continue;
+            }
+            std::error_code ec;
+            const std::filesystem::path path{argv[i]};
+            if (path.is_relative() && std::filesystem::exists(path, ec) && !ec) {
+                resolved_args.push_back(std::filesystem::absolute(path, ec).lexically_normal().string());
+                if (!ec) {
+                    argv[i] = resolved_args.back().data();
+                }
+            }
+        }
+    }
+
     // If you start a bundle (binary) on OSX without the Terminal, the working directory is "/".
     // But since we require the working directory to be the executable path for the location of
     // the user folder in the Qt Frontend, we need to cd into that working directory
