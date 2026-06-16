@@ -19,6 +19,12 @@
 #include <sys/resource.h>
 #endif
 
+#if defined(__APPLE__)
+#include <climits>
+#include <cstdlib>
+#include <cstring>
+#endif
+
 #include "main_window.h"
 
 #ifdef _WIN32
@@ -131,6 +137,16 @@ int main(int argc, char* argv[]) {
 #endif // _WIN32
 
 #if defined(__APPLE__)
+    // Make a relative path arg absolute before the chdir below changes the working directory.
+    static char resolved[PATH_MAX];
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "-u") == 0 || strcmp(argv[i], "-input-profile") == 0) {
+            ++i; // these flags take a value, not a path
+        } else if (argv[i][0] != '-' && argv[i][0] != '/' && realpath(argv[i], resolved)) {
+            argv[i] = resolved; // points into the static buffer; valid until exit, nothing allocated
+        }
+    }
+
     // If you start a bundle (binary) on OSX without the Terminal, the working directory is "/".
     // But since we require the working directory to be the executable path for the location of
     // the user folder in the Qt Frontend, we need to cd into that working directory
