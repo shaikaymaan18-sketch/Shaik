@@ -147,7 +147,7 @@ public:
      * Converts the value of the setting to a std::string. Respects the global state if the setting
      * has one.
      *
-     * @returns The current setting as a std::stringf
+     * @returns The current setting as a std::string
      */
     [[nodiscard]] std::string ToString() const override {
         return ToString(this->GetValue());
