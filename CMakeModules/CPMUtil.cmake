@@ -242,13 +242,12 @@ function(AddJsonPackage)
 
         # these are overrides that can be generated at runtime,
         # so can be defined separately from the json
-        DOWNLOAD_ONLY
         BUNDLED_PACKAGE
         FORCE_BUNDLED_PACKAGE)
 
     set(multiValueArgs OPTIONS)
 
-    set(optionArgs MODULE)
+    set(optionArgs MODULE_PATH DOWNLOAD_ONLY)
 
     cmake_parse_arguments(JSON "${optionArgs}" "${oneValueArgs}" "${multiValueArgs}"
         "${ARGN}")
@@ -279,8 +278,12 @@ function(AddJsonPackage)
 
     parse_object(${object})
 
-    if (JSON_MODULE)
-        set(EXTRA_ARGS MODULE)
+    if (JSON_MODULE_PATH)
+        list(APPEND EXTRA_ARGS MODULE_PATH)
+    endif()
+
+    if (JSON_DOWNLOAD_ONLY)
+        list(APPEND EXTRA_ARGS DOWNLOAD_ONLY)
     endif()
 
     if(ci)
@@ -333,22 +336,6 @@ function(AddPackage)
     cpm_set_policies()
     set(EXTRA_ARGS "")
 
-    #[[
-        URL configurations, descending order of precedence:
-        - URL [+ GIT_URL] -> bare URL fetch
-        - REPO + TAG + ARTIFACT -> github release artifact
-        - REPO + TAG -> github release archive
-        - REPO + SHA -> github commit archive
-        - REPO + BRANCH -> github branch
-
-        Hash configurations, descending order of precedence:
-        - HASH -> bare sha512sum
-        - HASH_SUFFIX -> hash grabbed from the URL + this suffix
-        - HASH_URL -> hash grabbed from a URL
-          * technically this is unsafe since a hacker can attack that url
-
-        NOTE: hash algo defaults to sha512
-    #]]
     set(oneValueArgs
         NAME
         VERSION
@@ -368,6 +355,7 @@ function(AddPackage)
 
         URL
         GIT_URL
+        SOURCE_SUBDIR
 
         KEY
         BUNDLED_PACKAGE
@@ -376,7 +364,7 @@ function(AddPackage)
 
     set(multiValueArgs OPTIONS PATCHES)
 
-    set(optionArgs MODULE)
+    set(optionArgs MODULE_PATH DOWNLOAD_ONLY)
 
     cmake_parse_arguments(PKG_ARGS "${optionArgs}" "${oneValueArgs}" "${multiValueArgs}"
         "${ARGN}")
@@ -562,22 +550,36 @@ function(AddPackage)
             VERSION ${PKG_ARGS_VERSION})
     endif()
 
-    if (PKG_ARGS_MODULE)
-        set(PKG_ARGS_DOWNLOAD_ONLY ON)
-    elseif (NOT DEFINED PKG_ARGS_DOWNLOAD_ONLY)
-        set(PKG_ARGS_DOWNLOAD_ONLY OFF)
+    if (PKG_ARGS_FIND_PACKAGE_ARGUMENTS)
+        list(APPEND EXTRA_ARGS
+            FIND_PACKAGE_ARGUMENTS "${PKG_ARGS_FIND_PACKAGE_ARGUMENTS}")
+    endif()
+
+    if (PKG_ARGS_PATCHES)
+        list(APPEND EXTRA_ARGS
+            PATCHES "${PKG_ARGS_PATCHES}")
+    endif()
+
+    if (PKG_ARGS_OPTIONS)
+        list(APPEND EXTRA_ARGS
+            OPTIONS "${PKG_ARGS_OPTIONS}")
+    endif()
+
+    if (PKG_ARGS_SOURCE_SUBDIR)
+        list(APPEND EXTRA_ARGS
+            SOURCE_SUBDIR "${PKG_ARGS_SOURCE_SUBDIR}")
+    endif()
+
+    if (PKG_ARGS_DOWNLOAD_ONLY OR PKG_ARGS_MODULE_PATH)
+        list(APPEND EXTRA_ARGS DOWNLOAD_ONLY ON)
     endif()
 
     CPMAddPackage(
-        NAME ${PKG_ARGS_NAME}
-        URL ${pkg_url}
-        URL_HASH ${pkg_hash}
-        CUSTOM_CACHE_KEY ${pkg_key}
-        DOWNLOAD_ONLY ${PKG_ARGS_DOWNLOAD_ONLY}
-        FIND_PACKAGE_ARGUMENTS ${PKG_ARGS_FIND_PACKAGE_ARGUMENTS}
+        NAME "${PKG_ARGS_NAME}"
+        URL "${pkg_url}"
+        URL_HASH "${pkg_hash}"
+        CUSTOM_CACHE_KEY "${pkg_key}"
 
-        OPTIONS ${PKG_ARGS_OPTIONS}
-        PATCHES ${PKG_ARGS_PATCHES}
         EXCLUDE_FROM_ALL ON
 
         ${EXTRA_ARGS}
@@ -621,7 +623,7 @@ function(AddPackage)
     Propagate(${PKG_ARGS_NAME}_SOURCE_DIR)
     Propagate(${PKG_ARGS_NAME}_BINARY_DIR)
 
-    if (PKG_ARGS_MODULE)
+    if (PKG_ARGS_MODULE_PATH)
         list(PREPEND CMAKE_PREFIX_PATH "${${ARTIFACT_PACKAGE}_SOURCE_DIR}")
         Propagate(CMAKE_PREFIX_PATH)
     endif()
@@ -640,7 +642,7 @@ function(AddCIPackage)
 
     set(multiValueArgs DISABLED_PLATFORMS)
 
-    set(optionArgs MODULE)
+    set(optionArgs MODULE_PATH)
 
     cmake_parse_arguments(PKG_ARGS
         "${optionArgs}"
@@ -717,8 +719,8 @@ function(AddCIPackage)
         set(ARTIFACT
             "${ARTIFACT_NAME}-${pkgname}-${ARTIFACT_VERSION}.${ARTIFACT_EXT}")
 
-        if (PKG_ARGS_MODULE)
-            set(EXTRA_ARGS MODULE)
+        if (PKG_ARGS_MODULE_PATH)
+            list(APPEND EXTRA_ARGS MODULE_PATH)
         endif()
 
         AddPackage(
@@ -760,7 +762,7 @@ function(AddQt repo version)
         DISABLED_PLATFORMS
             android-x86_64 android-aarch64
             freebsd-amd64 solaris-amd64 openbsd-amd64
-        MODULE)
+        MODULE_PATH)
 
     find_package(Qt6 REQUIRED PATHS ${Qt6_SOURCE_DIR} NO_DEFAULT_PATH)
 
