@@ -1634,7 +1634,7 @@ bool BufferCache<P>::SynchronizeBuffer(Buffer& buffer, DAddr device_addr, u32 si
     if (total_size_bytes == 0) {
         return true;
     }
-    u64 min_offset = (std::numeric_limits<s64>::max)();
+    u64 min_offset = (std::numeric_limits<u64>::max)();
     u64 max_offset = 0;
     for (const auto& copy : upload_copies) {
         min_offset = (std::min)(min_offset, copy.dst_offset);
