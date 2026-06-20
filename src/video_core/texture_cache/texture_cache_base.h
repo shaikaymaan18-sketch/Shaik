@@ -139,6 +139,9 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
         size_t last_submitted_offset = 0;
         size_t bytes_per_slice;
         bool initialized = false;
+        bool is_sparse = false;
+        std::vector<u8> slice_has_data;
+        std::vector<std::pair<GPUVAddr, size_t>> sparse_segments;
     };
 
     struct BlitImages {
