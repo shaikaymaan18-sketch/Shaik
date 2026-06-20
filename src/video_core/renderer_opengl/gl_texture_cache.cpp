@@ -652,7 +652,7 @@ void TextureCacheRuntime::BlitFramebuffer(Framebuffer* dst, Framebuffer* src,
 
 void TextureCacheRuntime::AccelerateImageUpload(Image& image, const StagingBufferMap& map,
                                                 std::span<const SwizzleParameters> swizzles,
-                                                u32 z_start, u32 z_count) {
+                                                u32 z_start, u32 z_count, std::span<const u8> slice_has_data) {
     switch (image.info.type) {
     case ImageType::e2D:
         if (IsPixelFormatASTC(image.info.format)) {

@@ -97,9 +97,9 @@ public:
         return true;
     }
 
-    void AccelerateImageUpload(Image&, const StagingBufferRef&,
+    void AccelerateImageUpload(Image &, const StagingBufferRef &,
                                std::span<const VideoCommon::SwizzleParameters>,
-                               u32 z_start, u32 z_count);
+                               u32 z_start, u32 z_count, std::span<const u8> slice_has_data={});
 
     void InsertUploadMemoryBarrier() {}
 
