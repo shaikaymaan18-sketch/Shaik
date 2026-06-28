@@ -1142,6 +1142,13 @@ bool Device::GetSuitability(bool requires_swapchain) {
         features.extended_dynamic_state3.extendedDynamicState3ColorBlendEquation = false;
     }
 
+    if (extensions.extended_dynamic_state3 &&
+        (driver_id == VK_DRIVER_ID_MESA_RADV)) {
+        LOG_WARNING(Render_Vulkan,
+                    "RADV: Disabling broken extendedDynamicState3DepthClampEnable");
+        features.extended_dynamic_state3.extendedDynamicState3DepthClampEnable = false;
+    }
+
     // Intel Windows < 27.20.100.0: Broken VertexInputDynamicState
     // Same for NVIDIA Proprietary < 580.119.02, unknown when VIDS was first NOT broken
     // Disable VertexInputDynamicState on old Intel Windows drivers
