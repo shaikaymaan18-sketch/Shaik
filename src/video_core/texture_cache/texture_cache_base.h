@@ -143,6 +143,13 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
         bool is_sparse = false;
         std::vector<u8> slice_has_data;
         std::vector<std::pair<GPUVAddr, size_t>> sparse_segments;
+        size_t segment_scan_cursor = 0;
+        u64 swizzled_slice_size = 0;
+        u32 swizzle_block_depth = 0;
+        bool is_incremental = false;
+        size_t staging_base_byte_offset = 0;
+        u32 incremental_z_start = 0;
+        u32 incremental_z_count = 0;
     };
 
     struct BlitImages {
@@ -432,6 +439,19 @@ private:
 
     void QueueAsyncUnswizzle(Image& image, ImageId image_id);
     void TickAsyncUnswizzle();
+    void TickCompletedSparseImages();
+
+    struct CompletedSparseImage {
+        ImageId image_id;
+        VideoCommon::ImageInfo info;
+        GPUVAddr gpu_addr;
+        size_t guest_size_bytes;
+        std::vector<std::pair<GPUVAddr, size_t>> last_segments;
+        std::vector<u8> slice_uploaded;
+        size_t bytes_per_slice;
+        u64 swizzled_slice_size;
+        u32 swizzle_block_depth;
+    };
 
     Runtime& runtime;
 
@@ -521,6 +541,7 @@ private:
     std::vector<std::unique_ptr<AsyncDecodeContext>> async_decodes;
 
     std::deque<PendingUnswizzle> unswizzle_queue;
+    std::deque<CompletedSparseImage> completed_sparse_images;
 
     // Join caching
     boost::container::small_vector<ImageId, 4> join_overlap_ids;

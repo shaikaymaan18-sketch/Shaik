@@ -148,8 +148,9 @@ public:
     void Unswizzle(Image& image,
                    const StagingBufferRef& swizzled,
                    std::span<const VideoCommon::SwizzleParameters> swizzles,
-                   u32 z_start, u32 z_count,
-                   std::span<const u8> slice_has_data = {});
+                   u32 z_src_start, u32 z_image_start, u32 z_count,
+                   std::span<const u8> slice_has_data = {},
+                   bool image_already_uploaded = false);
 
     void UnswizzleChunk(
         Image& image,
@@ -157,13 +158,15 @@ public:
         const VideoCommon::SwizzleParameters& sw,
         const BlockLinearSwizzle3DParams& params,
         u32 blocks_x, u32 blocks_y,
-        u32 z_start, u32 z_count);
+        u32 z_src, u32 z_dst, u32 z_count,
+        VkImageLayout prior_image_layout);
 
     void UnswizzleZeroChunk(
         Image& image,
         u32 blocks_x, u32 blocks_y,
         u32 bytes_per_block,
-        u32 z_start, u32 z_count);
+        u32 z_dst, u32 z_count,
+        VkImageLayout prior_image_layout);
 
 private:
     Scheduler& scheduler;

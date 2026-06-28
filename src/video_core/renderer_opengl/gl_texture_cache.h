@@ -120,9 +120,11 @@ public:
                          const Region2D& src_region, Tegra::Engines::Fermi2D::Filter filter,
                          Tegra::Engines::Fermi2D::Operation operation);
 
-    void AccelerateImageUpload(Image &image, const StagingBufferMap &map,
+    void AccelerateImageUpload(Image& image, const StagingBufferMap& map,
                                std::span<const VideoCommon::SwizzleParameters> swizzles,
-                               u32 z_start, u32 z_count, std::span<const u8> slice_has_data={});
+                               u32 z_src_start, u32 z_image_start, u32 z_count,
+                               std::span<const u8> slice_has_data = {},
+                               bool image_already_uploaded = false);
 
     void InsertUploadMemoryBarrier();
 
