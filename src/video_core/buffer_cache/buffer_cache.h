@@ -1620,8 +1620,8 @@ template <class P>
 bool BufferCache<P>::SynchronizeBuffer(Buffer& buffer, DAddr device_addr, u32 size) {
     upload_copies.clear();
     u64 largest_copy = 0;
-    u64 staging_offset = 0;
     if (!Settings::values.enable_gpu_buffer_readback.GetValue()){
+        u64 staging_offset = 0;
         DAddr buffer_start = buffer.CpuAddr();
         auto push = [&](u64 start, u64 end) {
             if (start >= end) {
