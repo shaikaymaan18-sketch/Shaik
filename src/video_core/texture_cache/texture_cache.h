@@ -184,7 +184,7 @@ void TextureCache<P>::TickFrame() {
     sentenced_image_view.Tick();
     TickAsyncDecode();
     TickAsyncUnswizzle();
-    TickCompletedSparseImages();
+    //TickCompletedSparseImages();
 
     runtime.TickFrame();
     ++frame_tick;
@@ -1586,7 +1586,7 @@ void TextureCache<P>::TickAsyncUnswizzle() {
     const bool all_submitted   = slices_submitted >= total_slices;
 
     if (is_final_batch && all_submitted) {
-        if (task.is_sparse && !task.is_incremental) {
+        /*if (task.is_sparse && !task.is_incremental) {
             const auto segs =
                 gpu_memory->GetSubmappedRange(image.gpu_addr, image.guest_size_bytes);
             CompletedSparseImage entry;
@@ -1600,7 +1600,7 @@ void TextureCache<P>::TickAsyncUnswizzle() {
             entry.swizzled_slice_size  = task.swizzled_slice_size;
             entry.swizzle_block_depth  = task.swizzle_block_depth;
             completed_sparse_images.push_back(std::move(entry));
-        }
+        }*/
 
         runtime.FreeDeferredStagingBuffer(task.staging_buffer);
         image.flags &= ~ImageFlagBits::IsDecoding;
