@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <algorithm>
+#include <array>
 
 #include "video_core/renderer_vulkan/vk_texture_cache.h"
 
@@ -158,15 +159,18 @@ VkPipelineInputAssemblyStateCreateInfo GetPipelineInputAssemblyStateCreateInfo(c
         .primitiveRestartEnable = device.IsMoltenVK() ? VK_TRUE : VK_FALSE,
     };
 }
-constexpr VkPipelineViewportStateCreateInfo PIPELINE_VIEWPORT_STATE_CREATE_INFO{
-    .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-    .pNext = nullptr,
-    .flags = 0,
-    .viewportCount = 1,
-    .pViewports = nullptr,
-    .scissorCount = 1,
-    .pScissors = nullptr,
-};
+VkPipelineViewportStateCreateInfo GetPipelineViewportStateCreateInfo(const Device& device) {
+    const u32 viewport_count = device.GetViewportCount();
+    return VkPipelineViewportStateCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .viewportCount = viewport_count,
+        .pViewports = nullptr,
+        .scissorCount = viewport_count,
+        .pScissors = nullptr,
+    };
+}
 constexpr VkPipelineRasterizationStateCreateInfo PIPELINE_RASTERIZATION_STATE_CREATE_INFO{
     .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
     .pNext = nullptr,
@@ -399,7 +403,7 @@ void UpdateTwoTexturesDescriptorSet(const Device& device, VkDescriptorSet descri
     device.GetLogical().UpdateDescriptorSets(write_descriptor_sets, nullptr);
 }
 
-void BindBlitState(vk::CommandBuffer cmdbuf, const Region2D& dst_region) {
+void BindBlitState(const Device& device, vk::CommandBuffer cmdbuf, const Region2D& dst_region) {
     const VkOffset2D offset{
         .x = (std::min)(dst_region.start.x, dst_region.end.x),
         .y = (std::min)(dst_region.start.y, dst_region.end.y),
@@ -421,13 +425,17 @@ void BindBlitState(vk::CommandBuffer cmdbuf, const Region2D& dst_region) {
         .offset = offset,
         .extent = extent,
     };
-    cmdbuf.SetViewport(0, viewport);
-    cmdbuf.SetScissor(0, scissor);
+    const u32 viewport_count = device.GetViewportCount();
+    const std::array<VkViewport, 2> viewports{viewport, viewport};
+    const std::array<VkRect2D, 2> scissors{scissor, scissor};
+    cmdbuf.SetViewport(0, vk::Span<VkViewport>(viewports.data(), viewport_count));
+    cmdbuf.SetScissor(0, vk::Span<VkRect2D>(scissors.data(), viewport_count));
 }
 
-void BindBlitState(vk::CommandBuffer cmdbuf, VkPipelineLayout layout, const Region2D& dst_region,
-                   const Region2D& src_region, const Extent3D& src_size = {1, 1, 1}) {
-    BindBlitState(cmdbuf, dst_region);
+void BindBlitState(const Device& device, vk::CommandBuffer cmdbuf, VkPipelineLayout layout,
+                   const Region2D& dst_region, const Region2D& src_region,
+                   const Extent3D& src_size = {1, 1, 1}) {
+    BindBlitState(device, cmdbuf, dst_region);
     const float scale_x = static_cast<float>(src_region.end.x - src_region.start.x) /
                           static_cast<float>(src_size.width);
     const float scale_y = static_cast<float>(src_region.end.y - src_region.start.y) /
@@ -696,7 +704,7 @@ void BlitImageHelper::BlitColor(const Framebuffer* dst_framebuffer, VkImageView 
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, descriptor_set,
                                   nullptr);
-        BindBlitState(cmdbuf, layout, dst_region, src_region, src_size);
+        BindBlitState(device, cmdbuf, layout, dst_region, src_region, src_size);
         cmdbuf.Draw(3, 1, 0, 0);
         cmdbuf.EndRenderPass();
     });
@@ -728,7 +736,7 @@ void BlitImageHelper::BlitImpl(const Framebuffer* dst_framebuffer,
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, descriptor_set,
                                   nullptr);
-        BindBlitState(cmdbuf, layout, dst_region, src_region);
+        BindBlitState(device, cmdbuf, layout, dst_region, src_region);
         cmdbuf.Draw(3, 1, 0, 0);
     });
     scheduler.InvalidateState();
@@ -885,13 +893,13 @@ void BlitImageHelper::ClearColor(const Framebuffer* dst_framebuffer, u8 color_ma
     const VkPipelineLayout layout = *clear_color_pipeline_layout;
     scheduler.RequestRenderpass(dst_framebuffer);
     scheduler.Record(
-        [pipeline, layout, color_mask, clear_color, dst_region](vk::CommandBuffer cmdbuf) {
+        [pipeline, layout, color_mask, clear_color, dst_region, this](vk::CommandBuffer cmdbuf) {
             cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
             const std::array blend_color = {
                 (color_mask & 0x1) ? 1.0f : 0.0f, (color_mask & 0x2) ? 1.0f : 0.0f,
                 (color_mask & 0x4) ? 1.0f : 0.0f, (color_mask & 0x8) ? 1.0f : 0.0f};
             cmdbuf.SetBlendConstants(blend_color.data());
-            BindBlitState(cmdbuf, dst_region);
+            BindBlitState(device, cmdbuf, dst_region);
             cmdbuf.PushConstants(layout, VK_SHADER_STAGE_FRAGMENT_BIT, clear_color);
             cmdbuf.Draw(3, 1, 0, 0);
         });
@@ -911,11 +919,11 @@ void BlitImageHelper::ClearDepthStencil(const Framebuffer* dst_framebuffer, bool
     const VkPipeline pipeline = FindOrEmplaceClearStencilPipeline(key);
     const VkPipelineLayout layout = *clear_color_pipeline_layout;
     scheduler.RequestRenderpass(dst_framebuffer);
-    scheduler.Record([pipeline, layout, clear_depth, dst_region](vk::CommandBuffer cmdbuf) {
+    scheduler.Record([pipeline, layout, clear_depth, dst_region, this](vk::CommandBuffer cmdbuf) {
         constexpr std::array blend_constants{0.0f, 0.0f, 0.0f, 0.0f};
         cmdbuf.SetBlendConstants(blend_constants.data());
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-        BindBlitState(cmdbuf, dst_region);
+        BindBlitState(device, cmdbuf, dst_region);
         cmdbuf.PushConstants(layout, VK_SHADER_STAGE_FRAGMENT_BIT, clear_depth);
         cmdbuf.Draw(3, 1, 0, 0);
     });
@@ -1176,8 +1184,11 @@ void BlitImageHelper::Convert(VkPipeline pipeline, const Framebuffer* dst_frameb
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, descriptor_set,
                                   nullptr);
-        cmdbuf.SetViewport(0, viewport);
-        cmdbuf.SetScissor(0, scissor);
+        const u32 viewport_count = device.GetViewportCount();
+        const std::array<VkViewport, 2> viewports{viewport, viewport};
+        const std::array<VkRect2D, 2> scissors{scissor, scissor};
+        cmdbuf.SetViewport(0, vk::Span<VkViewport>(viewports.data(), viewport_count));
+        cmdbuf.SetScissor(0, vk::Span<VkRect2D>(scissors.data(), viewport_count));
         cmdbuf.PushConstants(layout, VK_SHADER_STAGE_VERTEX_BIT, push_constants);
         cmdbuf.Draw(3, 1, 0, 0);
     });
@@ -1222,8 +1233,11 @@ void BlitImageHelper::ConvertDepthStencil(VkPipeline pipeline, const Framebuffer
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, descriptor_set,
                                   nullptr);
-        cmdbuf.SetViewport(0, viewport);
-        cmdbuf.SetScissor(0, scissor);
+        const u32 viewport_count = device.GetViewportCount();
+        const std::array<VkViewport, 2> viewports{viewport, viewport};
+        const std::array<VkRect2D, 2> scissors{scissor, scissor};
+        cmdbuf.SetViewport(0, vk::Span<VkViewport>(viewports.data(), viewport_count));
+        cmdbuf.SetScissor(0, vk::Span<VkRect2D>(scissors.data(), viewport_count));
         cmdbuf.PushConstants(layout, VK_SHADER_STAGE_VERTEX_BIT, push_constants);
         cmdbuf.Draw(3, 1, 0, 0);
     });
@@ -1261,6 +1275,7 @@ VkPipeline BlitImageHelper::FindOrEmplaceColorPipeline(const BlitImagePipelineKe
         .blendConstants = {0.0f, 0.0f, 0.0f, 0.0f},
     };
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_ci = GetPipelineInputAssemblyStateCreateInfo(device);
+    const VkPipelineViewportStateCreateInfo viewport_ci = GetPipelineViewportStateCreateInfo(device);
     blit_color_pipelines.push_back(device.GetLogical().CreateGraphicsPipeline({
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = nullptr,
@@ -1270,7 +1285,7 @@ VkPipeline BlitImageHelper::FindOrEmplaceColorPipeline(const BlitImagePipelineKe
         .pVertexInputState = &PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .pInputAssemblyState = &input_assembly_ci,
         .pTessellationState = nullptr,
-        .pViewportState = &PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .pViewportState = &viewport_ci,
         .pRasterizationState = &PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .pMultisampleState = &PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
         .pDepthStencilState = nullptr,
@@ -1293,6 +1308,7 @@ VkPipeline BlitImageHelper::FindOrEmplaceDepthStencilPipeline(const BlitImagePip
     blit_depth_stencil_keys.push_back(key);
     const std::array stages = MakeStages(*full_screen_vert, *blit_depth_stencil_frag);
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_ci = GetPipelineInputAssemblyStateCreateInfo(device);
+    const VkPipelineViewportStateCreateInfo viewport_ci = GetPipelineViewportStateCreateInfo(device);
     blit_depth_stencil_pipelines.push_back(device.GetLogical().CreateGraphicsPipeline({
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = nullptr,
@@ -1302,7 +1318,7 @@ VkPipeline BlitImageHelper::FindOrEmplaceDepthStencilPipeline(const BlitImagePip
         .pVertexInputState = &PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .pInputAssemblyState = &input_assembly_ci,
         .pTessellationState = nullptr,
-        .pViewportState = &PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .pViewportState = &viewport_ci,
         .pRasterizationState = &PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .pMultisampleState = &PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
         .pDepthStencilState = &PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
@@ -1346,6 +1362,7 @@ VkPipeline BlitImageHelper::FindOrEmplaceClearColorPipeline(const BlitImagePipel
         .blendConstants = {0.0f, 0.0f, 0.0f, 0.0f},
     };
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_ci = GetPipelineInputAssemblyStateCreateInfo(device);
+    const VkPipelineViewportStateCreateInfo viewport_ci = GetPipelineViewportStateCreateInfo(device);
     clear_color_pipelines.push_back(device.GetLogical().CreateGraphicsPipeline({
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = nullptr,
@@ -1355,7 +1372,7 @@ VkPipeline BlitImageHelper::FindOrEmplaceClearColorPipeline(const BlitImagePipel
         .pVertexInputState = &PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .pInputAssemblyState = &input_assembly_ci,
         .pTessellationState = nullptr,
-        .pViewportState = &PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .pViewportState = &viewport_ci,
         .pRasterizationState = &PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .pMultisampleState = &PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
         .pDepthStencilState = &PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
@@ -1402,6 +1419,7 @@ VkPipeline BlitImageHelper::FindOrEmplaceClearStencilPipeline(
         .maxDepthBounds = 0.0f,
     };
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_ci = GetPipelineInputAssemblyStateCreateInfo(device);
+    const VkPipelineViewportStateCreateInfo viewport_ci = GetPipelineViewportStateCreateInfo(device);
     clear_stencil_pipelines.push_back(device.GetLogical().CreateGraphicsPipeline({
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = nullptr,
@@ -1411,7 +1429,7 @@ VkPipeline BlitImageHelper::FindOrEmplaceClearStencilPipeline(
         .pVertexInputState = &PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .pInputAssemblyState = &input_assembly_ci,
         .pTessellationState = nullptr,
-        .pViewportState = &PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .pViewportState = &viewport_ci,
         .pRasterizationState = &PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .pMultisampleState = &PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
         .pDepthStencilState = &depth_stencil_ci,
@@ -1526,6 +1544,7 @@ VkPipeline BlitImageHelper::FindOrEmplaceBlitDepthPipeline(VkRenderPass renderpa
     blit_depth_keys.push_back(renderpass);
     const std::array stages = MakeStages(*full_screen_vert, *blit_depth_frag);
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_ci = GetPipelineInputAssemblyStateCreateInfo(device);
+    const VkPipelineViewportStateCreateInfo viewport_ci = GetPipelineViewportStateCreateInfo(device);
     blit_depth_pipelines.push_back(device.GetLogical().CreateGraphicsPipeline({
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = nullptr,
@@ -1535,7 +1554,7 @@ VkPipeline BlitImageHelper::FindOrEmplaceBlitDepthPipeline(VkRenderPass renderpa
         .pVertexInputState = &PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .pInputAssemblyState = &input_assembly_ci,
         .pTessellationState = nullptr,
-        .pViewportState = &PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .pViewportState = &viewport_ci,
         .pRasterizationState = &PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .pMultisampleState = &PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
         .pDepthStencilState = &PIPELINE_DEPTH_ONLY_STATE_CREATE_INFO,
@@ -1563,6 +1582,7 @@ VkPipeline BlitImageHelper::FindOrEmplaceResolveDepthStencilPipeline(VkRenderPas
         MakeStages(*full_screen_vert,
                    resolve_stencil ? *blit_depth_stencil_msaa_frag : *blit_depth_msaa_frag);
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_ci = GetPipelineInputAssemblyStateCreateInfo(device);
+    const VkPipelineViewportStateCreateInfo viewport_ci = GetPipelineViewportStateCreateInfo(device);
     pipelines.push_back(device.GetLogical().CreateGraphicsPipeline({
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = nullptr,
@@ -1572,7 +1592,7 @@ VkPipeline BlitImageHelper::FindOrEmplaceResolveDepthStencilPipeline(VkRenderPas
         .pVertexInputState = &PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .pInputAssemblyState = &input_assembly_ci,
         .pTessellationState = nullptr,
-        .pViewportState = &PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .pViewportState = &viewport_ci,
         .pRasterizationState = &PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .pMultisampleState = &PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
         .pDepthStencilState = resolve_stencil ? &PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO
@@ -1796,6 +1816,7 @@ void BlitImageHelper::ConvertPipelineEx(vk::Pipeline& pipeline, VkRenderPass ren
     }
     const std::array stages = MakeStages(*full_screen_vert, *module);
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_ci = GetPipelineInputAssemblyStateCreateInfo(device);
+    const VkPipelineViewportStateCreateInfo viewport_ci = GetPipelineViewportStateCreateInfo(device);
     pipeline = device.GetLogical().CreateGraphicsPipeline(VkGraphicsPipelineCreateInfo{
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = nullptr,
@@ -1805,7 +1826,7 @@ void BlitImageHelper::ConvertPipelineEx(vk::Pipeline& pipeline, VkRenderPass ren
         .pVertexInputState = &PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .pInputAssemblyState = &input_assembly_ci,
         .pTessellationState = nullptr,
-        .pViewportState = &PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .pViewportState = &viewport_ci,
         .pRasterizationState = &PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .pMultisampleState = &PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
         .pDepthStencilState = is_target_depth ? &PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO : nullptr,
@@ -1839,6 +1860,7 @@ void BlitImageHelper::ConvertPipeline(vk::Pipeline& pipeline, VkRenderPass rende
         is_target_depth ? *convert_float_to_depth_frag : *convert_depth_to_float_frag;
     const std::array stages = MakeStages(*full_screen_vert, frag_shader);
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_ci = GetPipelineInputAssemblyStateCreateInfo(device);
+    const VkPipelineViewportStateCreateInfo viewport_ci = GetPipelineViewportStateCreateInfo(device);
     pipeline = device.GetLogical().CreateGraphicsPipeline(VkGraphicsPipelineCreateInfo{
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = nullptr,
@@ -1848,7 +1870,7 @@ void BlitImageHelper::ConvertPipeline(vk::Pipeline& pipeline, VkRenderPass rende
         .pVertexInputState = &PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .pInputAssemblyState = &input_assembly_ci,
         .pTessellationState = nullptr,
-        .pViewportState = &PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .pViewportState = &viewport_ci,
         .pRasterizationState = &PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .pMultisampleState = &PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
         .pDepthStencilState = is_target_depth ? &PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO : nullptr,
