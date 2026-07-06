@@ -90,7 +90,7 @@ AppLoader::LoadResult AppLoader_KIP::Load(Kernel::KProcess& process,
 
     // TODO: this is bad form of ASLR, it sucks
     std::uintptr_t aslr_offset = ((::Settings::values.rng_seed_enabled.GetValue()
-        ? ::Settings::values.rng_seed.GetValue() : Common::Random::Random64(0)) << 12) & 0xfff000;
+        ? ::Settings::values.rng_seed.GetValue() : Common::Random::Random64(0)) << 12) & 0xffffff & ~(Common::HostPageSize - 1);
 
     // Setup the process code layout
     if (process.LoadFromMetadata(system.Kernel(), FileSys::ProgramMetadata::GetDefault(), codeset.memory.size(), 0, aslr_offset).IsError()) {

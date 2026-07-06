@@ -10,6 +10,8 @@
 #include "core/arm/nce/guest_context.h"
 #include "core/arm/nce/instructions.h"
 #include "core/arm/nce/patcher.h"
+
+#include "common/host_memory.h"
 #include "core/core.h"
 #include "core/core_timing.h"
 #include "core/hle/kernel/svc.h"
@@ -356,11 +358,11 @@ bool Patcher::RelocateAndCopy(Common::ProcessAddress load_base, const Kernel::Co
 }
 
 size_t Patcher::GetSectionSize() const noexcept {
-    return Common::AlignUp(m_patch_instructions.size() * sizeof(u32), Core::Memory::YUZU_PAGESIZE);
+    return Common::AlignUp(m_patch_instructions.size() * sizeof(u32), Common::HostPageSize);
 }
 
 size_t Patcher::GetPreSectionSize() const noexcept {
-    return Common::AlignUp(m_patch_instructions_pre.size() * sizeof(u32), Core::Memory::YUZU_PAGESIZE);
+    return Common::AlignUp(m_patch_instructions_pre.size() * sizeof(u32), Common::HostPageSize);
 }
 
 void Patcher::WriteLoadContext(oaknut::VectorCodeGenerator& cg) {

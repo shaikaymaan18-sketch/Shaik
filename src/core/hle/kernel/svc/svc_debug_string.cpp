@@ -50,7 +50,7 @@ Result OutputDebugString(Core::System& system, u64 address, u64 len) {
                         if (flusher_data.msg_buffer.back() == '\n')
                             flusher_data.msg_buffer.pop_back();
 
-                        LOG_INFO(Debug_Emulated, "\n{}", flusher_data.msg_buffer);
+                        LOG_CRITICAL(Debug_Emulated, "\n{}", flusher_data.msg_buffer);
                         flusher_data.msg_buffer.clear();
                     }
                     if (stop_token.stop_requested()) break;

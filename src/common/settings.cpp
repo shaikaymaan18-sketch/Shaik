@@ -177,15 +177,11 @@ bool IsDMALevelSafe() {
 }
 
 bool IsFastmemEnabled() {
-    if (values.cpu_accuracy.GetValue() == Settings::CpuAccuracy::Debugging)
+    if (values.cpu_accuracy.GetValue() == CpuAccuracy::Debugging)
         return bool(values.cpuopt_fastmem);
     else if (values.cpu_accuracy.GetValue() == CpuAccuracy::Unsafe)
         return bool(values.cpuopt_unsafe_host_mmu);
-#if defined(__linux__) && defined(ARCHITECTURE_arm64)
-    // Only 4kb systems support host MMU right now
-    // TODO: Support this
-    return getpagesize() == 4096;
-#elif !defined(__APPLE__) && !defined(__ANDROID__) && !defined(_WIN32) && !defined(__linux__) && !defined(__FreeBSD__)
+#if !defined(__APPLE__) && !defined(__ANDROID__) && !defined(_WIN32) && !defined(__linux__) && !defined(__FreeBSD__)
     return false;
 #else
     return true;

@@ -26,10 +26,8 @@
 #if defined(__linux__)
 #include <sys/random.h>
 #elif defined(__APPLE__)
-#include <sys/types.h>
-#include <sys/random.h>
-#include <mach/vm_map.h>
 #include <mach/mach.h>
+#include <mach/mach_vm.h>
 #elif defined(__FreeBSD__)
 #include <sys/shm.h>
 #elif defined(__OPENORBIS__)
@@ -59,6 +57,7 @@
 #include "common/free_region_manager.h"
 #include "common/host_memory.h"
 #include "common/logging.h"
+#include "common/settings.h"
 
 #if defined(__ANDROID__) && __ANDROID_API__ < 30
 #include <sys/syscall.h>
@@ -71,9 +70,6 @@ static int memfd_create(const char* name, unsigned int flags) {
 #endif
 
 namespace Common {
-
-[[maybe_unused]] constexpr size_t PageAlignment = 0x1000;
-[[maybe_unused]] constexpr size_t HugePageSize = 0x200000;
 
 #ifdef _WIN32
 
@@ -401,6 +397,7 @@ private:
 
 #ifdef ARCHITECTURE_arm64
 
+#ifndef __APPLE__
 static void* ChooseVirtualBase(size_t virtual_size) {
     constexpr uintptr_t Map39BitSize = (1ULL << 39);
     constexpr uintptr_t Map36BitSize = (1ULL << 36);
@@ -420,10 +417,9 @@ static void* ChooseVirtualBase(size_t virtual_size) {
         uintptr_t hint_address = ((rng() % range) + lower) * HugePageSize;
 
         // Try to map.
-        // Note: we may be able to take advantage of MAP_FIXED_NOREPLACE here.
         void* map_pointer =
             mmap(reinterpret_cast<void*>(hint_address), virtual_size, PROT_READ | PROT_WRITE,
-                 MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+                 MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED_NOREPLACE, -1, 0);
 
         // If we successfully mapped, we're done.
         if (reinterpret_cast<uintptr_t>(map_pointer) == hint_address) {
@@ -442,6 +438,56 @@ static void* ChooseVirtualBase(size_t virtual_size) {
 #else
 
 static void* ChooseVirtualBase(size_t virtual_size) {
+    virtual_size -= HugePageSize; // we handle alignment on our own
+
+    // todo: does this have to be 39bit? why?
+    size_t cursor = 0;
+    while (cursor < MACH_VM_MAX_ADDRESS - virtual_size) {
+        u64 region = cursor;
+        u64 region_size = 0;
+
+        // variables we don't need but apple forces us to use anyway
+        u32 info_count = VM_REGION_BASIC_INFO_COUNT_64;
+        vm_region_basic_info_data_64_t info;
+        mach_port_t name;
+
+
+        // find the next mapped region of memory
+        int res = mach_vm_region(mach_task_self(), &region, &region_size, VM_REGION_BASIC_INFO_64,
+                                 reinterpret_cast<vm_region_info_t>(&info), &info_count, &name);
+
+        // the rest of the address space is unmapped, we can just allocate here
+        if (res == KERN_INVALID_ADDRESS) {
+            return mmap(reinterpret_cast<void *>(cursor), virtual_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+        }
+        if (res != KERN_SUCCESS) {
+            LOG_WARNING(HW_Memory, "Failed to check memory region: {} {}", mach_error_string(res), res);
+            continue;
+        }
+
+        // AlignUp landed in another region, continue from here
+        if (region <= cursor) {
+            cursor = AlignUp(region + region_size, HugePageSize);
+            continue;
+        }
+
+        // find the difference between this region and the last region, if it's >= virtual_size, we can use it
+        if (region - cursor >= virtual_size && cursor != 0) {
+            auto ptr = mmap(reinterpret_cast<void *>(cursor), virtual_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+            if (ptr != MAP_FAILED) {
+                return ptr;
+            }
+        }
+
+        cursor = AlignUp(region + region_size, HugePageSize);
+    }
+
+    return MAP_FAILED;
+}
+#endif // !defined(__APPLE__)
+#else
+
+static void* ChooseVirtualBase(size_t virtual_size) {
 #if defined(__FreeBSD__) || defined(__DragonFly__) || defined(__OpenBSD__) || defined(__sun__) || defined(__HAIKU__) || defined(__managarm__) || defined(__AIX__)
     void* virtual_base = mmap(nullptr, virtual_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_ALIGNED_SUPER, -1, 0);
     if (virtual_base != MAP_FAILED)
@@ -450,7 +496,7 @@ static void* ChooseVirtualBase(size_t virtual_size) {
     return mmap(nullptr, virtual_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
 }
 
-#endif
+#endif // ARCHITECTURE_arm64
 
 #if defined(__sun__) || defined(__HAIKU__) || defined(__NetBSD__) || defined(__DragonFly__)
 /// Most Unices don't have a portable shm_open (AIX, OpenBSD, NetBSD, Solaris 11, OpenIndiana)
@@ -507,8 +553,6 @@ public:
     {}
 
     bool Init() {
-        long page_size = sysconf(_SC_PAGESIZE);
-        ASSERT_MSG(page_size == 0x1000, "page size {:#x} is incompatible with 4K paging", page_size);
         // Backing memory initialization
 #if defined(__sun__) || defined(__HAIKU__) || defined(__NetBSD__) || defined(__DragonFly__)
         fd = shm_open_anon(O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW, 0600);
@@ -553,7 +597,6 @@ public:
             LOG_CRITICAL(HW_Memory, "mmap failed: {}", strerror(errno));
             return false;
         }
-
         // Virtual memory initialization
         virtual_base = virtual_map_base = static_cast<u8*>(ChooseVirtualBase(virtual_size));
         if (virtual_base == MAP_FAILED) {
@@ -697,12 +740,13 @@ HostMemory::HostMemory(size_t backing_size_, size_t virtual_size_)
 #else
     // Try to allocate a fastmem arena.
     // The implementation will fail with std::bad_alloc on errors.
-    impl = std::make_unique<HostMemory::Impl>(AlignUp(backing_size, PageAlignment), AlignUp(virtual_size, PageAlignment) + HugePageSize);
+    impl = std::make_unique<HostMemory::Impl>(AlignUp(backing_size, HostPageSize), AlignUp(virtual_size, HostPageSize) + HugePageSize);
     if (impl->Init()) {
         backing_base = impl->backing_base;
         virtual_base = impl->virtual_base;
         if (virtual_base) {
             // Ensure the virtual base is aligned to the L2 block size.
+            // TODO: move this to ChooseVirtualBase and drop virtual_base_offset
             virtual_base = reinterpret_cast<u8*>(Common::AlignUp(uintptr_t(virtual_base), HugePageSize));
             virtual_base_offset = virtual_base - impl->virtual_base;
         }
@@ -724,9 +768,24 @@ HostMemory& HostMemory::operator=(HostMemory&&) noexcept = default;
 
 void HostMemory::Map(size_t virtual_offset, size_t host_offset, size_t length, MemoryPermission perms, bool separate_heap) {
 #if !(defined(__OPENORBIS__) || defined(__managarm__))
-    ASSERT(virtual_offset % PageAlignment == 0);
-    ASSERT(host_offset % PageAlignment == 0);
-    ASSERT(length % PageAlignment == 0);
+    size_t aligned_length = length;
+    ASSERT(virtual_offset % HostPageSize == host_offset % HostPageSize);
+    // todo: placeholder for now, our best bet is probably using the whole pa page for it
+    if (virtual_offset % HostPageSize != 0) {
+        // todo: use most permissive protections? or leave to Protect
+        LOG_WARNING(HW_Memory, "Memory address is unaligned to virtual base, surrounding pages will inherit the same permissions", HostPageSize);
+        auto aligned = AlignDown(virtual_offset, HostPageSize);
+        auto diff = virtual_offset - aligned;
+        assert(virtual_offset > aligned);
+        virtual_offset = aligned;
+        aligned_length = AlignUp(length + diff, HostPageSize);
+        ASSERT(aligned_length >= length);
+    }
+    length = aligned_length;
+
+    ASSERT(virtual_offset % HostPageSize == 0);
+    ASSERT(host_offset % HostPageSize == 0);
+    ASSERT(length % HostPageSize == 0);
     ASSERT(virtual_offset + length <= virtual_size);
     ASSERT(host_offset + length <= backing_size);
     if (length == 0 || !virtual_base || !impl) {
@@ -738,8 +797,8 @@ void HostMemory::Map(size_t virtual_offset, size_t host_offset, size_t length, M
 
 void HostMemory::Unmap(size_t virtual_offset, size_t length, bool separate_heap) {
 #if !(defined(__OPENORBIS__) || defined(__managarm__))
-    ASSERT(virtual_offset % PageAlignment == 0);
-    ASSERT(length % PageAlignment == 0);
+    ASSERT(virtual_offset % HostPageSize == 0);
+    ASSERT(length % HostPageSize == 0);
     ASSERT(virtual_offset + length <= virtual_size);
     if (length == 0 || !virtual_base || !impl) {
         return;
@@ -750,15 +809,25 @@ void HostMemory::Unmap(size_t virtual_offset, size_t length, bool separate_heap)
 
 void HostMemory::Protect(size_t virtual_offset, size_t length, MemoryPermission perm) {
 #if !(defined(__OPENORBIS__) || defined(__managarm__))
-    ASSERT(virtual_offset % PageAlignment == 0);
-    ASSERT(length % PageAlignment == 0);
+    bool read = True(perm & MemoryPermission::Read);
+    bool write = True(perm & MemoryPermission::Write);
+    bool execute = True(perm & MemoryPermission::Execute);
+
+    if (length % HostPageSize != 0 || virtual_offset % HostPageSize != 0) {
+        // todo: make this actually inherit most permissive
+        LOG_WARNING(HW_Memory, "Memory is unaligned to page size, surrounding pages will inherit most permissive permissions");
+        auto aligned = AlignDown(virtual_offset, HostPageSize);
+        auto diff = virtual_offset - aligned;
+        virtual_offset = aligned;
+        length = AlignUp(length + diff, HostPageSize);
+    }
+    ASSERT(!(read && write && execute));
+    ASSERT(virtual_offset % HostPageSize == 0);
+    ASSERT(length % HostPageSize == 0);
     ASSERT(virtual_offset + length <= virtual_size);
     if (length == 0 || !virtual_base || !impl) {
         return;
     }
-    const bool read = True(perm & MemoryPermission::Read);
-    const bool write = True(perm & MemoryPermission::Write);
-    const bool execute = True(perm & MemoryPermission::Execute);
     impl->Protect(virtual_offset + virtual_base_offset, length, read, write, execute);
 #endif
 }

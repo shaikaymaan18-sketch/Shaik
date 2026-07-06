@@ -18,8 +18,9 @@
 #include "core/arm/nce/visitor_base.h"
 
 namespace Core {
+    class KernelContext;
 
-namespace Memory {
+    namespace Memory {
 class Memory;
 }
 
@@ -105,7 +106,6 @@ private:
     const u64& m_pc;
 };
 
-std::optional<u64> MatchAndExecuteOneInstruction(Core::Memory::Memory& memory, mcontext_t* context,
-                                                 fpsimd_context* fpsimd_context);
+std::optional<u64> MatchAndExecuteOneInstruction(Core::Memory::Memory& memory, KernelContext context);
 
 } // namespace Core

@@ -16,9 +16,7 @@
 
 #include "core/hle/kernel/k_process.h"
 
-#include <signal.h>
 #include <sys/syscall.h>
-#include <unistd.h>
 
 namespace Core {
 
@@ -33,14 +31,6 @@ static_assert(offsetof(NativeExecutionParameters, native_context) == TpidrEl0Nat
 static_assert(offsetof(NativeExecutionParameters, lock) == TpidrEl0Lock);
 static_assert(offsetof(NativeExecutionParameters, magic) == TpidrEl0TlsMagic);
 
-fpsimd_context* GetFloatingPointState(mcontext_t& host_ctx) {
-    _aarch64_ctx* header = reinterpret_cast<_aarch64_ctx*>(&host_ctx.__reserved);
-    while (header->magic != FPSIMD_MAGIC) {
-        header = reinterpret_cast<_aarch64_ctx*>(reinterpret_cast<char*>(header) + header->size);
-    }
-    return reinterpret_cast<fpsimd_context*>(header);
-}
-
 using namespace Common::Literals;
 constexpr u32 StackSize = 128_KiB;
 
@@ -48,32 +38,29 @@ constexpr u32 StackSize = 128_KiB;
 
 void* ArmNce::RestoreGuestContext(void* raw_context) {
     // Retrieve the host context.
-    auto& host_ctx = static_cast<ucontext_t*>(raw_context)->uc_mcontext;
+    auto host_ctx = KernelContext(&static_cast<ucontext_t*>(raw_context)->uc_mcontext);
 
     // Thread-local parameters will be located in x9.
-    auto* tpidr = reinterpret_cast<NativeExecutionParameters*>(host_ctx.regs[9]);
+    auto* tpidr = reinterpret_cast<NativeExecutionParameters*>(host_ctx.regs()[9]);
     auto* guest_ctx = static_cast<GuestContext*>(tpidr->native_context);
 
-    // Retrieve the host floating point state.
-    auto* fpctx = GetFloatingPointState(host_ctx);
-
     // Save host callee-saved registers.
-    std::memcpy(guest_ctx->host_ctx.host_saved_vregs.data(), &fpctx->vregs[8],
+    std::memcpy(guest_ctx->host_ctx.host_saved_vregs.data(), &host_ctx.vregs()[8],
                 sizeof(guest_ctx->host_ctx.host_saved_vregs));
-    std::memcpy(guest_ctx->host_ctx.host_saved_regs.data(), &host_ctx.regs[19],
+    std::memcpy(guest_ctx->host_ctx.host_saved_regs.data(), &host_ctx.regs()[19],
                 sizeof(guest_ctx->host_ctx.host_saved_regs));
 
     // Save stack pointer.
-    guest_ctx->host_ctx.host_sp = host_ctx.sp;
+    guest_ctx->host_ctx.host_sp = *host_ctx.sp();
 
     // Restore all guest state except tpidr_el0.
-    host_ctx.sp = guest_ctx->sp;
-    host_ctx.pc = guest_ctx->pc;
-    host_ctx.pstate = guest_ctx->pstate;
-    fpctx->fpcr = guest_ctx->fpcr;
-    fpctx->fpsr = guest_ctx->fpsr;
-    std::memcpy(host_ctx.regs, guest_ctx->cpu_registers.data(), sizeof(host_ctx.regs));
-    std::memcpy(fpctx->vregs, guest_ctx->vector_registers.data(), sizeof(fpctx->vregs));
+    *host_ctx.sp() = guest_ctx->sp;
+    *host_ctx.pc() = guest_ctx->pc;
+    *host_ctx.pstate() = guest_ctx->pstate;
+    *host_ctx.fpcr() = guest_ctx->fpcr;
+    *host_ctx.fpsr() = guest_ctx->fpsr;
+    std::memcpy(host_ctx.regs(), guest_ctx->cpu_registers.data(), sizeof(guest_ctx->cpu_registers));
+    std::memcpy(host_ctx.vregs(), guest_ctx->vector_registers.data(), sizeof(guest_ctx->vector_registers));
 
     // Return the new thread-local storage pointer.
     return tpidr;
@@ -81,47 +68,44 @@ void* ArmNce::RestoreGuestContext(void* raw_context) {
 
 void ArmNce::SaveGuestContext(GuestContext* guest_ctx, void* raw_context) {
     // Retrieve the host context.
-    auto& host_ctx = static_cast<ucontext_t*>(raw_context)->uc_mcontext;
-
-    // Retrieve the host floating point state.
-    auto* fpctx = GetFloatingPointState(host_ctx);
+    auto host_ctx = KernelContext(&static_cast<ucontext_t*>(raw_context)->uc_mcontext);
 
     // Save all guest registers except tpidr_el0.
-    std::memcpy(guest_ctx->cpu_registers.data(), host_ctx.regs, sizeof(host_ctx.regs));
-    std::memcpy(guest_ctx->vector_registers.data(), fpctx->vregs, sizeof(fpctx->vregs));
-    guest_ctx->fpsr = fpctx->fpsr;
-    guest_ctx->fpcr = fpctx->fpcr;
-    guest_ctx->pstate = static_cast<u32>(host_ctx.pstate);
-    guest_ctx->pc = host_ctx.pc;
-    guest_ctx->sp = host_ctx.sp;
+    std::memcpy(guest_ctx->cpu_registers.data(), host_ctx.regs(), sizeof(guest_ctx->cpu_registers));
+    std::memcpy(guest_ctx->vector_registers.data(), host_ctx.vregs(), sizeof(guest_ctx->vector_registers));
+    guest_ctx->fpsr = *host_ctx.fpsr();
+    guest_ctx->fpcr = *host_ctx.fpcr();
+    guest_ctx->pstate = *host_ctx.pstate();
+    guest_ctx->pc = *host_ctx.pc();
+    guest_ctx->sp = *host_ctx.sp();
 
     // Restore stack pointer.
-    host_ctx.sp = guest_ctx->host_ctx.host_sp;
+    *host_ctx.sp() = guest_ctx->host_ctx.host_sp;
 
     // Restore host callee-saved registers.
-    std::memcpy(&host_ctx.regs[19], guest_ctx->host_ctx.host_saved_regs.data(),
+    std::memcpy(&host_ctx.regs()[19], guest_ctx->host_ctx.host_saved_regs.data(),
                 sizeof(guest_ctx->host_ctx.host_saved_regs));
-    std::memcpy(&fpctx->vregs[8], guest_ctx->host_ctx.host_saved_vregs.data(),
+    std::memcpy(&host_ctx.vregs()[8], guest_ctx->host_ctx.host_saved_vregs.data(),
                 sizeof(guest_ctx->host_ctx.host_saved_vregs));
 
     // Return from the call on exit by setting pc to x30.
-    host_ctx.pc = guest_ctx->host_ctx.host_saved_regs[11];
+    *host_ctx.pc() = guest_ctx->host_ctx.host_saved_regs[11];
 
     // Clear esr_el1 and return it.
-    host_ctx.regs[0] = guest_ctx->esr_el1.exchange(0);
+    host_ctx.regs()[0] = guest_ctx->esr_el1.exchange(0);
 }
 
 bool ArmNce::HandleFailedGuestFault(GuestContext* guest_ctx, void* raw_info, void* raw_context) {
-    auto& host_ctx = static_cast<ucontext_t*>(raw_context)->uc_mcontext;
+    auto host_ctx = KernelContext(&static_cast<ucontext_t*>(raw_context)->uc_mcontext);
     auto* info = static_cast<siginfo_t*>(raw_info);
 
     // We can't handle the access, so determine why we crashed.
-    const bool is_prefetch_abort = host_ctx.pc == reinterpret_cast<u64>(info->si_addr);
+    const bool is_prefetch_abort = *host_ctx.pc() == reinterpret_cast<u64>(info->si_addr);
 
     // For data aborts, skip the instruction and return to guest code.
     // This will allow games to continue in many scenarios where they would otherwise crash.
     if (!is_prefetch_abort) {
-        host_ctx.pc += 4;
+        *host_ctx.pc() += 4;
         return true;
     }
 
@@ -142,14 +126,13 @@ bool ArmNce::HandleFailedGuestFault(GuestContext* guest_ctx, void* raw_info, voi
 }
 
 bool ArmNce::HandleGuestAlignmentFault(GuestContext* guest_ctx, void* raw_info, void* raw_context) {
-    auto& host_ctx = static_cast<ucontext_t*>(raw_context)->uc_mcontext;
-    auto* fpctx = GetFloatingPointState(host_ctx);
+    auto host_ctx = KernelContext(&static_cast<ucontext_t*>(raw_context)->uc_mcontext);
     auto& memory = guest_ctx->parent->m_running_thread->GetOwnerProcess()->GetMemory();
 
     // Match and execute an instruction.
-    auto next_pc = MatchAndExecuteOneInstruction(memory, &host_ctx, fpctx);
+    auto next_pc = MatchAndExecuteOneInstruction(memory, &host_ctx);
     if (next_pc) {
-        host_ctx.pc = *next_pc;
+        *host_ctx.pc() = *next_pc;
         return true;
     }
 
@@ -278,7 +261,11 @@ ArmNce::~ArmNce() = default;
 
 void ArmNce::Initialize() {
     if (m_thread_id == -1) {
+#if defined(__linux__)
         m_thread_id = gettid();
+#else
+        m_thread_id = pthread_mach_thread_np(pthread_self());
+#endif
     }
 
     // Configure signal stack.
@@ -381,14 +368,24 @@ void ArmNce::SignalInterrupt(Kernel::KThread* thread) {
     if (params->is_running) {
         // We should signal to the running thread.
         // The running thread will unlock the thread context.
+#if defined(__linux__)
         syscall(SYS_tkill, m_thread_id, BreakFromRunCodeSignal);
+#elif defined(TARGET_OS_MAC) && defined(__aarch64__)
+        asm volatile(
+            "mov x0, %0\n"    // m_thread_id
+            "mov x1, %1\n"    // BreakFromRunCodeSignal
+            "mov x16, #328\n" // syscall code for __pthread_kill
+            "svc #0x80\n"
+            :: "r"(static_cast<u64>(m_thread_id)), "r"(static_cast<u64>(BreakFromRunCodeSignal))
+            : "x0", "x1", "x16", "memory", "cc");
+#endif
     } else {
         // If the thread is no longer running, we have nothing to do.
         UnlockThreadParameters(params);
     }
 }
 
-[[maybe_unused]] const std::size_t CACHE_PAGE_SIZE = 4096;
+[[maybe_unused]] const std::size_t CACHE_PAGE_SIZE = Common::HostPageSize;
 
 void ArmNce::ClearInstructionCache() {
 #ifdef __aarch64__

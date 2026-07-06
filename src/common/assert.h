@@ -17,8 +17,8 @@ void AssertFailSoftImpl();
 [[noreturn]] void AssertFatalImpl();
 
 // Prevents errors on old GCC... smh...
-#ifdef _MSC_VER
-#define YUZU_NO_INLINE __declspec(noinline)
+#if defined(_MSC_VER) || defined(__clang__)
+#define YUZU_NO_INLINE
 #else
 #define YUZU_NO_INLINE __attribute__((noinline))
 #endif

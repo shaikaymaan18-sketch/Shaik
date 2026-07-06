@@ -10,6 +10,9 @@
 #include "core/arm/arm_interface.h"
 #include "core/arm/nce/arm_nce_asm_definitions.h"
 
+#include <unistd.h>
+#include <signal.h>
+
 namespace Core {
 
 class ArmNce;
@@ -40,6 +43,90 @@ struct GuestContext {
     ArmNce* parent{};
 };
 
+class KernelContext {
+public:
+#if defined(__linux__)
+    KernelContext(void* ptr_) : ptr(static_cast<mcontext_t *>(ptr_)), fpsimd{GetFloatingPointState(ptr)} {}
+
+    u64* pc() {
+        // u64 (unsigned long) does not equal unsigned long long
+        // thank you gcc
+        return reinterpret_cast<u64*>(&ptr->pc);
+    }
+
+    u64* sp() {
+        return reinterpret_cast<u64*>(&ptr->sp);
+    }
+
+    u64* regs() {
+        return reinterpret_cast<u64*>(&ptr->regs);
+    }
+
+    u128* vregs() {
+        // returns __uint128, u128 is a std::array
+        return reinterpret_cast<u128*>(&fpsimd->vregs);
+    }
+
+    u32* fpcr() {
+        return &fpsimd->fpcr;
+    }
+
+    u32* fpsr() {
+        return &fpsimd->fpsr;
+    }
+
+    u32* pstate() {
+        // only first 32 bits are used
+        return reinterpret_cast<u32*>(&ptr->pstate);
+    }
+
+#elif defined(__APPLE__)
+    KernelContext(void* ptr) : ptr(static_cast<mcontext_t *>(ptr)) {}
+
+    u64* pc() {
+        return &(*ptr)->__ss.__pc;
+    }
+
+    u64* sp() {
+        return &(*ptr)->__ss.__sp;
+    }
+
+    u64* regs() {
+        return (*ptr)->__ss.__x;
+    }
+
+    u128* vregs() {
+        // .__v returns __uint128, u128 is an std::array
+        return reinterpret_cast<u128 *>((*ptr)->__ns.__v);
+    }
+
+    u32* fpcr() {
+        return &(*ptr)->__ns.__fpcr;
+    }
+
+    u32* fpsr() {
+        return &(*ptr)->__ns.__fpsr;
+    }
+
+    u32* pstate() {
+        return &(*ptr)->__ss.__cpsr;
+    }
+#endif
+private:
+    mcontext_t* ptr;
+#ifdef __linux__
+    fpsimd_context* fpsimd;
+
+    fpsimd_context* GetFloatingPointState(mcontext_t* host_ctx) {
+        _aarch64_ctx* header = reinterpret_cast<_aarch64_ctx*>(&host_ctx->__reserved);
+        while (header->magic != FPSIMD_MAGIC) {
+            header = reinterpret_cast<_aarch64_ctx*>(reinterpret_cast<char*>(header) + header->size);
+        }
+        return reinterpret_cast<fpsimd_context*>(header);
+    }
+#endif
+};
+
 // Verify assembly offsets.
 static_assert(offsetof(GuestContext, sp) == GuestContextSp);
 static_assert(offsetof(GuestContext, host_ctx) == GuestContextHostContext);
@@ -48,5 +135,10 @@ static_assert(offsetof(HostContext, host_tpidr_el0) - 8 == HostContextSpTpidrEl0
 static_assert(offsetof(HostContext, host_tpidr_el0) == HostContextTpidrEl0);
 static_assert(offsetof(HostContext, host_saved_regs) == HostContextRegs);
 static_assert(offsetof(HostContext, host_saved_vregs) == HostContextVregs);
+
+#ifdef TARGET_OS_MAC
+// ensure that fp and lr are next to the rest of the x registers so they can be accessed like an array
+static_assert(offsetof(_STRUCT_ARM_THREAD_STATE64, __sp) - offsetof(_STRUCT_ARM_THREAD_STATE64, __x) == sizeof(u64) * 31);
+#endif
 
 } // namespace Core

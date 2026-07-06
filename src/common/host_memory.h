@@ -8,11 +8,24 @@
 
 #include <memory>
 #include <optional>
+
+#ifndef _MSC_VER
+#include <unistd.h>
+#endif
+
 #include "common/common_funcs.h"
 #include "common/common_types.h"
 #include "common/virtual_buffer.h"
 
 namespace Common {
+
+#ifndef _MSC_VER
+const size_t HostPageSize = sysconf(_SC_PAGESIZE);
+#else
+constexpr size_t HostPageSize = 0x1000;
+#endif
+const size_t GuestHostAlignment = HostPageSize / 4096;
+constexpr size_t HugePageSize = 0x200000;
 
 enum class MemoryPermission : u32 {
     Read = 1 << 0,

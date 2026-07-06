@@ -212,6 +212,11 @@ KPhysicalAddress KMemoryManager::AllocateAndOpenContinuous(size_t num_pages, siz
         return 0;
     }
 
+    // todo: find a better way to do this
+    if (align_pages % Common::GuestHostAlignment != 0) {
+        align_pages = Common::AlignUp(align_pages, Common::GuestHostAlignment);
+    }
+
     // Lock the pool that we're allocating from.
     const auto [pool, dir] = DecodeOption(option);
     KScopedLightLock lk(m_pool_locks[static_cast<std::size_t>(pool)]);

@@ -22,9 +22,9 @@ void AssertFailSoftImpl() {
 #   elif defined(ARCHITECTURE_arm64)
         __asm__ __volatile__("brk #0");
 #   else
-        exit(1);
+        __builtin_debugtrap();
 #   endif
-#else // POSIX ^^^ _MSC_VER vvv
+#else // Clang/GCC ^^^ MSVC vvv
         DebugBreak();
 #endif
     }

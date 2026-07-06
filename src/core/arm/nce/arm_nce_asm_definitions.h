@@ -5,8 +5,15 @@
 
 #define __ASSEMBLY__
 
+#ifndef __APPLE__
 #include <asm-generic/signal.h>
 #include <asm-generic/unistd.h>
+#else
+#define SIGUSR2 31
+#define SIGURG  16
+#define SIGSEGV 11
+#define SIGBUS  10
+#endif
 
 #define ReturnToRunCodeByExceptionLevelChangeSignal SIGUSR2
 #define BreakFromRunCodeSignal SIGURG
