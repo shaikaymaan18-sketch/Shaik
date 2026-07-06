@@ -4,6 +4,7 @@
 // SPDX-FileCopyrightText: Copyright 2021 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include "core/memory.h"
 #ifdef _WIN32
 
 #include <iterator>
@@ -766,22 +767,46 @@ HostMemory::HostMemory(HostMemory&&) noexcept = default;
 
 HostMemory& HostMemory::operator=(HostMemory&&) noexcept = default;
 
+bool HostMemory::IsIrregularlyMappedAddress(size_t addr) noexcept {
+    auto index = addr / Core::Memory::YUZU_PAGESIZE;
+
+    auto i = irregular_mappings.upper_bound(index);
+    if (i == irregular_mappings.begin())
+        return false;
+    --i;
+
+    return index < i->first + i->second;
+}
+
 void HostMemory::Map(size_t virtual_offset, size_t host_offset, size_t length, MemoryPermission perms, bool separate_heap) {
 #if !(defined(__OPENORBIS__) || defined(__managarm__))
-    size_t aligned_length = length;
-    ASSERT(virtual_offset % HostPageSize == host_offset % HostPageSize);
-    // todo: placeholder for now, our best bet is probably using the whole pa page for it
     if (virtual_offset % HostPageSize != 0) {
-        // todo: use most permissive protections? or leave to Protect
-        LOG_WARNING(HW_Memory, "Memory address is unaligned to virtual base, surrounding pages will inherit the same permissions", HostPageSize);
-        auto aligned = AlignDown(virtual_offset, HostPageSize);
-        auto diff = virtual_offset - aligned;
-        assert(virtual_offset > aligned);
-        virtual_offset = aligned;
-        aligned_length = AlignUp(length + diff, HostPageSize);
-        ASSERT(aligned_length >= length);
+        if (IsIrregularlyMappedAddress(virtual_offset)) {
+            auto aligned = AlignUp(virtual_offset, HostPageSize);
+            LOG_WARNING(HW_Memory, "Irregularly mapped virtual addresses {:#x}-{:#x} will not have a valid physical address",
+                virtual_offset, aligned);
+            length -= aligned - virtual_offset;
+            virtual_offset = aligned;
+        } else {
+            auto aligned = AlignDown(virtual_offset, HostPageSize);
+            irregular_mappings.emplace(aligned / Core::Memory::YUZU_PAGESIZE, virtual_offset - aligned);
+            length += virtual_offset - aligned;
+            virtual_offset = aligned;
+        }
     }
-    length = aligned_length;
+
+    if (length % HostPageSize != 0) {
+        if (IsIrregularlyMappedAddress(virtual_offset + length)) {
+            auto aligned = AlignDown(length, HostPageSize);
+            LOG_WARNING(HW_Memory, "Irregularly mapped virtual addresses {:#x}-{:#x} will not have a valid physical address",
+                virtual_offset + aligned, virtual_offset + length);
+            length = aligned;
+        } else {
+            auto aligned = AlignUp(length, HostPageSize);
+            irregular_mappings.emplace((virtual_offset + aligned) / Core::Memory::YUZU_PAGESIZE, aligned - length);
+            length = aligned;
+        }
+    }
 
     ASSERT(virtual_offset % HostPageSize == 0);
     ASSERT(host_offset % HostPageSize == 0);

@@ -13,6 +13,8 @@
 #include <unistd.h>
 #endif
 
+#include <map>
+
 #include "common/common_funcs.h"
 #include "common/common_types.h"
 #include "common/virtual_buffer.h"
@@ -24,7 +26,7 @@ const size_t HostPageSize = sysconf(_SC_PAGESIZE);
 #else
 constexpr size_t HostPageSize = 0x1000;
 #endif
-const size_t GuestHostAlignment = HostPageSize / 4096;
+const size_t GuestHostAlignment = HostPageSize / 0x1000;
 constexpr size_t HugePageSize = 0x200000;
 
 enum class MemoryPermission : u32 {
@@ -98,8 +100,12 @@ private:
     u8* backing_base{};
     u8* virtual_base{};
     size_t virtual_base_offset{};
+    // todo: include actual paddr for host ops?
+    std::map<size_t, size_t> irregular_mappings{};
     // Windows requires it for kernels whom lack proper support for some functions!
     std::optional<Common::VirtualBuffer<u8>> fallback_buffer;
+
+    bool IsIrregularlyMappedAddress(size_t addr) noexcept;
 };
 
 } // namespace Common
