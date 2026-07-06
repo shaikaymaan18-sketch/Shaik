@@ -15,6 +15,7 @@
 
 #ifdef __linux__
 #include <asm/sigcontext.h>
+#include <signal.h>
 #endif
 
 namespace Core {
