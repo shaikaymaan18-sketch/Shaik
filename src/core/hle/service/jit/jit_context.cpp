@@ -60,9 +60,7 @@ public:
     {}
 
     std::optional<std::uint32_t> MemoryReadCode(VAddr vaddr) override {
-        // todo: does code page have to be 4kib?
-        //static_assert(Core::Memory::YUZU_PAGESIZE == Dynarmic::CODE_PAGE_SIZE);
-        auto const aligned_vaddr = vaddr & ~(Dynarmic::CODE_PAGE_SIZE - 1);
+        auto const aligned_vaddr = Common::AlignDown(vaddr, Dynarmic::CODE_PAGE_SIZE);
         if (last_code_addr != aligned_vaddr) {
             cached_code_page = ReadMemory<Dynarmic::CodePage>(aligned_vaddr);
             last_code_addr = aligned_vaddr;
@@ -167,8 +165,8 @@ private:
     std::vector<u8>& local_memory;
     IntervalSet& mapped_ranges;
     JITContextImpl& parent;
-    Dynarmic::CodePage cached_code_page;
     u64 last_code_addr = u64(-1);
+    Dynarmic::CodePage cached_code_page;
 };
 
 class JITContextImpl {

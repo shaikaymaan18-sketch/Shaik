@@ -64,7 +64,6 @@ public:
     bool CheckMemoryAccess(u64 addr, u64 size, Kernel::DebugWatchpointType type);
     void ReturnException(u64 pc, Dynarmic::HaltReason hr);
 
-    Dynarmic::CodePage cached_code_page;
     u64 last_code_addr = u64(-1);
     ArmDynarmic64& m_parent;
     Core::Memory::Memory& m_memory;
@@ -74,6 +73,7 @@ public:
     const bool m_debugger_enabled{};
     const bool m_check_memory_access{};
     static constexpr u64 MinimumRunCycles = 10000U;
+    Dynarmic::CodePage cached_code_page;
 };
 
 class ArmDynarmic64 final : public ArmInterface {
