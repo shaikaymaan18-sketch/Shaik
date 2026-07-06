@@ -350,7 +350,6 @@ FN_MAX_LIMIT_LIST
         return properties.float_controls;
     }
 
-    /// Returns true if ASTC is natively supported, including HDR-profile (non-LDR-only)
     bool IsOptimalAstcSupported() const {
         return features.features.textureCompressionASTC_LDR &&
                features.texture_compression_astc_hdr.textureCompressionASTC_HDR;

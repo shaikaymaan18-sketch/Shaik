@@ -44,7 +44,7 @@ layout(binding = BINDING_INPUT_BUFFER, std430) readonly restrict buffer InputBuf
 };
 
 #ifdef VULKAN
-layout(binding = BINDING_OUTPUT_IMAGE, rgba32f) uniform writeonly restrict image2DArray dest_image;
+layout(binding = BINDING_OUTPUT_IMAGE) uniform writeonly restrict image2DArray dest_image;
 #else
 layout(binding = BINDING_OUTPUT_IMAGE, rgba8) uniform writeonly restrict image2DArray dest_image;
 #endif
@@ -135,17 +135,6 @@ void ResultEmplaceBack(EncodingData val) {
 
 uvec4 ReplicateByteTo16(uvec4 value) {
     return value * 0x101;
-}
-
-// sRGB EOTF (decode: encoded value -> linear). Only used on the Vulkan path, where the
-// destination image is a linear float format with no format-level sRGB tag of its own.
-// Vectorized (single vec3 overload, no per-component scalar ternary) to match the style
-// already used elsewhere in this file (see the HDR Mt piecewise selection) rather than the
-// float/vec3 overload pair this replaces.
-vec3 SRGBToLinear(vec3 c) {
-    const vec3 lo = c / 12.92;
-    const vec3 hi = pow(max((c + 0.055) / 1.055, vec3(0.0)), vec3(2.4));
-    return mix(hi, lo, lessThanEqual(c, vec3(0.04045)));
 }
 
 uint ReplicateBitTo7(uint value) {
@@ -611,14 +600,11 @@ bool IsHDRColorEndpointMode(uint cem) {
     return cem == 2u || cem == 3u || cem == 7u || cem == 11u || cem == 14u || cem == 15u;
 }
 
-// Sign-extends the low nbits of value (a 2's complement field packed into the bottom of an
-// otherwise-unsigned integer), per C.2.15's HDR endpoint bitfield unpacking.
 int SignExtend(int value, uint nbits) {
     int sign_bit = 1 << (nbits - 1u);
     return (value ^ sign_bit) - sign_bit;
 }
 
-// HDR Endpoint Mode 7 (C.2.15): base RGB + scale factor.
 void DecodeHDREndpointMode7(uint v0, uint v1, uint v2, uint v3, out ivec3 e0, out ivec3 e1) {
     uint modeval = ((v0 & 0xC0u) >> 6u) | ((v1 & 0x80u) >> 5u) | ((v2 & 0x80u) >> 4u);
 
@@ -691,8 +677,6 @@ void DecodeHDREndpointMode7(uint v0, uint v1, uint v2, uint v3, out ivec3 e0, ou
               clamp(blue - scale, 0, 0xFFF));
 }
 
-// HDR Endpoint Mode 11 (C.2.15): direct RGB pair. Shared by modes 11, 14 and 15, which all
-// decode their RGB the same way and only differ in how alpha is filled in.
 void DecodeHDREndpointMode11(uint v0, uint v1, uint v2, uint v3, uint v4, uint v5, out ivec3 e0,
                              out ivec3 e1) {
     uint majcomp = ((v4 & 0x80u) >> 7u) | ((v5 & 0x80u) >> 6u);
@@ -939,7 +923,6 @@ void ComputeEndpoints(out uvec4 ep1, out uvec4 ep2, uint color_endpoint_mode, ui
         READ_UINT_VALUES(8)
         ivec3 e0, e1;
         DecodeHDREndpointMode11(V[0].x, V[0].y, V[0].z, V[0].w, V[1].x, V[1].y, e0, e1);
-        // Only HDR mode with LDR (8-bit UNORM)-interpreted alpha; left as-is (0-255).
         ep1 = uvec4(V[1].z, uint(e0.x), uint(e0.y), uint(e0.z));
         ep2 = uvec4(V[1].w, uint(e1.x), uint(e1.y), uint(e1.z));
         break;
@@ -971,7 +954,6 @@ void ComputeEndpoints(out uvec4 ep1, out uvec4 ep2, uint color_endpoint_mode, ui
         break;
     }
     default: {
-        // Not a valid CEM at all (all 16 values are now handled above).
         ep1 = uvec4(0xFF, 0xFF, 0, 0);
         ep2 = uvec4(0xFF, 0xFF, 0, 0);
         break;
@@ -1372,8 +1354,6 @@ void DecompressBlock(ivec3 coord) {
 
             vec4 p;
             if (IsHDRColorEndpointMode(local_cem)) {
-                // Endpoints are raw 12-bit pseudo-logarithmic values; shift left 4 bits to
-                // become 16-bit before interpolating, per C.2.19.
                 const uvec4 C0 = endpoints0[local_partition] << 4u;
                 const uvec4 C1 = endpoints1[local_partition] << 4u;
                 const uvec4 C = (C0 * (uvec4(64) - weight_vec) + C1 * weight_vec + uvec4(32)) / 64u;
@@ -1386,13 +1366,10 @@ void DecompressBlock(ivec3 coord) {
                     mix(Mt_lo, mix(Mt_mid, Mt_hi, greaterThanEqual(M, uvec4(1536u))),
                         greaterThanEqual(M, uvec4(512u)));
                 const uvec4 Cf = (E << 10u) + (Mt >> 3u);
-                // +Inf/NaN clamps to the largest finite FP16 value (0x7BFF).
                 const uvec4 half_bits = mix(Cf, uvec4(0x7BFFu), greaterThanEqual(Cf, uvec4(0x7C00u)));
                 p = vec4(unpackHalf2x16(half_bits.x).x, unpackHalf2x16(half_bits.y).x,
                         unpackHalf2x16(half_bits.z).x, unpackHalf2x16(half_bits.w).x);
 
-                // Mode 14 keeps an LDR (8-bit UNORM)-interpreted alpha; component 0 here (A,
-                // see the ep1/ep2 layout used throughout this file).
                 if (local_cem == 14u) {
                     const uint a0 = ReplicateByteTo16(uvec4(endpoints0[local_partition].x)).x;
                     const uint a1 = ReplicateByteTo16(uvec4(endpoints1[local_partition].x)).x;
@@ -1405,9 +1382,6 @@ void DecompressBlock(ivec3 coord) {
                 const vec4 Cf =
                     vec4((C0 * (uvec4(64) - weight_vec) + C1 * weight_vec + uvec4(32)) / 64);
                 p = Cf / 65535.0f;
-#ifdef VULKAN
-                p.yzw = mix(p.yzw, SRGBToLinear(p.yzw), bvec3((block_height_mask & 0x80000000u) != 0u));
-#endif
             }
 
 #ifdef VULKAN
@@ -1436,7 +1410,7 @@ void main() {
     uint offset = 0;
     offset += pos.z * layer_stride;
     offset += (block_y >> block_height) * block_size;
-    offset += (block_y & (block_height_mask & 0x7FFFFFFFu)) << GOB_SIZE_SHIFT;
+    offset += (block_y & block_height_mask) << GOB_SIZE_SHIFT;
     offset += (pos.x >> GOB_SIZE_X_SHIFT) << x_shift;
     offset += swizzle;
 

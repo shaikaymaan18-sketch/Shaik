@@ -1283,9 +1283,6 @@ static constexpr bool IsHDRColorEndpointMode(u32 cem) {
     }
 }
 
-// Sign-extends the low nbits of value (a 2's complement field packed into
-// the bottom of an otherwise-unsigned integer), per C.2.15's HDR endpoint
-// bitfield unpacking.
 static constexpr s32 SignExtend(s32 value, u32 nbits) {
     const s32 sign_bit = 1 << (nbits - 1);
     return (value ^ sign_bit) - sign_bit;
@@ -1296,7 +1293,6 @@ struct HDREndpointRGB {
     s32 r1, g1, b1;
 };
 
-// HDR Endpoint Mode 7 (C.2.15): base RGB + scale factor.
 static void DecodeHDREndpointMode7(u32 v0, u32 v1, u32 v2, u32 v3, s32& r0, s32& g0, s32& b0,
                                     s32& r1, s32& g1, s32& b1) {
     const u32 modeval = ((v0 & 0xC0) >> 6) | ((v1 & 0x80) >> 5) | ((v2 & 0x80) >> 4);
@@ -1389,8 +1385,6 @@ static void DecodeHDREndpointMode7(u32 v0, u32 v1, u32 v2, u32 v3, s32& r0, s32&
     b0 = std::clamp(blue - scale, 0, 0xFFF);
 }
 
-// HDR Endpoint Mode 11 (C.2.15): direct RGB pair. Shared by modes 11, 14 and 15,
-// which all decode their RGB the same way and only differ in how alpha is filled in.
 static HDREndpointRGB DecodeHDREndpointMode11(u32 v0, u32 v1, u32 v2, u32 v3, u32 v4, u32 v5) {
     const u32 majcomp = ((v4 & 0x80) >> 7) | ((v5 & 0x80) >> 6);
     if (majcomp == 3) {
@@ -1451,11 +1445,6 @@ static HDREndpointRGB DecodeHDREndpointMode11(u32 v0, u32 v1, u32 v2, u32 v3, u3
     if (ohm & 0x12)
         vb1 |= static_cast<s32>(x3 << 7);
 
-    // NOTE: the published spec text says "modeval >> 1" here, but no "modeval" is defined
-    // in this decode (that name belongs to Mode 7's unrelated decode) -- substituting the
-    // "mode" computed just above reproduces exactly Table C.2.23's per-mode shift amounts
-    // (3,3,2,2,1,1,0,0 for modes 0..7), so this is a spec transcription error, not a real
-    // "modeval" this function forgot to compute.
     const s32 shamt = (static_cast<s32>(mode) >> 1) ^ 3;
     va <<= shamt;
     vb0 <<= shamt;
@@ -1643,7 +1632,6 @@ static void ComputeEndpoints(Pixel& ep1, Pixel& ep2, const u32*& colorValues,
     case 14: {
         READ_UINT_VALUES(8)
         const HDREndpointRGB rgb = DecodeHDREndpointMode11(v[0], v[1], v[2], v[3], v[4], v[5]);
-        // Only mode with LDR (8-bit UNORM)-interpreted alpha; left as-is (0-255).
         ep1 = Pixel(v[6], rgb.r0, rgb.g0, rgb.b0);
         ep2 = Pixel(v[7], rgb.r1, rgb.g1, rgb.b1);
     } break;
@@ -1963,14 +1951,10 @@ static void DecompressBlock(std::span<const u8, 16> inBuf, const u32 blockWidth,
                 }
                 u32 weight = weights[plane][j * blockWidth + i];
 
-                // Mode 14 is RGB-HDR but keeps an LDR (8-bit UNORM)-interpreted alpha
-                // (component 0 here, see Pixel::A()) -- the only HDR mode with this split.
                 const bool is_hdr = IsHDRColorEndpointMode(colorEndpointMode[partition]) &&
                                     !(colorEndpointMode[partition] == 14 && c == 0);
 
                 if (is_hdr) {
-                    // Endpoints are raw 12-bit pseudo-logarithmic values; shift left 4 bits
-                    // to become 16-bit before interpolating, per C.2.19.
                     C0 <<= 4;
                     C1 <<= 4;
                     const u32 C = (C0 * (64 - weight) + C1 * weight + 32) / 64;
@@ -1985,7 +1969,6 @@ static void DecompressBlock(std::span<const u8, 16> inBuf, const u32 blockWidth,
                         Mt = 4 * M - 512;
                     }
                     const u32 Cf = (E << 10) + (Mt >> 3);
-                    // +Inf/NaN clamps to the largest finite FP16 value (0x7BFF).
                     const u16 half_bits = (Cf >= 0x7C00) ? u16{0x7BFF} : static_cast<u16>(Cf);
                     p.Component(c) = HalfToClampedByte(half_bits);
                 } else {
