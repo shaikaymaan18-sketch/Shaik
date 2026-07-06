@@ -16,8 +16,6 @@
 
 #include "core/hle/kernel/k_process.h"
 
-#include <sys/syscall.h>
-
 namespace Core {
 
 namespace {

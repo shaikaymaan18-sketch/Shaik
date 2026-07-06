@@ -9,7 +9,7 @@
 #include <memory>
 #include <optional>
 
-#ifndef _MSC_VER
+#ifndef _WIN32
 #include <unistd.h>
 #endif
 
@@ -19,7 +19,7 @@
 
 namespace Common {
 
-#ifndef _MSC_VER
+#ifndef _WIN32
 const size_t HostPageSize = sysconf(_SC_PAGESIZE);
 #else
 constexpr size_t HostPageSize = 0x1000;
