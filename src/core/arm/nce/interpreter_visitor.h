@@ -18,9 +18,9 @@
 #include "core/arm/nce/visitor_base.h"
 
 namespace Core {
-    class KernelContext;
+class KernelContext;
 
-    namespace Memory {
+namespace Memory {
 class Memory;
 }
 

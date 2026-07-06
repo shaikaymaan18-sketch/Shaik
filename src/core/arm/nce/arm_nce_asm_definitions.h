@@ -16,6 +16,8 @@
 #define SIGURG  16
 #define SIGSEGV 11
 #define SIGBUS  10
+
+#define __pthread_pkill 328
 #endif
 
 #define ReturnToRunCodeByExceptionLevelChangeSignal SIGUSR2

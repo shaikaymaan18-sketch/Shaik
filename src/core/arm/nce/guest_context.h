@@ -14,9 +14,7 @@
 #include "core/arm/nce/arm_nce_asm_definitions.h"
 
 #ifdef __linux__
-#include <unistd.h>
-#include <sys/syscall.h>
-#include <signal.h>
+#include <asm/sigcontext.h>
 #endif
 
 namespace Core {
@@ -142,7 +140,7 @@ static_assert(offsetof(HostContext, host_tpidr_el0) == HostContextTpidrEl0);
 static_assert(offsetof(HostContext, host_saved_regs) == HostContextRegs);
 static_assert(offsetof(HostContext, host_saved_vregs) == HostContextVregs);
 
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
 // ensure that fp and lr are next to the rest of the x registers so they can be accessed like an array
 static_assert(offsetof(_STRUCT_ARM_THREAD_STATE64, __sp) - offsetof(_STRUCT_ARM_THREAD_STATE64, __x) == sizeof(u64) * 31);
 #endif

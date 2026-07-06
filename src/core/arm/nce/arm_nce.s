@@ -8,7 +8,7 @@
     movk    reg, #(((val) >> 0x10) & 0xFFFF), lsl #16
 
 #ifdef __APPLE__
-#define func(name) _##name
+#define SYM(name) _##name
 
 .macro ASM_FUNCTION_START name
 
@@ -19,7 +19,7 @@ _\name:
 
 .endm
 #else
-#define func(name) name
+#define SYM(name) name
 .macro ASM_FUNCTION_START name
 
 .section .text.\name, "ax", %progbits
@@ -89,7 +89,7 @@ ASM_FUNCTION_START _ZN4Core6ArmNce37ReturnToRunCodeByExceptionLevelChangeEiPv
     mov     x8, #(__NR_tkill)
     svc     #0
 #else
-    mov     x16, #328
+    mov     x16, #(__pthread_pkill)
     svc     #0x80
 #endif
 
@@ -104,7 +104,7 @@ ASM_FUNCTION_START _ZN4Core6ArmNce50ReturnToRunCodeByExceptionLevelChangeSignalH
 
     /* Call the context restorer with the raw context. */
     mov     x0, x2
-    bl      func(_ZN4Core6ArmNce19RestoreGuestContextEPv)
+    bl      SYM(_ZN4Core6ArmNce19RestoreGuestContextEPv)
 
     /* Save the old value of tpidr_el0. */
     mrs     x8, tpidr_el0
@@ -115,7 +115,7 @@ ASM_FUNCTION_START _ZN4Core6ArmNce50ReturnToRunCodeByExceptionLevelChangeSignalH
     msr     tpidr_el0, x0
 
     /* Unlock the context. */
-    bl      func(_ZN4Core6ArmNce22UnlockThreadParametersEPv)
+    bl      SYM(_ZN4Core6ArmNce22UnlockThreadParametersEPv)
 
     /* Returning from here will enter the guest. */
     ldp     x29, x30, [sp], #0x10
@@ -141,7 +141,7 @@ ASM_FUNCTION_START _ZN4Core6ArmNce29BreakFromRunCodeSignalHandlerEiPvS1_
 
     /* Tail call the restorer. */
     mov     x1, x2
-    b       func(_ZN4Core6ArmNce16SaveGuestContextEPNS_12GuestContextEPv)
+    b       SYM(_ZN4Core6ArmNce16SaveGuestContextEPNS_12GuestContextEPv)
 
     /* Returning from here will enter host code. */
 
@@ -163,7 +163,7 @@ ASM_FUNCTION_START _ZN4Core6ArmNce32GuestAlignmentFaultSignalHandlerEiPvS1_
 
     /* Incorrect TLS magic, so this is a host fault. */
     /* Tail call the handler. */
-    b       func(_ZN4Core6ArmNce24HandleHostAlignmentFaultEiPvS1_)
+    b       SYM(_ZN4Core6ArmNce24HandleHostAlignmentFaultEiPvS1_)
 
 1:
     /* Correct TLS magic, so this is a guest fault. */
@@ -180,7 +180,7 @@ ASM_FUNCTION_START _ZN4Core6ArmNce32GuestAlignmentFaultSignalHandlerEiPvS1_
     msr     tpidr_el0, x3
 
     /* Call the handler. */
-    bl       func(_ZN4Core6ArmNce25HandleGuestAlignmentFaultEPNS_12GuestContextEPvS3_)
+    bl       SYM(_ZN4Core6ArmNce25HandleGuestAlignmentFaultEPNS_12GuestContextEPvS3_)
 
     /* If the handler returned false, we want to preserve the host tpidr_el0. */
     cbz     x0, 2f
@@ -206,7 +206,7 @@ ASM_FUNCTION_START _ZN4Core6ArmNce29GuestAccessFaultSignalHandlerEiPvS1_
 
     /* Incorrect TLS magic, so this is a host fault. */
     /* Tail call the handler. */
-    b       func(_ZN4Core6ArmNce21HandleHostAccessFaultEiPvS1_)
+    b       SYM(_ZN4Core6ArmNce21HandleHostAccessFaultEiPvS1_)
 
 1:
     /* Correct TLS magic, so this is a guest fault. */
@@ -223,7 +223,7 @@ ASM_FUNCTION_START _ZN4Core6ArmNce29GuestAccessFaultSignalHandlerEiPvS1_
     msr     tpidr_el0, x3
 
     /* Call the handler. */
-    bl       func(_ZN4Core6ArmNce22HandleGuestAccessFaultEPNS_12GuestContextEPvS3_)
+    bl       SYM(_ZN4Core6ArmNce22HandleGuestAccessFaultEPNS_12GuestContextEPvS3_)
 
     /* If the handler returned false, we want to preserve the host tpidr_el0. */
     cbz     x0, 2f

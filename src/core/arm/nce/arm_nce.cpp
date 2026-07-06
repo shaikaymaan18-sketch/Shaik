@@ -16,6 +16,10 @@
 
 #include "core/hle/kernel/k_process.h"
 
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <signal.h>
+
 namespace Core {
 
 namespace {
@@ -368,7 +372,7 @@ void ArmNce::SignalInterrupt(Kernel::KThread* thread) {
         // The running thread will unlock the thread context.
 #if defined(__linux__)
         syscall(SYS_tkill, m_thread_id, BreakFromRunCodeSignal);
-#elif defined(TARGET_OS_MAC) && defined(__aarch64__)
+#elif defined(__APPLE__) && defined(__aarch64__)
         asm volatile(
             "mov x0, %0\n"    // m_thread_id
             "mov x1, %1\n"    // BreakFromRunCodeSignal
