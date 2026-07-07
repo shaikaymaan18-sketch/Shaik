@@ -75,6 +75,12 @@ layout(binding = BINDING_INPUT_BUFFER, std430) buffer InputBufferU128 { uvec4  u
 layout(binding = BINDING_OUTPUT_BUFFER, std430) writeonly buffer OutputBuffer {
     uint out_u32[];
 };
+layout(binding = BINDING_OUTPUT_BUFFER, std430) writeonly buffer OutputBufferU64 {
+    uvec2 out_u64[];
+};
+layout(binding = BINDING_OUTPUT_BUFFER, std430) writeonly buffer OutputBufferU128 {
+    uvec4 out_u128[];
+};
 
 // --- Constants ---
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
@@ -153,12 +159,14 @@ void main() {
     uint block_index = block_coord.x +
                        (block_coord.y * pc.blocks_dim.x) +
                        (block_coord.z * pc.blocks_dim.x * pc.blocks_dim.y);
-    uint out_idx = block_index * (bytes_per_block >> 2u);
 
-    out_u32[out_idx]     = texel.x;
-    out_u32[out_idx + 1u] = texel.y;
-    if (pc.bytes_per_block_log2 == 4u) {
-        out_u32[out_idx + 2u] = texel.z;
-        out_u32[out_idx + 3u] = texel.w;
+    if (pc.bytes_per_block_log2 == 4u) {         // 16 bytes (BC3/BC7)
+        out_u128[block_index] = texel;
+    } else if (pc.bytes_per_block_log2 == 3u) {  // 8 bytes (BC1/BC4)
+        out_u64[block_index] = texel.xy;
+    } else {
+        uint out_idx = block_index * (bytes_per_block >> 2u);
+        out_u32[out_idx] = texel.x;
+        if ((bytes_per_block >> 2u) > 1u) out_u32[out_idx + 1u] = texel.y;
     }
 }

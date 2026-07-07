@@ -153,20 +153,18 @@ public:
                    bool image_already_uploaded);
 
     void UnswizzleChunk(
-        Image& image,
-        const StagingBufferRef& swizzled,
-        const VideoCommon::SwizzleParameters& sw,
-        const BlockLinearSwizzle3DParams& params,
+        Image &image,
+        const StagingBufferRef &swizzled,
+        const VideoCommon::SwizzleParameters &sw,
+        const BlockLinearSwizzle3DParams &params,
         u32 blocks_x, u32 blocks_y,
-        u32 z_src, u32 z_dst, u32 z_count,
-        VkImageLayout prior_image_layout);
+        u32 z_src, u32 z_dst, u32 z_count);
 
     void UnswizzleZeroChunk(
-        Image& image,
+        Image &image,
         u32 blocks_x, u32 blocks_y,
         u32 bytes_per_block,
-        u32 z_dst, u32 z_count,
-        VkImageLayout prior_image_layout);
+        u32 z_dst, u32 z_count);
 
 private:
     Scheduler& scheduler;
