@@ -6,8 +6,6 @@
 
 #pragma once
 
-#define __ASSEMBLY__
-
 #ifndef __APPLE__
 #include <asm-generic/signal.h>
 #include <asm-generic/unistd.h>

@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: Copyright 2023 yuzu Emulator Project */
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
+#define __ASSEMBLY__
 #include "core/arm/nce/arm_nce_asm_definitions.h"
 
 #define LOAD_IMMEDIATE_32(reg, val)                     \
