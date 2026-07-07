@@ -212,10 +212,8 @@ KPhysicalAddress KMemoryManager::AllocateAndOpenContinuous(size_t num_pages, siz
         return 0;
     }
 
-    // todo: find a better way to do this
-    if (align_pages % Common::GuestHostAlignment != 0) {
-        align_pages = Common::AlignUp(align_pages, Common::GuestHostAlignment);
-    }
+    // todo: does this waste too much space?
+    align_pages = Common::AlignUp(align_pages, Common::GuestHostAlignment);
 
     // Lock the pool that we're allocating from.
     const auto [pool, dir] = DecodeOption(option);
@@ -253,6 +251,9 @@ KPhysicalAddress KMemoryManager::AllocateAndOpenContinuous(size_t num_pages, siz
 
 Result KMemoryManager::AllocatePageGroupImpl(KPageGroup* out, size_t num_pages, Pool pool,
                                              Direction dir, bool unoptimized, bool random) {
+    // todo: does this waste too much space?
+    num_pages = Common::AlignUp(num_pages, Common::GuestHostAlignment);
+
     // Choose a heap based on our page size request.
     const s32 heap_index = KPageHeap::GetBlockIndex(num_pages);
     R_UNLESS(0 <= heap_index, ResultOutOfMemory);
@@ -275,7 +276,13 @@ Result KMemoryManager::AllocatePageGroupImpl(KPageGroup* out, size_t num_pages, 
              cur_manager = this->GetNextManager(cur_manager, dir)) {
             while (num_pages >= pages_per_alloc) {
                 // Allocate a block.
-                KPhysicalAddress allocated_block = cur_manager->AllocateBlock(index, random);
+                KPhysicalAddress allocated_block = 0;
+                if (random) {
+                    allocated_block = cur_manager->AllocateAligned(index, pages_per_alloc, Common::GuestHostAlignment);
+                } else {
+                    // TODO: linear search support for Aligned?
+                    allocated_block = cur_manager->AllocateBlock(index, random);
+                }
                 if (allocated_block == 0) {
                     break;
                 }
