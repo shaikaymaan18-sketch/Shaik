@@ -1472,6 +1472,7 @@ void TextureCache<P>::TickAsyncUnswizzle() {
         if (swizzle_chunk_size > 0 && !task.is_incremental && copy_amount < remaining) {
             copy_amount = (copy_amount / task.bytes_per_slice) * task.bytes_per_slice;
             if (copy_amount == 0) copy_amount = task.bytes_per_slice;
+            copy_amount = (std::min)(copy_amount, remaining);
         }
 
         u8* const staging_base = task.staging_buffer.mapped_span.data();
@@ -1583,7 +1584,8 @@ void TextureCache<P>::TickAsyncUnswizzle() {
 
     // Check if complete
     const u32 slices_submitted = static_cast<u32>(task.last_submitted_offset / task.bytes_per_slice);
-    const bool all_submitted   = slices_submitted >= total_slices;
+    const bool all_submitted = slices_submitted >= total_slices ||
+                               (is_final_batch && bytes_ready < task.bytes_per_slice);
 
     if (is_final_batch && all_submitted) {
         /*if (task.is_sparse && !task.is_incremental) {
