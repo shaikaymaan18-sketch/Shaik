@@ -6,7 +6,7 @@
 
 #pragma once
 
-#ifndef __APPLE__
+#if defined(__ASSEMBLY__) && defined(__linux__)
 #include <asm-generic/signal.h>
 #include <asm-generic/unistd.h>
 #else

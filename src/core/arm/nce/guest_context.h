@@ -14,7 +14,6 @@
 #include "core/arm/nce/arm_nce_asm_definitions.h"
 
 #ifdef __linux__
-#include <asm/sigcontext.h>
 #include <signal.h>
 #endif
 
