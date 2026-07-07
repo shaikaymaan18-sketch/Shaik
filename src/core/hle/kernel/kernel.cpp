@@ -457,12 +457,12 @@ struct KernelCore::Impl {
             GetInteger(kernel_region_start), kernel_region_size, KMemoryRegionType_Kernel));
 
         // Setup the code region.
-        constexpr size_t CodeRegionAlign = PageSize;
-        constexpr KVirtualAddress code_region_start =
+        const size_t CodeRegionAlign = Common::HostPageSize;
+        const KVirtualAddress code_region_start =
             Common::AlignDown(GetInteger(code_start_virt_addr), CodeRegionAlign);
-        constexpr KVirtualAddress code_region_end =
+        const KVirtualAddress code_region_end =
             Common::AlignUp(GetInteger(code_end_virt_addr), CodeRegionAlign);
-        constexpr size_t code_region_size = code_region_end - code_region_start;
+        const size_t code_region_size = code_region_end - code_region_start;
         ASSERT(memory_layout->GetVirtualMemoryRegionTree().Insert(
             GetInteger(code_region_start), code_region_size, KMemoryRegionType_KernelCode));
 
@@ -524,7 +524,7 @@ struct KernelCore::Impl {
 
         // Determine the size of the slab region.
         const size_t slab_region_size =
-            Common::AlignUp(Init::CalculateTotalSlabHeapSize(system.Kernel()), PageSize);
+            Common::AlignUp(Init::CalculateTotalSlabHeapSize(system.Kernel()), Common::HostPageSize);
         ASSERT(slab_region_size <= resource_region_size);
 
         // Setup the slab region.
@@ -576,7 +576,7 @@ struct KernelCore::Impl {
             region.SetTypeAttribute(KMemoryRegionAttr_DidKernelMap);
 
             // Create a virtual pair region and insert it into the tree.
-            const KPhysicalAddress map_phys_addr = Common::AlignDown(region.GetAddress(), PageSize);
+            const KPhysicalAddress map_phys_addr = Common::AlignDown(region.GetAddress(), Common::HostPageSize);
             const size_t map_size =
                 Common::AlignUp(region.GetEndAddress(), PageSize) - GetInteger(map_phys_addr);
             const KVirtualAddress map_virt_addr =

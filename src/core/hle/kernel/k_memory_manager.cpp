@@ -455,7 +455,7 @@ size_t KMemoryManager::Impl::Initialize(KPhysicalAddress address, size_t size,
     const size_t page_heap_size = KPageHeap::CalculateManagementOverheadSize(size);
     const size_t total_management_size = manager_size + page_heap_size;
     ASSERT(manager_size <= total_management_size);
-    ASSERT(management + total_management_size <= management_end);
+    ASSERT(management + total_management_size <= Common::AlignUp(GetInteger(management_end), Common::HostPageSize));
     ASSERT(Common::IsAligned(total_management_size, PageSize));
 
     // Setup region.
@@ -557,7 +557,7 @@ size_t KMemoryManager::Impl::CalculateManagementOverheadSize(size_t region_size)
         sizeof(u64);
     const size_t manager_meta_size = Common::AlignUp(optimize_map_size + ref_count_size, PageSize);
     const size_t page_heap_size = KPageHeap::CalculateManagementOverheadSize(region_size);
-    return manager_meta_size + page_heap_size;
+    return Common::AlignUp(manager_meta_size + page_heap_size, Common::HostPageSize);
 }
 
 } // namespace Kernel
