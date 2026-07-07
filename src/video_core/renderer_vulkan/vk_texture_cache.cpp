@@ -2537,7 +2537,9 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
 void TextureCacheRuntime::AccelerateImageUpload(
     Image& image, const StagingBufferRef& map,
     std::span<const VideoCommon::SwizzleParameters> swizzles,
-    u32 z_start, u32 z_count) {
+    u32 z_src_start, u32 z_image_start, u32 z_count,
+    std::span<const u8> slice_has_data,
+    bool image_already_uploaded) {
 
     if (IsPixelFormatASTC(image.info.format)) {
         return astc_decoder_pass->Assemble(image, map, swizzles);
@@ -2551,8 +2553,15 @@ void TextureCacheRuntime::AccelerateImageUpload(
         return;
     }
 
-    if (bl3d_unswizzle_pass && IsPixelFormatBCn(image.info.format) && image.info.type == ImageType::e3D && image.info.resources.levels == 1 && image.info.resources.layers == 1) {
-        return bl3d_unswizzle_pass->Unswizzle(image, map, swizzles, z_start, z_count);
+    if (bl3d_unswizzle_pass &&
+        IsPixelFormatBCn(image.info.format) &&
+        image.info.type == ImageType::e3D &&
+        image.info.resources.levels == 1 &&
+        image.info.resources.layers == 1) {
+
+        return bl3d_unswizzle_pass->Unswizzle(image, map, swizzles,
+                                               z_src_start, z_image_start, z_count,
+                                               slice_has_data, image_already_uploaded);
     }
 
     ASSERT(false);
