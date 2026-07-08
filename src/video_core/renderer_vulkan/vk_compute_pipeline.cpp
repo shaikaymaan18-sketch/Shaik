@@ -22,7 +22,7 @@
 #include "video_core/vulkan_common/vulkan_device.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
 #include "video_core/gpu_logging/gpu_logging.h"
-#include "common/logging/log.h"
+#include "common/logging.h"
 #include "common/settings.h"
 
 namespace Vulkan {
