@@ -2154,6 +2154,10 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
     if (uses_widened_astc_format) {
         format_info.format = VK_FORMAT_R32G32B32A32_SFLOAT;
     }
+    supports_depth_comparison =
+        device->IsFormatSupported(format_info.format,
+                                  VK_FORMAT_FEATURE_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT,
+                                  FormatType::Optimal);
     const VkImageUsageFlags requested_view_usage = ImageUsageFlags(format_info, format);
     const VkImageUsageFlags image_usage = image.UsageFlags();
     const VkImageUsageFlags clamped_view_usage = requested_view_usage & image_usage;
@@ -2393,7 +2397,8 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
                                     min_filter == VK_FILTER_LINEAR ||
                                     mipmap_mode == VK_SAMPLER_MIPMAP_MODE_LINEAR};
 
-    const auto create_sampler = [&](const f32 anisotropy, bool force_nearest) {
+    const auto create_sampler = [&](const f32 anisotropy, bool force_nearest,
+                                    bool disable_compare = false) {
         return device.GetLogical().CreateSampler(VkSamplerCreateInfo{
             .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
             .pNext = pnext,
@@ -2408,7 +2413,7 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
             .anisotropyEnable =
                 static_cast<VkBool32>(!force_nearest && anisotropy > 1.0f ? VK_TRUE : VK_FALSE),
             .maxAnisotropy = force_nearest ? 1.0f : anisotropy,
-            .compareEnable = tsc.depth_compare_enabled,
+            .compareEnable = disable_compare ? VK_FALSE : tsc.depth_compare_enabled,
             .compareOp = MaxwellToVK::Sampler::DepthCompareFunction(tsc.depth_compare_func),
             .minLod = tsc.mipmap_filter == TextureMipmapFilter::None ? 0.0f : tsc.MinLod(),
             .maxLod = tsc.mipmap_filter == TextureMipmapFilter::None ? 0.25f : tsc.MaxLod(),
@@ -2426,6 +2431,9 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
     }
     if (has_linear_filtering) {
         sampler_nearest = create_sampler(1.0f, true);
+    }
+    if (tsc.depth_compare_enabled) {
+        sampler_noncompare = create_sampler(max_anisotropy, false, true);
     }
 }
 
