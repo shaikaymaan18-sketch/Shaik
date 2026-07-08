@@ -2154,10 +2154,15 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
     if (uses_widened_astc_format) {
         format_info.format = VK_FORMAT_R32G32B32A32_SFLOAT;
     }
-    supports_depth_comparison =
-        device->IsFormatSupported(format_info.format,
-                                  VK_FORMAT_FEATURE_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT,
-                                  FormatType::Optimal);
+    if (device->ApiVersion() >= VK_API_VERSION_1_3) {
+        const VkFormatProperties3 properties3 =
+            device->GetPhysical().GetFormatProperties3(format_info.format);
+        supports_depth_comparison =
+            (properties3.optimalTilingFeatures &
+             VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT) != 0;
+    } else {
+        supports_depth_comparison = true;
+    }
     const VkImageUsageFlags requested_view_usage = ImageUsageFlags(format_info, format);
     const VkImageUsageFlags image_usage = image.UsageFlags();
     const VkImageUsageFlags clamped_view_usage = requested_view_usage & image_usage;
