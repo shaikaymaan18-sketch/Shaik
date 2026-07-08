@@ -523,7 +523,7 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         features.shader_atomic_int64.shaderBufferInt64Atomics = false;
         features.shader_atomic_int64.shaderSharedInt64Atomics = false;
         features.features.shaderInt64 = false;
-        LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken narrow storage buffer access.");
+        LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken storage buffer access.");
         features.bit8_storage.storageBuffer8BitAccess = false;
         features.bit8_storage.uniformAndStorageBuffer8BitAccess = false;
         features.bit16_storage.storageBuffer16BitAccess = false;
