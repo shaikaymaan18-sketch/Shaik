@@ -61,7 +61,7 @@ size_t GetStreamBufferSize(const Device& device) {
     } else {
         size = MAX_STREAM_BUFFER_SIZE;
     }
-    return Common::AlignUp(size, MAX_ALIGNMENT);
+    return std::min(Common::AlignUp(size, MAX_ALIGNMENT), MAX_STREAM_BUFFER_SIZE);
 }
 } // Anonymous namespace
 
