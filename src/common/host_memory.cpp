@@ -399,6 +399,10 @@ private:
 #ifdef ARCHITECTURE_arm64
 
 #ifndef __APPLE__
+
+#ifndef MAP_FIXED_NOREPLACE
+#define MAP_FIXED_NOREPLACE 0
+#endif
 static void* ChooseVirtualBase(size_t virtual_size) {
     constexpr uintptr_t Map39BitSize = (1ULL << 39);
     constexpr uintptr_t Map36BitSize = (1ULL << 36);
@@ -427,11 +431,13 @@ static void* ChooseVirtualBase(size_t virtual_size) {
             return map_pointer;
         }
 
+#if MAP_FIXED_NOREPLACE == 0
         // Unmap if necessary, and try again.
         if (map_pointer != MAP_FAILED) {
             munmap(map_pointer, virtual_size);
         }
     }
+#endif
 
     return MAP_FAILED;
 }
