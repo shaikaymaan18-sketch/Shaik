@@ -470,11 +470,15 @@ void ArmNce::SignalInterrupt(Kernel::KThread* thread) {
     }
 }
 
-void ArmNce::InvalidateCacheRange(u64 addr, std::size_t size) {
+void ArmNce::ClearInstructionCache() {
     // Ensure all previous memory operations complete
     asm volatile("dsb ish\n"
                  "dsb ish\n"
                  "isb" ::: "memory");
+}
+
+void ArmNce::InvalidateCacheRange(u64 addr, std::size_t size) {
+    ClearInstructionCache();
 }
 
 } // namespace Core

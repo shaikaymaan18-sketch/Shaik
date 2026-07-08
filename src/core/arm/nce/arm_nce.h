@@ -52,6 +52,7 @@ public:
 
     void SignalInterrupt(Kernel::KThread* thread) override;
     void InvalidateCacheRange(u64 addr, std::size_t size) override;
+    void ClearInstructionCache() override;
 
     void LockThread(Kernel::KThread* thread) override;
     void UnlockThread(Kernel::KThread* thread) override;
