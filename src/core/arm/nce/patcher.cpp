@@ -365,12 +365,26 @@ size_t Patcher::GetPreSectionSize() const noexcept {
     return Common::AlignUp(m_patch_instructions_pre.size() * sizeof(u32), Common::HostPageSize);
 }
 
+__attribute__((always_inline))
+void Patcher::LoadTLS(oaknut::VectorCodeGenerator& cg, oaknut::XReg out) {
+#ifdef __APPLE__
+    // The kernel zeros out TPIDR_EL0 too unpredictably, so we use pthreads TLS instead
+    // (which we can optimize by JIT'ing the key offset)
+
+    // https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/libsyscall/os/tsd.h#L156-L189
+    cg.MRS(out, oaknut::SystemReg::TPIDRRO_EL0);
+    cg.LDR(out, out, CONTEXT_KEY * 8);
+#else
+    cg.MRS(out, oaknut::SystemReg::TPIDR_EL0);
+#endif
+}
+
 void Patcher::WriteLoadContext(oaknut::VectorCodeGenerator& cg) {
     // This function was called, which modifies X30, so use that as a scratch register.
     // SP contains the guest X30, so save our return X30 to SP + 8, since we have allocated 16 bytes
     // of stack.
     cg.STR(X30, SP, 8);
-    cg.MRS(X30, oaknut::SystemReg::TPIDR_EL0);
+    LoadTLS(cg, X30);
     cg.LDR(X30, X30, offsetof(NativeExecutionParameters, native_context));
 
     // Load system registers.
@@ -403,7 +417,7 @@ void Patcher::WriteSaveContext(oaknut::VectorCodeGenerator& cg) {
     // SP contains the guest X30, so save our X30 to SP + 8, since we have allocated 16 bytes of
     // stack.
     cg.STR(X30, SP, 8);
-    cg.MRS(X30, oaknut::SystemReg::TPIDR_EL0);
+    LoadTLS(cg, X30);
     cg.LDR(X30, X30, offsetof(NativeExecutionParameters, native_context));
 
     // Store all general-purpose registers except X30.
@@ -452,7 +466,7 @@ void Patcher::WriteSvcTrampoline(ModuleDestLabel module_dest, u32 svc_id, oaknut
     // Now that we've saved all registers, we can use any registers as scratch.
     // Store PC + 4 to arm interface, since we know the instruction offset from the entry point.
     oaknut::Label pc_after_svc;
-    cg.MRS(X1, oaknut::SystemReg::TPIDR_EL0);
+    LoadTLS(cg, X1);
     cg.LDR(X1, X1, offsetof(NativeExecutionParameters, native_context));
     cg.LDR(X2, pc_after_svc);
     cg.STR(X2, X1, offsetof(GuestContext, pc));
@@ -482,7 +496,9 @@ void Patcher::WriteSvcTrampoline(ModuleDestLabel module_dest, u32 svc_id, oaknut
     static_assert(offsetof(HostContext, host_sp) + 8 == offsetof(HostContext, host_tpidr_el0));
     cg.LDP(X2, X3, X1, offsetof(HostContext, host_sp));
     cg.MOV(SP, X2);
+#ifndef __APPLE__
     cg.MSR(oaknut::SystemReg::TPIDR_EL0, X3);
+#endif
 
     // Load callee-saved host registers and return to host.
     static constexpr size_t HOST_REGS_OFF = offsetof(HostContext, host_saved_regs);
@@ -509,7 +525,7 @@ void Patcher::WriteSvcTrampoline(ModuleDestLabel module_dest, u32 svc_id, oaknut
 
     // Host called this location. Save the return address so we can
     // unwind the stack properly when jumping back.
-    cg.MRS(X2, oaknut::SystemReg::TPIDR_EL0);
+    LoadTLS(cg, X2);
     cg.LDR(X2, X2, offsetof(NativeExecutionParameters, native_context));
     cg.ADD(X0, X2, offsetof(GuestContext, host_ctx));
     cg.STR(X30, X0, offsetof(HostContext, host_saved_regs) + 11 * sizeof(u64));
@@ -522,7 +538,7 @@ void Patcher::WriteSvcTrampoline(ModuleDestLabel module_dest, u32 svc_id, oaknut
 
     // Use X1 as a scratch register to restore X30.
     cg.STR(X1, SP, PRE_INDEXED, -16);
-    cg.MRS(X1, oaknut::SystemReg::TPIDR_EL0);
+    LoadTLS(cg, X1);
     cg.LDR(X1, X1, offsetof(NativeExecutionParameters, native_context));
     cg.LDR(X30, X1, offsetof(GuestContext, cpu_registers) + sizeof(u64) * 30);
     cg.LDR(X1, SP, POST_INDEXED, 16);
@@ -544,10 +560,10 @@ void Patcher::WriteSvcTrampoline(ModuleDestLabel module_dest, u32 svc_id, oaknut
         this->WriteModulePc(module_dest);
 }
 
+// Retrieve emulated TLS register from GuestContext.
 void Patcher::WriteMrsHandler(ModuleDestLabel module_dest, oaknut::XReg dest_reg,
                               oaknut::SystemReg src_reg, oaknut::VectorCodeGenerator& cg) {
-    // Retrieve emulated TLS register from GuestContext.
-    cg.MRS(dest_reg, oaknut::SystemReg::TPIDR_EL0);
+    LoadTLS(cg, dest_reg);
     if (src_reg == oaknut::SystemReg::TPIDRRO_EL0) {
         cg.LDR(dest_reg, dest_reg, offsetof(NativeExecutionParameters, tpidrro_el0));
     } else {
@@ -566,7 +582,7 @@ void Patcher::WriteMsrHandler(ModuleDestLabel module_dest, oaknut::XReg src_reg,
     cg.STR(scratch_reg, SP, PRE_INDEXED, -16);
 
     // Save guest value to NativeExecutionParameters::tpidr_el0.
-    cg.MRS(scratch_reg, oaknut::SystemReg::TPIDR_EL0);
+    LoadTLS(cg, scratch_reg);
     cg.STR(src_reg, scratch_reg, offsetof(NativeExecutionParameters, tpidr_el0));
 
     // Restore scratch register.
@@ -636,7 +652,7 @@ void Patcher::LockContext(oaknut::VectorCodeGenerator& cg) {
     // Reload lock pointer.
     cg.l(retry);
     cg.CLREX();
-    cg.MRS(X0, oaknut::SystemReg::TPIDR_EL0);
+    LoadTLS(cg, X0);
     cg.ADD(X0, X0, offsetof(NativeExecutionParameters, lock));
 
     static_assert(SpinLockLocked == 0);
@@ -662,7 +678,7 @@ void Patcher::UnlockContext(oaknut::VectorCodeGenerator& cg) {
     cg.STP(X0, X1, SP, PRE_INDEXED, -16);
 
     // Load lock pointer.
-    cg.MRS(X0, oaknut::SystemReg::TPIDR_EL0);
+    LoadTLS(cg, X0);
     cg.ADD(X0, X0, offsetof(NativeExecutionParameters, lock));
 
     // Load SpinLockUnlocked.

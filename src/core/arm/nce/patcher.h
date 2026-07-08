@@ -73,6 +73,7 @@ private:
     };
 
     // Core implementations with explicit code generator
+    void LoadTLS(oaknut::VectorCodeGenerator& cg, oaknut::XReg out);
     void WriteLoadContext(oaknut::VectorCodeGenerator& code);
     void WriteSaveContext(oaknut::VectorCodeGenerator& code);
     void LockContext(oaknut::VectorCodeGenerator& code);

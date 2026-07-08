@@ -668,12 +668,17 @@ public:
 public:
     // TODO: This shouldn't be defined in kernel namespace
     struct NativeExecutionParameters {
+#if defined(__APPLE__) && HAS_NCE
+        // Are we in actual guest code?
+        bool is_actually_running{};
+#endif
+        // Are we in any stage of performing guest operations?
+        bool is_running{};
+        u32 magic{Common::MakeMagic('Y', 'U', 'Z', 'U')};
+        std::atomic<u32> lock{1};
         u64 tpidr_el0{};
         u64 tpidrro_el0{};
         void* native_context{};
-        std::atomic<u32> lock{1};
-        bool is_running{};
-        u32 magic{Common::MakeMagic('Y', 'U', 'Z', 'U')};
     };
 
     NativeExecutionParameters& GetNativeExecutionParameters() {

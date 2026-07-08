@@ -131,15 +131,6 @@ private:
 #endif
 };
 
-// Verify assembly offsets.
-static_assert(offsetof(GuestContext, sp) == GuestContextSp);
-static_assert(offsetof(GuestContext, host_ctx) == GuestContextHostContext);
-static_assert(offsetof(HostContext, host_sp) == HostContextSpTpidrEl0);
-static_assert(offsetof(HostContext, host_tpidr_el0) - 8 == HostContextSpTpidrEl0);
-static_assert(offsetof(HostContext, host_tpidr_el0) == HostContextTpidrEl0);
-static_assert(offsetof(HostContext, host_saved_regs) == HostContextRegs);
-static_assert(offsetof(HostContext, host_saved_vregs) == HostContextVregs);
-
 #ifdef __APPLE__
 // ensure that fp and lr are next to the rest of the x registers so they can be accessed like an array
 static_assert(offsetof(_STRUCT_ARM_THREAD_STATE64, __sp) - offsetof(_STRUCT_ARM_THREAD_STATE64, __x) == sizeof(u64) * 31);

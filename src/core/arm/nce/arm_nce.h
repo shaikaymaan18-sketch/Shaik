@@ -16,6 +16,15 @@ namespace Core {
 
 class System;
 
+#ifdef __APPLE__
+// TLS index for NativeExecutionParameters in pthreads.
+// This value is actually reserved for old versions of iOSSimulator, however we aren't iOSSimulator,
+// so we can manually initialize and use it.
+// https://github.com/apple-oss-distributions/libpthread/blob/42d026df5b07825070f60134b980a1ec2552dfee/private/pthread/tsd_private.h#L241-L245
+constexpr pthread_key_t CONTEXT_KEY = 210;
+#endif
+
+
 class ArmNce final : public ArmInterface {
 public:
     ArmNce(System& system, bool uses_wall_clock, std::size_t core_index);
@@ -39,7 +48,6 @@ public:
     u32 GetSvcNumber() const override;
 
     void SignalInterrupt(Kernel::KThread* thread) override;
-    void ClearInstructionCache() override;
     void InvalidateCacheRange(u64 addr, std::size_t size) override;
 
     void LockThread(Kernel::KThread* thread) override;
@@ -53,7 +61,8 @@ protected:
     void RewindBreakpointInstruction() override {}
 
 private:
-    // Assembly definitions.
+    // Only confirmed to be valid on Apple systems.
+    static void* GetGuestParameters();
     static HaltReason ReturnToRunCodeByTrampoline(void* tpidr, GuestContext* ctx,
                                                   u64 trampoline_addr);
     static HaltReason ReturnToRunCodeByExceptionLevelChange(int tid, void* tpidr);
@@ -62,20 +71,16 @@ private:
                                                                    void* raw_context);
     static void BreakFromRunCodeSignalHandler(int sig, void* info, void* raw_context);
     static void GuestAlignmentFaultSignalHandler(int sig, void* info, void* raw_context);
-    static void GuestAccessFaultSignalHandler(int sig, void* info, void* raw_context);
+    static void GuestMemoryFaultSignalHandler(int sig, void* info, void* raw_context);
 
     static void LockThreadParameters(void* tpidr);
     static void UnlockThreadParameters(void* tpidr);
 
-private:
     // C++ implementation functions for assembly definitions.
     static void* RestoreGuestContext(void* raw_context);
     static void SaveGuestContext(GuestContext* ctx, void* raw_context);
     static bool HandleFailedGuestFault(GuestContext* ctx, void* info, void* raw_context);
     static bool HandleGuestAlignmentFault(GuestContext* ctx, void* info, void* raw_context);
-    static bool HandleGuestAccessFault(GuestContext* ctx, void* info, void* raw_context);
-    static void HandleHostAlignmentFault(int sig, void* info, void* raw_context);
-    static void HandleHostAccessFault(int sig, void* info, void* raw_context);
 
 public:
     Core::System& m_system;

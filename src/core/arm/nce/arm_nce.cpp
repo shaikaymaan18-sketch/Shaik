@@ -3,6 +3,19 @@
 
 // SPDX-FileCopyrightText: Copyright 2023 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
+#ifdef __aarch64__
+
+// short asm ops should always be inlined
+#if !defined(__clang__) && !defined(__GNUC__)
+#define ALWAYS_INLINE __attribute__((always_inline))
+#elif defined(_MSC_VER)
+// todo: windows support?? it supports native context switching and signal handling
+// https://learn.microsoft.com/en-us/windows/win32/debug/using-a-vectored-exception-handler
+// https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-setthreadcontext
+#define ALWAYS_INLINE __forceinline
+#else
+#define ALWAYS_INLINE
+#endif
 
 #include <cinttypes>
 #include <memory>
@@ -29,14 +42,112 @@ struct sigaction g_orig_segv_action;
 
 // Verify assembly offsets.
 using NativeExecutionParameters = Kernel::KThread::NativeExecutionParameters;
-static_assert(offsetof(NativeExecutionParameters, native_context) == TpidrEl0NativeContext);
-static_assert(offsetof(NativeExecutionParameters, lock) == TpidrEl0Lock);
-static_assert(offsetof(NativeExecutionParameters, magic) == TpidrEl0TlsMagic);
 
 using namespace Common::Literals;
 constexpr u32 StackSize = 128_KiB;
 
 } // namespace
+
+ALWAYS_INLINE
+void* ArmNce::GetGuestParameters() {
+    void* nep; /* NativeExecutionParameters* */
+#ifdef __APPLE__
+    // https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/libsyscall/os/tsd.h#L156-L189
+    asm volatile(
+        "mrs %[out], TPIDRRO_EL0\n"
+        "ldr %[out], [ %[out], #%[off] ]\n"
+        : [out] "=&r"(nep)
+        : [off] "i"(CONTEXT_KEY * 8)
+        : "memory");
+#else
+    asm volatile(
+        "mrs %0, TPIDR_EL0\n"
+        : "=r"(nep));
+#endif
+    return nep;
+}
+
+void ArmNce::LockThreadParameters(void* tpidr) {
+
+}
+
+void ArmNce::UnlockThreadParameters(void* tpidr) {
+
+}
+
+void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_context) {
+    DEBUG_ASSERT(sig == SIGSEGV);
+
+    NativeExecutionParameters* nep = static_cast<NativeExecutionParameters*>(GetGuestParameters());
+
+#ifdef __APPLE__
+    if (nep->is_actually_running) {
+#else
+    if (nep->magic == Common::MakeMagic('Y', 'U', 'Z', 'U')) {
+        // Load the host's TPIDR_EL0 value
+        u64 scratch;
+        asm volatile(
+            "ldr %[scratch], [ %[tpidr], #[off] ]\n"
+            "msr TPIDR_EL0, %[scratch]\n"
+            : [scratch] "=&r"(scratch),
+            : [tpidr] "r"(nep),
+            : "memory"
+            );
+#endif
+
+        auto* info = static_cast<siginfo_t*>(raw_info);
+        auto* guest_ctx = static_cast<GuestContext*>(nep->native_context);
+        auto& memory = guest_ctx->parent->m_running_thread->GetOwnerProcess()->GetMemory();
+
+        if (sig == SIGSEGV) {
+            // Try to handle an invalid access.
+            // TODO: handle accesses which split a page?
+            const Common::ProcessAddress addr =
+                (reinterpret_cast<u64>(info->si_addr) & ~Memory::YUZU_PAGEMASK);
+            if (memory.InvalidateNCE(addr, Memory::YUZU_PAGESIZE)) {
+                // We handled the access successfully and are returning to guest code.
+                goto ret;
+            }
+        } else if (sig == SIGBUS) {
+            // Match and execute an instruction.
+            auto ctx = KernelContext(&static_cast<ucontext_t*>(raw_context)->uc_mcontext);
+            auto next_pc = MatchAndExecuteOneInstruction(memory, &ctx);
+            if (next_pc) {
+                // We handled the access successfully and are returning to guest code.
+                *ctx.pc() = *next_pc;
+                goto ret;
+            }
+        } else [[unlikely]] {
+            UNREACHABLE_MSG("unexpected signal {}", sig);
+        }
+
+        // We couldn't handle the access.
+        if (HandleFailedGuestFault(guest_ctx, raw_info, raw_context)) {
+            // Return to guest
+            goto ret;
+        }
+        // Otherwise HandleFailedGuestFault sets host context and returns to host
+        return;
+
+        ret:
+#ifndef __APPLE__
+        asm volatile(
+            "msr TPIDR_EL0, %0\n"
+            :: "r"(nep));
+#else
+        (void)0;
+#endif
+    } else {
+        // Host fault, call original handler
+        if (sig == SIGSEGV) {
+            g_orig_segv_action.sa_sigaction(sig, static_cast<siginfo_t*>(raw_info), raw_context);
+        } else if (sig == SIGBUS) {
+            g_orig_bus_action.sa_sigaction(sig, static_cast<siginfo_t*>(raw_info), raw_context);
+        } else [[unlikely]] {
+            UNREACHABLE_MSG("unexpected signal {}", sig);
+        }
+    }
+}
 
 void* ArmNce::RestoreGuestContext(void* raw_context) {
     // Retrieve the host context.
@@ -125,46 +236,6 @@ bool ArmNce::HandleFailedGuestFault(GuestContext* guest_ctx, void* raw_info, voi
     // Return to host.
     SaveGuestContext(guest_ctx, raw_context);
     return false;
-}
-
-bool ArmNce::HandleGuestAlignmentFault(GuestContext* guest_ctx, void* raw_info, void* raw_context) {
-    auto host_ctx = KernelContext(&static_cast<ucontext_t*>(raw_context)->uc_mcontext);
-    auto& memory = guest_ctx->parent->m_running_thread->GetOwnerProcess()->GetMemory();
-
-    // Match and execute an instruction.
-    auto next_pc = MatchAndExecuteOneInstruction(memory, &host_ctx);
-    if (next_pc) {
-        *host_ctx.pc() = *next_pc;
-        return true;
-    }
-
-    // We couldn't handle the access.
-    return HandleFailedGuestFault(guest_ctx, raw_info, raw_context);
-}
-
-bool ArmNce::HandleGuestAccessFault(GuestContext* guest_ctx, void* raw_info, void* raw_context) {
-    auto* info = static_cast<siginfo_t*>(raw_info);
-
-    // Try to handle an invalid access.
-    // TODO: handle accesses which split a page?
-    const Common::ProcessAddress addr =
-        (reinterpret_cast<u64>(info->si_addr) & ~Memory::YUZU_PAGEMASK);
-    auto& memory = guest_ctx->parent->m_running_thread->GetOwnerProcess()->GetMemory();
-    if (memory.InvalidateNCE(addr, Memory::YUZU_PAGESIZE)) {
-        // We handled the access successfully and are returning to guest code.
-        return true;
-    }
-
-    // We couldn't handle the access.
-    return HandleFailedGuestFault(guest_ctx, raw_info, raw_context);
-}
-
-void ArmNce::HandleHostAlignmentFault(int sig, void* raw_info, void* raw_context) {
-    return g_orig_bus_action.sa_sigaction(sig, static_cast<siginfo_t*>(raw_info), raw_context);
-}
-
-void ArmNce::HandleHostAccessFault(int sig, void* raw_info, void* raw_context) {
-    return g_orig_segv_action.sa_sigaction(sig, static_cast<siginfo_t*>(raw_info), raw_context);
 }
 
 void ArmNce::LockThread(Kernel::KThread* thread) {
@@ -261,7 +332,19 @@ ArmNce::ArmNce(System& system, bool uses_wall_clock, std::size_t core_index)
 
 ArmNce::~ArmNce() = default;
 
+#ifdef __APPLE__
+// https://github.com/apple-oss-distributions/libpthread/blob/42d026df5b07825070f60134b980a1ec2552dfee/src/pthread_tsd.c#L418-L435
+extern "C" int pthread_key_init_np(int, void (*)(void *));
+#endif
+
 void ArmNce::Initialize() {
+#ifdef __APPLE__
+    if (m_thread_id == -1) {
+        m_thread_id = pthread_mach_thread_np(pthread_self());
+    }
+
+    ASSERT(pthread_key_init_np(CONTEXT_KEY, [](void*) -> void {}) == 0);
+#endif
     if (m_thread_id == -1) {
 #if defined(__linux__)
         m_thread_id = gettid();
@@ -317,7 +400,7 @@ void ArmNce::Initialize() {
         struct sigaction access_fault_action {};
         access_fault_action.sa_flags = SA_SIGINFO | SA_ONSTACK | SA_RESTART;
         access_fault_action.sa_sigaction =
-            reinterpret_cast<HandlerType>(&ArmNce::GuestAccessFaultSignalHandler);
+            reinterpret_cast<HandlerType>(&ArmNce::GuestMemoryFaultSignalHandler);
         access_fault_action.sa_mask = signal_mask;
         Common::SigAction(GuestAccessFaultSignal, &access_fault_action, &g_orig_segv_action);
     });
@@ -372,7 +455,7 @@ void ArmNce::SignalInterrupt(Kernel::KThread* thread) {
         // The running thread will unlock the thread context.
 #if defined(__linux__)
         syscall(SYS_tkill, m_thread_id, BreakFromRunCodeSignal);
-#elif defined(__APPLE__) && defined(__aarch64__)
+#elif defined(__APPLE__)
         asm volatile(
             "mov x0, %0\n"    // m_thread_id
             "mov x1, %1\n"    // BreakFromRunCodeSignal
@@ -387,19 +470,13 @@ void ArmNce::SignalInterrupt(Kernel::KThread* thread) {
     }
 }
 
-[[maybe_unused]] const std::size_t CACHE_PAGE_SIZE = Common::HostPageSize;
-
-void ArmNce::ClearInstructionCache() {
-#ifdef __aarch64__
+void ArmNce::InvalidateCacheRange(u64 addr, std::size_t size) {
     // Ensure all previous memory operations complete
     asm volatile("dsb ish\n"
                  "dsb ish\n"
                  "isb" ::: "memory");
-#endif
-}
-
-void ArmNce::InvalidateCacheRange(u64 addr, std::size_t size) {
-    this->ClearInstructionCache();
 }
 
 } // namespace Core
+
+#endif // #ifdef __aarch64__

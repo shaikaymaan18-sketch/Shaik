@@ -283,6 +283,8 @@ Result KMemoryManager::AllocatePageGroupImpl(KPageGroup* out, size_t num_pages, 
                     // TODO: linear search support for Aligned?
                     allocated_block = cur_manager->AllocateBlock(index, random);
                 }
+
+                ASSERT(Common::IsAligned(GetInteger(allocated_block), Common::HostPageSize));
                 if (allocated_block == 0) {
                     break;
                 }
