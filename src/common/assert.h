@@ -16,21 +16,42 @@
 void AssertFailSoftImpl();
 [[noreturn]] void AssertFatalImpl();
 
-// Prevents errors on old GCC... smh...
-#if defined(_MSC_VER) || defined(__clang__)
-#define YUZU_NO_INLINE
-#else
+#if defined(__GNUC__) || defined(__clang__)
 #define YUZU_NO_INLINE __attribute__((noinline))
+#elif defined(_MSC_VER)
+#define YUZU_NO_INLINE __declspec(noinline)
+#else
+#define YUZU_NO_INLINE
 #endif
 
+#if !defined(__clang__) && !defined(__GNUC__)
+#define YUZU_ALWAYS_INLINE __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#define YUZU_ALWAYS_INLINE [[msvc::forceinline]]
+#else
+#define YUZU_ALWAYS_INLINE
+#endif
+
+// Prevents errors on old GCC... smh...
+#if defined(__GNUC__) && !defined(__clang__)
 #define ASSERT_MSG(_a_, ...)                                                                       \
-    ([&]() YUZU_NO_INLINE {                                                                         \
+    ([&]() YUZU_NO_INLINE {                                                                        \
         auto&& assert_condition = (_a_);                                                           \
-        if (!(assert_condition)) [[unlikely]] {                                                   \
-            LOG_CRITICAL(Debug, __FILE__ ": assert " __VA_ARGS__);                                \
+        if (!(assert_condition)) [[unlikely]] {                                                    \
+            LOG_CRITICAL(Debug, __FILE__ ": assert " __VA_ARGS__);                                 \
             AssertFailSoftImpl();                                                                  \
         }                                                                                          \
     }())
+#else
+#define ASSERT_MSG(_a_, ...)                                                                       \
+    ([&]() YUZU_ALWAYS_INLINE {                                                                    \
+        auto&& assert_condition = (_a_);                                                           \
+        if (!(assert_condition)) [[unlikely]] {                                                    \
+            LOG_CRITICAL(Debug, __FILE__ ": assert " __VA_ARGS__);                                 \
+            AssertFailSoftImpl();                                                                  \
+        }                                                                                          \
+    }())
+#endif
 #define ASSERT(_a_) ASSERT_MSG(_a_, "{}", #_a_)
 
 #define UNREACHABLE_MSG(...)                                                                       \

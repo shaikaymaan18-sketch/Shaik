@@ -3,19 +3,8 @@
 
 // SPDX-FileCopyrightText: Copyright 2023 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
-#ifdef __aarch64__
 
-// short asm ops should always be inlined
-#if !defined(__clang__) && !defined(__GNUC__)
-#define ALWAYS_INLINE __attribute__((always_inline))
-#elif defined(_MSC_VER)
-// todo: windows support?? it supports native context switching and signal handling
-// https://learn.microsoft.com/en-us/windows/win32/debug/using-a-vectored-exception-handler
-// https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-setthreadcontext
-#define ALWAYS_INLINE __forceinline
-#else
-#define ALWAYS_INLINE
-#endif
+#ifdef __aarch64__
 
 #include <cinttypes>
 #include <memory>
@@ -48,14 +37,14 @@ constexpr u32 StackSize = 128_KiB;
 
 } // namespace
 
-ALWAYS_INLINE
+YUZU_ALWAYS_INLINE
 void* ArmNce::GetGuestParameters() {
     void* nep; /* NativeExecutionParameters* */
 #ifdef __APPLE__
     // https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/libsyscall/os/tsd.h#L156-L189
     asm volatile(
-        "mrs %[out], TPIDRRO_EL0\n"
-        "ldr %[out], [ %[out], #%[off] ]\n"
+        "mrs %[out], TPIDRRO_EL0\n"         // load pthreads TLS storage
+        "ldr %[out], [ %[out], #%[off] ]\n" // accessed like an array, so i * sizeof(u64)
         : [out] "=&r"(nep)
         : [off] "i"(CONTEXT_KEY * 8)
         : "memory");
@@ -67,12 +56,23 @@ void* ArmNce::GetGuestParameters() {
     return nep;
 }
 
+YUZU_ALWAYS_INLINE
 void ArmNce::LockThreadParameters(void* tpidr) {
+    auto* nep = static_cast<NativeExecutionParameters*>(tpidr);
 
+    u32 value;
+    do {
+        do {
+            value = nep->lock.load(std::memory_order_acquire);
+        } while (value == SpinLockLocked);
+    } while (!nep->lock.compare_exchange_weak(value, SpinLockLocked,
+                                                 std::memory_order_relaxed,
+                                                 std::memory_order_relaxed));
 }
 
+YUZU_ALWAYS_INLINE
 void ArmNce::UnlockThreadParameters(void* tpidr) {
-
+    static_cast<NativeExecutionParameters*>(tpidr)->lock.store(SpinLockUnlocked, std::memory_order_release);
 }
 
 void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_context) {
@@ -149,22 +149,102 @@ void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_co
     }
 }
 
+// This function has to be marked naked so that the compiler doesn't touch the stack
+// or implement a return (we "artificially" return later by setting PC to the LR value)
+YUZU_NO_INLINE
+__attribute__((naked))
+HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(int tid, void *tpidr) {
+    // x0  - tid
+    // x1  - tpidr
+    // x19 - callee-saved register and our tpidr storage
+    //
+    // uses tkill on linux and pthread_kill on macOS, both have the same signature:
+    // syscall (u32 tid, u64 signal)
+    asm volatile(
+        "str x19, [SP, #-0x10]!\n"
+        "mov x19, x1\n" // move tpidr to x19 so it doesn't get clobbered
+
+        "mov x1, #%[sig]\n"  // set x1 to SIGUSR2
+#ifdef __linux__
+        "mov x8, %[syscall]\n"
+        "svc #0\n"
+        "brk 0x0\n"
+        :: [syscall] "i"(__NR_tkill),
+#elif defined(__APPLE__)
+        "mov x8, #328\n"
+        "svc #0\n"
+        "brk 0x0\n"
+        ::
+#endif
+        [sig] "i"(SIGUSR2)
+        : "memory"
+        );
+}
+
+void ArmNce::ReturnToRunCodeByExceptionLevelChangeSignalHandler(int sig, void *info, void *raw_context) {
+    auto tpidr = static_cast<NativeExecutionParameters*>(RestoreGuestContext(raw_context));
+
+    RestoreGuestContext(raw_context);
+#ifndef __APPLE__
+    // Save old value of TPIDR_EL0, load guest one
+    u64 tpidr_el0;
+    asm volatile("mrs %0, TPIDR_EL0"
+                 "msr TPIDR_EL0, %1"
+                 : "=r"(tpidr_el0)
+                 : "r"(tpidr));
+    tpidr->tpidr_el0 = tpidr_el0;
+#else
+    tpidr->is_actually_running = true;
+#endif
+
+    // todo: is Lock called?
+    UnlockThreadParameters(tpidr);
+    // sigaction restores context and returns to guest
+}
+
+void ArmNce::BreakFromRunCodeSignalHandler(int sig, void *info, void *raw_context) {
+    NativeExecutionParameters* tpidr = reinterpret_cast<NativeExecutionParameters *>(GetGuestParameters());
+#ifdef __APPLE__
+    if (tpidr->is_actually_running) {
+#else
+    if (tpidr->magic == Common::MakeMagic('Y', 'U', 'Z', 'U')) {
+        // Load the host's TPIDR_EL0 value
+        u64 scratch;
+        asm volatile(
+            "ldr %[scratch], [ %[tpidr], #[off] ]\n"
+            "msr TPIDR_EL0, %[scratch]\n"
+            : [scratch] "=&r"(scratch),
+            : [tpidr] "r"(nep),
+            : "memory"
+            );
+#endif
+        SaveGuestContext(static_cast<GuestContext *>(tpidr->native_context), raw_context);
+        // Returning from here will enter host code.
+    }
+}
+
+HaltReason ArmNce::ReturnToRunCodeByTrampoline(void *tpidr, GuestContext *ctx, u64 trampoline_addr) {
+    // todo
+    return HaltReason::DataAbort;
+}
+
 void* ArmNce::RestoreGuestContext(void* raw_context) {
     // Retrieve the host context.
     auto host_ctx = KernelContext(&static_cast<ucontext_t*>(raw_context)->uc_mcontext);
 
-    // Thread-local parameters will be located in x9.
-    auto* tpidr = reinterpret_cast<NativeExecutionParameters*>(host_ctx.regs()[9]);
+    // Thread-local parameters will be located in x19.
+    auto* tpidr = reinterpret_cast<NativeExecutionParameters*>(host_ctx.regs()[19]);
     auto* guest_ctx = static_cast<GuestContext*>(tpidr->native_context);
 
     // Save host callee-saved registers.
+    host_ctx.regs()[19] = *reinterpret_cast<u64*>(*host_ctx.sp()); // load x19 original value from the stack
     std::memcpy(guest_ctx->host_ctx.host_saved_vregs.data(), &host_ctx.vregs()[8],
                 sizeof(guest_ctx->host_ctx.host_saved_vregs));
     std::memcpy(guest_ctx->host_ctx.host_saved_regs.data(), &host_ctx.regs()[19],
                 sizeof(guest_ctx->host_ctx.host_saved_regs));
 
     // Save stack pointer.
-    guest_ctx->host_ctx.host_sp = *host_ctx.sp();
+    guest_ctx->host_ctx.host_sp = *host_ctx.sp() + 16; // +16 for the space we reserve for x19
 
     // Restore all guest state except tpidr_el0.
     *host_ctx.sp() = guest_ctx->sp;
@@ -370,17 +450,17 @@ void ArmNce::Initialize() {
 
         sigset_t signal_mask;
         sigemptyset(&signal_mask);
-        sigaddset(&signal_mask, ReturnToRunCodeByExceptionLevelChangeSignal);
-        sigaddset(&signal_mask, BreakFromRunCodeSignal);
-        sigaddset(&signal_mask, GuestAlignmentFaultSignal);
-        sigaddset(&signal_mask, GuestAccessFaultSignal);
+        sigaddset(&signal_mask, SIGUSR2); // ReturnToCodeByExceptionLevel
+        sigaddset(&signal_mask, SIGURG);  // BreakFromRunCode
+        sigaddset(&signal_mask, SIGBUS);
+        sigaddset(&signal_mask, SIGSEGV);
 
         struct sigaction return_to_run_code_action {};
         return_to_run_code_action.sa_flags = SA_SIGINFO | SA_ONSTACK;
         return_to_run_code_action.sa_sigaction = reinterpret_cast<HandlerType>(
             &ArmNce::ReturnToRunCodeByExceptionLevelChangeSignalHandler);
         return_to_run_code_action.sa_mask = signal_mask;
-        Common::SigAction(ReturnToRunCodeByExceptionLevelChangeSignal, &return_to_run_code_action,
+        Common::SigAction(SIGUSR2, &return_to_run_code_action,
                           nullptr);
 
         struct sigaction break_from_run_code_action {};
@@ -388,21 +468,21 @@ void ArmNce::Initialize() {
         break_from_run_code_action.sa_sigaction =
             reinterpret_cast<HandlerType>(&ArmNce::BreakFromRunCodeSignalHandler);
         break_from_run_code_action.sa_mask = signal_mask;
-        Common::SigAction(BreakFromRunCodeSignal, &break_from_run_code_action, nullptr);
+        Common::SigAction(SIGURG, &break_from_run_code_action, nullptr);
 
         struct sigaction alignment_fault_action {};
         alignment_fault_action.sa_flags = SA_SIGINFO | SA_ONSTACK;
         alignment_fault_action.sa_sigaction =
-            reinterpret_cast<HandlerType>(&ArmNce::GuestAlignmentFaultSignalHandler);
+            reinterpret_cast<HandlerType>(&ArmNce::GuestMemoryFaultSignalHandler);
         alignment_fault_action.sa_mask = signal_mask;
-        Common::SigAction(GuestAlignmentFaultSignal, &alignment_fault_action, nullptr);
+        Common::SigAction(SIGBUS, &alignment_fault_action, nullptr);
 
         struct sigaction access_fault_action {};
         access_fault_action.sa_flags = SA_SIGINFO | SA_ONSTACK | SA_RESTART;
         access_fault_action.sa_sigaction =
             reinterpret_cast<HandlerType>(&ArmNce::GuestMemoryFaultSignalHandler);
         access_fault_action.sa_mask = signal_mask;
-        Common::SigAction(GuestAccessFaultSignal, &access_fault_action, &g_orig_segv_action);
+        Common::SigAction(SIGSEGV, &access_fault_action, &g_orig_segv_action);
     });
 }
 
@@ -461,7 +541,7 @@ void ArmNce::SignalInterrupt(Kernel::KThread* thread) {
             "mov x1, %1\n"    // BreakFromRunCodeSignal
             "mov x16, #328\n" // syscall code for __pthread_kill
             "svc #0x80\n"
-            :: "r"(static_cast<u64>(m_thread_id)), "r"(static_cast<u64>(BreakFromRunCodeSignal))
+            :: "r"(static_cast<u64>(m_thread_id)), "r"(static_cast<u64>(SIGURG))
             : "x0", "x1", "x16", "memory", "cc");
 #endif
     } else {

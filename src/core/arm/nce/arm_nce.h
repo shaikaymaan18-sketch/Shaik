@@ -11,6 +11,9 @@
 #include "core/arm/arm_interface.h"
 #include "core/arm/nce/guest_context.h"
 
+#define SpinLockLocked 0
+#define SpinLockUnlocked 1
+
 namespace Core::Memory {
 class Memory;
 }
@@ -74,7 +77,6 @@ private:
     static void ReturnToRunCodeByExceptionLevelChangeSignalHandler(int sig, void* info,
                                                                    void* raw_context);
     static void BreakFromRunCodeSignalHandler(int sig, void* info, void* raw_context);
-    static void GuestAlignmentFaultSignalHandler(int sig, void* info, void* raw_context);
     static void GuestMemoryFaultSignalHandler(int sig, void* info, void* raw_context);
 
     static void LockThreadParameters(void* tpidr);
@@ -84,7 +86,6 @@ private:
     static void* RestoreGuestContext(void* raw_context);
     static void SaveGuestContext(GuestContext* ctx, void* raw_context);
     static bool HandleFailedGuestFault(GuestContext* ctx, void* info, void* raw_context);
-    static bool HandleGuestAlignmentFault(GuestContext* ctx, void* info, void* raw_context);
 
 public:
     Core::System& m_system;

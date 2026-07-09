@@ -11,7 +11,6 @@
 #include "common/common_funcs.h"
 #include "common/common_types.h"
 #include "core/arm/arm_interface.h"
-#include "core/arm/nce/arm_nce_asm_definitions.h"
 
 #ifdef __linux__
 #include <signal.h>

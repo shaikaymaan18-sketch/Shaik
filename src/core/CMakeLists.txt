@@ -1237,10 +1237,8 @@ if (HAS_NCE)
     set(CMAKE_ASM_FLAGS "${CFLAGS} -x assembler-with-cpp")
 
     target_sources(core PRIVATE
-        arm/nce/arm_nce_asm_definitions.h
         arm/nce/arm_nce.cpp
         arm/nce/arm_nce.h
-        arm/nce/arm_nce.s
         arm/nce/guest_context.h
         arm/nce/instructions.h
         arm/nce/interpreter_visitor.cpp
