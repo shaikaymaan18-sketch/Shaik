@@ -2,6 +2,15 @@
 
 AI and LLM use is *strictly* prohibited within our codebase and surrounding community, including issues and comments. This includes using AI or LLMs to write docs/commit messages, debug issues, brainstorm ideas, research concepts, or search the codebase.
 
+- [AI Policy](#ai-policy)
+  - [Low-quality code](#low-quality-code)
+  - [Licensing concerns](#licensing-concerns)
+  - [Vibe-coding](#vibe-coding)
+  - [Commit messages](#commit-messages)
+  - [Miscellaneous concerns](#miscellaneous-concerns)
+  - [Unacceptable Use Examples](#unacceptable-use-examples)
+  - [Addendum: Commit Messages](#addendum-commit-messages)
+
 ## Low-quality code
 
 AI is notorious for producing low-quality code; be it:
@@ -23,6 +32,14 @@ AI models may have also ingested AGPLv3 code, which is license-incompatible with
 
 Just don't. If you're not going to put the effort in to understand every line of code you wrote, neither will we, and your patch or pull request will be ignored.
 
+## Commit messages
+
+AI-generated commit messages are absolutely terrible, and your pull request or patch will immediately be rejected if you choose to do this. They are, quite simply, actively detrimental to our understanding of your changes, and if you're not willing to summarize the intent behind your changes, then we're not going to bother reading the code you wrote.
+
+Write concise, simple, and descriptive commit messages that actually convey the proper intent behind what your change is trying to do.
+
+See the [Addendum](#addendum-commit-messages) for an instance of how bad AI models are at commit messages.
+
 ## Miscellaneous concerns
 
 - While many environmental concerns about AI are typically blown out of proportion, it *is* a legitimate issue, and should be taken into account.
@@ -34,9 +51,6 @@ Just don't. If you're not going to put the effort in to understand every line of
 
 Here are a few examples of unacceptable use:
 
-- Commit messages
-  - LLMs are absolutely horrible at this. They are needlessly verbose, almost never catch the actual intent of the commit, and will almost always hallucinate false information about said changes.
-  - See the addendum for an example
 - Solving problems
   - Slapping a few files and a "please fix bug XYZ" into an LLM is a recipe for disaster that will pretty much never work.
 - Fully AI-generated code, aka "vibecoding"
