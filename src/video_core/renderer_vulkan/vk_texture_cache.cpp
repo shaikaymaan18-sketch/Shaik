@@ -2365,10 +2365,6 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
         sampler_default_anisotropy = create_sampler(max_anisotropy_default, false);
     }
     if (has_linear_filtering) {
-        // Integer-format image views can never be linearly filtered
-        // (VUID-vkCmdDraw*-magFilter-04553); this sampler is cached purely from the guest's TSC,
-        // decoupled from whichever ImageView it ends up paired with, so build a nearest-forced
-        // fallback here for callers to swap to when the paired view turns out to be integer.
         sampler_nearest = create_sampler(1.0f, true);
     }
 }

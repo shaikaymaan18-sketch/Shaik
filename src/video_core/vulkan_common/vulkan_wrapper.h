@@ -825,7 +825,6 @@ public:
     }
 
     /// Submits using VK_KHR_synchronization2 / Vulkan 1.3 vkQueueSubmit2.
-    /// Only valid to call when the device dispatch table has vkQueueSubmit2 loaded.
     VkResult Submit2(Span<VkSubmitInfo2> submit_infos,
                      VkFence fence = VK_NULL_HANDLE) const noexcept {
         return dld->vkQueueSubmit2(queue, submit_infos.size(), submit_infos.data(), fence);
@@ -1303,8 +1302,6 @@ public:
                          VkDependencyFlags dependency_flags, Span<VkMemoryBarrier> memory_barriers,
                          Span<VkBufferMemoryBarrier> buffer_barriers,
                          Span<VkImageMemoryBarrier> image_barriers) const noexcept {
-        // Legacy VkPipelineStageFlagBits/VkAccessFlagBits are bit-compatible with their
-        // Synchronization2 *2 counterparts, so barriers can be widened without a lookup table.
         static constexpr u32 MaxBarriers = 16;
         if (dld->vkCmdPipelineBarrier2 && memory_barriers.size() <= MaxBarriers &&
             buffer_barriers.size() <= MaxBarriers && image_barriers.size() <= MaxBarriers) {
