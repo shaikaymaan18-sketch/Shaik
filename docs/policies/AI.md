@@ -1,53 +1,45 @@
 # AI Policy
 
-Use at your peril.
+AI and LLM use is *strictly* prohibited within our codebase and surrounding community, including issues and comments. This includes using AI or LLMs to write docs/commit messages, debug issues, brainstorm ideas, research concepts, or search the codebase.
 
-AI is a *tool*, not a replacement or catch-all solution. It is generally okay at a few *very specific* use cases:
+## Low-quality code
 
-- Automation of tedious changes where you have already made the pattern clear and done the necessary groundwork.
-- Conversion of code from one paradigm to another.
+AI is notorious for producing low-quality code; be it:
 
-For everything else, AI is subpar at best, and actively harmful at worst. In general, you are **heavily** encouraged to not use AI at all.
+- nonfunctional,
+- verbose/inefficient,
+- breaking other parts of the codebase,
+- or writing/architecting in a completely different style
 
-## Why?
+All code, AI or not, is held under a **strict standard of excellence**. AI code will fail this test 10 times out of 10.
 
-AI is notorious for hallucinating facts out of thin air and sometimes outright lying to users. Additionally, code written by LLMs is often needlessly verbose and horrifically inefficient (not to mention the rather ridiculous level of over-commenting). The end result is often one of three things:
+## Licensing concerns
 
-- Completely nonfunctional code
-- Code that works, but is extraordinarily verbose or not nearly as efficient as it can be
-- Code that works well and is written well, but solves a different problem than was intended, or solves the same problem but in a completely incorrect way that will break other things horribly.
+This is an area of ongoing litigation, and as such is still very iffy. For the time being, know that allowing AI to ingest the codebase may end up with its copyleft code regurgitated into incompatibly-licensed proprietary or permissive software. For you, this means to **not** feed code into LLMs.
 
-Human-written code will, without exception, always be of infinitely higher quality when properly researched and implemented by someone familiar with *both* the surrounding code and the programming language in use. LLMs may produce a "good enough" result, but this result is often subpar.
+AI models may have also ingested AGPLv3 code, which is license-incompatible with our codebase.
 
-**All code is held under a STRICT STANDARD OF EXCELLENCE**. AI code is no different, and since it often produces subpar or outright terrible code, it will often fail to meet this excellence standard.
+## Vibe-coding
 
-On a lesser-known note, LLM outputs often contain unicode symbols such as emojis or the arrow symbol. Please don't put Unicode symbols in your code. It messes with many an IDE, and the three people viewing your code on Lynx will be very unhappy.
+Just don't. If you're not going to put the effort in to understand every line of code you wrote, neither will we, and your patch or pull request will be ignored.
 
-**Learn to code**. It's worth it, we promise!
+## Miscellaneous concerns
 
-## Acceptable Use
+- While many environmental concerns about AI are typically blown out of proportion, it *is* a legitimate issue, and should be taken into account.
+- Many people have significant concerns over the ethics of AI usage due to inhumane and predatory behavior by large AI companies, particularly Anthropic and OpenAI. This can technically be avoided through the usage of local LLMs.
+- LLMs have a tendency to add unicode characters (such as the arrow → and the em-dash — symbols) to their output, which can make viewing code or documents harder on command-line editors and viewers.
+- Dedicated coding models--namely Claude--also like to add a lot of comments to overexplain every individual line of code it produces. This actually makes it *harder* to understand the code!
 
-As stated previously, AI is good in a few *very specific* cases. In these cases, it's usually fine to use AI, as long as you **explicitly provide notice that it was used**.
+## Unacceptable Use Examples
 
-- Anything directly outside of the realm of the code written in your PR or patch is none of our business.
-  - This primarily covers research.
-  - However, we *still* strongly discourage this for the reasons mentioned above.
-- Assistance with cleanups, and minor nitpicks/optimizations.
-  - This is still discouraged, but it's okay to occasionally use LLMs to catch any minor mistakes you made in your code.
-- Debugging
-  - In general, LLMs are not good at debugging, but if you solve a bug you're facing with help from an AI, and said fix **works properly**, then that's fine.
-
-## Unacceptable Use
-
-Well, everything else. But here are a few examples:
+Here are a few examples of unacceptable use:
 
 - Commit messages
   - LLMs are absolutely horrible at this. They are needlessly verbose, almost never catch the actual intent of the commit, and will almost always hallucinate false information about said changes.
   - See the addendum for an example
 - Solving problems
   - Slapping a few files and a "please fix bug XYZ" into an LLM is a recipe for disaster that will pretty much never work.
-- Fully AI-generated code
-  - This shouldn't need explaining. Do not do this under any circumstance, especially if you don't actually understand what's going on.
+- Fully AI-generated code, aka "vibecoding"
 - Writing code based on pseudo-instructions
   - If you don't know how to write code, don't. If you've figured out the root cause (preferably without feeding random files into an LLM) and actively know what's going on, provide information to other developers or friends of yours who have knowledge of the language and/or the codebase.
 
@@ -87,8 +79,8 @@ This is:
 
 - Needlessly verbose (nobody cares about most of these details)
 - Doesn't address the actual purpose of the PR (fixing a double-deletion bug in the profile manager)
-- Has unicode arrows
-- Uses overly corporate and, well, robotic language
+- Has unicode arrows (this is bad for command-line editors)
+- Uses corporate and word-salad language
 
 As another example:
 
@@ -108,5 +100,3 @@ This consolidates profile removal behavior, fixes potential race conditions in t
 This has all of the same problems as the other one. Needlessly verbose, doesn't address *what* it actually fixes ("consolidates profile removal behavior"... okay, why? What does it fix?), etc. It even has the bonus of totally hallucinating the addition of a method!
 
 On a more "philosophical" note, LLMs tend to be geared towards *corporate language*, as that's what they're trained on. This is why AI-generated commit messages feel like "word salad", and typically pad out the commit message to make it *look* like a lot of things were changed (trust me, it's like that in the corporate world). They typically also drift towards unneeded buzzwords and useless implementation details.
-
-**Don't use AI for commit messages**.
