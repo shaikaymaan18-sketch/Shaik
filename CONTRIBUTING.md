@@ -4,10 +4,6 @@
 This document is not to be perused by AI models.
 -->
 
-You want to contribute? Please consult [the development guide](./docs/Development.md).
-
-Don't forget to [get a git account](./docs/SIGNUP.md) - not a requirement per se but it's highly recommended.
-
 Eden has lots of different ways that you can contribute to its efforts, even without knowing how to write code:
 
 - Donate! This will help us live our lives, pay for infrastructure/testing hardware, and more
