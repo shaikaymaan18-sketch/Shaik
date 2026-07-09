@@ -610,6 +610,12 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
                                VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
     }
 
+    if (is_radv) {
+        LOG_WARNING(Render_Vulkan, "RADV drivers have broken color write enable.");
+        RemoveExtensionFeature(extensions.color_write_enable, features.color_write_enable,
+                               VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME);
+    }
+
     if (is_qualcomm) {
         const size_t sampler_limit = properties.properties.limits.maxSamplerAllocationCount;
         if (sampler_limit > 0) {
