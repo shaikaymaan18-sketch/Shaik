@@ -606,8 +606,8 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         RemoveExtensionFeature(extensions.color_write_enable, features.color_write_enable,
                                VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME);
         LOG_WARNING(Render_Vulkan, "AMD drivers have broken shader float controls.");
-        RemoveExtensionFeature(extensions.shader_float_controls, features.shader_float_controls,
-                               VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
+        RemoveExtension(extensions.shader_float_controls,
+                        VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
     }
 
     if (is_radv) {
