@@ -605,7 +605,7 @@ void ArmNce::SignalInterrupt(Kernel::KThread* thread) {
         // We should signal to the running thread.
         // The running thread will unlock the thread context.
 #if defined(__linux__)
-        syscall(SYS_tkill, m_thread_id, BreakFromRunCodeSignal);
+        syscall(SYS_tkill, m_thread_id, SIGURG); // BreakFromRunCodeSignal
 #elif defined(__APPLE__)
         asm volatile(
             "mov x0, %0\n"    // m_thread_id
