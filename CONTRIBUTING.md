@@ -32,7 +32,7 @@ Eden is free, open-source, copyleft software, licensed under the terms of the [G
 
 Anywhere you like! If you are facing an issue and want to fix it, go ahead. For new features, you are heavily encouraged to open a feature request on GitHub, Codeberg, or Forgejo first, discussing the motivations, potential implementation, and user flow of your desired feature. Our UI/UX designers will work with you to refine your feature before you actually choose to implement it.
 
-You may also search for open issues on [GitHub](https://github.com/eden-emulator/Issue-Reports/issues), [Codeberg](https://codeberg.org/eden-emu/eden/issues), or [Forgejo](https://git.eden-emu.dev/eden-emu/eden). For larger features/refactors, you should first express your interest in the issue to ensure another developer isn't already working on it.
+You may also search for open issues on [GitHub](https://github.com/eden-emulator/Issue-Reports/issues), [Codeberg](https://codeberg.org/eden-emu/eden/issues), or [Forgejo](https://git.eden-emu.dev/eden-emu/eden/issues). For larger features/refactors, you should first express your interest in the issue to ensure another developer isn't already working on it.
 
 ### Great! Can I contribute already?
 
