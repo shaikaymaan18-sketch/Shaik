@@ -11,7 +11,7 @@ AI is notorious for producing low-quality code; be it:
 - breaking other parts of the codebase,
 - or writing/architecting in a completely different style
 
-All code, AI or not, is held under a **strict standard of excellence**. AI code will fail this test 10 times out of 10.
+All code, AI or not, is held under a **strict standard of excellence**. AI/LLM-generated code will fail this test 10 times out of 10.
 
 ## Licensing concerns
 
@@ -45,7 +45,7 @@ Here are a few examples of unacceptable use:
 
 ## Addendum: Commit Messages
 
-The patchset for pull request [#3422](https://git.eden-emu.dev/eden-emu/eden/pulls/3422) was fed into several LLMs to generate a commit message. All of them sucked, and not a single one caught on to what the commit actually did. For example:
+The patchset for pull request [#3422](https://git.eden-emu.dev/eden-emu/eden/pulls/3422) was fed into several LLMs to generate a commit message. One LLM produced the following:
 
 ```txt
 profile_manager: Refactor user deletion to use index instead of UUID
@@ -82,7 +82,7 @@ This is:
 - Has unicode arrows (this is bad for command-line editors)
 - Uses corporate and word-salad language
 
-As another example:
+Another (code-oriented) LLM output the following:
 
 ```txt
 profile(manager/ui): switch to index-based deletion and unify removal logic
