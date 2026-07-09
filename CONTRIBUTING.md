@@ -76,4 +76,6 @@ Once your request is processed, you will receive a confirmation email with your 
 
 ## Non-code Contributions
 
-Alongside the other contribution methods listed up top, you can also choose to contribute through documentation, organization, or
+Alongside the other contribution methods listed up top, you can also choose to contribute through documentation, organization, or community guides. These can be done either through the code contribution methods described above, or created externally and shared via our Discord community.
+
+If you have an external tool/page that you believe would be handy to integrate/link into Eden, please additionally email our developers at [`developers@eden-emu.dev`](mailto:developers@eden-emu.dev). **Do not submit vibe-coded or AI generated tools or applications**.
