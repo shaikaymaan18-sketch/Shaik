@@ -600,22 +600,14 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
 
     sets_per_pool = 64;
     if (is_amd_driver) {
-        // AMD drivers need a higher amount of Sets per Pool in certain circumstances like in XC2.
         sets_per_pool = 96;
-
-        // Disable VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT on AMD GCN4 and lower as it is broken.
-        if (!features.shader_float16_int8.shaderFloat16) {
-            LOG_WARNING(Render_Vulkan,
-                        "AMD GCN4 and earlier have broken VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT");
-            has_broken_cube_compatibility = true;
-        }
-
-        // AMD drivers (2026+) have broken float16 math on DKCR
-        if (features.shader_float16_int8.shaderFloat16) {
-            LOG_WARNING(Render_Vulkan,
-                        "AMD drivers (2026+) have broken float16 math");
-            features.shader_float16_int8.shaderFloat16 = false;
-        }
+        has_broken_cube_compatibility = true;
+        LOG_WARNING(Render_Vulkan, "AMD drivers have broken color write enable.");
+        RemoveExtensionFeature(extensions.color_write_enable, features.color_write_enable,
+                               VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME);
+        LOG_WARNING(Render_Vulkan, "AMD drivers have broken shader float controls.");
+        RemoveExtensionFeature(extensions.shader_float_controls, features.shader_float_controls,
+                               VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
     }
 
     if (is_qualcomm) {
