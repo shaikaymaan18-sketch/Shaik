@@ -46,6 +46,7 @@ There are five primary ways to contribute.
   - Codeberg is not subject to draconian DMCA laws, but they have been hostile to emulators such as Torzu in the past. Thus, you shouldn't rely on this either.
 - Submit patches to [`patch@eden-emu.dev`](mailto:patch@eden-emu.dev)
   - These **must** be in `git format-patch` format. You should familiarize yourself with the [art of patching](https://www.gitkraken.com/learn/git/git-patch) beforehand.
+  - Alongside the contents of your email, please attach the patch/diff file itself for easy access and use.
 - Email our developers at [`developers@eden-emu.dev`](mailto:developers@eden-emu.dev) with any of your relevant findings or code changes.
 
 To test your changes, ensure to read the [build documentation](./docs/Build.md) for your specific platform(s) to ensure everything compiles and works properly. You should also make sure that your branch is up-to-date with the upstream `master` branch before opening a pull request.
