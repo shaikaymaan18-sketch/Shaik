@@ -70,22 +70,21 @@ protected:
 private:
     // Only confirmed to be valid on Apple systems.
     static void* GetGuestParameters();
-    static HaltReason ReturnToRunCodeByTrampoline(void* tpidr, GuestContext* ctx,
-                                                  u64 trampoline_addr);
+
+    static HaltReason ReturnToRunCodeByTrampoline(void* tpidr, u64 trampoline_addr);
     static HaltReason ReturnToRunCodeByExceptionLevelChange(int tid, void* tpidr);
 
     static void ReturnToRunCodeByExceptionLevelChangeSignalHandler(int sig, void* info,
                                                                    void* raw_context);
     static void BreakFromRunCodeSignalHandler(int sig, void* info, void* raw_context);
     static void GuestMemoryFaultSignalHandler(int sig, void* info, void* raw_context);
+    static bool HandleFailedGuestFault(GuestContext* ctx, void* info, void* raw_context);
 
     static void LockThreadParameters(void* tpidr);
     static void UnlockThreadParameters(void* tpidr);
 
-    // C++ implementation functions for assembly definitions.
     static void* RestoreGuestContext(void* raw_context);
     static void SaveGuestContext(GuestContext* ctx, void* raw_context);
-    static bool HandleFailedGuestFault(GuestContext* ctx, void* info, void* raw_context);
 
 public:
     Core::System& m_system;

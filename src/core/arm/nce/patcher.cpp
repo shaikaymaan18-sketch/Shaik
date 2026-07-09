@@ -493,10 +493,10 @@ void Patcher::WriteSvcTrampoline(ModuleDestLabel module_dest, u32 svc_id, oaknut
     cg.ADD(X1, X1, offsetof(GuestContext, host_ctx));
 
     // Reload host TPIDR_EL0 and SP.
-    static_assert(offsetof(HostContext, host_sp) + 8 == offsetof(HostContext, host_tpidr_el0));
     cg.LDP(X2, X3, X1, offsetof(HostContext, host_sp));
     cg.MOV(SP, X2);
 #ifndef __APPLE__
+    static_assert(offsetof(HostContext, host_sp) + 8 == offsetof(HostContext, host_tpidr_el0));
     cg.MSR(oaknut::SystemReg::TPIDR_EL0, X3);
 #endif
 

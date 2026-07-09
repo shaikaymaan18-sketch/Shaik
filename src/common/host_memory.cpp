@@ -436,8 +436,8 @@ static void* ChooseVirtualBase(size_t virtual_size) {
         if (map_pointer != MAP_FAILED) {
             munmap(map_pointer, virtual_size);
         }
-    }
 #endif
+    }
 
     return MAP_FAILED;
 }

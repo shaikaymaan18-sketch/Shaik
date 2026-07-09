@@ -6,6 +6,19 @@
 
 #ifdef __aarch64__
 
+// Certain functions have to be marked naked so that the compiler doesn't touch the stack
+// or implement a return (we "artificially" return later by setting PC to the LR value)
+#if defined(__CLANG__) || defined(__GNUC__)
+#define YUZU_NAKED __attribute__((naked))
+#elif _MSC_VER
+// todo: windows support?? it supports native context switching and signal handling
+// https://learn.microsoft.com/en-us/windows/win32/debug/using-a-vectored-exception-handler
+// https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-setthreadcontext
+#define YUZU_NAKED __declspec(naked)
+#else
+#error Unsupported compiler
+#endif
+
 #include <cinttypes>
 #include <memory>
 
@@ -75,6 +88,141 @@ void ArmNce::UnlockThreadParameters(void* tpidr) {
     static_cast<NativeExecutionParameters*>(tpidr)->lock.store(SpinLockUnlocked, std::memory_order_release);
 }
 
+YUZU_NO_INLINE
+YUZU_NAKED
+HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(int tid, void *tpidr) {
+    // x0  - tid
+    // x1  - tpidr
+
+    // x19 - callee-saved register and our tpidr storage
+    //
+    // uses tkill on linux and pthread_kill on macOS, both have the same signature:
+    /* syscall (u32 tid, u64 signal) */
+    // tid is already in x0 so we don't have to explicitly pass it
+
+    asm volatile(
+        "str x19, [SP, #-0x10]!\n"
+        "mov x19, x1\n" // move tpidr to x19 so it doesn't get clobbered
+
+        "mov x1, #%[sig]\n"  // set x1 to SIGUSR2
+#ifdef __linux__
+        "mov x8, %[syscall]\n"
+        "svc #0\n"
+        "brk 0x0\n"
+        :: [syscall] "i"(__NR_tkill),
+#elif defined(__APPLE__)
+        "mov x8, #328\n"
+        "svc #0\n"
+        "brk 0x0\n"
+        ::
+#endif
+        [sig] "i"(SIGUSR2)
+        );
+}
+
+void ArmNce::ReturnToRunCodeByExceptionLevelChangeSignalHandler(int sig, void *info, void *raw_context) {
+    auto tpidr = static_cast<NativeExecutionParameters*>(RestoreGuestContext(raw_context));
+
+    RestoreGuestContext(raw_context);
+#ifndef __APPLE__
+    // Save old value of TPIDR_EL0, load guest one
+    u64 tpidr_el0;
+    asm volatile("mrs %0, TPIDR_EL0"
+                 "msr TPIDR_EL0, %1"
+                 : "=r"(tpidr_el0)
+                 : "r"(tpidr));
+    tpidr->tpidr_el0 = tpidr_el0;
+#else
+    tpidr->is_actually_running = true;
+#endif
+
+    UnlockThreadParameters(tpidr);
+    // sigaction restores context and returns to guest
+}
+
+YUZU_NO_INLINE
+YUZU_NAKED
+HaltReason ArmNce::ReturnToRunCodeByTrampoline(void *tpidr, u64 trampoline_addr) {
+    // x0 - NativeExecutionParameters*
+    // x1 - addr
+
+    // x2 - GuestContext*
+    // x3 - Host SP
+    // x4 - Host TPIDR_EL0 on non-Apple, is_actually_running on Apple
+    // x5 - Scratch register
+
+    asm volatile(
+        "mov x3, SP\n"
+        "ldr x2, [ x0, #%[ctx_off] ]\n"
+
+#ifndef __APPLE__
+        // Load guest tpidr_el0
+        "mrs x4, TPIDR_EL0\n"
+        "msr TPIDR_EL0, x0\n"
+        // Store host sp and tpidr_el0
+        "stp x3, x4, [ x2, #%[host_sp] ]\n"
+#else
+        // is_actually_running = true
+        "mov w4, #1\n"
+        "strb w0, [ x0, #%[is_running_off] ]\n"
+        // Store host sp
+        "str x3, [ x2, #(%[host_ctx] + 0xE0) ]\n"
+#endif
+
+        "add x5, x2, #%[host_ctx]\n"
+        // Save callee-saved host GPR registers
+        "stp     x19, x20, [x5, #0x0]\n"
+        "stp     x21, x22, [x5, #0x10]\n"
+        "stp     x23, x24, [x5, #0x20]\n"
+        "stp     x25, x26, [x5, #0x30]\n"
+        "stp     x27, x28, [x5, #0x40]\n"
+        "stp     x29, x30, [x5, #0x50]\n"
+
+        // Save callee-saved host vector registers
+        "stp     q8, q9,   [x5, #(0x60)]\n"
+        "stp     q10, q11, [x5, #(0x80)]\n"
+        "stp     q12, q13, [x5, #(0xA0)]\n"
+        "stp     q14, q15, [x5, #(0xC0)]\n"
+
+        "ldr x5, [ x2, #%[sp_off] ]\n"
+        "mov SP, x5\n"
+
+        "br x1\n"
+        "brk 0x0\n"
+
+        :: [ctx_off] "i"(offsetof(NativeExecutionParameters, native_context)),
+        [sp_off] "i"(offsetof(GuestContext, sp)),
+        [host_ctx] "i"(offsetof(GuestContext, host_ctx)),
+#ifdef __APPLE__
+        [is_running_off] "i"(offsetof(NativeExecutionParameters, is_actually_running))
+#endif
+        );
+}
+
+static_assert(offsetof(HostContext, host_sp) == 0xE0);
+
+void ArmNce::BreakFromRunCodeSignalHandler(int sig, void *info, void *raw_context) {
+    NativeExecutionParameters* tpidr = reinterpret_cast<NativeExecutionParameters *>(GetGuestParameters());
+#ifdef __APPLE__
+    if (tpidr->is_actually_running) {
+        tpidr->is_actually_running = false;
+#else
+    if (tpidr->magic == Common::MakeMagic('Y', 'U', 'Z', 'U')) {
+        // Load the host's TPIDR_EL0 value
+        u64 scratch;
+        asm volatile(
+            "ldr %[scratch], [ %[tpidr], #[off] ]\n"
+            "msr TPIDR_EL0, %[scratch]\n"
+            : [scratch] "=&r"(scratch),
+            : [tpidr] "r"(nep),
+            : "memory"
+            );
+#endif
+        SaveGuestContext(static_cast<GuestContext *>(tpidr->native_context), raw_context);
+        // Returning from here will enter host code.
+    }
+}
+
 void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_context) {
     DEBUG_ASSERT(sig == SIGSEGV);
 
@@ -82,6 +230,7 @@ void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_co
 
 #ifdef __APPLE__
     if (nep->is_actually_running) {
+        nep->is_actually_running = false;
 #else
     if (nep->magic == Common::MakeMagic('Y', 'U', 'Z', 'U')) {
         // Load the host's TPIDR_EL0 value
@@ -135,7 +284,7 @@ void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_co
             "msr TPIDR_EL0, %0\n"
             :: "r"(nep));
 #else
-        (void)0;
+        nep->is_actually_running = true;
 #endif
     } else {
         // Host fault, call original handler
@@ -147,85 +296,6 @@ void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_co
             UNREACHABLE_MSG("unexpected signal {}", sig);
         }
     }
-}
-
-// This function has to be marked naked so that the compiler doesn't touch the stack
-// or implement a return (we "artificially" return later by setting PC to the LR value)
-YUZU_NO_INLINE
-__attribute__((naked))
-HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(int tid, void *tpidr) {
-    // x0  - tid
-    // x1  - tpidr
-    // x19 - callee-saved register and our tpidr storage
-    //
-    // uses tkill on linux and pthread_kill on macOS, both have the same signature:
-    // syscall (u32 tid, u64 signal)
-    asm volatile(
-        "str x19, [SP, #-0x10]!\n"
-        "mov x19, x1\n" // move tpidr to x19 so it doesn't get clobbered
-
-        "mov x1, #%[sig]\n"  // set x1 to SIGUSR2
-#ifdef __linux__
-        "mov x8, %[syscall]\n"
-        "svc #0\n"
-        "brk 0x0\n"
-        :: [syscall] "i"(__NR_tkill),
-#elif defined(__APPLE__)
-        "mov x8, #328\n"
-        "svc #0\n"
-        "brk 0x0\n"
-        ::
-#endif
-        [sig] "i"(SIGUSR2)
-        : "memory"
-        );
-}
-
-void ArmNce::ReturnToRunCodeByExceptionLevelChangeSignalHandler(int sig, void *info, void *raw_context) {
-    auto tpidr = static_cast<NativeExecutionParameters*>(RestoreGuestContext(raw_context));
-
-    RestoreGuestContext(raw_context);
-#ifndef __APPLE__
-    // Save old value of TPIDR_EL0, load guest one
-    u64 tpidr_el0;
-    asm volatile("mrs %0, TPIDR_EL0"
-                 "msr TPIDR_EL0, %1"
-                 : "=r"(tpidr_el0)
-                 : "r"(tpidr));
-    tpidr->tpidr_el0 = tpidr_el0;
-#else
-    tpidr->is_actually_running = true;
-#endif
-
-    // todo: is Lock called?
-    UnlockThreadParameters(tpidr);
-    // sigaction restores context and returns to guest
-}
-
-void ArmNce::BreakFromRunCodeSignalHandler(int sig, void *info, void *raw_context) {
-    NativeExecutionParameters* tpidr = reinterpret_cast<NativeExecutionParameters *>(GetGuestParameters());
-#ifdef __APPLE__
-    if (tpidr->is_actually_running) {
-#else
-    if (tpidr->magic == Common::MakeMagic('Y', 'U', 'Z', 'U')) {
-        // Load the host's TPIDR_EL0 value
-        u64 scratch;
-        asm volatile(
-            "ldr %[scratch], [ %[tpidr], #[off] ]\n"
-            "msr TPIDR_EL0, %[scratch]\n"
-            : [scratch] "=&r"(scratch),
-            : [tpidr] "r"(nep),
-            : "memory"
-            );
-#endif
-        SaveGuestContext(static_cast<GuestContext *>(tpidr->native_context), raw_context);
-        // Returning from here will enter host code.
-    }
-}
-
-HaltReason ArmNce::ReturnToRunCodeByTrampoline(void *tpidr, GuestContext *ctx, u64 trampoline_addr) {
-    // todo
-    return HaltReason::DataAbort;
 }
 
 void* ArmNce::RestoreGuestContext(void* raw_context) {
@@ -343,6 +413,10 @@ HaltReason ArmNce::RunThread(Kernel::KThread* thread) {
     auto* thread_params = &thread->GetNativeExecutionParameters();
     auto* process = thread->GetOwnerProcess();
 
+#ifdef __APPLE__
+    ASSERT(pthread_setspecific(CONTEXT_KEY, &thread_params) == 0);
+#endif
+
     // Move non-critical operations outside the locked section
     const u64 tpidr_el0_cache = m_guest_ctx.tpidr_el0;
     const u64 tpidrro_el0_cache = m_guest_ctx.tpidrro_el0;
@@ -362,7 +436,7 @@ HaltReason ArmNce::RunThread(Kernel::KThread* thread) {
     // to deal with dynamic loading of NROs.
     const auto& post_handlers = process->GetPostHandlers();
     if (auto it = post_handlers.find(m_guest_ctx.pc); it != post_handlers.end()) {
-        hr = ReturnToRunCodeByTrampoline(thread_params, &m_guest_ctx, it->second);
+        hr = ReturnToRunCodeByTrampoline(thread_params, it->second);
     } else {
         hr = ReturnToRunCodeByExceptionLevelChange(m_thread_id, thread_params);  // Android: Use "process handle SIGUSR2 -n true -p true -s false" (and SIGURG) in LLDB when debugging
     }
@@ -424,14 +498,11 @@ void ArmNce::Initialize() {
     }
 
     ASSERT(pthread_key_init_np(CONTEXT_KEY, [](void*) -> void {}) == 0);
-#endif
+#elif defined(__linux__)
     if (m_thread_id == -1) {
-#if defined(__linux__)
         m_thread_id = gettid();
-#else
-        m_thread_id = pthread_mach_thread_np(pthread_self());
-#endif
     }
+#endif
 
     // Configure signal stack.
     if (!m_stack) {
