@@ -614,6 +614,9 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         LOG_WARNING(Render_Vulkan, "RADV drivers have broken color write enable.");
         RemoveExtensionFeature(extensions.color_write_enable, features.color_write_enable,
                                VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME);
+        LOG_WARNING(Render_Vulkan, "RADV drivers have broken border color swizzle.");
+        RemoveExtensionFeature(extensions.border_color_swizzle, features.border_color_swizzle,
+                               VK_EXT_BORDER_COLOR_SWIZZLE_EXTENSION_NAME);
     }
 
     if (is_qualcomm) {
