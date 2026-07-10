@@ -1089,7 +1089,7 @@ void RasterizerVulkan::UpdateDynamicStates() {
 
     if (device.IsExtVertexInputDynamicStateSupported()) {
         if (auto* gp = pipeline_cache.CurrentGraphicsPipeline(); gp && gp->HasDynamicVertexInput()) {
-            UpdateVertexInput(regs);
+            UpdateVertexInput(regs, gp);
         }
     }
 }
@@ -1808,7 +1808,8 @@ void RasterizerVulkan::UpdateStencilTestEnable(Tegra::Engines::Maxwell3D::Regs& 
     });
 }
 
-void RasterizerVulkan::UpdateVertexInput(Tegra::Engines::Maxwell3D::Regs& regs) {
+void RasterizerVulkan::UpdateVertexInput(Tegra::Engines::Maxwell3D::Regs& regs,
+                                         const GraphicsPipeline* pipeline) {
     auto& dirty{maxwell3d->dirty.flags};
     const bool vertex_input_dirty = dirty[Dirty::VertexInput];
     const bool vertex_buffers_dirty = dirty[VideoCommon::Dirty::VertexBuffers];
@@ -1831,7 +1832,8 @@ void RasterizerVulkan::UpdateVertexInput(Tegra::Engines::Maxwell3D::Regs& regs) 
     for (u32 index = 0; index < max_attributes; ++index) {
         const Maxwell::VertexAttribute attribute{regs.vertex_attrib_format[index]};
         const u32 binding{attribute.buffer};
-        if (attribute.constant || binding >= max_bindings) {
+        if (attribute.constant || binding >= max_bindings ||
+            !pipeline->IsVertexAttributeLoaded(index)) {
             continue;
         }
         attributes.push_back({

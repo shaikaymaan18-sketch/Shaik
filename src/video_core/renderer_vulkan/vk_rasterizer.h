@@ -193,7 +193,7 @@ private:
     void UpdateBlending(Tegra::Engines::Maxwell3D::Regs& regs);
     void UpdateColorWriteEnable(Tegra::Engines::Maxwell3D::Regs& regs);
 
-    void UpdateVertexInput(Tegra::Engines::Maxwell3D::Regs& regs);
+    void UpdateVertexInput(Tegra::Engines::Maxwell3D::Regs& regs, const GraphicsPipeline* pipeline);
 
     Tegra::GPU& gpu;
     Tegra::MaxwellDeviceMemoryManager& device_memory;
