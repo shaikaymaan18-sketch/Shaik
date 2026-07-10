@@ -1169,19 +1169,20 @@ void TextureCacheRuntime::BlitImage(Framebuffer* dst_framebuffer, ImageView& dst
     ASSERT(!(is_dst_msaa && !is_src_msaa));
     ASSERT(operation == Fermi2D::Operation::SrcCopy);
 
+    const bool is_msaa_to_msaa = is_src_msaa && is_dst_msaa;
+    if (is_msaa_to_msaa && aspect_mask == VK_IMAGE_ASPECT_COLOR_BIT) {
+        blit_image_helper.BlitColorMSAA(dst_framebuffer, src, dst_region, src_region);
+        return;
+    }
+    if (is_msaa_to_msaa && device.CantBlitMSAA()) {
+        UNIMPLEMENTED_MSG("MSAA to MSAA depth-stencil blit is not supported on this driver");
+        return;
+    }
+
     const VkImage dst_image = dst.ImageHandle();
     const VkImage src_image = src.ImageHandle();
     const VkImageSubresourceLayers dst_layers = MakeSubresourceLayers(&dst);
     const VkImageSubresourceLayers src_layers = MakeSubresourceLayers(&src);
-    const bool is_msaa_to_msaa = is_src_msaa && is_dst_msaa;
-
-    // NVIDIA 510+ and Intel crash on MSAA->MSAA blits (scaling operations)
-    // Fall back to 3D helpers for MSAA scaling
-    if (is_msaa_to_msaa && device.CantBlitMSAA()) {
-        // This should be handled by NeedsScaleHelper() and use 3D helpers instead
-        UNIMPLEMENTED_MSG("MSAA to MSAA blit not supported on this driver");
-        return;
-    }
     const bool is_resolve = is_src_msaa && !is_dst_msaa;
     scheduler.RequestOutsideRenderPassOperationContext();
     scheduler.Record([filter, dst_region, src_region, dst_image, src_image, dst_layers, src_layers,
@@ -2093,10 +2094,11 @@ bool Image::BlitScaleHelper(bool scale_up) {
         blit_view = std::make_unique<ImageView>(*runtime, view_info, NULL_IMAGE_ID, *this);
     }
 
-    const u32 src_width = scale_up ? info.size.width : scaled_width;
-    const u32 src_height = scale_up ? info.size.height : scaled_height;
-    const u32 dst_width = scale_up ? scaled_width : info.size.width;
-    const u32 dst_height = scale_up ? scaled_height : info.size.height;
+    const auto [samples_x, samples_y] = VideoCommon::SamplesLog2(info.num_samples);
+    const u32 src_width = (scale_up ? info.size.width : scaled_width) >> samples_x;
+    const u32 src_height = (scale_up ? info.size.height : scaled_height) >> samples_y;
+    const u32 dst_width = (scale_up ? scaled_width : info.size.width) >> samples_x;
+    const u32 dst_height = (scale_up ? scaled_height : info.size.height) >> samples_y;
     const Region2D src_region{
         .start = {0, 0},
         .end = {s32(src_width), s32(src_height)},
@@ -2106,17 +2108,23 @@ bool Image::BlitScaleHelper(bool scale_up) {
         .end = {s32(dst_width), s32(dst_height)},
     };
     const VkExtent2D extent{
-        .width = (std::max)(scaled_width, info.size.width),
-        .height = (std::max)(scaled_height, info.size.height),
+        .width = (std::max)(scaled_width, info.size.width) >> samples_x,
+        .height = (std::max)(scaled_height, info.size.height) >> samples_y,
     };
 
     auto* view_ptr = blit_view.get();
     if (aspect_mask == VK_IMAGE_ASPECT_COLOR_BIT) {
         if (!blit_framebuffer)
             blit_framebuffer.emplace(*runtime, view_ptr, nullptr, extent, scale_up);
-        runtime->blit_image_helper.BlitColor(&*blit_framebuffer, *blit_view,
-            dst_region, src_region, operation, BLIT_OPERATION);
-    } else if (aspect_mask == (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) {
+        if (info.num_samples > 1) {
+            runtime->blit_image_helper.BlitColorMSAA(&*blit_framebuffer, *blit_view,
+                dst_region, src_region);
+        } else {
+            runtime->blit_image_helper.BlitColor(&*blit_framebuffer, *blit_view,
+                dst_region, src_region, operation, BLIT_OPERATION);
+        }
+    } else if (aspect_mask == (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT) &&
+               info.num_samples == 1) {
         if (!blit_framebuffer)
             blit_framebuffer.emplace(*runtime, nullptr, view_ptr, extent, scale_up);
         runtime->blit_image_helper.BlitDepthStencil(&*blit_framebuffer, *blit_view,
@@ -2132,7 +2140,8 @@ bool Image::BlitScaleHelper(bool scale_up) {
 
 bool Image::NeedsScaleHelper() const {
     const auto& device = runtime->device;
-    const bool needs_msaa_helper = info.num_samples > 1 && device.CantBlitMSAA();
+    const bool needs_msaa_helper = info.num_samples > 1 &&
+        (device.CantBlitMSAA() || aspect_mask == VK_IMAGE_ASPECT_COLOR_BIT);
     if (needs_msaa_helper) {
         return true;
     }

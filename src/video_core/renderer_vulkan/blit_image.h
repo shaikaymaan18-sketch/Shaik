@@ -53,6 +53,13 @@ struct MSAACopyPipelineKey {
     bool msaa_to_non_msaa;
 };
 
+struct BlitMSAAPipelineKey {
+    constexpr auto operator<=>(const BlitMSAAPipelineKey&) const noexcept = default;
+
+    VkRenderPass renderpass;
+    VkSampleCountFlagBits samples;
+};
+
 class BlitImageHelper {
 public:
     explicit BlitImageHelper(const Device& device, Scheduler& scheduler,
@@ -67,6 +74,9 @@ public:
     void BlitColor(const Framebuffer* dst_framebuffer, VkImageView src_image_view,
                    VkImage src_image, VkSampler src_sampler, const Region2D& dst_region,
                    const Region2D& src_region, const Extent3D& src_size);
+
+    void BlitColorMSAA(const Framebuffer* dst_framebuffer, const ImageView& src_image_view,
+                       const Region2D& dst_region, const Region2D& src_region);
 
     void BlitDepthStencil(const Framebuffer* dst_framebuffer, ImageView& src_image_view,
                           const Region2D& dst_region, const Region2D& src_region,
@@ -118,6 +128,7 @@ private:
     [[nodiscard]] VkPipeline FindOrEmplaceClearStencilPipeline(
         const BlitDepthStencilPipelineKey& key);
     [[nodiscard]] VkPipeline FindOrEmplaceMSAACopyPipeline(const MSAACopyPipelineKey& key);
+    [[nodiscard]] VkPipeline FindOrEmplaceBlitColorMSAAPipeline(const BlitMSAAPipelineKey& key);
 
     void ConvertPipeline(vk::Pipeline& pipeline, VkRenderPass renderpass, bool is_target_depth);
 
@@ -148,6 +159,7 @@ private:
     vk::PipelineLayout msaa_copy_pipeline_layout;
     vk::ShaderModule full_screen_vert;
     vk::ShaderModule blit_color_to_color_frag;
+    vk::ShaderModule blit_color_msaa_frag;
     vk::ShaderModule blit_depth_stencil_frag;
     vk::ShaderModule clear_color_vert;
     vk::ShaderModule clear_color_frag;
@@ -174,6 +186,8 @@ private:
     std::vector<vk::Pipeline> clear_stencil_pipelines;
     std::vector<MSAACopyPipelineKey> msaa_copy_keys;
     std::vector<vk::Pipeline> msaa_copy_pipelines;
+    std::vector<BlitMSAAPipelineKey> blit_msaa_color_keys;
+    std::vector<vk::Pipeline> blit_msaa_color_pipelines;
     struct MSAACopyResources {
         u64 tick;
         vk::ImageView src_view;
