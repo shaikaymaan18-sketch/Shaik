@@ -1606,6 +1606,10 @@ Image::Image(TextureCacheRuntime& runtime_, const ImageInfo& info_, GPUVAddr gpu
                                    ? std::make_optional(VK_FORMAT_R32G32B32A32_SFLOAT)
                                    : std::nullopt)),
       aspect_mask(ImageAspectMask(info.format)) {
+    if (info.num_samples > 1) {
+        LOG_INFO(Render_Vulkan, "MSAA image created: format={} samples={} {}x{} aspect={:#x}",
+                 info.format, info.num_samples, info.size.width, info.size.height, aspect_mask);
+    }
     if (IsPixelFormatASTC(info.format) && !runtime->device.IsOptimalAstcSupported()) {
         switch (Settings::values.accelerate_astc.GetValue()) {
         case Settings::AstcDecodeMode::Gpu:
