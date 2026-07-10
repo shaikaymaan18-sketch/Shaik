@@ -26,6 +26,7 @@
 #include "video_core/host_shaders/vulkan_uint8_comp_spv.h"
 #include "video_core/host_shaders/block_linear_unswizzle_3d_bcn_comp_spv.h"
 #include "video_core/renderer_vulkan/vk_compute_pass.h"
+#include "video_core/surface.h"
 #include "video_core/renderer_vulkan/vk_descriptor_pool.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/renderer_vulkan/vk_staging_buffer_pool.h"
@@ -745,10 +746,8 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
 
     const u32 MAX_BATCH_SLICES = (std::min)(z_count, image.info.size.depth);
 
-    if (!image.has_compute_unswizzle_buffer) {
-        // Allocate exactly what this batch needs
-        image.AllocateComputeUnswizzleBuffer(MAX_BATCH_SLICES);
-    }
+    // Allocate or grow to cover this batch's slice count
+    image.AllocateComputeUnswizzleBuffer(MAX_BATCH_SLICES);
 
     ASSERT(swizzles.size() == 1);
     const auto& sw = swizzles[0];

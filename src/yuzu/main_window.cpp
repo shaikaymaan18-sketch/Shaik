@@ -3585,9 +3585,6 @@ void MainWindow::OnToggleDockedMode() {
 void MainWindow::OnToggleGpuAccuracy() {
     switch (Settings::values.gpu_accuracy.GetValue()) {
     case Settings::GpuAccuracy::Low:
-        Settings::values.gpu_accuracy.SetValue(Settings::GpuAccuracy::Medium);
-        break;
-    case Settings::GpuAccuracy::Medium:
         Settings::values.gpu_accuracy.SetValue(Settings::GpuAccuracy::High);
         break;
     case Settings::GpuAccuracy::High:
@@ -4563,8 +4560,7 @@ static void AdjustLinkColor() {
 }
 
 void MainWindow::UpdateUITheme() {
-    const QString default_theme = QString::fromUtf8(
-        UISettings::themes[static_cast<size_t>(UISettings::default_theme)].second);
+    const QString default_theme = QString::fromUtf8(UISettings::themes[size_t(UISettings::default_theme)].second);
     QString current_theme = QString::fromStdString(UISettings::values.theme);
 
     if (current_theme.isEmpty())
@@ -4575,8 +4571,7 @@ void MainWindow::UpdateUITheme() {
     AdjustLinkColor();
 #else
     if (current_theme == QStringLiteral("default") || current_theme == QStringLiteral("colorful")) {
-        QIcon::setThemeName(current_theme == QStringLiteral("colorful") ? current_theme
-                                                                        : startup_icon_theme);
+        QIcon::setThemeName(current_theme == QStringLiteral("colorful") ? current_theme : startup_icon_theme);
         QIcon::setThemeSearchPaths(QStringList(default_theme_paths));
         if (isDarkMode()) {
             current_theme = QStringLiteral("default_dark");
