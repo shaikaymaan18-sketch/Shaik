@@ -703,33 +703,6 @@ void CopyBufferToImage(vk::CommandBuffer cmdbuf, VkBuffer src_buffer, VkImage im
     };
 }
 
-[[nodiscard]] VkImageCopy MakeImageCopy(const Region2D& dst_region, const Region2D& src_region,
-                                        const VkImageSubresourceLayers& dst_layers,
-                                        const VkImageSubresourceLayers& src_layers) {
-    return VkImageCopy{
-        .srcSubresource = src_layers,
-        .srcOffset =
-            {
-                .x = src_region.start.x,
-                .y = src_region.start.y,
-                .z = 0,
-            },
-        .dstSubresource = dst_layers,
-        .dstOffset =
-            {
-                .x = dst_region.start.x,
-                .y = dst_region.start.y,
-                .z = 0,
-            },
-        .extent =
-            {
-                .width = static_cast<u32>(dst_region.end.x - dst_region.start.x),
-                .height = static_cast<u32>(dst_region.end.y - dst_region.start.y),
-                .depth = 1,
-            },
-    };
-}
-
 void TryTransformSwizzleIfNeeded(PixelFormat format, std::array<SwizzleSource, 4>& swizzle,
                                  bool emulate_bgr565, bool emulate_a4b4g4r4) {
     switch (format) {
@@ -1206,17 +1179,13 @@ void TextureCacheRuntime::BlitImage(Framebuffer* dst_framebuffer, ImageView& dst
     ASSERT(operation == Fermi2D::Operation::SrcCopy);
 
     const bool is_msaa_to_msaa = is_src_msaa && is_dst_msaa;
-    bool is_msaa_copy = false;
-    if (is_msaa_to_msaa) {
-        const s32 copy_width = src_region.end.x - src_region.start.x;
-        const s32 copy_height = src_region.end.y - src_region.start.y;
-        is_msaa_copy = src.Samples() == dst.Samples() && copy_width > 0 && copy_height > 0 &&
-                       copy_width == dst_region.end.x - dst_region.start.x &&
-                       copy_height == dst_region.end.y - dst_region.start.y;
-        if (!is_msaa_copy && device.CantBlitMSAA()) {
-            UNIMPLEMENTED_MSG("Scaled MSAA to MSAA blit is not supported on this driver");
-            return;
-        }
+    if (is_msaa_to_msaa && aspect_mask == VK_IMAGE_ASPECT_COLOR_BIT) {
+        blit_image_helper.BlitColorMSAA(dst_framebuffer, src, dst_region, src_region);
+        return;
+    }
+    if (is_msaa_to_msaa && device.CantBlitMSAA()) {
+        UNIMPLEMENTED_MSG("MSAA to MSAA depth-stencil blit is not supported on this driver");
+        return;
     }
 
     const VkImage dst_image = dst.ImageHandle();
@@ -1226,7 +1195,7 @@ void TextureCacheRuntime::BlitImage(Framebuffer* dst_framebuffer, ImageView& dst
     const bool is_resolve = is_src_msaa && !is_dst_msaa;
     scheduler.RequestOutsideRenderPassOperationContext();
     scheduler.Record([filter, dst_region, src_region, dst_image, src_image, dst_layers, src_layers,
-                      aspect_mask, is_resolve, is_msaa_copy](vk::CommandBuffer cmdbuf) {
+                      aspect_mask, is_resolve](vk::CommandBuffer cmdbuf) {
         const std::array read_barriers{
             VkImageMemoryBarrier{
                 .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1296,10 +1265,6 @@ void TextureCacheRuntime::BlitImage(Framebuffer* dst_framebuffer, ImageView& dst
             cmdbuf.ResolveImage(src_image, VK_IMAGE_LAYOUT_GENERAL, dst_image,
                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                 MakeImageResolve(dst_region, src_region, dst_layers, src_layers));
-        } else if (is_msaa_copy) {
-            cmdbuf.CopyImage(src_image, VK_IMAGE_LAYOUT_GENERAL, dst_image,
-                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                             MakeImageCopy(dst_region, src_region, dst_layers, src_layers));
         } else {
             const bool is_linear = filter == Fermi2D::Filter::Bilinear;
             const VkFilter vk_filter = is_linear ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
@@ -2184,7 +2149,8 @@ bool Image::BlitScaleHelper(bool scale_up) {
 
 bool Image::NeedsScaleHelper() const {
     const auto& device = runtime->device;
-    const bool needs_msaa_helper = info.num_samples > 1 && device.CantBlitMSAA();
+    const bool needs_msaa_helper = info.num_samples > 1 &&
+        (device.CantBlitMSAA() || aspect_mask == VK_IMAGE_ASPECT_COLOR_BIT);
     if (needs_msaa_helper) {
         return true;
     }
