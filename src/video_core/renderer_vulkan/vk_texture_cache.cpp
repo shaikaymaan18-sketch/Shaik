@@ -909,9 +909,6 @@ TextureCacheRuntime::TextureCacheRuntime(const Device& device_, Scheduler& sched
         astc_decoder_pass.emplace(device, scheduler, descriptor_pool, staging_buffer_pool,
                                   compute_pass_descriptor_queue, memory_allocator);
     }
-    if (device.IsStorageImageMultisampleSupported()) {
-        msaa_copy_pass.emplace(device, scheduler, descriptor_pool, staging_buffer_pool, compute_pass_descriptor_queue);
-    }
     if (!device.IsKhrImageFormatListSupported()) {
         return;
     }
@@ -1555,10 +1552,14 @@ void TextureCacheRuntime::CopyImage(Image& dst, Image& src,
 void TextureCacheRuntime::CopyImageMSAA(Image& dst, Image& src,
                                         std::span<const VideoCommon::ImageCopy> copies) {
     const bool msaa_to_non_msaa = src.info.num_samples > 1 && dst.info.num_samples == 1;
-    if (msaa_copy_pass) {
-        return msaa_copy_pass->CopyImage(dst, src, copies, msaa_to_non_msaa);
+    const u32 num_samples = msaa_to_non_msaa ? src.info.num_samples : dst.info.num_samples;
+    if (dst.AspectMask() != VK_IMAGE_ASPECT_COLOR_BIT ||
+        VideoCore::Surface::IsPixelFormatInteger(dst.info.format)) {
+        UNIMPLEMENTED_MSG("Copying images with different samples is not supported.");
+        return;
     }
-    UNIMPLEMENTED_MSG("Copying images with different samples is not supported.");
+    blit_image_helper.CopyMSAA(render_pass_cache, dst.Handle(), dst.info.format, src.Handle(),
+                               src.info.format, num_samples, copies, msaa_to_non_msaa);
 }
 
 u64 TextureCacheRuntime::GetDeviceLocalMemory() const {
@@ -1577,7 +1578,11 @@ std::optional<size_t> TextureCacheRuntime::GetSamplerHeapBudget() const {
     return device.GetSamplerHeapBudget();
 }
 
-void TextureCacheRuntime::TickFrame() {}
+void TextureCacheRuntime::TickFrame() {
+    std::erase_if(pending_msaa_images, [this](const auto& pending) {
+        return scheduler.IsFree(pending.first);
+    });
+}
 
 Image::Image(TextureCacheRuntime& runtime_, const ImageInfo& info_, GPUVAddr gpu_addr_,
              VAddr cpu_addr_)
@@ -1684,56 +1689,37 @@ void Image::UploadMemory(VkBuffer buffer, VkDeviceSize offset,
         ScaleDown(true);
     }
 
-    // Handle MSAA upload if necessary
-    /* WARNING, TODO: This code uses some hacks, besides being fundamentally ugly
-       since tropic didn't want to touch it for a long time, so it needs a rewrite from someone
-       better than me at vulkan. */
-    // CHANGE: Gate the MSAA path more strictly and only use it for color, when the pass and device
-    //         support are available. Avoid running the MSAA path when prerequisites aren't met,
-    //         preventing validation and runtime issues.
     const bool wants_msaa_upload = info.num_samples > 1
         && (aspect_mask & VK_IMAGE_ASPECT_COLOR_BIT) != 0
-        && runtime->CanUploadMSAA() && runtime->msaa_copy_pass.has_value()
-        && runtime->device.IsStorageImageMultisampleSupported();
+        && !VideoCore::Surface::IsPixelFormatInteger(info.format);
 
     if (wants_msaa_upload) {
-        // Create a temporary non-MSAA image to upload the data first
         ImageInfo temp_info = info;
         temp_info.num_samples = 1;
 
-        // CHANGE: Build a fresh VkImageCreateInfo with robust usage flags for the temp image.
-        //         Using the target image's usage as-is could miss STORAGE/TRANSFER bits and trigger
-        //         validation errors.
         VkImageCreateInfo image_ci = MakeImageCreateInfo(runtime->device, temp_info);
-        image_ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                         VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+        image_ci.format =
+            MaxwellToVK::SurfaceFormat(runtime->device, FormatType::Optimal, true, info.format)
+                .format;
+        image_ci.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        vk::Image temp_image = runtime->memory_allocator.CreateImage(image_ci);
 
-        // CHANGE: The previous stack-allocated wrapper was destroyed at function exit,
-        //         which could destroy VkImage before the GPU used it.
-        auto temp_wrapper = std::make_shared<Image>(*runtime, temp_info, 0, 0);
-        temp_wrapper->original_image = runtime->memory_allocator.CreateImage(image_ci);
-        temp_wrapper->current_image = &Image::original_image;
-        temp_wrapper->aspect_mask = aspect_mask;
-        temp_wrapper->initialized = true;
-
-        // Upload to the temporary non-MSAA image
         scheduler->RequestOutsideRenderPassOperationContext();
-        auto vk_copies = TransformBufferImageCopies(copies, offset, temp_wrapper->aspect_mask);
+        auto vk_copies = TransformBufferImageCopies(copies, offset, aspect_mask);
         const VkBuffer src_buffer = buffer;
-        const VkImage temp_vk_image = *temp_wrapper->original_image;
-        const VkImageAspectFlags vk_aspect_mask = temp_wrapper->aspect_mask;
+        const VkImage temp_vk_image = *temp_image;
+        const VkImageAspectFlags vk_aspect_mask = aspect_mask;
 
-        scheduler->Record([src_buffer, temp_vk_image, vk_aspect_mask, vk_copies,
-                           keep = temp_wrapper](vk::CommandBuffer cmdbuf) {
+        scheduler->Record([src_buffer, temp_vk_image, vk_aspect_mask,
+                           vk_copies](vk::CommandBuffer cmdbuf) {
             CopyBufferToImage(cmdbuf, src_buffer, temp_vk_image, vk_aspect_mask, false, VideoCommon::FixSmallVectorADL(vk_copies));
         });
 
-        // Use MSAACopyPass to convert from non-MSAA to MSAA
         std::vector<VideoCommon::ImageCopy> image_copies;
         image_copies.reserve(copies.size());
         for (const auto& copy : copies) {
             VideoCommon::ImageCopy image_copy{};
-            image_copy.src_offset = {0, 0, 0}; // Use zero offset for source
+            image_copy.src_offset = {0, 0, 0};
             image_copy.dst_offset = copy.image_offset;
             image_copy.src_subresource = copy.image_subresource;
             image_copy.dst_subresource = copy.image_subresource;
@@ -1741,12 +1727,11 @@ void Image::UploadMemory(VkBuffer buffer, VkDeviceSize offset,
             image_copies.push_back(image_copy);
         }
 
-        runtime->msaa_copy_pass->CopyImage(*this, *temp_wrapper, image_copies,
-                                           /*msaa_to_non_msaa=*/false);
-        std::exchange(initialized, true);
-
-        const u64 tick = scheduler->Flush();
-        scheduler->Wait(tick);
+        runtime->blit_image_helper.CopyMSAA(runtime->render_pass_cache, Handle(), info.format,
+                                            temp_vk_image, info.format, info.num_samples,
+                                            image_copies, false);
+        initialized = true;
+        runtime->pending_msaa_images.emplace_back(scheduler->CurrentTick(), std::move(temp_image));
 
         if (is_rescaled) {
             ScaleUp();
@@ -1754,7 +1739,14 @@ void Image::UploadMemory(VkBuffer buffer, VkDeviceSize offset,
         return;
     }
 
-    // Regular non-MSAA upload (original behavior preserved)
+    if (info.num_samples > 1) {
+        LOG_WARNING(Render_Vulkan, "MSAA upload not implemented for format {}", info.format);
+        if (is_rescaled) {
+            ScaleUp();
+        }
+        return;
+    }
+
     scheduler->RequestOutsideRenderPassOperationContext();
     auto vk_copies = TransformBufferImageCopies(copies, offset, aspect_mask);
     const VkBuffer src_buffer = buffer;
@@ -1794,22 +1786,45 @@ void Image::DownloadMemory(std::span<VkBuffer> buffers_span, std::span<size_t> o
         ScaleDown();
     }
 
-    // RE-USE MSAA UPLOAD CODE BUT NOW FOR DOWNLOAD
-    if (info.num_samples > 1 && runtime->msaa_copy_pass) {
-        // TODO: Depth/stencil formats need special handling
-        if (aspect_mask == VK_IMAGE_ASPECT_COLOR_BIT) {
+    if (info.num_samples > 1) {
+        if (aspect_mask == VK_IMAGE_ASPECT_COLOR_BIT &&
+            !VideoCore::Surface::IsPixelFormatInteger(info.format)) {
             ImageInfo temp_info = info;
             temp_info.num_samples = 1;
 
             VkImageCreateInfo image_ci = MakeImageCreateInfo(runtime->device, temp_info);
-            image_ci.usage = original_image.UsageFlags();
+            image_ci.format =
+                MaxwellToVK::SurfaceFormat(runtime->device, FormatType::Optimal, true, info.format)
+                    .format;
+            image_ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
             vk::Image temp_image = runtime->memory_allocator.CreateImage(image_ci);
+            const VkImage temp_vk_image = *temp_image;
 
-            Image temp_wrapper(*runtime, temp_info, 0, 0);
-            temp_wrapper.original_image = std::move(temp_image);
-            temp_wrapper.current_image = &Image::original_image;
-            temp_wrapper.aspect_mask = aspect_mask;
-            temp_wrapper.initialized = true;
+            scheduler->RequestOutsideRenderPassOperationContext();
+            scheduler->Record([temp_vk_image](vk::CommandBuffer cmdbuf) {
+                const VkImageMemoryBarrier init_barrier{
+                    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                    .pNext = nullptr,
+                    .srcAccessMask = 0,
+                    .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                                     VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                    .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                    .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+                    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .image = temp_vk_image,
+                    .subresourceRange{
+                        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                        .baseMipLevel = 0,
+                        .levelCount = VK_REMAINING_MIP_LEVELS,
+                        .baseArrayLayer = 0,
+                        .layerCount = VK_REMAINING_ARRAY_LAYERS,
+                    },
+                };
+                cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
+                                       init_barrier);
+            });
 
             std::vector<VideoCommon::ImageCopy> image_copies;
             for (const auto& copy : copies) {
@@ -1822,7 +1837,9 @@ void Image::DownloadMemory(std::span<VkBuffer> buffers_span, std::span<size_t> o
                 image_copies.push_back(image_copy);
             }
 
-            runtime->msaa_copy_pass->CopyImage(temp_wrapper, *this, image_copies, true);
+            runtime->blit_image_helper.CopyMSAA(runtime->render_pass_cache, temp_vk_image,
+                                                info.format, Handle(), info.format,
+                                                info.num_samples, image_copies, true);
 
             boost::container::small_vector<VkBuffer, 8> buffers_vector{};
             boost::container::small_vector<boost::container::small_vector<VkBufferImageCopy, 16>, 8>
@@ -1834,7 +1851,7 @@ void Image::DownloadMemory(std::span<VkBuffer> buffers_span, std::span<size_t> o
             }
 
             scheduler->RequestOutsideRenderPassOperationContext();
-            scheduler->Record([buffers = std::move(buffers_vector), image = *temp_wrapper.original_image,
+            scheduler->Record([buffers = std::move(buffers_vector), image = temp_vk_image,
                                aspect_mask_ = aspect_mask, vk_copies](vk::CommandBuffer cmdbuf) {
                 const VkImageMemoryBarrier read_barrier{
                     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1889,6 +1906,8 @@ void Image::DownloadMemory(std::span<VkBuffer> buffers_span, std::span<size_t> o
                 cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, vk::PIPELINE_STAGE_GRAPHICS_COMPUTE,
                                        0, memory_write_barrier, nullptr, image_write_barrier);
             });
+            runtime->pending_msaa_images.emplace_back(scheduler->CurrentTick(),
+                                                      std::move(temp_image));
             return;
         }
     } else {

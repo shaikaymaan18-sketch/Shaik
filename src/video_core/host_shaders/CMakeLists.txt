@@ -26,7 +26,9 @@ set(SHADER_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/convert_depth_to_float.frag
     ${CMAKE_CURRENT_SOURCE_DIR}/convert_float_to_depth.frag
     ${CMAKE_CURRENT_SOURCE_DIR}/convert_msaa_to_non_msaa.comp
+    ${CMAKE_CURRENT_SOURCE_DIR}/convert_msaa_to_non_msaa.frag
     ${CMAKE_CURRENT_SOURCE_DIR}/convert_non_msaa_to_msaa.comp
+    ${CMAKE_CURRENT_SOURCE_DIR}/convert_non_msaa_to_msaa.frag
     ${CMAKE_CURRENT_SOURCE_DIR}/convert_s8d24_to_abgr8.frag
     ${CMAKE_CURRENT_SOURCE_DIR}/full_screen_triangle.vert
     ${CMAKE_CURRENT_SOURCE_DIR}/fxaa.frag
