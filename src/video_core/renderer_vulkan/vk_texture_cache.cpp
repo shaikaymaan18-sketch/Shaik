@@ -1144,6 +1144,15 @@ void TextureCacheRuntime::BlitImage(Framebuffer* dst_framebuffer, ImageView& dst
         return;
     }
     ASSERT(src.format == dst.format);
+    if (is_src_msaa && !is_dst_msaa &&
+        (aspect_mask & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) != 0) {
+        if ((aspect_mask & VK_IMAGE_ASPECT_DEPTH_BIT) == 0) {
+            UNIMPLEMENTED_MSG("Stencil-only MSAA resolve is not supported");
+            return;
+        }
+        blit_image_helper.ResolveDepthStencil(dst_framebuffer, src, dst_region, src_region);
+        return;
+    }
     if (aspect_mask == (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) {
         const auto format = src.format;
         const auto can_blit_depth_stencil = [this, format] {

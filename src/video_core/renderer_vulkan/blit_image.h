@@ -78,6 +78,9 @@ public:
     void BlitColorMSAA(const Framebuffer* dst_framebuffer, const ImageView& src_image_view,
                        const Region2D& dst_region, const Region2D& src_region);
 
+    void ResolveDepthStencil(const Framebuffer* dst_framebuffer, ImageView& src_image_view,
+                             const Region2D& dst_region, const Region2D& src_region);
+
     void BlitDepthStencil(const Framebuffer* dst_framebuffer, ImageView& src_image_view,
                           const Region2D& dst_region, const Region2D& src_region,
                           Tegra::Engines::Fermi2D::Filter filter,
@@ -129,6 +132,8 @@ private:
         const BlitDepthStencilPipelineKey& key);
     [[nodiscard]] VkPipeline FindOrEmplaceMSAACopyPipeline(const MSAACopyPipelineKey& key);
     [[nodiscard]] VkPipeline FindOrEmplaceBlitColorMSAAPipeline(const BlitMSAAPipelineKey& key);
+    [[nodiscard]] VkPipeline FindOrEmplaceResolveDepthStencilPipeline(VkRenderPass renderpass,
+                                                                      bool resolve_stencil);
 
     void ConvertPipeline(vk::Pipeline& pipeline, VkRenderPass renderpass, bool is_target_depth);
 
@@ -161,6 +166,8 @@ private:
     vk::ShaderModule blit_color_to_color_frag;
     vk::ShaderModule blit_color_msaa_frag;
     vk::ShaderModule blit_depth_stencil_frag;
+    vk::ShaderModule blit_depth_msaa_frag;
+    vk::ShaderModule blit_depth_stencil_msaa_frag;
     vk::ShaderModule clear_color_vert;
     vk::ShaderModule clear_color_frag;
     vk::ShaderModule clear_stencil_frag;
@@ -188,6 +195,10 @@ private:
     std::vector<vk::Pipeline> msaa_copy_pipelines;
     std::vector<BlitMSAAPipelineKey> blit_msaa_color_keys;
     std::vector<vk::Pipeline> blit_msaa_color_pipelines;
+    std::vector<VkRenderPass> resolve_depth_keys;
+    std::vector<vk::Pipeline> resolve_depth_pipelines;
+    std::vector<VkRenderPass> resolve_depth_stencil_keys;
+    std::vector<vk::Pipeline> resolve_depth_stencil_pipelines;
     struct MSAACopyResources {
         u64 tick;
         vk::ImageView src_view;
