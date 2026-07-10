@@ -8,15 +8,24 @@
 
 // Certain functions have to be marked naked so that the compiler doesn't touch the stack
 // or implement a return (we "artificially" return later by setting PC to the LR value)
-#if defined(__CLANG__) || defined(__GNUC__)
-#define YUZU_NAKED __attribute__((naked))
-#elif _MSC_VER
+#if defined(__clang__) || defined(__GNUC__)
+#define YUZU_NAKED                                          \
+        _Pragma("GCC diagnostic push")                      \
+        _Pragma("GCC diagnostic ignored \"-Wreturn-type\"") \
+        __attribute__((naked))
+#elif defined(_MSC_VER)
 // todo: windows support?? it supports native context switching and signal handling
 // https://learn.microsoft.com/en-us/windows/win32/debug/using-a-vectored-exception-handler
 // https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-setthreadcontext
 #define YUZU_NAKED __declspec(naked)
 #else
 #error Unsupported compiler
+#endif
+
+#if defined(__GNUC__)
+#define YUZU_NAKED_END _Pragma("GCC diagnostic pop")
+#else
+#define YUZU_NAKED_END
 #endif
 
 #include <cinttypes>
@@ -105,20 +114,25 @@ HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(int tid, void *tpidr) {
         "mov x19, x1\n" // move tpidr to x19 so it doesn't get clobbered
 
         "mov x1, #%[sig]\n"  // set x1 to SIGUSR2
-#ifdef __linux__
+#if defined(__linux__)
         "mov x8, %[syscall]\n"
         "svc #0\n"
         "brk 0x0\n"
         :: [syscall] "i"(__NR_tkill),
 #elif defined(__APPLE__)
-        "mov x8, #328\n"
-        "svc #0\n"
+        "mov x16, #328\n"
+        "svc #0x80\n"
+        "brk 0x0\n"
+        ::
+#else
         "brk 0x0\n"
         ::
 #endif
         [sig] "i"(SIGUSR2)
+        : "memory"
         );
 }
+YUZU_NAKED_END
 
 void ArmNce::ReturnToRunCodeByExceptionLevelChangeSignalHandler(int sig, void *info, void *raw_context) {
     auto tpidr = static_cast<NativeExecutionParameters*>(RestoreGuestContext(raw_context));
@@ -192,12 +206,13 @@ HaltReason ArmNce::ReturnToRunCodeByTrampoline(void *tpidr, u64 trampoline_addr)
 
         :: [ctx_off] "i"(offsetof(NativeExecutionParameters, native_context)),
         [sp_off] "i"(offsetof(GuestContext, sp)),
-        [host_ctx] "i"(offsetof(GuestContext, host_ctx)),
+        [host_ctx] "i"(offsetof(GuestContext, host_ctx))
 #ifdef __APPLE__
-        [is_running_off] "i"(offsetof(NativeExecutionParameters, is_actually_running))
+        ,[is_running_off] "i"(offsetof(NativeExecutionParameters, is_actually_running))
 #endif
         );
 }
+YUZU_NAKED_END
 
 static_assert(offsetof(HostContext, host_sp) == 0xE0);
 
@@ -213,8 +228,8 @@ void ArmNce::BreakFromRunCodeSignalHandler(int sig, void *info, void *raw_contex
         asm volatile(
             "ldr %[scratch], [ %[tpidr], #[off] ]\n"
             "msr TPIDR_EL0, %[scratch]\n"
-            : [scratch] "=&r"(scratch),
-            : [tpidr] "r"(nep),
+            : [scratch] "=&r"(scratch)
+            : [tpidr] "r"(nep)
             : "memory"
             );
 #endif
@@ -238,8 +253,8 @@ void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_co
         asm volatile(
             "ldr %[scratch], [ %[tpidr], #[off] ]\n"
             "msr TPIDR_EL0, %[scratch]\n"
-            : [scratch] "=&r"(scratch),
-            : [tpidr] "r"(nep),
+            : [scratch] "=&r"(scratch)
+            : [tpidr] "r"(nep)
             : "memory"
             );
 #endif

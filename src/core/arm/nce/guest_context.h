@@ -84,7 +84,7 @@ public:
     }
 
 #elif defined(__APPLE__)
-    KernelContext(void* ptr) : ptr(static_cast<mcontext_t *>(ptr)) {}
+    KernelContext(void* ptr) : ptr(*static_cast<mcontext_t **>(ptr)) {}
 
     u64* pc() {
         return &(*ptr)->__ss.__pc;
