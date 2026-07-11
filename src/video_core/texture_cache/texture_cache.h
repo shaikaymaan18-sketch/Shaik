@@ -261,7 +261,6 @@ void TextureCache<P>::CheckFeedbackLoop(std::span<const ImageViewInOut> views) {
     const bool depth_active = (rt_active_mask & depth_bit) != 0;
 
     const bool requires_barrier = [&] {
-        const bool color_needs_barrier = runtime.NeedsColorFeedbackBarrier();
         for (const auto& view : views) {
             if (!view.id) {
                 continue;
@@ -280,15 +279,11 @@ void TextureCache<P>::CheckFeedbackLoop(std::span<const ImageViewInOut> views) {
 
             const ImageId view_image_id = slot_image_views[view.id].image_id;
             {
-                bool is_color_feedback = false;
+                bool is_continue = false;
                 for (size_t i = 0; i < 8; ++i)
-                    is_color_feedback |= (rt_active_mask & (1u << i)) && view_image_id == rt_image_id[i];
-                if (is_color_feedback) {
-                    if (color_needs_barrier) {
-                        return true;
-                    }
+                    is_continue |= (rt_active_mask & (1u << i)) && view_image_id == rt_image_id[i];
+                if (is_continue)
                     continue;
-                }
             }
             if (depth_active && view_image_id == rt_depth_image_id) {
                 return true;

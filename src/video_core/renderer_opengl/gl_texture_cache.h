@@ -149,10 +149,6 @@ public:
         // OpenGL does not require a barrier for attachment feedback loops.
     }
 
-    [[nodiscard]] bool NeedsColorFeedbackBarrier() const noexcept {
-        return false;
-    }
-
 private:
     const Device& device;
     StateTracker& state_tracker;

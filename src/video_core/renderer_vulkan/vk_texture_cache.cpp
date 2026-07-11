@@ -1068,10 +1068,6 @@ void TextureCacheRuntime::BarrierFeedbackLoop() {
     scheduler.RequestOutsideRenderPassOperationContext();
 }
 
-bool TextureCacheRuntime::NeedsColorFeedbackBarrier() const noexcept {
-    return device.GetDriverID() == VK_DRIVER_ID_QUALCOMM_PROPRIETARY;
-}
-
 void TextureCacheRuntime::ReinterpretImage(Image& dst, Image& src,
                                            std::span<const VideoCommon::ImageCopy> copies) {
     if (ENABLE_MSAA_RESOLVE_CONSUME) {
