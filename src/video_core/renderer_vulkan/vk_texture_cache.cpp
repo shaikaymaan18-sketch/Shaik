@@ -53,6 +53,7 @@ using VideoCore::Surface::SurfaceType;
 
 namespace {
 constexpr bool ENABLE_MSAA_RESOLVE_CONSUME = true;
+constexpr bool ENABLE_MSAA_COLOR_DISCARD = true;
 
 constexpr VkBorderColor ConvertBorderColor(const std::array<float, 4>& color) {
     if (color == std::array<float, 4>{0, 0, 0, 0}) {
@@ -1645,7 +1646,8 @@ void TextureCacheRuntime::CopyImageMSAA(Image& dst, Image& src,
         UNIMPLEMENTED_MSG("Copying images with different samples is not supported.");
         return;
     }
-    if (ENABLE_MSAA_RESOLVE_CONSUME && msaa_to_non_msaa && copies.size() == 1) {
+    if (ENABLE_MSAA_RESOLVE_CONSUME && msaa_to_non_msaa && copies.size() == 1 &&
+        src.info.format == dst.info.format) {
         const VideoCommon::ImageCopy& copy = copies.front();
         const ResolveShadow* const shadow = GetValidResolveShadow(src.Handle());
         if (shadow != nullptr && copy.src_offset.x == 0 && copy.src_offset.y == 0 &&
@@ -2746,6 +2748,9 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
     const bool do_resolve_color =
         samples != VK_SAMPLE_COUNT_1_BIT && num_colors > 0 && runtime.device.IsTiler();
     renderpass_key.resolve_color = do_resolve_color;
+
+    discard_msaa_color =
+        ENABLE_MSAA_RESOLVE_CONSUME && ENABLE_MSAA_COLOR_DISCARD && do_resolve_color;
 
     renderpass = runtime.render_pass_cache.Get(renderpass_key);
     render_pass_key = renderpass_key;

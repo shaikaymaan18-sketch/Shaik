@@ -153,8 +153,10 @@ void Scheduler::RealizeDeferredClear() {
     if (base.depth_format != VideoCore::Surface::PixelFormat::Invalid) {
         clear_values[count++] = dc.depth_stencil_value;
     }
-    const VkRenderPass renderpass =
-        dc.framebuffer->RenderPassVariant(dc.color_clear_mask, dc.depth_stencil, 0);
+    const u32 color_discard_mask =
+        dc.framebuffer->DiscardsMsaaColor() ? dc.color_clear_mask : 0u;
+    const VkRenderPass renderpass = dc.framebuffer->RenderPassVariant(
+        dc.color_clear_mask, dc.depth_stencil, color_discard_mask);
     EndRenderPass();
     BeginRenderPassImpl(dc.framebuffer, renderpass, clear_values.data(), count);
 }

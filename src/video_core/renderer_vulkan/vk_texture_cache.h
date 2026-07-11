@@ -241,6 +241,10 @@ public:
         return index < resolve_images.size() ? *resolve_images[index] : VK_NULL_HANDLE;
     }
 
+    [[nodiscard]] bool DiscardsMsaaColor() const noexcept {
+        return discard_msaa_color;
+    }
+
 private:
     vk::Framebuffer framebuffer;
     VkRenderPass renderpass{};
@@ -258,6 +262,7 @@ private:
     std::vector<vk::ImageView> resolve_image_views;
     RenderPassKey render_pass_key{};
     RenderPassCache* render_pass_cache{nullptr};
+    bool discard_msaa_color{};
 };
 
 class Image : public VideoCommon::ImageBase {
