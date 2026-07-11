@@ -206,6 +206,14 @@ public:
         return is_rescaled;
     }
 
+    [[nodiscard]] bool HasResolveColor() const noexcept {
+        return !resolve_images.empty();
+    }
+
+    [[nodiscard]] VkImage ResolveColorImage(size_t index) const noexcept {
+        return index < resolve_images.size() ? *resolve_images[index] : VK_NULL_HANDLE;
+    }
+
 private:
     vk::Framebuffer framebuffer;
     VkRenderPass renderpass{};
@@ -219,6 +227,8 @@ private:
     bool has_depth{};
     bool has_stencil{};
     bool is_rescaled{};
+    std::vector<vk::Image> resolve_images;
+    std::vector<vk::ImageView> resolve_image_views;
 };
 
 class Image : public VideoCommon::ImageBase {

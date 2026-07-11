@@ -305,6 +305,19 @@ public:
         return properties.driver.driverID;
     }
 
+    /// Returns true for tile-based deferred renderers.
+    bool IsTiler() const {
+        switch (GetDriverID()) {
+        case VK_DRIVER_ID_QUALCOMM_PROPRIETARY:
+        case VK_DRIVER_ID_ARM_PROPRIETARY:
+        case VK_DRIVER_ID_SAMSUNG_PROPRIETARY:
+        case VK_DRIVER_ID_MESA_TURNIP:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     bool ShouldBoostClocks() const;
 
     /// Returns uniform buffer alignment requirement.

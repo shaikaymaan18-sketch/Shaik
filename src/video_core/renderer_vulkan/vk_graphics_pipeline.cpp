@@ -124,8 +124,8 @@ PixelFormat DecodeFormat(u8 encoded_format) {
     return PixelFormatFromRenderTargetFormat(format);
 }
 
-RenderPassKey MakeRenderPassKey(const FixedPipelineState& state) {
-    RenderPassKey key;
+RenderPassKey MakeRenderPassKey(const FixedPipelineState& state, const Device& device) {
+    RenderPassKey key{};
     std::ranges::transform(state.color_formats, key.color_formats.begin(), DecodeFormat);
     if (state.depth_enabled != 0) {
         const auto depth_format{static_cast<Tegra::DepthFormat>(state.depth_format.Value())};
@@ -134,6 +134,11 @@ RenderPassKey MakeRenderPassKey(const FixedPipelineState& state) {
         key.depth_format = PixelFormat::Invalid;
     }
     key.samples = MaxwellToVK::MsaaMode(state.msaa_mode);
+    const bool has_color = std::ranges::any_of(key.color_formats, [](PixelFormat format) {
+        return format != PixelFormat::Invalid;
+    });
+    key.resolve_color =
+        key.samples != VK_SAMPLE_COUNT_1_BIT && has_color && device.IsTiler();
     return key;
 }
 
@@ -285,7 +290,7 @@ GraphicsPipeline::GraphicsPipeline(
         descriptor_update_template =
             builder.CreateTemplate(set_layout, *pipeline_layout, uses_push_descriptor);
 
-        const VkRenderPass render_pass{render_pass_cache.Get(MakeRenderPassKey(key.state))};
+        const VkRenderPass render_pass{render_pass_cache.Get(MakeRenderPassKey(key.state, device))};
         Validate();
         MakePipeline(render_pass);
         if (pipeline_statistics) {

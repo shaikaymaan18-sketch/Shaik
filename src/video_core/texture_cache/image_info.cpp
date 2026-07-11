@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // SPDX-FileCopyrightText: Copyright 2020 yuzu Emulator Project
@@ -165,10 +165,6 @@ ImageInfo::ImageInfo(const Maxwell3D::Regs::RenderTargetConfig& ct,
     layer_stride = ct.array_pitch * 4;
     maybe_unaligned_layer_stride = layer_stride;
     num_samples = NumSamples(msaa_mode);
-    if (num_samples > 1) {
-        LOG_CRITICAL(HW_GPU, "Guest color RT requests MSAA: samples={} {}x{}", num_samples,
-                     size.width, size.height);
-    }
     block = Extent3D{
         .width = ct.tile_mode.block_width,
         .height = ct.tile_mode.block_height,
@@ -199,10 +195,6 @@ ImageInfo::ImageInfo(const Maxwell3D::Regs::Zeta& zt, const Maxwell3D::Regs::Zet
     layer_stride = zt.array_pitch * 4;
     maybe_unaligned_layer_stride = layer_stride;
     num_samples = NumSamples(msaa_mode);
-    if (num_samples > 1) {
-        LOG_CRITICAL(HW_GPU, "Guest depth RT requests MSAA: samples={} {}x{}", num_samples,
-                     size.width, size.height);
-    }
     block = Extent3D{
         .width = zt.tile_mode.block_width,
         .height = zt.tile_mode.block_height,

@@ -1606,10 +1606,6 @@ Image::Image(TextureCacheRuntime& runtime_, const ImageInfo& info_, GPUVAddr gpu
                                    ? std::make_optional(VK_FORMAT_R32G32B32A32_SFLOAT)
                                    : std::nullopt)),
       aspect_mask(ImageAspectMask(info.format)) {
-    if (info.num_samples > 1) {
-        LOG_CRITICAL(Render_Vulkan, "MSAA image created: format={} samples={} {}x{} aspect={:#x}",
-                     info.format, info.num_samples, info.size.width, info.size.height, aspect_mask);
-    }
     if (IsPixelFormatASTC(info.format) && !runtime->device.IsOptimalAstcSupported()) {
         switch (Settings::values.accelerate_astc.GetValue()) {
         case Settings::AstcDecodeMode::Gpu:
@@ -2556,10 +2552,64 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
         renderpass_key.depth_format = PixelFormat::Invalid;
     }
     renderpass_key.samples = samples;
+    const bool do_resolve_color =
+        samples != VK_SAMPLE_COUNT_1_BIT && num_colors > 0 && runtime.device.IsTiler();
+    renderpass_key.resolve_color = do_resolve_color;
 
     renderpass = runtime.render_pass_cache.Get(renderpass_key);
     render_area.width = (std::min)(render_area.width, width);
     render_area.height = (std::min)(render_area.height, height);
+
+    if (do_resolve_color) {
+        const u32 layers = static_cast<u32>((std::max)(num_layers, 1));
+        for (size_t index = 0; index < NUM_RT; ++index) {
+            const PixelFormat format = renderpass_key.color_formats[index];
+            if (format == PixelFormat::Invalid) {
+                continue;
+            }
+            const VkFormat vk_format =
+                MaxwellToVK::SurfaceFormat(runtime.device, FormatType::Optimal, true, format).format;
+            VkImageCreateInfo resolve_ci{
+                .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = 0,
+                .imageType = VK_IMAGE_TYPE_2D,
+                .format = vk_format,
+                .extent = {render_area.width, render_area.height, 1},
+                .mipLevels = 1,
+                .arrayLayers = layers,
+                .samples = VK_SAMPLE_COUNT_1_BIT,
+                .tiling = VK_IMAGE_TILING_OPTIMAL,
+                .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                         VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+                .queueFamilyIndexCount = 0,
+                .pQueueFamilyIndices = nullptr,
+                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            };
+            vk::Image resolve_image = runtime.memory_allocator.CreateImage(resolve_ci);
+            vk::ImageView resolve_view =
+                runtime.device.GetLogical().CreateImageView(VkImageViewCreateInfo{
+                    .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                    .pNext = nullptr,
+                    .flags = 0,
+                    .image = *resolve_image,
+                    .viewType = layers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D,
+                    .format = vk_format,
+                    .components{},
+                    .subresourceRange{
+                        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                        .baseMipLevel = 0,
+                        .levelCount = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount = layers,
+                    },
+                });
+            attachments.push_back(*resolve_view);
+            resolve_images.push_back(std::move(resolve_image));
+            resolve_image_views.push_back(std::move(resolve_view));
+        }
+    }
 
     num_color_buffers = static_cast<u32>(num_colors);
     framebuffer = runtime.device.GetLogical().CreateFramebuffer({

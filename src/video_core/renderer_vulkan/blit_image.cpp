@@ -702,8 +702,6 @@ void BlitImageHelper::ResolveDepthStencil(const Framebuffer* dst_framebuffer,
                                           const Region2D& src_region) {
     const bool resolve_stencil =
         dst_framebuffer->HasAspectStencilBit() && device.IsExtShaderStencilExportSupported();
-    LOG_CRITICAL(Render_Vulkan, "MSAA depth-stencil resolve: format={} resolve_stencil={}",
-                 src_image_view.format, resolve_stencil);
     const VkPipeline pipeline =
         FindOrEmplaceResolveDepthStencilPipeline(dst_framebuffer->RenderPass(), resolve_stencil);
     const VkPipelineLayout layout =

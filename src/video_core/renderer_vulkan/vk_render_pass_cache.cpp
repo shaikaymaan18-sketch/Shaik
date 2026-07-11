@@ -101,6 +101,26 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
         };
         descriptions.push_back(AttachmentDescription(*device, key.depth_format, key.samples));
     }
+    std::array<VkAttachmentReference, 8> resolve_references{};
+    const bool do_resolve_color =
+        key.resolve_color && key.samples != VK_SAMPLE_COUNT_1_BIT && num_colors > 0;
+    if (do_resolve_color) {
+        for (size_t index = 0; index < key.color_formats.size(); ++index) {
+            const PixelFormat format{key.color_formats[index]};
+            const bool is_valid{format != PixelFormat::Invalid};
+            resolve_references[index] = VkAttachmentReference{
+                .attachment = is_valid ? static_cast<u32>(descriptions.size()) : VK_ATTACHMENT_UNUSED,
+                .layout = VK_IMAGE_LAYOUT_GENERAL,
+            };
+            if (is_valid) {
+                VkAttachmentDescription resolve_desc =
+                    AttachmentDescription(*device, format, VK_SAMPLE_COUNT_1_BIT);
+                resolve_desc.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+                resolve_desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+                descriptions.push_back(resolve_desc);
+            }
+        }
+    }
     const VkSubpassDescription subpass{
         .flags = 0,
         .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -108,7 +128,7 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
         .pInputAttachments = nullptr,
         .colorAttachmentCount = num_attachments,
         .pColorAttachments = references.data(),
-        .pResolveAttachments = nullptr,
+        .pResolveAttachments = do_resolve_color ? resolve_references.data() : nullptr,
         .pDepthStencilAttachment = has_depth ? &depth_reference : nullptr,
         .preserveAttachmentCount = 0,
         .pPreserveAttachments = nullptr,
