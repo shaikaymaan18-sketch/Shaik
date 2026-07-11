@@ -97,21 +97,20 @@ void ArmNce::UnlockThreadParameters(void* tpidr) {
     static_cast<NativeExecutionParameters*>(tpidr)->lock.store(SpinLockUnlocked, std::memory_order_release);
 }
 
-YUZU_NO_INLINE
 YUZU_NAKED
+YUZU_NO_INLINE
 HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(int tid, void *tpidr) {
     // x0  - tid
     // x1  - tpidr
 
-    // x19 - callee-saved register and our tpidr storage
+    // x9 - NativeExecutionParameters*
     //
     // uses tkill on linux and pthread_kill on macOS, both have the same signature:
     /* syscall (u32 tid, u64 signal) */
     // tid is already in x0 so we don't have to explicitly pass it
 
     asm volatile(
-        "str x19, [SP, #-0x10]!\n"
-        "mov x19, x1\n" // move tpidr to x19 so it doesn't get clobbered
+        "mov x9, x1\n" // move tpidr to x9 so it doesn't get clobbered
 
         "mov x1, #%[sig]\n"  // set x1 to SIGUSR2
 #if defined(__linux__)
@@ -141,8 +140,8 @@ void ArmNce::ReturnToRunCodeByExceptionLevelChangeSignalHandler(int sig, void *i
 #ifndef __APPLE__
     // Save old value of TPIDR_EL0, load guest one
     u64 tpidr_el0;
-    asm volatile("mrs %0, TPIDR_EL0"
-                 "msr TPIDR_EL0, %1"
+    asm volatile("mrs %0, TPIDR_EL0\n"
+                 "msr TPIDR_EL0, %1\n"
                  : "=r"(tpidr_el0)
                  : "r"(tpidr));
     tpidr->tpidr_el0 = tpidr_el0;
@@ -154,8 +153,8 @@ void ArmNce::ReturnToRunCodeByExceptionLevelChangeSignalHandler(int sig, void *i
     // sigaction restores context and returns to guest
 }
 
-YUZU_NO_INLINE
 YUZU_NAKED
+YUZU_NO_INLINE
 HaltReason ArmNce::ReturnToRunCodeByTrampoline(void *tpidr, u64 trampoline_addr) {
     // x0 - NativeExecutionParameters*
     // x1 - addr
@@ -168,22 +167,22 @@ HaltReason ArmNce::ReturnToRunCodeByTrampoline(void *tpidr, u64 trampoline_addr)
     asm volatile(
         "mov x3, SP\n"
         "ldr x2, [ x0, #%[ctx_off] ]\n"
+        "add x5, x2, #%[host_ctx] \n"
 
 #ifndef __APPLE__
         // Load guest tpidr_el0
         "mrs x4, TPIDR_EL0\n"
         "msr TPIDR_EL0, x0\n"
         // Store host sp and tpidr_el0
-        "stp x3, x4, [ x2, #%[host_sp] ]\n"
+        "stp x3, x4, [x2, #0xE0]\n"
 #else
         // is_actually_running = true
         "mov w4, #1\n"
         "strb w0, [ x0, #%[is_running_off] ]\n"
         // Store host sp
-        "str x3, [ x2, #(%[host_ctx] + 0xE0) ]\n"
+        "str x3, [x5, #0xE0]\n"
 #endif
 
-        "add x5, x2, #%[host_ctx]\n"
         // Save callee-saved host GPR registers
         "stp     x19, x20, [x5, #0x0]\n"
         "stp     x21, x22, [x5, #0x10]\n"
@@ -214,7 +213,7 @@ HaltReason ArmNce::ReturnToRunCodeByTrampoline(void *tpidr, u64 trampoline_addr)
 }
 YUZU_NAKED_END
 
-static_assert(offsetof(HostContext, host_sp) == 0xE0);
+static_assert(offsetof(HostContext, host_sp) == 0xE0); // TODO: don't use magic number
 
 void ArmNce::BreakFromRunCodeSignalHandler(int sig, void *info, void *raw_context) {
     NativeExecutionParameters* tpidr = reinterpret_cast<NativeExecutionParameters *>(GetGuestParameters());
@@ -224,17 +223,13 @@ void ArmNce::BreakFromRunCodeSignalHandler(int sig, void *info, void *raw_contex
 #else
     if (tpidr->magic == Common::MakeMagic('Y', 'U', 'Z', 'U')) {
         // Load the host's TPIDR_EL0 value
-        u64 scratch;
+        void* host_tpidr = reinterpret_cast<GuestContext*>(&tpidr->native_context)->host_ctx.host_tpidr_el0;
         asm volatile(
-            "ldr %[scratch], [ %[tpidr], #[off] ]\n"
-            "msr TPIDR_EL0, %[scratch]\n"
-            : [scratch] "=&r"(scratch)
-            : [tpidr] "r"(nep)
-            : "memory"
-            );
+            "msr TPIDR_EL0, %[host_tpidr]\n"
+            :: [host_tpidr] "r"(host_tpidr));
 #endif
         SaveGuestContext(static_cast<GuestContext *>(tpidr->native_context), raw_context);
-        // Returning from here will enter host code.
+        // SaveGuestContext loads host context, returning from here will enter host code.
     }
 }
 
@@ -249,14 +244,10 @@ void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_co
 #else
     if (nep->magic == Common::MakeMagic('Y', 'U', 'Z', 'U')) {
         // Load the host's TPIDR_EL0 value
-        u64 scratch;
+        void* host_tpidr = reinterpret_cast<GuestContext*>(&nep->native_context)->host_ctx.host_tpidr_el0;
         asm volatile(
-            "ldr %[scratch], [ %[tpidr], #[off] ]\n"
-            "msr TPIDR_EL0, %[scratch]\n"
-            : [scratch] "=&r"(scratch)
-            : [tpidr] "r"(nep)
-            : "memory"
-            );
+            "msr TPIDR_EL0, %[host_tpidr]\n"
+            :: [host_tpidr] "r"(host_tpidr));
 #endif
 
         auto* info = static_cast<siginfo_t*>(raw_info);
@@ -317,19 +308,18 @@ void* ArmNce::RestoreGuestContext(void* raw_context) {
     // Retrieve the host context.
     auto host_ctx = KernelContext(&static_cast<ucontext_t*>(raw_context)->uc_mcontext);
 
-    // Thread-local parameters will be located in x19.
-    auto* tpidr = reinterpret_cast<NativeExecutionParameters*>(host_ctx.regs()[19]);
+    // Thread-local parameters will be located in x9.
+    auto* tpidr = reinterpret_cast<NativeExecutionParameters*>(host_ctx.regs()[9]);
     auto* guest_ctx = static_cast<GuestContext*>(tpidr->native_context);
 
     // Save host callee-saved registers.
-    host_ctx.regs()[19] = *reinterpret_cast<u64*>(*host_ctx.sp()); // load x19 original value from the stack
     std::memcpy(guest_ctx->host_ctx.host_saved_vregs.data(), &host_ctx.vregs()[8],
                 sizeof(guest_ctx->host_ctx.host_saved_vregs));
     std::memcpy(guest_ctx->host_ctx.host_saved_regs.data(), &host_ctx.regs()[19],
                 sizeof(guest_ctx->host_ctx.host_saved_regs));
 
     // Save stack pointer.
-    guest_ctx->host_ctx.host_sp = *host_ctx.sp() + 16; // +16 for the space we reserve for x19
+    guest_ctx->host_ctx.host_sp = *host_ctx.sp();
 
     // Restore all guest state except tpidr_el0.
     *host_ctx.sp() = guest_ctx->sp;
