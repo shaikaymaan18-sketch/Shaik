@@ -44,7 +44,9 @@ using VideoCore::Surface::SurfaceType;
         }
 
         VkAttachmentDescription AttachmentDescription(const Device& device, PixelFormat format,
-                                                      VkSampleCountFlagBits samples) {
+                                                      VkSampleCountFlagBits samples,
+                                                      VkAttachmentLoadOp load_op,
+                                                      VkAttachmentStoreOp store_op) {
             using MaxwellToVK::SurfaceFormat;
 
             const SurfaceType surface_type = GetSurfaceType(format);
@@ -55,12 +57,10 @@ using VideoCore::Surface::SurfaceType;
                 .flags = {},
                 .format = SurfaceFormat(device, FormatType::Optimal, true, format).format,
                 .samples = samples,
-                .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
-                .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-                .stencilLoadOp = has_stencil ? VK_ATTACHMENT_LOAD_OP_LOAD
-                                                 : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                .stencilStoreOp = has_stencil ? VK_ATTACHMENT_STORE_OP_STORE
-                                                  : VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                .loadOp = load_op,
+                .storeOp = store_op,
+                .stencilLoadOp = has_stencil ? load_op : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                .stencilStoreOp = has_stencil ? store_op : VK_ATTACHMENT_STORE_OP_DONT_CARE,
                 .initialLayout = VK_IMAGE_LAYOUT_GENERAL,
                 .finalLayout = VK_IMAGE_LAYOUT_GENERAL,
             };
@@ -87,7 +87,14 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
             .layout = VK_IMAGE_LAYOUT_GENERAL,
         };
         if (is_valid) {
-            descriptions.push_back(AttachmentDescription(*device, format, key.samples));
+            const VkAttachmentLoadOp load_op = (key.color_clear_mask & (1u << index)) != 0
+                                                   ? VK_ATTACHMENT_LOAD_OP_CLEAR
+                                                   : VK_ATTACHMENT_LOAD_OP_LOAD;
+            const VkAttachmentStoreOp store_op = (key.color_discard_mask & (1u << index)) != 0
+                                                     ? VK_ATTACHMENT_STORE_OP_DONT_CARE
+                                                     : VK_ATTACHMENT_STORE_OP_STORE;
+            descriptions.push_back(
+                AttachmentDescription(*device, format, key.samples, load_op, store_op));
             num_attachments = static_cast<u32>(index + 1);
             ++num_colors;
         }
@@ -99,7 +106,11 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
             .attachment = num_colors,
             .layout = VK_IMAGE_LAYOUT_GENERAL,
         };
-        descriptions.push_back(AttachmentDescription(*device, key.depth_format, key.samples));
+        const VkAttachmentLoadOp depth_load_op = key.depth_stencil_clear
+                                                     ? VK_ATTACHMENT_LOAD_OP_CLEAR
+                                                     : VK_ATTACHMENT_LOAD_OP_LOAD;
+        descriptions.push_back(AttachmentDescription(*device, key.depth_format, key.samples,
+                                                     depth_load_op, VK_ATTACHMENT_STORE_OP_STORE));
     }
     std::array<VkAttachmentReference, 8> resolve_references{};
     const bool do_resolve_color =
@@ -114,8 +125,9 @@ VkRenderPass RenderPassCache::Get(const RenderPassKey& key) {
             };
             if (is_valid) {
                 VkAttachmentDescription resolve_desc =
-                    AttachmentDescription(*device, format, VK_SAMPLE_COUNT_1_BIT);
-                resolve_desc.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+                    AttachmentDescription(*device, format, VK_SAMPLE_COUNT_1_BIT,
+                                          VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                          VK_ATTACHMENT_STORE_OP_STORE);
                 resolve_desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
                 descriptions.push_back(resolve_desc);
             }

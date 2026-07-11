@@ -2557,6 +2557,8 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
     renderpass_key.resolve_color = do_resolve_color;
 
     renderpass = runtime.render_pass_cache.Get(renderpass_key);
+    render_pass_key = renderpass_key;
+    render_pass_cache = &runtime.render_pass_cache;
     render_area.width = (std::min)(render_area.width, width);
     render_area.height = (std::min)(render_area.height, height);
 
@@ -2623,6 +2625,18 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
         .height = render_area.height,
         .layers = static_cast<u32>((std::max)(num_layers, 1)),
     });
+}
+
+VkRenderPass Framebuffer::RenderPassVariant(u32 color_clear_mask, bool depth_stencil_clear,
+                                            u32 color_discard_mask) const {
+    if (color_clear_mask == 0 && !depth_stencil_clear && color_discard_mask == 0) {
+        return renderpass;
+    }
+    RenderPassKey key = render_pass_key;
+    key.color_clear_mask = color_clear_mask;
+    key.depth_stencil_clear = depth_stencil_clear;
+    key.color_discard_mask = color_discard_mask;
+    return render_pass_cache->Get(key);
 }
 
 void TextureCacheRuntime::AccelerateImageUpload(

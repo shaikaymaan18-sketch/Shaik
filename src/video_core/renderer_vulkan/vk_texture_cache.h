@@ -12,6 +12,7 @@
 
 #include "shader_recompiler/shader_info.h"
 #include "video_core/renderer_vulkan/vk_compute_pass.h"
+#include "video_core/renderer_vulkan/vk_render_pass_cache.h"
 #include "video_core/renderer_vulkan/vk_staging_buffer_pool.h"
 #include "video_core/texture_cache/image_view_base.h"
 #include "video_core/vulkan_common/vulkan_memory_allocator.h"
@@ -166,6 +167,13 @@ public:
         return renderpass;
     }
 
+    [[nodiscard]] const RenderPassKey& RenderPassKeyBase() const noexcept {
+        return render_pass_key;
+    }
+
+    [[nodiscard]] VkRenderPass RenderPassVariant(u32 color_clear_mask, bool depth_stencil_clear,
+                                                 u32 color_discard_mask) const;
+
     [[nodiscard]] VkExtent2D RenderArea() const noexcept {
         return render_area;
     }
@@ -229,6 +237,8 @@ private:
     bool is_rescaled{};
     std::vector<vk::Image> resolve_images;
     std::vector<vk::ImageView> resolve_image_views;
+    RenderPassKey render_pass_key{};
+    RenderPassCache* render_pass_cache{nullptr};
 };
 
 class Image : public VideoCommon::ImageBase {
