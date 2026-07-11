@@ -279,9 +279,8 @@ static bool LoadNroImpl(Core::System& system, Kernel::KProcess& process,
         ? ::Settings::values.rng_seed.GetValue() : Common::Random::Random64(0)) << 12) & 0xffffff & ~(Common::HostPageSize - 1);
 
     // Setup the process code layout
-    if (process
-            .LoadFromMetadata(system.Kernel(), FileSys::ProgramMetadata::GetDefault(), image_size, fastmem_base, aslr_offset)
-            .IsError()) {
+    if (auto res = process.LoadFromMetadata(system.Kernel(), FileSys::ProgramMetadata::GetDefault(), image_size, fastmem_base, aslr_offset); res.IsError()) {
+        LOG_CRITICAL(Loader, "Failed to load NRO! (Error {})", res.GetDescription());
         return false;
     }
 

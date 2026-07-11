@@ -93,7 +93,8 @@ AppLoader::LoadResult AppLoader_KIP::Load(Kernel::KProcess& process,
         ? ::Settings::values.rng_seed.GetValue() : Common::Random::Random64(0)) << 12) & 0xffffff & ~(Common::HostPageSize - 1);
 
     // Setup the process code layout
-    if (process.LoadFromMetadata(system.Kernel(), FileSys::ProgramMetadata::GetDefault(), codeset.memory.size(), 0, aslr_offset).IsError()) {
+    if (auto res = process.LoadFromMetadata(system.Kernel(), FileSys::ProgramMetadata::GetDefault(), codeset.memory.size(), 0, aslr_offset); res.IsError()) {
+        LOG_CRITICAL(Loader, "Failed to load KIP! (Error {})", res.GetDescription());
         return {ResultStatus::ErrorNotInitialized, {}};
     }
     const VAddr base_address = GetInteger(process.GetEntryPoint());

@@ -235,7 +235,8 @@ AppLoader_DeconstructedRomDirectory::LoadResult AppLoader_DeconstructedRomDirect
         ? ::Settings::values.rng_seed.GetValue() : Common::Random::Random64(0)) << 12) & 0xffffff & ~(Common::HostPageSize - 1);
 
     // Setup the process code layout
-    if (process.LoadFromMetadata(system.Kernel(), metadata, code_size, fastmem_base, aslr_offset).IsError()) {
+    if (auto res = process.LoadFromMetadata(system.Kernel(), metadata, code_size, fastmem_base, aslr_offset); res.IsError()) {
+        LOG_CRITICAL(Loader, "Failed to load ROM directory! (Error {})", res.GetDescription());
         return {ResultStatus::ErrorUnableToParseKernelMetadata, {}};
     }
 
