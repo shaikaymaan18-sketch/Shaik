@@ -52,6 +52,8 @@ using VideoCore::Surface::IsPixelFormatInteger;
 using VideoCore::Surface::SurfaceType;
 
 namespace {
+constexpr bool ENABLE_MSAA_RESOLVE_CONSUME = true;
+
 constexpr VkBorderColor ConvertBorderColor(const std::array<float, 4>& color) {
     if (color == std::array<float, 4>{0, 0, 0, 0}) {
         return VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
@@ -992,12 +994,84 @@ VkBuffer TextureCacheRuntime::GetTemporaryBuffer(size_t needed_size) {
     return *buffers[level];
 }
 
+VkImageView TextureCacheRuntime::GetOrCreateResolveShadow(VkImage msaa_image, VkFormat format,
+                                                          VkExtent2D extent, u32 layers) {
+    ResolveShadow& shadow = resolve_shadows[msaa_image];
+    if (shadow.image && shadow.format == format && shadow.extent.width == extent.width &&
+        shadow.extent.height == extent.height && shadow.layers == layers) {
+        shadow.up_to_date = true;
+        return *shadow.view;
+    }
+    shadow.image = memory_allocator.CreateImage(VkImageCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .imageType = VK_IMAGE_TYPE_2D,
+        .format = format,
+        .extent = {extent.width, extent.height, 1},
+        .mipLevels = 1,
+        .arrayLayers = layers,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .tiling = VK_IMAGE_TILING_OPTIMAL,
+        .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = nullptr,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+    });
+    shadow.view = device.GetLogical().CreateImageView(VkImageViewCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .image = *shadow.image,
+        .viewType = layers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D,
+        .format = format,
+        .components{},
+        .subresourceRange{
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = layers,
+        },
+    });
+    shadow.format = format;
+    shadow.extent = extent;
+    shadow.layers = layers;
+    shadow.up_to_date = true;
+    return *shadow.view;
+}
+
+const TextureCacheRuntime::ResolveShadow* TextureCacheRuntime::GetValidResolveShadow(
+    VkImage msaa_image) const {
+    const auto it = resolve_shadows.find(msaa_image);
+    if (it == resolve_shadows.end() || !it->second.up_to_date || !it->second.image) {
+        return nullptr;
+    }
+    return &it->second;
+}
+
+void TextureCacheRuntime::InvalidateResolveShadow(VkImage msaa_image) {
+    const auto it = resolve_shadows.find(msaa_image);
+    if (it != resolve_shadows.end()) {
+        it->second.up_to_date = false;
+    }
+}
+
+void TextureCacheRuntime::EraseResolveShadow(VkImage msaa_image) {
+    resolve_shadows.erase(msaa_image);
+}
+
 void TextureCacheRuntime::BarrierFeedbackLoop() {
     scheduler.RequestOutsideRenderPassOperationContext();
 }
 
 void TextureCacheRuntime::ReinterpretImage(Image& dst, Image& src,
                                            std::span<const VideoCommon::ImageCopy> copies) {
+    if (ENABLE_MSAA_RESOLVE_CONSUME) {
+        InvalidateResolveShadow(dst.Handle());
+    }
     boost::container::small_vector<VkBufferImageCopy, 16> vk_in_copies(copies.size());
     boost::container::small_vector<VkBufferImageCopy, 16> vk_out_copies(copies.size());
     const VkImageAspectFlags src_aspect_mask = src.AspectMask();
@@ -1449,6 +1523,9 @@ bool TextureCacheRuntime::IsFormatScalable(PixelFormat format) {
 
 void TextureCacheRuntime::CopyImage(Image& dst, Image& src,
                                     std::span<const VideoCommon::ImageCopy> copies) {
+    if (ENABLE_MSAA_RESOLVE_CONSUME) {
+        InvalidateResolveShadow(dst.Handle());
+    }
     // As per the size-compatible formats section of vulkan, copy manually via ReinterpretImage
     // these images that aren't size-compatible
     if (BytesPerBlock(src.info.format) != BytesPerBlock(dst.info.format)) {
@@ -1568,6 +1645,108 @@ void TextureCacheRuntime::CopyImageMSAA(Image& dst, Image& src,
         UNIMPLEMENTED_MSG("Copying images with different samples is not supported.");
         return;
     }
+    if (ENABLE_MSAA_RESOLVE_CONSUME && msaa_to_non_msaa && copies.size() == 1) {
+        const VideoCommon::ImageCopy& copy = copies.front();
+        const ResolveShadow* const shadow = GetValidResolveShadow(src.Handle());
+        if (shadow != nullptr && copy.src_offset.x == 0 && copy.src_offset.y == 0 &&
+            copy.src_subresource.base_level == 0 &&
+            static_cast<u32>(copy.extent.width) <= shadow->extent.width &&
+            static_cast<u32>(copy.extent.height) <= shadow->extent.height) {
+            const VkImage shadow_image = *shadow->image;
+            const VkImage dst_image = dst.Handle();
+            const VkImageCopy region{
+                .srcSubresource{
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel = 0,
+                    .baseArrayLayer = static_cast<u32>(copy.src_subresource.base_layer),
+                    .layerCount = static_cast<u32>(copy.src_subresource.num_layers),
+                },
+                .srcOffset = {0, 0, 0},
+                .dstSubresource{
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel = static_cast<u32>(copy.dst_subresource.base_level),
+                    .baseArrayLayer = static_cast<u32>(copy.dst_subresource.base_layer),
+                    .layerCount = static_cast<u32>(copy.dst_subresource.num_layers),
+                },
+                .dstOffset = {copy.dst_offset.x, copy.dst_offset.y, copy.dst_offset.z},
+                .extent = {copy.extent.width, copy.extent.height, 1},
+            };
+            scheduler.RequestOutsideRenderPassOperationContext();
+            scheduler.Record([shadow_image, dst_image, region](vk::CommandBuffer cmdbuf) {
+                const std::array pre_barriers{
+                    VkImageMemoryBarrier{
+                        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                        .pNext = nullptr,
+                        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                        .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                        .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+                        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                        .image = shadow_image,
+                        .subresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_REMAINING_MIP_LEVELS, 0,
+                                          VK_REMAINING_ARRAY_LAYERS},
+                    },
+                    VkImageMemoryBarrier{
+                        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                        .pNext = nullptr,
+                        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT |
+                                         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                                         VK_ACCESS_TRANSFER_WRITE_BIT,
+                        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                        .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+                        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                        .image = dst_image,
+                        .subresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_REMAINING_MIP_LEVELS, 0,
+                                          VK_REMAINING_ARRAY_LAYERS},
+                    },
+                };
+                const std::array post_barriers{
+                    VkImageMemoryBarrier{
+                        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                        .pNext = nullptr,
+                        .srcAccessMask = 0,
+                        .dstAccessMask = 0,
+                        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                        .image = shadow_image,
+                        .subresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_REMAINING_MIP_LEVELS, 0,
+                                          VK_REMAINING_ARRAY_LAYERS},
+                    },
+                    VkImageMemoryBarrier{
+                        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                        .pNext = nullptr,
+                        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT |
+                                         VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                                         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                                         VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
+                        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                        .image = dst_image,
+                        .subresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_REMAINING_MIP_LEVELS, 0,
+                                          VK_REMAINING_ARRAY_LAYERS},
+                    },
+                };
+                cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                                           VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                       VK_PIPELINE_STAGE_TRANSFER_BIT, 0, nullptr, nullptr,
+                                       pre_barriers);
+                cmdbuf.CopyImage(shadow_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst_image,
+                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, region);
+                cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                       VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, nullptr, nullptr,
+                                       post_barriers);
+            });
+            return;
+        }
+    }
     blit_image_helper.CopyMSAA(render_pass_cache, dst.Handle(), dst.info.format, src.Handle(),
                                src.info.format, num_samples, copies, msaa_to_non_msaa);
 }
@@ -1647,7 +1826,16 @@ Image::Image(TextureCacheRuntime& runtime_, const ImageInfo& info_, GPUVAddr gpu
 
 Image::Image(const VideoCommon::NullImageParams& params) : VideoCommon::ImageBase{params} {}
 
-Image::~Image() = default;
+Image::~Image() {
+    if (ENABLE_MSAA_RESOLVE_CONSUME && runtime != nullptr) {
+        if (original_image) {
+            runtime->EraseResolveShadow(*original_image);
+        }
+        if (scaled_image) {
+            runtime->EraseResolveShadow(*scaled_image);
+        }
+    }
+}
 
 void Image::AllocateComputeUnswizzleBuffer(u32 max_slices) {
     using VideoCore::Surface::BytesPerBlock;
@@ -1694,6 +1882,9 @@ void Image::AllocateComputeUnswizzleBuffer(u32 max_slices) {
 void Image::UploadMemory(VkBuffer buffer, VkDeviceSize offset,
                          std::span<const VideoCommon::BufferImageCopy> copies) {
     // TODO: Move this to another API
+    if (ENABLE_MSAA_RESOLVE_CONSUME && runtime != nullptr) {
+        runtime->InvalidateResolveShadow(Handle());
+    }
     const bool is_rescaled = True(flags & ImageFlagBits::Rescaled);
     if (is_rescaled) {
         ScaleDown(true);
@@ -2571,6 +2762,12 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
             }
             const VkFormat vk_format =
                 MaxwellToVK::SurfaceFormat(runtime.device, FormatType::Optimal, true, format).format;
+            if (ENABLE_MSAA_RESOLVE_CONSUME) {
+                const VkImage msaa_image = images[rt_map[index]];
+                attachments.push_back(runtime.GetOrCreateResolveShadow(msaa_image, vk_format,
+                                                                       render_area, layers));
+                continue;
+            }
             VkImageCreateInfo resolve_ci{
                 .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
                 .pNext = nullptr,
