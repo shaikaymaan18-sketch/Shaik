@@ -374,9 +374,11 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         .support_int8 = device.IsInt8Supported(),
         .support_uniform_and_storage_buffer_8bit =
             device.IsUniformAndStorageBuffer8BitAccessSupported(),
+        .support_storage_buffer_8bit = device.IsStorageBuffer8BitAccessSupported(),
         .support_int16 = device.IsShaderInt16Supported(),
         .support_uniform_and_storage_buffer_16bit =
             device.IsUniformAndStorageBuffer16BitAccessSupported(),
+        .support_storage_buffer_16bit = device.IsStorageBuffer16BitAccessSupported(),
         .support_int64 = device.IsShaderInt64Supported(),
         .support_vertex_instance_id = false,
         .support_float_controls = device.IsKhrShaderFloatControlsSupported(),
