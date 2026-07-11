@@ -135,6 +135,8 @@ public:
 
     void BarrierFeedbackLoop();
 
+    [[nodiscard]] bool NeedsColorFeedbackBarrier() const noexcept;
+
     bool IsFormatDitherable(VideoCore::Surface::PixelFormat format);
     bool IsFormatScalable(VideoCore::Surface::PixelFormat format);
 
