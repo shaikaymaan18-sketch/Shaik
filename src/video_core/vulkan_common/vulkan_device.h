@@ -109,6 +109,7 @@ VK_DEFINE_HANDLE(VmaAllocator)
     EXTENSION(NV, VIEWPORT_SWIZZLE, viewport_swizzle)                                              \
     EXTENSION(EXT, FILTER_CUBIC, filter_cubic)                                                     \
     EXTENSION(IMG, FILTER_CUBIC, filter_cubic_img)                                                 \
+    EXTENSION(EXT, DEVICE_FAULT, device_fault)                                                     \
     EXTENSION(QCOM, FILTER_CUBIC_WEIGHTS, filter_cubic_weights)
 
 // Define extensions which must be supported.
@@ -380,7 +381,11 @@ FN_MAX_LIMIT_LIST
 
     /// Returns true if descriptor aliasing is natively supported.
     bool IsDescriptorAliasingSupported() const {
-        return GetDriverID() != VK_DRIVER_ID_QUALCOMM_PROPRIETARY;
+        return true;
+    }
+
+    bool IsDeviceFaultSupported() const {
+        return extensions.device_fault && features.device_fault.deviceFault;
     }
 
     bool IsSampledImageArrayNonUniformIndexingSupported() const {
@@ -1065,6 +1070,7 @@ private:
 #undef FEATURE_CORE
 #undef FEATURE_EXT
 
+        VkPhysicalDeviceFaultFeaturesEXT device_fault{};
         VkPhysicalDeviceFeatures features{};
     };
 

@@ -791,6 +791,40 @@ VkFormat Device::GetSupportedFormat(VkFormat wanted_format, VkFormatFeatureFlags
 void Device::ReportLoss() const {
     LOG_CRITICAL(Render_Vulkan, "Device loss occurred!");
 
+    if (IsDeviceFaultSupported() && dld.vkGetDeviceFaultInfoEXT) {
+        VkDeviceFaultCountsEXT counts{};
+        counts.sType = VK_STRUCTURE_TYPE_DEVICE_FAULT_COUNTS_EXT;
+        if (dld.vkGetDeviceFaultInfoEXT(*logical, &counts, nullptr) == VK_SUCCESS) {
+            std::vector<VkDeviceFaultAddressInfoEXT> address_infos(counts.addressInfoCount);
+            std::vector<VkDeviceFaultVendorInfoEXT> vendor_infos(counts.vendorInfoCount);
+            VkDeviceFaultInfoEXT info{};
+            info.sType = VK_STRUCTURE_TYPE_DEVICE_FAULT_INFO_EXT;
+            info.pAddressInfos = address_infos.empty() ? nullptr : address_infos.data();
+            info.pVendorInfos = vendor_infos.empty() ? nullptr : vendor_infos.data();
+            counts.vendorBinarySize = 0;
+            if (dld.vkGetDeviceFaultInfoEXT(*logical, &counts, &info) == VK_SUCCESS) {
+                LOG_CRITICAL(Render_Vulkan, "Device fault: {}", info.description);
+                for (u32 i = 0; i < counts.addressInfoCount; ++i) {
+                    const VkDeviceFaultAddressInfoEXT& addr = address_infos[i];
+                    const VkDeviceSize precision = addr.addressPrecision;
+                    const VkDeviceAddress lower =
+                        precision != 0 ? addr.reportedAddress & ~(precision - 1) : addr.reportedAddress;
+                    LOG_CRITICAL(Render_Vulkan,
+                                 "Device fault address: type={} reported=0x{:x} precision=0x{:x} "
+                                 "lower=0x{:x}",
+                                 static_cast<int>(addr.addressType), addr.reportedAddress, precision,
+                                 lower);
+                }
+                for (u32 i = 0; i < counts.vendorInfoCount; ++i) {
+                    const VkDeviceFaultVendorInfoEXT& vendor = vendor_infos[i];
+                    LOG_CRITICAL(Render_Vulkan,
+                                 "Device fault vendor: {} code=0x{:x} data=0x{:x}",
+                                 vendor.description, vendor.vendorFaultCode, vendor.vendorFaultData);
+                }
+            }
+        }
+    }
+
     // Wait for the log to flush and for Nsight Aftermath to dump the results
     std::this_thread::sleep_for(std::chrono::seconds{15});
 }
@@ -1022,6 +1056,11 @@ bool Device::GetSuitability(bool requires_swapchain) {
 
 #undef EXT_FEATURE
 #undef FEATURE
+
+    if (extensions.device_fault) {
+        features.device_fault.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FAULT_FEATURES_EXT;
+        SetNext(next, features.device_fault);
+    }
 
     // Perform the feature test.
     physical.GetFeatures2(features2);
