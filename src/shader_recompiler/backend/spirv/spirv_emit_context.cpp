@@ -628,15 +628,15 @@ void EmitContext::DefineSharedMemory(const IR::Program& program) {
     if (uses_explicit_workgroup_layout) {
         AddExtension("SPV_KHR_workgroup_memory_explicit_layout");
         AddCapability(spv::Capability::WorkgroupMemoryExplicitLayoutKHR);
-        if (program.info.uses_int8) {
+        if (program.info.uses_int8 && profile.support_int8) {
             AddCapability(spv::Capability::WorkgroupMemoryExplicitLayout8BitAccessKHR);
             std::tie(shared_memory_u8, shared_u8, std::ignore) = make(U8, 1);
         }
-        if (program.info.uses_int16) {
+        if (program.info.uses_int16 && profile.support_int16) {
             AddCapability(spv::Capability::WorkgroupMemoryExplicitLayout16BitAccessKHR);
             std::tie(shared_memory_u16, shared_u16, std::ignore) = make(U16, 2);
         }
-        if (program.info.uses_int64) {
+        if (program.info.uses_int64 && profile.support_int64) {
             std::tie(shared_memory_u64, shared_u64, std::ignore) = make(U64, 8);
         }
         std::tie(shared_memory_u32, shared_u32, shared_memory_u32_type) = make(U32[1], 4);
