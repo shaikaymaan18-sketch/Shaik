@@ -24,7 +24,7 @@ void AssertFailSoftImpl();
 #define YUZU_NO_INLINE
 #endif
 
-#if !defined(__clang__) && !defined(__GNUC__)
+#if defined(__clang__) || defined(__GNUC__)
 #define YUZU_ALWAYS_INLINE __attribute__((always_inline))
 #elif defined(_MSC_VER)
 #define YUZU_ALWAYS_INLINE [[msvc::forceinline]]
