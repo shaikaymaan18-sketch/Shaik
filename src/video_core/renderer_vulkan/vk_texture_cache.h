@@ -98,10 +98,11 @@ public:
     }
 
     void AccelerateImageUpload(Image&, const StagingBufferRef&,
-                               std::span<const VideoCommon::SwizzleParameters>,
-                               u32 z_src_start, u32 z_image_start, u32 z_count,
-                               std::span<const u8> slice_has_data = {},
-                               bool image_already_uploaded = false);
+                             std::span<const VideoCommon::SwizzleParameters>,
+                             u32 z_src_start, u32 z_image_start, u32 z_count,
+                             std::span<const u8> slice_has_data = {},
+                             std::span<const VideoCommon::Accelerated::SliceBBox> slice_bounds = {},
+                             bool image_already_uploaded = false);
 
     void InsertUploadMemoryBarrier() {}
 
@@ -381,6 +382,7 @@ private:
     vk::Buffer compute_unswizzle_buffer;
     VkDeviceSize compute_unswizzle_buffer_size = 0;
     bool has_compute_unswizzle_buffer = false;
+    bool compute_unswizzle_buffer_is_zero = false;
 
     void AllocateComputeUnswizzleBuffer(u32 max_slices);
 

@@ -35,10 +35,20 @@ struct BlockLinearSwizzle3DParams {
     u32 block_depth_mask;
 };
 
+struct SliceBBox {
+    u32 x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+};
+
 [[nodiscard]] BlockLinearSwizzle2DParams MakeBlockLinearSwizzle2DParams(
     const SwizzleParameters& swizzle, const ImageInfo& info);
 
 [[nodiscard]] BlockLinearSwizzle3DParams MakeBlockLinearSwizzle3DParams(
     const SwizzleParameters& swizzle, const ImageInfo& info);
+
+[[nodiscard]] SliceBBox BoundSliceByteRange(u64 start_off, u64 end_off,
+                                            u32 block_size, u32 x_shift,
+                                            u32 block_height, u32 block_height_mask,
+                                            u32 bytes_per_block,
+                                            u32 blocks_x, u32 blocks_y);
 
 } // namespace VideoCommon::Accelerated

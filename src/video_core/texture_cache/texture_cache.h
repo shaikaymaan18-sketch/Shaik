@@ -1446,6 +1446,7 @@ void TextureCache<P>::TickAsyncUnswizzle() {
                 task.segment_scan_cursor = 0;
 
                 task.slice_has_data.assign(image.info.size.depth, 0u);
+                task.slice_bounds.assign(image.info.size.depth, {});
 
                 if (image.info.size.depth > 1 && !image.slice_offsets.empty()) {
                     const auto uploads = FullUploadSwizzles(task.info);
@@ -1454,6 +1455,10 @@ void TextureCache<P>::TickAsyncUnswizzle() {
                     const u64 swizzled_slice_size = sp.slice_size;
                     task.swizzled_slice_size  = swizzled_slice_size;
                     task.swizzle_block_depth  = sp.block_depth;
+
+                    const bool can_bound_xy = sp.block_depth == 0;
+                    const u32 blocks_x = Common::DivCeil(task.info.size.width, 4u);
+                    const u32 blocks_y = Common::DivCeil(task.info.size.height, 4u);
 
                     u32 z_watermark = 0;
                     for (const auto& [seg_gpu_addr, seg_size] : task.sparse_segments) {
@@ -1467,6 +1472,28 @@ void TextureCache<P>::TickAsyncUnswizzle() {
                         for (u32 z = z_watermark; z < static_cast<u32>(image.info.size.depth); ++z) {
                             if (image.slice_offsets[z] >= seg_end) break;
                             task.slice_has_data[z] = 1u;
+
+                            if (can_bound_xy) {
+                                const u64 slice_off  = image.slice_offsets[z];
+                                const u64 local_start = (std::max)(seg_start, slice_off) - slice_off;
+                                const u64 local_end   = (std::min)(seg_end, slice_off + swizzled_slice_size) - slice_off;
+                                const auto box = VideoCommon::Accelerated::BoundSliceByteRange(
+                                    local_start, local_end, sp.block_size, sp.x_shift,
+                                    sp.block_height, sp.block_height_mask, bytes_per_block,
+                                    blocks_x, blocks_y);
+
+                                auto& acc = task.slice_bounds[z];
+                                if (box.x1 > box.x0 && box.y1 > box.y0) {
+                                    if (acc.x1 <= acc.x0 || acc.y1 <= acc.y0) {
+                                        acc = box;
+                                    } else {
+                                        acc.x0 = (std::min)(acc.x0, box.x0);
+                                        acc.y0 = (std::min)(acc.y0, box.y0);
+                                        acc.x1 = (std::max)(acc.x1, box.x1);
+                                        acc.y1 = (std::max)(acc.y1, box.y1);
+                                    }
+                                }
+                            }
                         }
                     }
                 } else {
@@ -1593,6 +1620,7 @@ void TextureCache<P>::TickAsyncUnswizzle() {
                                           FixSmallVectorADL(uploads),
                                           z_src, z_image, z_count,
                                           sparse_hint,
+                                          std::span<const VideoCommon::Accelerated::SliceBBox>(task.slice_bounds),
                                           task.is_incremental);
             task.last_submitted_offset += static_cast<size_t>(z_count) * task.bytes_per_slice;
         }

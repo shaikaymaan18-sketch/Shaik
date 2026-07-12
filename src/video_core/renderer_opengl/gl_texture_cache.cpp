@@ -650,11 +650,11 @@ void TextureCacheRuntime::BlitFramebuffer(Framebuffer* dst, Framebuffer* src,
                            is_linear ? GL_LINEAR : GL_NEAREST);
 }
 
-void TextureCacheRuntime::AccelerateImageUpload(Image& image, const StagingBufferMap& map,
+void TextureCacheRuntime::AccelerateImageUpload(Image &image, const StagingBufferMap &map,
                                                 std::span<const SwizzleParameters> swizzles,
                                                 u32 z_src_start, u32 z_image_start, u32 z_count,
                                                 [[maybe_unused]] std::span<const u8> slice_has_data,
-                                                [[maybe_unused]] bool image_already_uploaded) {
+                                                std::span<const VideoCommon::Accelerated::SliceBBox> slice_bounds, [[maybe_unused]] bool image_already_uploaded) {
     switch (image.info.type) {
     case ImageType::e2D:
         if (IsPixelFormatASTC(image.info.format)) {

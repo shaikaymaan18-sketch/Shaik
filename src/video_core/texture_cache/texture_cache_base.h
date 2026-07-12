@@ -26,6 +26,8 @@
 #include "common/literals.h"
 #include "common/lru_cache.h"
 #include <ranges>
+
+#include "accelerated_swizzle.h"
 #include "common/scratch_buffer.h"
 #include "common/slot_vector.h"
 #include "common/thread_worker.h"
@@ -142,6 +144,7 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
         bool initialized = false;
         bool is_sparse = false;
         std::vector<u8> slice_has_data;
+        std::vector<VideoCommon::Accelerated::SliceBBox> slice_bounds;
         std::vector<std::pair<GPUVAddr, size_t>> sparse_segments;
         size_t segment_scan_cursor = 0;
         u64 swizzled_slice_size = 0;
