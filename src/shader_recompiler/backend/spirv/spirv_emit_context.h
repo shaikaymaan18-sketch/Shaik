@@ -311,6 +311,7 @@ public:
 
     Id local_memory{};
 
+    bool uses_explicit_workgroup_layout{};
     Id shared_memory_u8{};
     Id shared_memory_u16{};
     Id shared_memory_u32{};

@@ -531,6 +531,18 @@ FN_MAX_LIMIT_LIST
         return extensions.workgroup_memory_explicit_layout;
     }
 
+    bool IsWorkgroupMemoryExplicitLayout8BitAccessSupported() const {
+        return extensions.workgroup_memory_explicit_layout &&
+               features.workgroup_memory_explicit_layout.workgroupMemoryExplicitLayout8BitAccess &&
+               features.shader_float16_int8.shaderInt8;
+    }
+
+    bool IsWorkgroupMemoryExplicitLayout16BitAccessSupported() const {
+        return extensions.workgroup_memory_explicit_layout &&
+               features.workgroup_memory_explicit_layout.workgroupMemoryExplicitLayout16BitAccess &&
+               features.features.shaderInt16;
+    }
+
     /// Returns true if the device supports VK_KHR_image_format_list.
     bool IsKhrImageFormatListSupported() const {
         return extensions.image_format_list || instance_version >= VK_API_VERSION_1_2;

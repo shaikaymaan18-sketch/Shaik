@@ -1395,10 +1395,7 @@ void Device::RemoveUnsuitableExtensions() {
 
     // VK_KHR_workgroup_memory_explicit_layout
     extensions.workgroup_memory_explicit_layout =
-        features.features.shaderInt16 &&
         features.workgroup_memory_explicit_layout.workgroupMemoryExplicitLayout &&
-        features.workgroup_memory_explicit_layout.workgroupMemoryExplicitLayout8BitAccess &&
-        features.workgroup_memory_explicit_layout.workgroupMemoryExplicitLayout16BitAccess &&
         features.workgroup_memory_explicit_layout.workgroupMemoryExplicitLayoutScalarBlockLayout;
     RemoveExtensionFeatureIfUnsuitable(extensions.workgroup_memory_explicit_layout,
                                        features.workgroup_memory_explicit_layout,
