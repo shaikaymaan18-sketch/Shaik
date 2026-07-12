@@ -1234,8 +1234,9 @@ void EmitContext::DefineStorageBuffers(const Info& info, u32& binding) {
     }
     AddExtension("SPV_KHR_storage_buffer_storage_class");
 
-    const IR::Type used_types{profile.support_descriptor_aliasing ? info.used_storage_buffer_types
-                                                                  : IR::Type::U32};
+    IR::Type used_types{profile.support_descriptor_aliasing ? info.used_storage_buffer_types
+                                                            : IR::Type::U32};
+    used_types |= IR::Type::U32;
     if (profile.support_int8 && profile.support_storage_buffer_8bit &&
         True(used_types & IR::Type::U8)) {
         DefineSsbos(*this, storage_types.U8, &StorageDefinitions::U8, info, binding, U8,
