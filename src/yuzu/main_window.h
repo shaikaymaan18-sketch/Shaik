@@ -24,7 +24,6 @@
 #include "qt_common/config/qt_config.h"
 #include "qt_common/qt_common.h"
 #include "qt_common/util/game.h"
-#include "yuzu/compatibility_list.h"
 #include "yuzu/hotkeys.h"
 #include "yuzu/user_data_migration.h"
 

@@ -22,7 +22,6 @@
 #include "qt_common/config/uisettings.h"
 #include "qt_common/game_list/model.h"
 #include "qt_common/util/game.h"
-#include "yuzu/compatibility_list.h"
 
 class QVariantAnimation;
 

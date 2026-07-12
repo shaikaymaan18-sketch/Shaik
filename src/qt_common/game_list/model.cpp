@@ -52,7 +52,7 @@ void GameListModel::PopulateAsync(QVector<UISettings::GameDir>& game_dirs) {
     current_worker.reset();
     removeRows(0, rowCount());
 
-    current_worker = std::make_unique<GameListWorker>(vfs, provider, game_dirs, compatibility_list,
+    current_worker = std::make_unique<GameListWorker>(vfs, provider, game_dirs,
                                                       play_time_manager, system);
 
     connect(current_worker.get(), &GameListWorker::DataAvailable, this, &GameListModel::WorkerEvent,

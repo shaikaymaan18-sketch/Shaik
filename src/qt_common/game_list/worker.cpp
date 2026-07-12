@@ -33,7 +33,6 @@
 #include "qt_common/qt_common.h"
 
 #include "qt_common/game_list/game_list_p.h"
-#include "yuzu/compatibility_list.h"
 
 #include "qt_common/game_list/model.h"
 #include "qt_common/game_list/worker.h"
@@ -205,11 +204,6 @@ QList<QStandardItem*> MakeGameListEntry(const std::string& path, const std::stri
                                         Loader::AppLoader& loader, u64 program_id,
                                         const PlayTime::PlayTimeManager& play_time_manager,
                                         const FileSys::PatchManager& patch) {
-    auto const it = FindMatchingCompatibilityEntry(compatibility_list, program_id);
-    // The game list uses 99 as compatibility number for untested games
-    QString compatibility =
-        it != compatibility_list.end() ? it->second.first : QStringLiteral("99");
-
     auto const file_type = loader.GetFileType();
     auto const file_type_string = QString::fromStdString(Loader::GetFileTypeString(file_type));
 
@@ -226,7 +220,6 @@ QList<QStandardItem*> MakeGameListEntry(const std::string& path, const std::stri
         new GameListItemSize(size),
         new GameListItemPlayTime(play_time),
         new GameListItem(patch_versions),
-        new GameListItemCompat(compatibility),
     };
 }
 } // Anonymous namespace
@@ -237,7 +230,7 @@ GameListWorker::GameListWorker(FileSys::VirtualFilesystem vfs_,
                                const PlayTime::PlayTimeManager& play_time_manager_,
                                Core::System& system_)
     : vfs{std::move(vfs_)}, provider{provider_}, game_dirs{game_dirs_},
-      compatibility_list{compatibility_list_}, play_time_manager{play_time_manager_},
+      play_time_manager{play_time_manager_},
       system{system_} {
     // We want the game list to manage our lifetime.
     setAutoDelete(false);

@@ -12,7 +12,6 @@
 #include "common/common_types.h"
 #include "frontend_common/play_time_manager.h"
 #include "qt_common/config/uisettings.h"
-#include "yuzu/compatibility_list.h"
 
 namespace Core {
 class System;

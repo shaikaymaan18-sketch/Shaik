@@ -2610,20 +2610,6 @@ void MainWindow::OnGameListCopyTID(u64 program_id) {
     clipboard->setText(QString::fromStdString(fmt::format("{:016X}", program_id)));
 }
 
-void MainWindow::OnGameListNavigateToGamedbEntry(u64 program_id) {
-    const auto it = FindMatchingCompatibilityEntry(compatibility_list, program_id);
-
-    QString directory;
-    if (it != compatibility_list.end()) {
-        directory = it->second.second;
-    }
-
-    QDesktopServices::openUrl(QUrl(
-        QStringLiteral(
-            "https://www.emuready.com/listings?emulatorIds=43bfc023-ec22-422d-8324-048a8ec9f28f") +
-        directory));
-}
-
 void MainWindow::OnGameListCreateShortcut(u64 program_id, const std::string& game_path,
                                           const QtCommon::Game::ShortcutTarget target) {
     // Create shortcu
