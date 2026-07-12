@@ -158,7 +158,7 @@ Id EmitSharedAtomicExchange32(EmitContext& ctx, Id offset, Id value) {
 }
 
 Id EmitSharedAtomicExchange64(EmitContext& ctx, Id offset, Id value) {
-    if (ctx.profile.support_int64_atomics && ctx.uses_explicit_workgroup_layout) {
+    if (ctx.profile.support_shared_int64_atomics && ctx.uses_explicit_workgroup_layout) {
         const Id shift_id{ctx.Const(3U)};
         const Id index{ctx.OpShiftRightArithmetic(ctx.U32[1], offset, shift_id)};
         const Id pointer{

@@ -795,6 +795,11 @@ FN_MAX_LIMIT_LIST
         return extensions.shader_atomic_int64;
     }
 
+    bool IsSharedInt64AtomicsSupported() const {
+        return extensions.shader_atomic_int64 &&
+               features.shader_atomic_int64.shaderSharedInt64Atomics;
+    }
+
     bool IsExtConditionalRendering() const {
         return extensions.conditional_rendering;
     }
