@@ -1455,8 +1455,6 @@ void MainWindow::ConnectWidgetEvents() {
     connect(game_list, &GameList::VerifyIntegrityRequested, this,
             &MainWindow::OnGameListVerifyIntegrity);
     connect(game_list, &GameList::CopyTIDRequested, this, &MainWindow::OnGameListCopyTID);
-    connect(game_list, &GameList::NavigateToGamedbEntryRequested, this,
-            &MainWindow::OnGameListNavigateToGamedbEntry);
     connect(game_list, &GameList::CreateShortcut, this, &MainWindow::OnGameListCreateShortcut);
     connect(game_list, &GameList::AddDirectory, this, &MainWindow::OnGameListAddDirectory);
     connect(game_list_placeholder, &GameListPlaceholder::AddDirectory, this,
