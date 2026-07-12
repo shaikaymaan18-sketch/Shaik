@@ -1674,6 +1674,7 @@ void Image::AllocateComputeUnswizzleBuffer(u32 max_slices) {
         runtime->memory_allocator.CreateBuffer(ci, MemoryUsage::DeviceLocal);
 
     has_compute_unswizzle_buffer = true;
+    compute_unswizzle_buffer_is_zero = false;
 }
 
 void Image::UploadMemory(VkBuffer buffer, VkDeviceSize offset,
@@ -2539,6 +2540,7 @@ void TextureCacheRuntime::AccelerateImageUpload(
     std::span<const VideoCommon::SwizzleParameters> swizzles,
     u32 z_src_start, u32 z_image_start, u32 z_count,
     std::span<const u8> slice_has_data,
+    std::span<const VideoCommon::Accelerated::SliceBBox> slice_bounds,
     bool image_already_uploaded) {
 
     if (IsPixelFormatASTC(image.info.format)) {
@@ -2561,7 +2563,8 @@ void TextureCacheRuntime::AccelerateImageUpload(
 
         return bl3d_unswizzle_pass->Unswizzle(image, map, swizzles,
                                                z_src_start, z_image_start, z_count,
-                                               slice_has_data, image_already_uploaded);
+                                               slice_has_data, slice_bounds,
+                                               image_already_uploaded);
     }
 
     ASSERT(false);
