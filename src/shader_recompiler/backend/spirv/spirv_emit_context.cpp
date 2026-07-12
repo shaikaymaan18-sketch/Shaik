@@ -591,7 +591,8 @@ void EmitContext::DefineLocalMemory(const IR::Program& program) {
         return;
     }
     const u32 num_elements{Common::DivCeil(program.local_memory_size, 4U)};
-    const Id type{TypeArray(U32[1], Const(num_elements))};
+    const Id element_type{TypeStruct(U32[1])};
+    const Id type{TypeArray(element_type, Const(num_elements))};
     const Id pointer{TypePointer(spv::StorageClass::Private, type)};
     local_memory = AddGlobalVariable(pointer, spv::StorageClass::Private);
     if (profile.supported_spirv >= 0x00010400) {
