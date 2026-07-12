@@ -1440,7 +1440,7 @@ void TextureCache<P>::TickAsyncUnswizzle() {
                     task.swizzled_slice_size  = swizzled_slice_size;
                     task.swizzle_block_depth  = sp.block_depth;
 
-                    const bool can_bound_xy = sp.block_depth == 0;
+                    const bool can_bound_xy = sp.block_depth > 0;
                     const u32 blocks_x = Common::DivCeil(task.info.size.width, 4u);
                     const u32 blocks_y = Common::DivCeil(task.info.size.height, 4u);
 
