@@ -62,13 +62,9 @@ public:
     void RefreshExternalContent();
     void ResetExternalWatcher();
 
-    void LoadCompatibilityList();
-
     void RetranslateUI();
 
     QFileSystemWatcher* GetWatcher() const;
-
-    const CompatibilityList& GetCompatibilityList() const;
 
     void SetFlat(bool flat);
 
@@ -89,7 +85,6 @@ private:
 
     std::shared_ptr<FileSys::VfsFilesystem> vfs;
     FileSys::ManualContentProvider* provider;
-    CompatibilityList compatibility_list;
     const PlayTime::PlayTimeManager& play_time_manager;
     Core::System& system;
 

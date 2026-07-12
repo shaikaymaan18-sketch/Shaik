@@ -76,7 +76,6 @@ public:
     void SetFilterVisible(bool visibility);
     bool IsEmpty() const;
 
-    void LoadCompatibilityList();
     void PopulateAsync(QVector<UISettings::GameDir>& game_dirs);
 
     void SaveInterfaceLayout();
@@ -111,8 +110,6 @@ signals:
     void CopyTIDRequested(u64 program_id);
     void CreateShortcut(u64 program_id, const std::string& game_path,
                         const QtCommon::Game::ShortcutTarget target);
-    void NavigateToGamedbEntryRequested(u64 program_id,
-                                        const CompatibilityList& compatibility_list);
     void OpenPerGameGeneralRequested(const std::string& file);
     void LinkToRyujinxRequested(const u64& program_id);
     void OpenDirectory(const QString& directory);

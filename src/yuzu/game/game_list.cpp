@@ -136,10 +136,6 @@ bool GameList::IsEmpty() const {
     return item_model->IsEmpty();
 }
 
-void GameList::LoadCompatibilityList() {
-    item_model->LoadCompatibilityList();
-}
-
 void GameList::OnPopulate() {
     m_currentView->setEnabled(false);
 
@@ -483,7 +479,6 @@ void GameList::AddGamePopup(QMenu& context_menu, u64 program_id, const std::stri
     QAction* dump_romfs_sdmc = dump_romfs_menu->addAction(tr("Dump RomFS to SDMC"));
     QAction* verify_integrity = context_menu.addAction(tr("Verify Integrity"));
     QAction* copy_tid = context_menu.addAction(tr("Copy Title ID to Clipboard"));
-    QAction* navigate_to_gamedb_entry = context_menu.addAction(tr("Navigate to GameDB entry"));
 #if !defined(__APPLE__)
     QMenu* shortcut_menu = context_menu.addMenu(tr("Create Shortcut"));
     QAction* create_desktop_shortcut = shortcut_menu->addAction(tr("Add to Desktop"));
@@ -505,9 +500,6 @@ void GameList::AddGamePopup(QMenu& context_menu, u64 program_id, const std::stri
     remove_vk_shader_cache->setVisible(program_id != 0);
     remove_shader_cache->setVisible(program_id != 0);
     remove_all_content->setVisible(program_id != 0);
-    auto& compat_list = item_model->GetCompatibilityList();
-    auto it = FindMatchingCompatibilityEntry(compat_list, program_id);
-    navigate_to_gamedb_entry->setVisible(it != compat_list.end() && program_id != 0);
 
     connect(favorite, &QAction::triggered, this,
             [this, program_id]() { ToggleFavorite(program_id); });
@@ -567,9 +559,6 @@ void GameList::AddGamePopup(QMenu& context_menu, u64 program_id, const std::stri
             [this, path]() { emit VerifyIntegrityRequested(path); });
     connect(copy_tid, &QAction::triggered, this,
             [this, program_id]() { emit CopyTIDRequested(program_id); });
-    connect(navigate_to_gamedb_entry, &QAction::triggered, this, [this, program_id]() {
-        emit NavigateToGamedbEntryRequested(program_id, item_model->GetCompatibilityList());
-    });
 #if !defined(__APPLE__)
     connect(create_desktop_shortcut, &QAction::triggered, this, [this, program_id, path]() {
         emit CreateShortcut(program_id, path, QtCommon::Game::ShortcutTarget::Desktop);

@@ -203,7 +203,6 @@ QString FormatPatchNameVersions(const FileSys::PatchManager& patch_manager,
 QList<QStandardItem*> MakeGameListEntry(const std::string& path, const std::string& name,
                                         const std::size_t size, const std::vector<u8>& icon,
                                         Loader::AppLoader& loader, u64 program_id,
-                                        const CompatibilityList& compatibility_list,
                                         const PlayTime::PlayTimeManager& play_time_manager,
                                         const FileSys::PatchManager& patch) {
     auto const it = FindMatchingCompatibilityEntry(compatibility_list, program_id);
@@ -235,7 +234,6 @@ QList<QStandardItem*> MakeGameListEntry(const std::string& path, const std::stri
 GameListWorker::GameListWorker(FileSys::VirtualFilesystem vfs_,
                                FileSys::ManualContentProvider* provider_,
                                QVector<UISettings::GameDir>& game_dirs_,
-                               const CompatibilityList& compatibility_list_,
                                const PlayTime::PlayTimeManager& play_time_manager_,
                                Core::System& system_)
     : vfs{std::move(vfs_)}, provider{provider_}, game_dirs{game_dirs_},
@@ -335,7 +333,7 @@ void GameListWorker::AddTitlesToGameList(GameListDir* parent_dir) {
         }
 
         auto entry = MakeGameListEntry(file->GetFullPath(), name, file->GetSize(), icon, *loader,
-                                       program_id, compatibility_list, play_time_manager, patch);
+                                       program_id, play_time_manager, patch);
         RecordEvent([=](GameListModel* model) { model->AddEntry(entry, parent_dir); });
     }
 }
@@ -405,7 +403,7 @@ void GameListWorker::ScanFileSystem(ScanTarget target, const std::string& dir_pa
 
                     auto entry = MakeGameListEntry(
                         physical_name, name, Common::FS::GetSize(physical_name), icon, *app_loader,
-                        id, compatibility_list, play_time_manager, patch);
+                        id, play_time_manager, patch);
 
                     RecordEvent([=](GameListModel* model) { model->AddEntry(entry, parent_dir); });
                 };

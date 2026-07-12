@@ -157,50 +157,6 @@ void GameListModel::RemoveFavorite(u64 program_id) {
     }
 }
 
-void GameListModel::LoadCompatibilityList() {
-    QFile compat_list{QStringLiteral(":compatibility_list/compatibility_list.json")};
-
-    if (!compat_list.open(QFile::ReadOnly | QFile::Text)) {
-        LOG_ERROR(Frontend, "Unable to open game compatibility list");
-        return;
-    }
-
-    if (compat_list.size() == 0) {
-        LOG_WARNING(Frontend, "Game compatibility list is empty");
-        return;
-    }
-
-    const QByteArray content = compat_list.readAll();
-    if (content.isEmpty()) {
-        LOG_ERROR(Frontend, "Unable to completely read game compatibility list");
-        return;
-    }
-
-    const QJsonDocument json = QJsonDocument::fromJson(content);
-    const QJsonArray arr = json.array();
-
-    for (const QJsonValue& value : arr) {
-        const QJsonObject game = value.toObject();
-        const QString compatibility_key = QStringLiteral("compatibility");
-
-        if (!game.contains(compatibility_key) || !game[compatibility_key].isDouble()) {
-            continue;
-        }
-
-        const int compatibility = game[compatibility_key].toInt();
-        const QString directory = game[QStringLiteral("directory")].toString();
-        const QJsonArray ids = game[QStringLiteral("releases")].toArray();
-
-        for (const QJsonValue& id_ref : ids) {
-            const QJsonObject id_object = id_ref.toObject();
-            const QString id = id_object[QStringLiteral("id")].toString();
-
-            compatibility_list.emplace(id.toUpper().toStdString(),
-                                       std::make_pair(QString::number(compatibility), directory));
-        }
-    }
-}
-
 void GameListModel::Repopulate() {
     current_worker.reset();
     QtCommon::system->GetFileSystemController().CreateFactories(*QtCommon::vfs);
@@ -245,10 +201,6 @@ void GameListModel::RetranslateUI() {
 
 QFileSystemWatcher* GameListModel::GetWatcher() const {
     return watcher;
-}
-
-const CompatibilityList& GameListModel::GetCompatibilityList() const {
-    return compatibility_list;
 }
 
 void GameListModel::SetFlat(bool flat) {
