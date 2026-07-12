@@ -444,10 +444,14 @@ static void* ChooseVirtualBase(size_t virtual_size) {
 
 #else
 
+// TODO: With the current page table and direct mapping implementation, we need exactly half of the 39-bit
+// address space however Apple Silicon macOS reserved a majority of the 39-bit address space from
+// `0x1000000000` to `0x7000000000`, making it effectively unusable for NCE. If this reservation is removed
+// in a future version (e.g. macOS 28 when Rosetta is dropped) or the page tables are rewritten to support this
+// (albeit at the expense of certain games that depending on 39-bit addresses failing to work), NCE on Macs is possible.
 static void* ChooseVirtualBase(size_t virtual_size) {
     virtual_size -= HugePageSize; // we handle alignment on our own
 
-    // todo: does this have to be 39bit? why?
     size_t cursor = 0;
     while (cursor < MACH_VM_MAX_ADDRESS - virtual_size) {
         u64 region = cursor;
