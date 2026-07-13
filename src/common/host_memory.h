@@ -98,14 +98,14 @@ public:
 
     struct MisalignedMapping : by_vaddr {
 
-        MisalignedMapping(u64 vaddr, u64 paddr, u64 size) : vaddr(vaddr >> Core::Memory::YUZU_PAGEBITS),
-                                                           size(size >> Core::Memory::YUZU_PAGEBITS),
-                                                           real_paddr(paddr >> Core::Memory::YUZU_PAGEBITS) {}
-        VAddr vaddr;
+        MisalignedMapping(u64 vaddr_, u64 paddr_, u64 size_) : vaddr(vaddr_ >> Core::Memory::YUZU_PAGEBITS),
+                                                           size(size_ >> Core::Memory::YUZU_PAGEBITS),
+                                                           real_paddr(paddr_ >> Core::Memory::YUZU_PAGEBITS) {}
+        u64 vaddr;
         u64 size;
 
         // Real backing memory linked to this mapping
-        PAddr real_paddr;
+        u64 real_paddr;
     };
 
     const MisalignedMapping* GetUnalignedMappingFromVirtual(VAddr offset) const;
