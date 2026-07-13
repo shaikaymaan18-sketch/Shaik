@@ -822,7 +822,9 @@ void HostMemory::Map(size_t virtual_offset, size_t host_offset, size_t length, M
             UNREACHABLE_MSG("Attempted to map virtual addresses {:#x}-{:#x} which is unaligned to guest page size", virtual_offset, virtual_offset + length);
         }
 
-        if (auto map = GetUnalignedMappingFromVirtual(virtual_offset); map) {
+        if (auto map = GetUnalignedMappingFromVirtual(virtual_offset);
+            map && map->real_paddr != host_offset >> Core::Memory::YUZU_PAGEBITS) {
+
             auto aligned = AlignUp(virtual_offset, HostPageSize);
 
             for (size_t i = 0; i < ((aligned - virtual_offset) / Core::Memory::YUZU_PAGESIZE); ++i) {
@@ -831,7 +833,7 @@ void HostMemory::Map(size_t virtual_offset, size_t host_offset, size_t length, M
             }
 
             LOG_WARNING(HW_Memory, "Irregularly mapped virtual addresses {:#x}-{:#x} have an incorrect physical address (fake: {:#x}, real: {:#x})",
-                virtual_offset, aligned, host_offset, map->real_paddr);
+                virtual_offset, aligned, host_offset, map->real_paddr << Core::Memory::YUZU_PAGEBITS);
             length -= map->size;
             virtual_offset = aligned;
         } else {
@@ -853,7 +855,8 @@ void HostMemory::Map(size_t virtual_offset, size_t host_offset, size_t length, M
             //UNREACHABLE_MSG("Attempted to map virtual addresses {:#x}-{:#x} which is unaligned to guest page size", virtual_offset, virtual_offset + length);
         }
 
-        if (auto map = GetUnalignedMappingFromVirtual(virtual_offset + length); map) {
+        if (auto map = GetUnalignedMappingFromVirtual(virtual_offset + length);
+            map && map->real_paddr != host_offset >> Core::Memory::YUZU_PAGEBITS) {
             auto aligned = AlignDown(length, HostPageSize);
 
             // TODO: is fake_paddr right here?
@@ -863,7 +866,7 @@ void HostMemory::Map(size_t virtual_offset, size_t host_offset, size_t length, M
             }
 
             LOG_WARNING(HW_Memory, "Irregularly mapped virtual addresses {:#x}-{:#x} will not have a valid physical address (fake: {:#x}, real: {:#x})",
-                virtual_offset + aligned, virtual_offset + length, host_offset + aligned, map->real_paddr);
+                virtual_offset + aligned, virtual_offset + length, host_offset + aligned, map->real_paddr << Core::Memory::YUZU_PAGEBITS);
             length = aligned;
         } else {
             auto aligned = AlignUp(length, HostPageSize);
