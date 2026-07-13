@@ -777,9 +777,9 @@ HostMemory::HostMemory(HostMemory&&) noexcept = default;
 
 HostMemory& HostMemory::operator=(HostMemory&&) noexcept = default;
 
-HostMemory::IrregularMapping* HostMemory::GetUnalignedMappingFromVirtual(u64 offset) {
+const HostMemory::MisalignedMapping* HostMemory::GetUnalignedMappingFromVirtual(u64 offset) const {
     auto index = offset >> Core::Memory::YUZU_PAGEBITS;
-    constexpr auto cmp = [](const u64 a, const IrregularMapping b) {
+    constexpr auto cmp = [](const u64 a, const MisalignedMapping b) {
         return a < b.vaddr;
     };
     auto i = unaligned_mappings.upper_bound(index, cmp);
@@ -791,45 +791,54 @@ HostMemory::IrregularMapping* HostMemory::GetUnalignedMappingFromVirtual(u64 off
     return index < i->vaddr + i->size ? &*i : nullptr;
 }
 
-const HostMemory::IrregularMapping* HostMemory::GetIrregularMappingFromFakePhysical(u64 offset) {
+PAddr HostMemory::GetPhysicalAddrFromIrregular(PAddr offset) const {
     auto index = offset >> Core::Memory::YUZU_PAGEBITS;
-    constexpr auto cmp = [](const u64 a, const IrregularMapping b) {
-        return a < b.vaddr;
-    };
-    auto i = irregular_mappings.upper_bound(index, cmp);
+    auto i = irregular_mappings.left.upper_bound(index);
 
-    if (i == irregular_mappings.begin())
-        return nullptr;
+    if (i == irregular_mappings.left.begin())
+        return 0;
     --i;
 
-    return index < i->fake_paddr + i->size ? &*i : nullptr;
+    return index == i->first ? i->second + (offset % Core::Memory::YUZU_PAGESIZE) : 0;
+}
+
+PAddr HostMemory::GetIrregularAddrFromPhysical(PAddr offset) const {
+    auto index = offset >> Core::Memory::YUZU_PAGEBITS;
+    auto i = irregular_mappings.right.upper_bound(index);
+
+    if (i == irregular_mappings.right.begin())
+        return 0;
+    --i;
+
+    return index == i->first ? i->second + (offset % Core::Memory::YUZU_PAGESIZE) : 0;
 }
 
 void HostMemory::Map(size_t virtual_offset, size_t host_offset, size_t length, MemoryPermission perms, bool separate_heap) {
 #if !(defined(__OPENORBIS__) || defined(__managarm__))
     // TODO: offset paddr with vaddr to align with page table?
+    // ASSERT(virtual_offset % HostPageSize == host_offset % HostPageSize)
     if (virtual_offset % HostPageSize != 0) {
         if (virtual_offset % 0x1000 != 0) [[unlikely]] {
             UNREACHABLE_MSG("Attempted to map virtual addresses {:#x}-{:#x} which is unaligned to guest page size", virtual_offset, virtual_offset + length);
         }
 
         if (auto map = GetUnalignedMappingFromVirtual(virtual_offset); map) {
-            ASSERT(map->fake_paddr == 0); // sanity check
             auto aligned = AlignUp(virtual_offset, HostPageSize);
 
-            // TODO: is fake_paddr right here?
-            map->fake_paddr = host_offset;
-            irregular_mappings.insert(*map);
+            for (size_t i = 0; i < ((aligned - virtual_offset) / Core::Memory::YUZU_PAGESIZE); ++i) {
+                auto fake = i + (host_offset >> Core::Memory::YUZU_PAGEBITS);
+                irregular_mappings.insert({fake, i + map->real_paddr});
+            }
 
-            LOG_WARNING(HW_Memory, "Irregularly mapped virtual addresses {:#x}-{:#x} will not have a valid physical address (fake: {:#x}, real: {:#x})",
-                virtual_offset, aligned, map->fake_paddr, map->real_paddr);
+            LOG_WARNING(HW_Memory, "Irregularly mapped virtual addresses {:#x}-{:#x} have an incorrect physical address (fake: {:#x}, real: {:#x})",
+                virtual_offset, aligned, host_offset, map->real_paddr);
             length -= map->size;
             virtual_offset = aligned;
         } else {
             auto aligned = AlignDown(virtual_offset, HostPageSize);
 
             // TODO: is host_offset right here?
-            auto* mapping = new IrregularMapping {aligned, host_offset, virtual_offset - aligned};
+            auto* mapping = new MisalignedMapping {aligned, host_offset, virtual_offset - aligned};
             unaligned_mappings.insert(*mapping);
 
             length += mapping->size;
@@ -845,20 +854,21 @@ void HostMemory::Map(size_t virtual_offset, size_t host_offset, size_t length, M
         }
 
         if (auto map = GetUnalignedMappingFromVirtual(virtual_offset + length); map) {
-            ASSERT(map->fake_paddr == 0); // sanity check TODO: handle multiple misaligned mappings in one page boundary
             auto aligned = AlignDown(length, HostPageSize);
 
             // TODO: is fake_paddr right here?
-            map->fake_paddr = host_offset + length;
-            irregular_mappings.insert(*map);
+            for (size_t i = 0; i < ((length - aligned) / Core::Memory::YUZU_PAGESIZE); ++i) {
+                auto fake = i + ((host_offset + aligned) >> Core::Memory::YUZU_PAGEBITS);
+                irregular_mappings.insert({fake, i + map->real_paddr});
+            }
 
             LOG_WARNING(HW_Memory, "Irregularly mapped virtual addresses {:#x}-{:#x} will not have a valid physical address (fake: {:#x}, real: {:#x})",
-                virtual_offset + aligned, virtual_offset + length, map->fake_paddr, map->real_paddr);
+                virtual_offset + aligned, virtual_offset + length, host_offset + aligned, map->real_paddr);
             length = aligned;
         } else {
             auto aligned = AlignUp(length, HostPageSize);
             // TODO: is host_offset right here?
-            auto mapping = new IrregularMapping { virtual_offset + length, host_offset + length, aligned - length };
+            auto mapping = new MisalignedMapping { virtual_offset + length, host_offset + length, aligned - length };
             unaligned_mappings.insert(*mapping);
 
             length = aligned;

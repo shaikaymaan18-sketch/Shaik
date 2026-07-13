@@ -26,36 +26,60 @@ public:
 
     template <typename T>
     Common::PhysicalAddress GetPhysicalAddr(const T* ptr) const {
-        return (reinterpret_cast<uintptr_t>(ptr) -
-                reinterpret_cast<uintptr_t>(buffer.BackingBasePointer())) +
-               DramMemoryMap::Base;
+        auto offset = (reinterpret_cast<uintptr_t>(ptr) -
+                       reinterpret_cast<uintptr_t>(buffer.BackingBasePointer())) +
+                      DramMemoryMap::Base;
+        if (auto irregular = buffer.GetIrregularAddrFromPhysical(offset); irregular) {
+            return irregular;
+        }
+
+        return offset;
     }
 
     template <typename T>
     PAddr GetRawPhysicalAddr(const T* ptr) const {
-        return static_cast<PAddr>(reinterpret_cast<uintptr_t>(ptr) -
-                                  reinterpret_cast<uintptr_t>(buffer.BackingBasePointer()));
+        auto offset = reinterpret_cast<uintptr_t>(ptr) -
+                                  reinterpret_cast<uintptr_t>(buffer.BackingBasePointer());
+        if (auto irregular = buffer.GetIrregularAddrFromPhysical(offset); irregular) {
+            return irregular;
+        }
+
+        return offset;
     }
 
     template <typename T>
     T* GetPointer(Common::PhysicalAddress addr) {
-        return reinterpret_cast<T*>(buffer.BackingBasePointer() +
-                                    (GetInteger(addr) - DramMemoryMap::Base));
+        auto offset = (GetInteger(addr) - DramMemoryMap::Base);
+        if (auto real = buffer.GetPhysicalAddrFromIrregular(offset); real) {
+            offset = real;
+        }
+
+        return reinterpret_cast<T*>(buffer.BackingBasePointer() + offset);
     }
 
     template <typename T>
     const T* GetPointer(Common::PhysicalAddress addr) const {
-        return reinterpret_cast<T*>(buffer.BackingBasePointer() +
-                                    (GetInteger(addr) - DramMemoryMap::Base));
+        auto offset = (GetInteger(addr) - DramMemoryMap::Base);
+        if (auto real = buffer.GetPhysicalAddrFromIrregular(offset); real) {
+            offset = real;
+        }
+
+        return reinterpret_cast<T*>(buffer.BackingBasePointer() + offset);
     }
 
     template <typename T>
     T* GetPointerFromRaw(PAddr addr) {
+        if (auto real = buffer.GetPhysicalAddrFromIrregular(addr); real) {
+            addr = real;
+        }
         return reinterpret_cast<T*>(buffer.BackingBasePointer() + addr);
     }
 
     template <typename T>
     const T* GetPointerFromRaw(PAddr addr) const {
+        if (auto real = buffer.GetPhysicalAddrFromIrregular(addr); real) {
+            addr = real;
+        }
         return reinterpret_cast<T*>(buffer.BackingBasePointer() + addr);
     }
 

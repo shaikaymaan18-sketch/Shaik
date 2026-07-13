@@ -9,6 +9,7 @@
 #include <memory>
 #include <optional>
 
+#include <boost/bimap.hpp>
 #include <boost/intrusive/set.hpp>
 
 namespace bi = boost::intrusive;
@@ -94,24 +95,22 @@ public:
     }
 
     using by_vaddr = bi::set_base_hook<bi::tag<struct _by_vaddr>>;
-    using by_fake_paddr = bi::set_base_hook<bi::tag<struct _by_fake_paddr>>;
 
-    struct IrregularMapping : by_vaddr, by_fake_paddr {
+    struct MisalignedMapping : by_vaddr {
 
-        IrregularMapping(u64 vaddr, u64 paddr, u64 size) : vaddr(vaddr >> Core::Memory::YUZU_PAGEBITS),
+        MisalignedMapping(u64 vaddr, u64 paddr, u64 size) : vaddr(vaddr >> Core::Memory::YUZU_PAGEBITS),
                                                            size(size >> Core::Memory::YUZU_PAGEBITS),
                                                            real_paddr(paddr >> Core::Memory::YUZU_PAGEBITS) {}
-        u64 vaddr;
+        VAddr vaddr;
         u64 size;
 
         // Real backing memory linked to this mapping
-        u64 real_paddr;
-        // Memory address stored by the page table that mapped this mapping
-        u64 fake_paddr {0};
+        PAddr real_paddr;
     };
 
-    IrregularMapping* GetUnalignedMappingFromVirtual(u64 offset);
-    const IrregularMapping* GetIrregularMappingFromFakePhysical(u64 offset);
+    const MisalignedMapping* GetUnalignedMappingFromVirtual(VAddr offset) const;
+    PAddr GetPhysicalAddrFromIrregular(PAddr offset) const;
+    PAddr GetIrregularAddrFromPhysical(PAddr offset) const;
 
 private:
     size_t backing_size{};
@@ -128,17 +127,15 @@ private:
     // Windows requires it for kernels whom lack proper support for some functions!
     std::optional<VirtualBuffer<u8>> fallback_buffer;
 
-    static inline auto cmp_vaddr = [](const IrregularMapping& a, const IrregularMapping& b) {
+    static inline auto unaligned_cmp = [](const MisalignedMapping& a, const MisalignedMapping& b) {
         return a.vaddr < b.vaddr;
-    };
-    static inline auto cmp_paddr = [](const IrregularMapping& a, const IrregularMapping& b) {
-        return a.fake_paddr < b.fake_paddr;
     };
 
     // Mappings that have mapped more memory than needed due to page-size limitations
-    bi::set<IrregularMapping, bi::base_hook<by_vaddr>, bi::compare<decltype(cmp_vaddr)>> unaligned_mappings;
+    bi::set<MisalignedMapping, bi::base_hook<by_vaddr>, bi::compare<decltype(unaligned_cmp)>> unaligned_mappings;
     // Mappings in `unaligned_mappings` that have a fake physical address due to them being mapped again.
-    bi::set<IrregularMapping, bi::base_hook<by_fake_paddr>, bi::compare<decltype(cmp_paddr)>> irregular_mappings;
+    // Each key represents 1 4KiB page.
+    boost::bimap<PAddr, PAddr> irregular_mappings;
 };
 
 } // namespace Common
