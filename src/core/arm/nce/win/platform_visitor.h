@@ -14,7 +14,7 @@ struct XReg;
 
 namespace Core {
 
-std::optional<oaknut::Reg> CheckForPlatformRegister(u32 instruction);
+std::optional<oaknut::XReg> CheckForPlatformRegister(u32 instruction);
 
 class PlatformVisitor final : public VisitorBase {
 public:

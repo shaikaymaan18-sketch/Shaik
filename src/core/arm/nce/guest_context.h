@@ -14,8 +14,9 @@
 
 #ifdef __linux__
 #include <signal.h>
-#elif __WIN32
-#include "core/arm/nce/win/nt_headers.h"
+#elif _WIN32
+#include <windows.h>
+#undef interface
 #endif
 
 namespace Core {
@@ -116,15 +117,15 @@ public:
     u32* pstate() {
         return &ptr->__ss.__cpsr;
     }
-#elif defined(__WIN32)
-    KernelContext(void* ptr) : ptr(static_cast<os::CONTEXT*>(ptr)) {}
+#elif defined(_WIN32)
+    KernelContext(void* ptr) : ptr(static_cast<CONTEXT*>(ptr)) {}
 
     u64* pc() {
-        return ptr->Pc;
+        return &ptr->Pc;
     }
 
     u64* sp() {
-        return ptr->Sp;
+        return &ptr->Sp;
     }
 
     u64* regs() {
@@ -137,15 +138,18 @@ public:
     }
 
     u32* fpcr() {
-        return &ptr->Fpcr;
+        // unsigned long vs unsigned int
+        return reinterpret_cast<u32*>(&ptr->Fpcr);
     }
 
     u32* fpsr() {
-        return &ptr->Fpsr;
+        // unsigned long vs unsigned int
+        return reinterpret_cast<u32*>(&ptr->Fpsr);
     }
 
     u32* pstate() {
-        return &ptr->Cpsr;
+        // unsigned long vs unsigned int
+        return reinterpret_cast<u32*>(&ptr->Cpsr);
     }
 #endif
 
@@ -163,8 +167,8 @@ private:
         }
         return reinterpret_cast<fpsimd_context*>(header);
     }
-#elif defined(__WIN32)
-    os::CONTEXT* ptr;
+#elif defined(_WIN32)
+    CONTEXT* ptr;
 #endif
 };
 

@@ -11,6 +11,10 @@
 #include "core/arm/arm_interface.h"
 #include "core/arm/nce/guest_context.h"
 
+#ifdef _WIN32
+#include <winternl.h>
+#endif
+
 #define SpinLockLocked 0
 #define SpinLockUnlocked 1
 
@@ -28,11 +32,14 @@ class System;
 // so we can manually initialize and use it.
 // https://github.com/apple-oss-distributions/libpthread/blob/42d026df5b07825070f60134b980a1ec2552dfee/private/pthread/tsd_private.h#L241-L245
 constexpr pthread_key_t ContextKey = 210;
-#elif __WIN32
+#elif _WIN32
 
-static const u32 ContextKey = os::TlsAlloc();
-static const u32 NCEStorage = os::TlsAlloc();
-static const u64 TlsSlots = offsetof(os::TEB, TlsSlots);
+#define ExceptionLevelChangeSignal 0xE0000001
+thread_local bool is_host_fault = false;
+
+static const u32 ContextKey = TlsAlloc();
+static const u32 NCEStorage = TlsAlloc();
+static const u64 TlsSlots = offsetof(TEB, TlsSlots);
 #endif
 
 
@@ -77,7 +84,12 @@ private:
     static void* GetGuestParameters();
 
     static HaltReason ReturnToRunCodeByTrampoline(void* tpidr, u64 trampoline_addr);
+#ifndef _WIN32
     static HaltReason ReturnToRunCodeByExceptionLevelChange(int tid, void* tpidr);
+#else
+    static HaltReason ReturnToRunCodeByExceptionLevelChange(void* tid, void* tpidr);
+    static LONG VectoredExceptionHandler(PEXCEPTION_POINTERS info);
+#endif
 
     static void ReturnToRunCodeByExceptionLevelChangeSignalHandler(int sig, void* info,
                                                                    void* raw_context);
@@ -96,7 +108,7 @@ public:
 
     // Members set on initialization.
     std::size_t m_core_index{};
-#ifndef __WIN32
+#ifndef _WIN32
     pid_t m_thread_id{-1};
 #else
     void* m_thread_id{};

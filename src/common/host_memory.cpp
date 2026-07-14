@@ -110,6 +110,9 @@ using PFN_MapViewOfFile3 = _Ret_maybenull_ PVOID(WINAPI*)(
 using PFN_UnmapViewOfFile2 = BOOL(WINAPI*)(_In_ HANDLE Process, _In_ PVOID BaseAddress,
                                            _In_ ULONG UnmapFlags);
 
+using PFN_VirtualQuery = SIZE_T(WINAPI*) (
+    _In_opt_ LPCVOID lpAddress, _Out_ PMEMORY_BASIC_INFORMATION lpBuffer, _In_ SIZE_T dwLength);
+
 template <typename T>
 static void GetFuncAddress(Common::DynamicLibrary& dll, const char* name, T& pfn) {
     if (!dll.GetSymbol(name, &pfn)) {
@@ -134,10 +137,11 @@ public:
         }
         GetFuncAddress(kernelbase_dll, "CreateFileMapping2", pfn_CreateFileMapping2);
         GetFuncAddress(kernelbase_dll, "VirtualAlloc2", pfn_VirtualAlloc2);
+        GetFuncAddress(kernelbase_dll, "VirtualQuery", pfn_VirtualQuery);
         GetFuncAddress(kernelbase_dll, "MapViewOfFile3", pfn_MapViewOfFile3);
         GetFuncAddress(kernelbase_dll, "UnmapViewOfFile2", pfn_UnmapViewOfFile2);
 
-        if (!pfn_CreateFileMapping2 || !pfn_VirtualAlloc2 || !pfn_MapViewOfFile3 || !pfn_UnmapViewOfFile2) {
+        if (!pfn_CreateFileMapping2 || !pfn_VirtualAlloc2 || !pfn_VirtualQuery || !pfn_MapViewOfFile3 || !pfn_UnmapViewOfFile2) {
             LOG_CRITICAL(HW_Memory, "Failed to find functions for virtual allocs");
             return false;
         }
@@ -162,8 +166,39 @@ public:
             LOG_CRITICAL(HW_Memory, "Failed to map {} MiB of virtual memory", backing_size >> 20);
             return false;
         }
-        // Allocate virtual address placeholder
-        virtual_base = static_cast<u8*>(pfn_VirtualAlloc2(process, nullptr, virtual_size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS, nullptr, 0));
+
+        // Allocate virtual address placeholder within a 39-bit address space
+        SIZE_T cursor = 0;
+        while (cursor < (1ULL << 39) - virtual_size) {
+            MEMORY_BASIC_INFORMATION info{};
+
+            // find the next mapped region of memory
+            auto res = pfn_VirtualQuery(reinterpret_cast<LPCVOID>(cursor), &info, sizeof(info));
+
+            if (res == 0) {
+                LOG_WARNING(HW_Memory, "Failed to check memory region: {}", GetLastError());
+                continue;
+            }
+
+            auto start_aligned = AlignUp(reinterpret_cast<SIZE_T>(info.BaseAddress), HugePageSize);
+            // is this region free?
+            if (info.State == MEM_FREE && start_aligned < reinterpret_cast<SIZE_T>(info.BaseAddress) + info.RegionSize) {
+                // is this region big enough for us to use?
+                if (info.RegionSize - (start_aligned - reinterpret_cast<SIZE_T>(info.BaseAddress)) >= virtual_size) {
+                    virtual_base = static_cast<u8*>(pfn_VirtualAlloc2
+                        (process, reinterpret_cast<PVOID>(start_aligned), virtual_size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS, nullptr, 0));
+                }
+            }
+
+            cursor = reinterpret_cast<SIZE_T>(info.BaseAddress) + info.RegionSize;
+        }
+        // Check if we failed to allocate for direct-mapping, otherwise map normally
+        if (!virtual_base) {
+            LOG_WARNING(HW_Memory, "Failed to allocate within 39-bit address space, direct mapping is not supported");
+            virtual_base = static_cast<u8*>(pfn_VirtualAlloc2
+                        (process, nullptr, virtual_size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS, nullptr, 0));
+        }
+
         if (!virtual_base) {
             Release();
             LOG_CRITICAL(HW_Memory, "Failed to reserve {} GiB of virtual memory", virtual_size >> 30);
@@ -383,6 +418,7 @@ private:
     DynamicLibrary kernelbase_dll;
     PFN_CreateFileMapping2 pfn_CreateFileMapping2{};
     PFN_VirtualAlloc2 pfn_VirtualAlloc2{};
+    PFN_VirtualQuery pfn_VirtualQuery{};
     PFN_MapViewOfFile3 pfn_MapViewOfFile3{};
     PFN_UnmapViewOfFile2 pfn_UnmapViewOfFile2{};
 

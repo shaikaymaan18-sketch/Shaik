@@ -1251,9 +1251,7 @@ if (HAS_NCE)
     if (WIN32)
         target_sources(core PRIVATE
                 arm/nce/win/platform_visitor.h
-                arm/nce/win/platform_visitor.cpp
-                arm/nce/win/exceptions.h
-                arm/nce/win/exceptions.cpp)
+                arm/nce/win/platform_visitor.cpp)
     endif ()
 endif()
 
