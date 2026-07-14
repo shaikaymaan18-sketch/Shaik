@@ -224,7 +224,6 @@ void Load(VkDevice device, DeviceDispatch& dld) noexcept {
     X(vkGetMemoryWin32HandleKHR);
 #endif
     X(vkGetQueryPoolResults);
-    X(vkGetDeviceFaultInfoEXT);
     X(vkGetPipelineExecutablePropertiesKHR);
     X(vkGetPipelineExecutableStatisticsKHR);
     X(vkGetSemaphoreCounterValue);
