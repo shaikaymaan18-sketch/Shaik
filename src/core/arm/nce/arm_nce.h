@@ -30,14 +30,6 @@ class System;
 constexpr pthread_key_t ContextKey = 210;
 #elif __WIN32
 
-namespace os {
-extern "C" {
-    #include <winternl.h>
-    #include <processthreadsapi.h>
-    #include <errhandlingapi.h>
-}
-}
-
 static const u32 ContextKey = os::TlsAlloc();
 static const u32 NCEStorage = os::TlsAlloc();
 static const u64 TlsSlots = offsetof(os::TEB, TlsSlots);

@@ -7,7 +7,7 @@
 
 namespace Core {
 
-static s32 WINAPI VectoredExecptionHandler(EXCEPTION_POINTERS* info) {
+static s32 WINAPI VectoredExecptionHandler(os::EXCEPTION_POINTERS* info) {
     u32 code = info->ExceptionRecord->ExceptionCode;
 
     if (code == SIGSEGV || code == SIGBUS) {

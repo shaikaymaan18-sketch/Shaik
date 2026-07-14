@@ -14,6 +14,8 @@
 
 #ifdef __linux__
 #include <signal.h>
+#elif __WIN32
+#include "core/arm/nce/win/nt_headers.h"
 #endif
 
 namespace Core {
@@ -115,7 +117,7 @@ public:
         return &ptr->__ss.__cpsr;
     }
 #elif defined(__WIN32)
-    KernelContext(void* ptr) : ptr(static_cast<ARM64_NT_CONTEXT*>(ptr)) {}
+    KernelContext(void* ptr) : ptr(static_cast<os::CONTEXT*>(ptr)) {}
 
     u64* pc() {
         return ptr->Pc;
@@ -162,7 +164,7 @@ private:
         return reinterpret_cast<fpsimd_context*>(header);
     }
 #elif defined(__WIN32)
-    CONTEXT* ptr;
+    os::CONTEXT* ptr;
 #endif
 };
 

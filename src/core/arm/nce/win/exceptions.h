@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <windows.h>
+#include "core/arm/nce/arm_nce.h"
 
 #define SIGBUS EXCEPTION_DATATYPE_MISALIGNMENT
 #define SIGSEGV EXCEPTION_ACCESS_VIOLATION
@@ -13,6 +13,6 @@ namespace Core {
 
 thread_local bool is_host_fault = false;
 
-static s32 WINAPI VectoredExecptionHandler(EXCEPTION_POINTERS* info);
+static s32 WINAPI VectoredExecptionHandler(os::EXCEPTION_POINTERS* info);
 
 } // namespace Core

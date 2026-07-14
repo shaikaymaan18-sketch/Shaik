@@ -154,7 +154,6 @@ HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(int tid, void *tpidr) {
 void ArmNce::ReturnToRunCodeByExceptionLevelChangeSignalHandler(int sig, void *info, void *raw_context) {
     auto tpidr = static_cast<NativeExecutionParameters*>(RestoreGuestContext(raw_context));
 
-    RestoreGuestContext(raw_context);
 #if !defined(__APPLE__) && !defined(__WIN32)
     // Save old value of TPIDR_EL0, load guest one
     u64 tpidr_el0;
@@ -452,9 +451,9 @@ HaltReason ArmNce::RunThread(Kernel::KThread* thread) {
     auto* thread_params = &thread->GetNativeExecutionParameters();
     auto* process = thread->GetOwnerProcess();
 
-#ifdef __APPLE__
+#if defined(__APPLE__)
     ASSERT(pthread_setspecific(ContextKey, &thread_params) == 0);
-#elif
+#elif defined(__WIN32)
     ASSERT(TlsSetValue(ContextKey, &thread_params) == 0);
 #endif
 
