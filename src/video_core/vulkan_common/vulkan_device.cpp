@@ -504,8 +504,8 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
     CollectToolingInfo();
 
     if (is_qualcomm) {
-        LOG_WARNING(Render_Vulkan, "Qualcomm drivers require scaled vertex format emulation");
         must_emulate_scaled_formats = true;
+        LOG_WARNING(Render_Vulkan, "Qualcomm drivers require scaled vertex format emulation");
         LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken custom border color.");
         RemoveExtensionFeature(extensions.custom_border_color, features.custom_border_color,
                                VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME);
@@ -515,6 +515,14 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken color write enable.");
         RemoveExtensionFeature(extensions.color_write_enable, features.color_write_enable,
                                VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME);
+        LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken shader float controls.");
+        RemoveExtension(extensions.shader_float_controls, VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
+        LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken shader atomic int64.");
+        RemoveExtensionFeature(extensions.shader_atomic_int64, features.shader_atomic_int64,
+                               VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME);
+        features.shader_atomic_int64.shaderBufferInt64Atomics = false;
+        features.shader_atomic_int64.shaderSharedInt64Atomics = false;
+        features.features.shaderInt64 = false;
 
 #if defined(__ANDROID__) && defined(ARCHITECTURE_arm64)
         // BCn patching only safe on Android 9+ (API 28+). Older versions crash on driver load.
