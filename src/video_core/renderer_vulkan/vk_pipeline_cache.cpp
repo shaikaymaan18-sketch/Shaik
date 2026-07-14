@@ -419,6 +419,12 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         .support_geometry_streams = device.AreTransformFeedbackGeometryStreamsSupported(),
         .support_sampled_image_array_nonuniform_indexing =
             device.IsSampledImageArrayNonUniformIndexingSupported(),
+        .support_storage_image_array_nonuniform_indexing =
+            device.IsStorageImageArrayNonUniformIndexingSupported(),
+        .support_uniform_texel_buffer_array_nonuniform_indexing =
+            device.IsUniformTexelBufferArrayNonUniformIndexingSupported(),
+        .support_storage_texel_buffer_array_nonuniform_indexing =
+            device.IsStorageTexelBufferArrayNonUniformIndexingSupported(),
 
         .warp_size_potentially_larger_than_guest = device.IsWarpSizePotentiallyBiggerThanGuest(),
 

@@ -15,8 +15,49 @@
 namespace Shader::Backend::SPIRV {
 namespace {
 
-[[nodiscard]] bool IsNonUniformDescriptor(EmitContext& ctx, const IR::Value& index) noexcept {
-    return ctx.profile.support_sampled_image_array_nonuniform_indexing && !index.IsImmediate();
+enum class NonUniformKind {
+    SampledImage,
+    StorageImage,
+    UniformTexelBuffer,
+    StorageTexelBuffer,
+};
+
+[[nodiscard]] bool IsNonUniformSupported(const Profile& profile, NonUniformKind kind) noexcept {
+    switch (kind) {
+    case NonUniformKind::SampledImage:
+        return profile.support_sampled_image_array_nonuniform_indexing;
+    case NonUniformKind::StorageImage:
+        return profile.support_storage_image_array_nonuniform_indexing;
+    case NonUniformKind::UniformTexelBuffer:
+        return profile.support_uniform_texel_buffer_array_nonuniform_indexing;
+    case NonUniformKind::StorageTexelBuffer:
+        return profile.support_storage_texel_buffer_array_nonuniform_indexing;
+    }
+    return false;
+}
+
+void MarkNonUniform(EmitContext& ctx, Id idx, const IR::Value& index, NonUniformKind kind) {
+    if (index.IsImmediate() || !IsNonUniformSupported(ctx.profile, kind)) {
+        return;
+    }
+    if (!ctx.non_uniform_ids.contains(idx.value)) {
+        ctx.Decorate(idx, spv::Decoration::NonUniform);
+        ctx.non_uniform_ids.insert(idx.value);
+    }
+    switch (kind) {
+    case NonUniformKind::SampledImage:
+        ctx.uses_nonuniform_sampled_image = true;
+        break;
+    case NonUniformKind::StorageImage:
+        ctx.uses_nonuniform_storage_image = true;
+        break;
+    case NonUniformKind::UniformTexelBuffer:
+        ctx.uses_nonuniform_uniform_texel_buffer = true;
+        break;
+    case NonUniformKind::StorageTexelBuffer:
+        ctx.uses_nonuniform_storage_texel_buffer = true;
+        break;
+    }
 }
 
 class ImageOperands {
@@ -195,10 +236,7 @@ Id Texture(EmitContext& ctx, IR::TextureInstInfo info, [[maybe_unused]] const IR
     const TextureDefinition& def{ctx.textures.at(info.descriptor_index)};
     if (def.count > 1) {
         auto const idx = index.IsImmediate() ? ctx.Const(index.U32()) : ctx.Def(index);
-        if (!ctx.non_uniform_ids.contains(idx.value) && IsNonUniformDescriptor(ctx, index)) {
-            ctx.Decorate(idx, spv::Decoration::NonUniform);
-            ctx.non_uniform_ids.insert(idx.value);
-        }
+        MarkNonUniform(ctx, idx, index, NonUniformKind::SampledImage);
         const Id pointer{ctx.OpAccessChain(def.pointer_type, def.id, idx)};
         const Id object{ctx.OpLoad(def.sampled_type, pointer)};
         return object;
@@ -212,6 +250,7 @@ Id TextureImage(EmitContext& ctx, IR::TextureInstInfo info, const IR::Value& ind
         const TextureBufferDefinition& def{ctx.texture_buffers.at(info.descriptor_index)};
         if (def.count > 1) {
             const Id idx{index.IsImmediate() ? ctx.Const(index.U32()) : ctx.Def(index)};
+            MarkNonUniform(ctx, idx, index, NonUniformKind::UniformTexelBuffer);
             const Id ptr{ctx.OpAccessChain(ctx.image_buffer_type, def.id, idx)};
             return ctx.OpLoad(ctx.image_buffer_type, ptr);
         }
@@ -220,10 +259,7 @@ Id TextureImage(EmitContext& ctx, IR::TextureInstInfo info, const IR::Value& ind
         const TextureDefinition& def{ctx.textures.at(info.descriptor_index)};
         if (def.count > 1) {
             auto const idx = index.IsImmediate() ? ctx.Const(index.U32()) : ctx.Def(index);
-            if (!ctx.non_uniform_ids.contains(idx.value) && IsNonUniformDescriptor(ctx, index)) {
-                ctx.Decorate(idx, spv::Decoration::NonUniform);
-                ctx.non_uniform_ids.insert(idx.value);
-            }
+            MarkNonUniform(ctx, idx, index, NonUniformKind::SampledImage);
             const Id ptr = ctx.OpAccessChain(def.pointer_type, def.id, idx);
             const Id object = ctx.OpLoad(def.sampled_type, ptr);
             const Id image = ctx.OpImage(def.image_type, object);
@@ -238,6 +274,7 @@ std::pair<Id, bool> Image(EmitContext& ctx, const IR::Value& index, IR::TextureI
         const ImageBufferDefinition def{ctx.image_buffers.at(info.descriptor_index)};
         if (def.count > 1) {
             const Id idx{index.IsImmediate() ? ctx.Const(index.U32()) : ctx.Def(index)};
+            MarkNonUniform(ctx, idx, index, NonUniformKind::StorageTexelBuffer);
             const Id ptr{ctx.OpAccessChain(def.pointer_type, def.id, idx)};
             return {ctx.OpLoad(def.image_type, ptr), def.is_integer};
         }
@@ -246,6 +283,7 @@ std::pair<Id, bool> Image(EmitContext& ctx, const IR::Value& index, IR::TextureI
         const ImageDefinition def{ctx.images.at(info.descriptor_index)};
         if (def.count > 1) {
             const Id idx{index.IsImmediate() ? ctx.Const(index.U32()) : ctx.Def(index)};
+            MarkNonUniform(ctx, idx, index, NonUniformKind::StorageImage);
             const Id ptr{ctx.OpAccessChain(def.pointer_type, def.id, idx)};
             return {ctx.OpLoad(def.image_type, ptr), def.is_integer};
         }

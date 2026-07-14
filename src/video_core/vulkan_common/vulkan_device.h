@@ -397,6 +397,18 @@ FN_MAX_LIMIT_LIST
         return features.descriptor_indexing.shaderSampledImageArrayNonUniformIndexing;
     }
 
+    bool IsStorageImageArrayNonUniformIndexingSupported() const {
+        return features.descriptor_indexing.shaderStorageImageArrayNonUniformIndexing;
+    }
+
+    bool IsUniformTexelBufferArrayNonUniformIndexingSupported() const {
+        return features.descriptor_indexing.shaderUniformTexelBufferArrayNonUniformIndexing;
+    }
+
+    bool IsStorageTexelBufferArrayNonUniformIndexingSupported() const {
+        return features.descriptor_indexing.shaderStorageTexelBufferArrayNonUniformIndexing;
+    }
+
     /// Returns true if the device supports float64 natively.
     bool IsFloat64Supported() const {
         return features.features.shaderFloat64;

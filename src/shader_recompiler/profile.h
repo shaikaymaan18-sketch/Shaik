@@ -59,6 +59,9 @@ struct Profile {
     bool support_multi_viewport{};
     bool support_geometry_streams{};
     bool support_sampled_image_array_nonuniform_indexing{};
+    bool support_storage_image_array_nonuniform_indexing{};
+    bool support_uniform_texel_buffer_array_nonuniform_indexing{};
+    bool support_storage_texel_buffer_array_nonuniform_indexing{};
 
     bool warp_size_potentially_larger_than_guest{};
 
