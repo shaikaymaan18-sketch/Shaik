@@ -17,6 +17,7 @@
 #include "video_core/texture_cache/image_view_base.h"
 #include "video_core/vulkan_common/vulkan_memory_allocator.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
+#include "video_core/delayed_destruction_ring.h"
 
 namespace Settings {
 struct ResolutionScalingInfo;
@@ -57,6 +58,8 @@ public:
     StagingBufferRef DownloadStagingBuffer(size_t size, bool deferred = false);
 
     void FreeDeferredStagingBuffer(StagingBufferRef& ref);
+
+    void ReleaseSparseUnswizzleBuffer(Image& image);
 
     void TickFrame();
 
@@ -167,6 +170,8 @@ public:
 
     static constexpr size_t indexing_slots = 8 * sizeof(size_t);
     std::array<vk::Buffer, indexing_slots> buffers{};
+
+    VideoCommon::DelayedDestructionRing<vk::Buffer, 8> sentenced_unswizzle_buffers;
     struct MsaaScratchKey {
         VkFormat format;
         VkImageType type;
@@ -367,6 +372,7 @@ public:
     u64 allocation_tick;
 
     friend class BlockLinearUnswizzle3DPass;
+    friend class TextureCacheRuntime;
 
 private:
     bool BlitScaleHelper(bool scale_up);

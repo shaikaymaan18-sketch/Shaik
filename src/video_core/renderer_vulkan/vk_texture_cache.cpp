@@ -1870,6 +1870,16 @@ void TextureCacheRuntime::TickFrame() {
     std::erase_if(pending_resolve_shadows, [this](const auto& pending) {
         return scheduler.IsFree(pending.first);
     });
+    sentenced_unswizzle_buffers.Tick();
+}
+
+void TextureCacheRuntime::ReleaseSparseUnswizzleBuffer(Image& image) {
+    if (image.has_compute_unswizzle_buffer) {
+        sentenced_unswizzle_buffers.Push(std::move(image.compute_unswizzle_buffer));
+        image.has_compute_unswizzle_buffer = false;
+        image.compute_unswizzle_buffer_size = 0;
+        image.compute_unswizzle_buffer_is_zero = false;
+    }
 }
 
 Image::Image(TextureCacheRuntime& runtime_, const ImageInfo& info_, GPUVAddr gpu_addr_,
