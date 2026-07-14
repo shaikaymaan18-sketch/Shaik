@@ -28,12 +28,18 @@ class System;
 // so we can manually initialize and use it.
 // https://github.com/apple-oss-distributions/libpthread/blob/42d026df5b07825070f60134b980a1ec2552dfee/private/pthread/tsd_private.h#L241-L245
 constexpr pthread_key_t ContextKey = 210;
-#else
-#include <winternal.h>
+#elif __WIN32
+
+namespace os {
+extern "C" {
+    #include <winternl.h>
+}
+
+}
 
 static const u32 ContextKey = TlsAlloc();
 static const u32 NCEStorage = TlsAlloc();
-static const u64 TlsSlots = offsetof(TEB, TlsSlots);
+static const u64 TlsSlots = offsetof(os::TEB, TlsSlots);
 #endif
 
 
