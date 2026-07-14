@@ -142,6 +142,8 @@ public:
 
     bool HasNativeASTC() const noexcept;
 
+    void ReleaseSparseUnswizzleBuffer(Image& image) {}
+
     void TickFrame() {}
 
     StateTracker& GetStateTracker() {

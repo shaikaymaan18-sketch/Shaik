@@ -1634,6 +1634,7 @@ void TextureCache<P>::TickAsyncUnswizzle() {
 
         runtime.FreeDeferredStagingBuffer(task.staging_buffer);
         image.flags &= ~ImageFlagBits::IsDecoding;
+        runtime.ReleaseSparseUnswizzleBuffer(image);
         unswizzle_queue.pop_front();
     }
 }
