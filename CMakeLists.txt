@@ -300,7 +300,7 @@ if (NOT EXISTS ${PROJECT_BINARY_DIR}/${compat_json})
     file(WRITE ${PROJECT_BINARY_DIR}/${compat_json} "")
 endif()
 
-if (ARCHITECTURE_arm64 AND (ANDROID OR PLATFORM_LINUX))
+if (ARCHITECTURE_arm64 AND (ANDROID OR PLATFORM_LINUX OR WIN32))
     set(HAS_NCE 1)
     add_compile_definitions(HAS_NCE=1)
 endif()

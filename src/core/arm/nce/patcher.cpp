@@ -17,6 +17,7 @@
 #include "core/hle/kernel/svc.h"
 #include "core/memory.h"
 #include "core/hle/kernel/k_thread.h"
+#include "win/platform_visitor.h"
 
 namespace Core::NCE {
 
@@ -165,6 +166,19 @@ bool Patcher::PatchText(std::span<const u8> program_image, const Kernel::CodeSet
         if (auto exclusive = Exclusive{inst}; exclusive.Verify()) {
             curr_patch->m_exclusives.push_back(i);
         }
+#ifdef __WIN32
+        // TODO: keep track of exclusives?
+        if (auto scratch = CheckForPlatformRegister(inst); scratch) {
+            bool pre_buffer = false;
+            auto ret = AddRelocations(pre_buffer);
+
+            if (pre_buffer) {
+                WritePlatformRegHandler(ret, inst, scratch, c_pre);
+            } else {
+                WritePlatformRegHandler(ret, inst, scratch, c);
+            }
+        }
+#endif
     }
 
     // Determine patching mode for the final relocation step
@@ -365,7 +379,7 @@ size_t Patcher::GetPreSectionSize() const noexcept {
     return Common::AlignUp(m_patch_instructions_pre.size() * sizeof(u32), Common::HostPageSize);
 }
 
-__attribute__((always_inline))
+YUZU_ALWAYS_INLINE
 void Patcher::LoadTLS(oaknut::VectorCodeGenerator& cg, oaknut::XReg out) {
 #ifdef __APPLE__
     // The kernel zeros out TPIDR_EL0 too unpredictably, so we use pthreads TLS instead
@@ -373,11 +387,39 @@ void Patcher::LoadTLS(oaknut::VectorCodeGenerator& cg, oaknut::XReg out) {
 
     // https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/libsyscall/os/tsd.h#L156-L189
     cg.MRS(out, oaknut::SystemReg::TPIDRRO_EL0);
-    cg.LDR(out, out, CONTEXT_KEY * 8);
+    cg.LDR(out, out, ContextKey * 8);
+#elif __WIN32
+    // x18 always points to TEB in Windows, we can just use that for TLS storage
+    ASSERT(out != X18);
+    cg.LDR(out, X18, TlsSlots + 8 * ContextKey);
 #else
     cg.MRS(out, oaknut::SystemReg::TPIDR_EL0);
 #endif
 }
+
+#ifdef __WIN32
+void Patcher::WritePlatformRegHandler(ModuleDestLabel module_dest, uint32 instruction, oaknut::XReg scratch, oaknut::VectorCodeGenerator& code) {
+    // Save X18 register and scratch register
+    cg.STP(X18, scratch, SP, PRE_INDEXED, -16);
+
+    // Load x18 register
+    cg.MOV(scratch, X18);
+    cg.LDR(X18, scratch, TlsSlots + 8 * NCEStorage);
+
+    // Perform operation
+    cg.append(instruction);
+
+    // Store x18 register and restore scratch register
+    cg.STR(X18, scratch, TlsSlots + 8 * NCEStorage);
+    cg.LDP(X18, scratch, SP, POST_INDEXED, 16);
+
+    // Jump back to the instruction after the "emulated" instruction.
+    if (&cg == &c_pre)
+        this->BranchToModulePre(module_dest);
+    else
+        this->BranchToModule(module_dest);
+}
+#endif
 
 void Patcher::WriteLoadContext(oaknut::VectorCodeGenerator& cg) {
     // This function was called, which modifies X30, so use that as a scratch register.
@@ -495,7 +537,7 @@ void Patcher::WriteSvcTrampoline(ModuleDestLabel module_dest, u32 svc_id, oaknut
     // Reload host TPIDR_EL0 and SP.
     cg.LDP(X2, X3, X1, offsetof(HostContext, host_sp));
     cg.MOV(SP, X2);
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__WIN32)
     static_assert(offsetof(HostContext, host_sp) + 8 == offsetof(HostContext, host_tpidr_el0));
     cg.MSR(oaknut::SystemReg::TPIDR_EL0, X3);
 #endif
@@ -563,12 +605,28 @@ void Patcher::WriteSvcTrampoline(ModuleDestLabel module_dest, u32 svc_id, oaknut
 // Retrieve emulated TLS register from GuestContext.
 void Patcher::WriteMrsHandler(ModuleDestLabel module_dest, oaknut::XReg dest_reg,
                               oaknut::SystemReg src_reg, oaknut::VectorCodeGenerator& cg) {
+#ifdef __WIN32
+    if (dest_reg != X18) {
+#endif
     LoadTLS(cg, dest_reg);
+
     if (src_reg == oaknut::SystemReg::TPIDRRO_EL0) {
         cg.LDR(dest_reg, dest_reg, offsetof(NativeExecutionParameters, tpidrro_el0));
     } else {
         cg.LDR(dest_reg, dest_reg, offsetof(NativeExecutionParameters, tpidr_el0));
     }
+#ifdef __WIN32
+    } else {
+        const auto scratch = dest_reg.index() == 0 ? X1 : X0;
+        cg.STR(scratch, SP, PRE_INDEXED, -16);
+
+        LoadTLS(cg, scratch);
+        cg.LDR(scratch, scratch, offsetof(NativeExecutionParameters, native_context));
+        cg.STR(scratch, X18, TlsSlots + 8 * NCEStorage);
+
+        cg.LDR(scratch, SP, POST_INDEXED, 16);
+    }
+#endif
 
     // Jump back to the instruction after the emulated MRS.
     if (&cg == &c_pre)
@@ -579,14 +637,23 @@ void Patcher::WriteMrsHandler(ModuleDestLabel module_dest, oaknut::XReg dest_reg
 
 void Patcher::WriteMsrHandler(ModuleDestLabel module_dest, oaknut::XReg src_reg, oaknut::VectorCodeGenerator& cg) {
     const auto scratch_reg = src_reg.index() == 0 ? X1 : X0;
-    cg.STR(scratch_reg, SP, PRE_INDEXED, -16);
+    const auto scratch_reg2 = src_reg.index() == 2 ? X3 : X2;
+
+    cg.STP(scratch_reg, scratch_reg2, SP, PRE_INDEXED, -16);
 
     // Save guest value to NativeExecutionParameters::tpidr_el0.
     LoadTLS(cg, scratch_reg);
+#ifdef __WIN32
+    if (src_reg == X18) {
+        // Load real x18 value and use that
+        cg.LDR(scratch_reg2, X18, TlsSlots + 8 * NCEStorage);
+        src_reg = scratch_reg2;
+    } else
+#endif
     cg.STR(src_reg, scratch_reg, offsetof(NativeExecutionParameters, tpidr_el0));
 
-    // Restore scratch register.
-    cg.LDR(scratch_reg, SP, POST_INDEXED, 16);
+    // Restore scratch registers.
+    cg.LDP(scratch_reg, scratch_reg2, SP, POST_INDEXED, 16);
 
     // Jump back to the instruction after the emulated MSR.
     if (&cg == &c_pre)

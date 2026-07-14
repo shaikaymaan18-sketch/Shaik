@@ -4,7 +4,7 @@
 // SPDX-FileCopyrightText: Copyright 2023 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-#ifdef __aarch64__
+#ifdef ARCHITECTURE_arm64
 
 // Certain functions have to be marked naked so that the compiler doesn't touch the stack
 // or implement a return (we "artificially" return later by setting PC to the LR value)
@@ -14,15 +14,12 @@
         _Pragma("GCC diagnostic ignored \"-Wreturn-type\"") \
         __attribute__((naked))
 #elif defined(_MSC_VER)
-// todo: windows support?? it supports native context switching and signal handling
-// https://learn.microsoft.com/en-us/windows/win32/debug/using-a-vectored-exception-handler
-// https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-setthreadcontext
 #define YUZU_NAKED __declspec(naked)
 #else
 #error Unsupported compiler
 #endif
 
-#if defined(__GNUC__)
+#if defined(__clang__) || defined(__GNUC__)
 #define YUZU_NAKED_END _Pragma("GCC diagnostic pop")
 #else
 #define YUZU_NAKED_END
@@ -40,18 +37,23 @@
 
 #include "core/hle/kernel/k_process.h"
 
+#ifndef __WIN32
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <signal.h>
+#else
+#include "core/arm/nce/win/exceptions.h"
+#endif
 
 namespace Core {
 
 namespace {
 
+#ifndef __WIN32
 struct sigaction g_orig_bus_action;
 struct sigaction g_orig_segv_action;
+#endif
 
-// Verify assembly offsets.
 using NativeExecutionParameters = Kernel::KThread::NativeExecutionParameters;
 
 using namespace Common::Literals;
@@ -62,15 +64,22 @@ constexpr u32 StackSize = 128_KiB;
 YUZU_ALWAYS_INLINE
 void* ArmNce::GetGuestParameters() {
     void* nep; /* NativeExecutionParameters* */
-#ifdef __APPLE__
+#if defined(__APPLE__)
     // https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/libsyscall/os/tsd.h#L156-L189
     asm volatile(
         "mrs %[out], TPIDRRO_EL0\n"         // load pthreads TLS storage
         "ldr %[out], [ %[out], #%[off] ]\n" // accessed like an array, so i * sizeof(u64)
         : [out] "=&r"(nep)
-        : [off] "i"(CONTEXT_KEY * 8)
+        : [off] "i"((ContextKey - 1) * 8)
         : "memory");
-#else
+#elif defined(__WIN32)
+    asm volatile(
+        "mrs %[out], TPIDR_EL0\n"           // load windows TLS storage
+        "ldr %[out], [ %[out], #%[off] ]\n"
+        : [out] "=&r"(nep)
+        : [off] "i"(TlsSlots + 8 * ContextKey)
+        : "memory");
+#elif defined(__linux__)
     asm volatile(
         "mrs %0, TPIDR_EL0\n"
         : "=r"(nep));
@@ -137,7 +146,7 @@ void ArmNce::ReturnToRunCodeByExceptionLevelChangeSignalHandler(int sig, void *i
     auto tpidr = static_cast<NativeExecutionParameters*>(RestoreGuestContext(raw_context));
 
     RestoreGuestContext(raw_context);
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__WIN32)
     // Save old value of TPIDR_EL0, load guest one
     u64 tpidr_el0;
     asm volatile("mrs %0, TPIDR_EL0\n"
@@ -169,7 +178,7 @@ HaltReason ArmNce::ReturnToRunCodeByTrampoline(void *tpidr, u64 trampoline_addr)
         "ldr x2, [ x0, #%[ctx_off] ]\n"
         "add x5, x2, #%[host_ctx] \n"
 
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__WIN32)
         // Load guest tpidr_el0
         "mrs x4, TPIDR_EL0\n"
         "msr TPIDR_EL0, x0\n"
@@ -206,7 +215,7 @@ HaltReason ArmNce::ReturnToRunCodeByTrampoline(void *tpidr, u64 trampoline_addr)
         :: [ctx_off] "i"(offsetof(NativeExecutionParameters, native_context)),
         [sp_off] "i"(offsetof(GuestContext, sp)),
         [host_ctx] "i"(offsetof(GuestContext, host_ctx))
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__WIN32)
         ,[is_running_off] "i"(offsetof(NativeExecutionParameters, is_actually_running))
 #endif
         );
@@ -217,7 +226,7 @@ static_assert(offsetof(HostContext, host_sp) == 0xE0); // TODO: don't use magic 
 
 void ArmNce::BreakFromRunCodeSignalHandler(int sig, void *info, void *raw_context) {
     NativeExecutionParameters* tpidr = reinterpret_cast<NativeExecutionParameters *>(GetGuestParameters());
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__WIN32)
     if (tpidr->is_actually_running) {
         tpidr->is_actually_running = false;
 #else
@@ -234,11 +243,11 @@ void ArmNce::BreakFromRunCodeSignalHandler(int sig, void *info, void *raw_contex
 }
 
 void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_context) {
-    DEBUG_ASSERT(sig == SIGSEGV);
+    DEBUG_ASSERT(sig == SIGSEGV || sig == SIGBUS);
 
     NativeExecutionParameters* nep = static_cast<NativeExecutionParameters*>(GetGuestParameters());
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__WIN32)
     if (nep->is_actually_running) {
         nep->is_actually_running = false;
 #else
@@ -250,22 +259,26 @@ void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_co
             :: [host_tpidr] "r"(host_tpidr));
 #endif
 
-        auto* info = static_cast<siginfo_t*>(raw_info);
         auto* guest_ctx = static_cast<GuestContext*>(nep->native_context);
         auto& memory = guest_ctx->parent->m_running_thread->GetOwnerProcess()->GetMemory();
 
         if (sig == SIGSEGV) {
             // Try to handle an invalid access.
             // TODO: handle accesses which split a page?
+#ifndef __WIN32
             const Common::ProcessAddress addr =
-                (reinterpret_cast<u64>(info->si_addr) & ~Memory::YUZU_PAGEMASK);
+                (reinterpret_cast<u64>(static_cast<siginfo_t*>(raw_info)->si_addr) & ~Memory::YUZU_PAGEMASK);
+#else
+            const Common::ProcessAddress addr =
+                (reinterpret_cast<u64>(*static_cast<u64*>(raw_info)) & ~Memory::YUZU_PAGEMASK);
+#endif
             if (memory.InvalidateNCE(addr, Memory::YUZU_PAGESIZE)) {
                 // We handled the access successfully and are returning to guest code.
                 goto ret;
             }
         } else if (sig == SIGBUS) {
             // Match and execute an instruction.
-            auto ctx = KernelContext(&static_cast<ucontext_t*>(raw_context)->uc_mcontext);
+            auto ctx = KernelContext(raw_context);
             auto next_pc = MatchAndExecuteOneInstruction(memory, &ctx);
             if (next_pc) {
                 // We handled the access successfully and are returning to guest code.
@@ -292,7 +305,9 @@ void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_co
 #else
         nep->is_actually_running = true;
 #endif
-    } else {
+    }
+#ifndef __WIN32
+    else {
         // Host fault, call original handler
         if (sig == SIGSEGV) {
             g_orig_segv_action.sa_sigaction(sig, static_cast<siginfo_t*>(raw_info), raw_context);
@@ -302,11 +317,14 @@ void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_co
             UNREACHABLE_MSG("unexpected signal {}", sig);
         }
     }
+#elif
+    is_host_fault = true;
+#endif
 }
 
 void* ArmNce::RestoreGuestContext(void* raw_context) {
     // Retrieve the host context.
-    auto host_ctx = KernelContext(&static_cast<ucontext_t*>(raw_context)->uc_mcontext);
+    auto host_ctx = KernelContext(raw_context);
 
     // Thread-local parameters will be located in x9.
     auto* tpidr = reinterpret_cast<NativeExecutionParameters*>(host_ctx.regs()[9]);
@@ -336,7 +354,7 @@ void* ArmNce::RestoreGuestContext(void* raw_context) {
 
 void ArmNce::SaveGuestContext(GuestContext* guest_ctx, void* raw_context) {
     // Retrieve the host context.
-    auto host_ctx = KernelContext(&static_cast<ucontext_t*>(raw_context)->uc_mcontext);
+    auto host_ctx = KernelContext(raw_context);
 
     // Save all guest registers except tpidr_el0.
     std::memcpy(guest_ctx->cpu_registers.data(), host_ctx.regs(), sizeof(guest_ctx->cpu_registers));
@@ -364,11 +382,10 @@ void ArmNce::SaveGuestContext(GuestContext* guest_ctx, void* raw_context) {
 }
 
 bool ArmNce::HandleFailedGuestFault(GuestContext* guest_ctx, void* raw_info, void* raw_context) {
-    auto host_ctx = KernelContext(&static_cast<ucontext_t*>(raw_context)->uc_mcontext);
-    auto* info = static_cast<siginfo_t*>(raw_info);
+    auto host_ctx = KernelContext(raw_context);
 
     // We can't handle the access, so determine why we crashed.
-    const bool is_prefetch_abort = *host_ctx.pc() == reinterpret_cast<u64>(info->si_addr);
+    const bool is_prefetch_abort = *host_ctx.pc() == reinterpret_cast<u64>(static_cast<siginfo_t*>(raw_info)->si_addr);
 
     // For data aborts, skip the instruction and return to guest code.
     // This will allow games to continue in many scenarios where they would otherwise crash.
@@ -419,7 +436,9 @@ HaltReason ArmNce::RunThread(Kernel::KThread* thread) {
     auto* process = thread->GetOwnerProcess();
 
 #ifdef __APPLE__
-    ASSERT(pthread_setspecific(CONTEXT_KEY, &thread_params) == 0);
+    ASSERT(pthread_setspecific(ContextKey, &thread_params) == 0);
+#elif
+    ASSERT(TlsSetValue(ContextKey, &thread_params) == 0);
 #endif
 
     // Move non-critical operations outside the locked section
@@ -502,10 +521,15 @@ void ArmNce::Initialize() {
         m_thread_id = pthread_mach_thread_np(pthread_self());
     }
 
-    ASSERT(pthread_key_init_np(CONTEXT_KEY, [](void*) -> void {}) == 0);
+    ASSERT(pthread_key_init_np(ContextKey, [](void*) -> void {}) == 0);
 #elif defined(__linux__)
     if (m_thread_id == -1) {
         m_thread_id = gettid();
+    }
+#elif defined(__WIN32)
+    if (m_thread_id == nullptr) {
+        DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(),
+            &m_thread_id, 0, false, DUPLICATE_SAME_ACCESS);
     }
 #endif
 
@@ -522,6 +546,7 @@ void ArmNce::Initialize() {
     // Set up signals.
     static std::once_flag flag;
     std::call_once(flag, [] {
+#ifndef __WIN32
         using HandlerType = decltype(sigaction::sa_sigaction);
 
         sigset_t signal_mask;
@@ -559,6 +584,9 @@ void ArmNce::Initialize() {
             reinterpret_cast<HandlerType>(&ArmNce::GuestMemoryFaultSignalHandler);
         access_fault_action.sa_mask = signal_mask;
         Common::SigAction(SIGSEGV, &access_fault_action, &g_orig_segv_action);
+#else
+        AddVectoredExceptionHandler(1, VectoredExceptionHandler);
+#endif
     });
 }
 
@@ -619,6 +647,9 @@ void ArmNce::SignalInterrupt(Kernel::KThread* thread) {
             "svc #0x80\n"
             :: "r"(static_cast<u64>(m_thread_id)), "r"(static_cast<u64>(SIGURG))
             : "x0", "x1", "x16", "memory", "cc");
+#elif
+        SuspendThread(m_thread_id);
+        UnlockThreadParameters(params);
 #endif
     } else {
         // If the thread is no longer running, we have nothing to do.
@@ -639,4 +670,4 @@ void ArmNce::InvalidateCacheRange(u64 addr, std::size_t size) {
 
 } // namespace Core
 
-#endif // #ifdef __aarch64__
+#endif // #ifdef ARCHITECTURE_arm64

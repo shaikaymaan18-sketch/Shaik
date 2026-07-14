@@ -49,7 +49,7 @@ struct GuestContext {
 class KernelContext {
 public:
 #if defined(__linux__)
-    KernelContext(void* ptr_) : ptr(static_cast<mcontext_t *>(ptr_)), fpsimd{GetFloatingPointState(ptr)} {}
+    KernelContext(void* ptr_) : ptr(&static_cast<ucontext_t *>(ptr_)->uc_mcontext), fpsimd{GetFloatingPointState(ptr)} {}
 
     u64* pc() {
         // u64 (unsigned long) does not equal unsigned long long
@@ -84,40 +84,74 @@ public:
     }
 
 #elif defined(__APPLE__)
-    KernelContext(void* ptr) : ptr(*static_cast<mcontext_t **>(ptr)) {}
+    KernelContext(void* ptr) : ptr(static_cast<ucontext_t>(ptr).uc_mcontext) {}
 
     u64* pc() {
-        return &(*ptr)->__ss.__pc;
+        return &ptr->__ss.__pc;
     }
 
     u64* sp() {
-        return &(*ptr)->__ss.__sp;
+        return &ptr->__ss.__sp;
     }
 
     u64* regs() {
-        return (*ptr)->__ss.__x;
+        return ptr->__ss.__x;
     }
 
     u128* vregs() {
         // .__v returns __uint128, u128 is an std::array
-        return reinterpret_cast<u128 *>((*ptr)->__ns.__v);
+        return reinterpret_cast<u128 *>(ptr->__ns.__v);
     }
 
     u32* fpcr() {
-        return &(*ptr)->__ns.__fpcr;
+        return &ptr->__ns.__fpcr;
     }
 
     u32* fpsr() {
-        return &(*ptr)->__ns.__fpsr;
+        return &ptr->__ns.__fpsr;
     }
 
     u32* pstate() {
-        return &(*ptr)->__ss.__cpsr;
+        return &ptr->__ss.__cpsr;
+    }
+#elif defined(__WIN32)
+    KernelContext(void* ptr) : ptr(static_cast<ARM64_NT_CONTEXT*>(ptr)) {}
+
+    u64* pc() {
+        return ptr->Pc;
+    }
+
+    u64* sp() {
+        return ptr->Sp;
+    }
+
+    u64* regs() {
+        return ptr->X;
+    }
+
+    u128* vregs() {
+        // V returns ARM64_NT_NEON128, u128 is an std::array
+        return reinterpret_cast<u128 *>(ptr->V);
+    }
+
+    u32* fpcr() {
+        return &ptr->Fpcr;
+    }
+
+    u32* fpsr() {
+        return &ptr->Fpsr;
+    }
+
+    u32* pstate() {
+        return &ptr->Cpsr;
     }
 #endif
+
 private:
+#if defined(__APPLE__)
+    mcontext_t ptr;
+#elif defined(__linux__)
     mcontext_t* ptr;
-#ifdef __linux__
     fpsimd_context* fpsimd;
 
     fpsimd_context* GetFloatingPointState(mcontext_t* host_ctx) {
@@ -127,6 +161,8 @@ private:
         }
         return reinterpret_cast<fpsimd_context*>(header);
     }
+#elif defined(__WIN32)
+    ARM64_NT_CONTEXT* ptr;
 #endif
 };
 

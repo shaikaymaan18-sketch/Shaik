@@ -1247,6 +1247,14 @@ if (HAS_NCE)
         arm/nce/patcher.h
         arm/nce/visitor_base.h)
     target_link_libraries(core PRIVATE merry::oaknut)
+
+    if (WIN32)
+        target_sources(core PRIVATE
+                arm/nce/win/platform_visitor.h
+                arm/nce/win/platform_visitor.cpp
+                arm/nce/win/exceptions.h
+                arm/nce/win/exceptions.cpp)
+    endif ()
 endif()
 
 if (ARCHITECTURE_x86_64 OR ARCHITECTURE_arm64 OR ARCHITECTURE_riscv64 OR ARCHITECTURE_loongarch64)

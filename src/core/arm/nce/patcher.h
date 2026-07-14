@@ -82,6 +82,9 @@ private:
     void WriteMrsHandler(ModuleDestLabel module_dest, oaknut::XReg dest_reg, oaknut::SystemReg src_reg, oaknut::VectorCodeGenerator& code);
     void WriteMsrHandler(ModuleDestLabel module_dest, oaknut::XReg src_reg, oaknut::VectorCodeGenerator& code);
     void WriteCntpctHandler(ModuleDestLabel module_dest, oaknut::XReg dest_reg, oaknut::VectorCodeGenerator& code);
+#ifdef __WIN32
+    void WritePlatformRegHandler(ModuleDestLabel module_dest, uint32 instruction, oaknut::XReg scratch, oaknut::VectorCodeGenerator& code);
+#endif
 
     // Convenience wrappers using default code generator
     void WriteLoadContext() { WriteLoadContext(c); }

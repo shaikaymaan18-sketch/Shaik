@@ -654,7 +654,7 @@ template <>
     float32x4_t va = vld1q_f32(&a.x);
     float32x4_t vb = vld1q_f32(&b.x);
     float32x4_t result = vmulq_f32(va, vb);
-#if defined(__aarch64__) // Use vaddvq_f32 in ARMv8 architectures
+#if defined(ARCHITECTURE_arm64) // Use vaddvq_f32 in ARMv8 architectures
     return vaddvq_f32(result);
 #else // Use manual addition for older architectures
     float32x2_t sum2 = vadd_f32(vget_high_f32(result), vget_low_f32(result));

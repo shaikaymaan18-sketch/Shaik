@@ -27,7 +27,13 @@ class System;
 // This value is actually reserved for old versions of iOSSimulator, however we aren't iOSSimulator,
 // so we can manually initialize and use it.
 // https://github.com/apple-oss-distributions/libpthread/blob/42d026df5b07825070f60134b980a1ec2552dfee/private/pthread/tsd_private.h#L241-L245
-constexpr pthread_key_t CONTEXT_KEY = 210;
+constexpr pthread_key_t ContextKey = 210;
+#else
+#include <winternal.h>
+
+static const u32 ContextKey = TlsAlloc();
+static const u32 NCEStorage = TlsAlloc();
+static const u64 TlsSlots = offsetof(TEB, TlsSlots);
 #endif
 
 
@@ -91,7 +97,11 @@ public:
 
     // Members set on initialization.
     std::size_t m_core_index{};
+#ifndef __WIN32
     pid_t m_thread_id{-1};
+#else
+    void* m_thread_id{};
+#endif
 
     // Core context.
     GuestContext m_guest_ctx{};

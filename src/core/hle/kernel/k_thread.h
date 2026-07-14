@@ -668,7 +668,7 @@ public:
 public:
     // TODO: This shouldn't be defined in kernel namespace
     struct NativeExecutionParameters {
-#if defined(__APPLE__) && HAS_NCE
+#if (defined(__APPLE__) || defined(__WIN32)) && HAS_NCE
         // Are we in actual guest code?
         bool is_actually_running{};
 #endif
