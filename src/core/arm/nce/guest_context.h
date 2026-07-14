@@ -162,7 +162,7 @@ private:
         return reinterpret_cast<fpsimd_context*>(header);
     }
 #elif defined(__WIN32)
-    ARM64_NT_CONTEXT* ptr;
+    CONTEXT* ptr;
 #endif
 };
 

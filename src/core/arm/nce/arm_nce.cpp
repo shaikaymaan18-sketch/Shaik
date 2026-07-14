@@ -106,6 +106,7 @@ void ArmNce::UnlockThreadParameters(void* tpidr) {
     static_cast<NativeExecutionParameters*>(tpidr)->lock.store(SpinLockUnlocked, std::memory_order_release);
 }
 
+#ifndef __WIN32
 YUZU_NAKED
 YUZU_NO_INLINE
 HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(int tid, void *tpidr) {
@@ -141,6 +142,14 @@ HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(int tid, void *tpidr) {
         );
 }
 YUZU_NAKED_END
+#else
+HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(int tid, void *tpidr) {
+    DEBUG_ASSERT(os::TlsGetValue(ContextKey) == tpidr);
+
+    os::RaiseException(SIGUSR2, 0, 0, nullptr); // TODO: pass tpidr through arguments?
+    __builtin_unreachable();
+}
+#endif
 
 void ArmNce::ReturnToRunCodeByExceptionLevelChangeSignalHandler(int sig, void *info, void *raw_context) {
     auto tpidr = static_cast<NativeExecutionParameters*>(RestoreGuestContext(raw_context));
@@ -224,9 +233,11 @@ YUZU_NAKED_END
 
 static_assert(offsetof(HostContext, host_sp) == 0xE0); // TODO: don't use magic number
 
+#ifndef __WIN32
+
 void ArmNce::BreakFromRunCodeSignalHandler(int sig, void *info, void *raw_context) {
-    NativeExecutionParameters* tpidr = reinterpret_cast<NativeExecutionParameters *>(GetGuestParameters());
-#if defined(__APPLE__) || defined(__WIN32)
+    NativeExecutionParameters* tpidr = static_cast<NativeExecutionParameters *>(GetGuestParameters());
+#if defined(__APPLE__)
     if (tpidr->is_actually_running) {
         tpidr->is_actually_running = false;
 #else
@@ -241,6 +252,8 @@ void ArmNce::BreakFromRunCodeSignalHandler(int sig, void *info, void *raw_contex
         // SaveGuestContext loads host context, returning from here will enter host code.
     }
 }
+
+#endif
 
 void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_context) {
     DEBUG_ASSERT(sig == SIGSEGV || sig == SIGBUS);
@@ -326,8 +339,12 @@ void* ArmNce::RestoreGuestContext(void* raw_context) {
     // Retrieve the host context.
     auto host_ctx = KernelContext(raw_context);
 
+#ifndef __WIN32
     // Thread-local parameters will be located in x9.
     auto* tpidr = reinterpret_cast<NativeExecutionParameters*>(host_ctx.regs()[9]);
+#else
+    auto* tpidr = static_cast<NativeExecutionParameters*>(GetGuestParameters());
+#endif
     auto* guest_ctx = static_cast<GuestContext*>(tpidr->native_context);
 
     // Save host callee-saved registers.
@@ -647,7 +664,8 @@ void ArmNce::SignalInterrupt(Kernel::KThread* thread) {
             "svc #0x80\n"
             :: "r"(static_cast<u64>(m_thread_id)), "r"(static_cast<u64>(SIGURG))
             : "x0", "x1", "x16", "memory", "cc");
-#elif
+#elif defined(__WIN32)
+        // TODO: use SetThreadState to emulate BreakFromRunCodeSignalHandler
         SuspendThread(m_thread_id);
         UnlockThreadParameters(params);
 #endif

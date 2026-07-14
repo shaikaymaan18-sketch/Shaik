@@ -17,7 +17,10 @@
 #include "core/hle/kernel/svc.h"
 #include "core/memory.h"
 #include "core/hle/kernel/k_thread.h"
+
+#ifdef __WIN32
 #include "win/platform_visitor.h"
+#endif
 
 namespace Core::NCE {
 

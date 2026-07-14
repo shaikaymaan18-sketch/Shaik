@@ -33,12 +33,13 @@ constexpr pthread_key_t ContextKey = 210;
 namespace os {
 extern "C" {
     #include <winternl.h>
+    #include <processthreadsapi.h>
+    #include <errhandlingapi.h>
+}
 }
 
-}
-
-static const u32 ContextKey = TlsAlloc();
-static const u32 NCEStorage = TlsAlloc();
+static const u32 ContextKey = os::TlsAlloc();
+static const u32 NCEStorage = os::TlsAlloc();
 static const u64 TlsSlots = offsetof(os::TEB, TlsSlots);
 #endif
 
