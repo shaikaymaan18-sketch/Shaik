@@ -707,9 +707,8 @@ void BcnEncodePass::Encode(VkImageView src_view, u32 blocks_x, u32 blocks_y, u32
     const VkPipelineLayout vk_layout = active.Layout();
     const VkDescriptorUpdateTemplate vk_template = active.DescriptorTemplate();
     const VkDescriptorSet set = active.CommitDescriptorSet();
-    const Device& dev = device;
 
-    scheduler.Record([dev = &dev, vk_pipeline, vk_layout, vk_template, set, pc, gx, gy, layers,
+    scheduler.Record([dev = &device, vk_pipeline, vk_layout, vk_template, set, pc, gx, gy, layers,
                       descriptor_data, out_buffer, out_buffer_offset, output_bytes](vk::CommandBuffer cmdbuf) {
         dev->GetLogical().UpdateDescriptorSet(set, vk_template, descriptor_data);
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_COMPUTE, vk_pipeline);
