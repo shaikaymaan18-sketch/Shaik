@@ -374,9 +374,6 @@ void SetupDenormControl(const Profile& profile, const IR::Program& program, Emit
 
 void SetupSignedNanCapabilities(const Profile& profile, const IR::Program& program,
                                 EmitContext& ctx, Id main_func) {
-    if (profile.has_broken_signed_nan_preserve) {
-        return;
-    }
     if (profile.has_broken_fp16_float_controls && program.info.uses_fp16) {
         return;
     }
