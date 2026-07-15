@@ -71,12 +71,7 @@ void* ArmNce::GetGuestParameters() {
         : [off] "i"((ContextKey - 1) * 8)
         : "memory");
 #elif defined(_WIN32)
-    asm volatile(
-        "mrs %[out], TPIDR_EL0\n"           // load windows TLS storage
-        "ldr %[out], [ %[out], #%[off] ]\n"
-        : [out] "=&r"(nep)
-        : [off] "i"(TlsSlots + 8 * ContextKey)
-        : "memory");
+    nep = TlsGetValue(ContextKey);
 #elif defined(__linux__)
     asm volatile(
         "mrs %0, TPIDR_EL0\n"
