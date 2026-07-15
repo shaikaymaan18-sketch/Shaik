@@ -100,8 +100,7 @@ public:
     void TransitionImageLayout(Image& image);
 
     bool HasBrokenTextureViewFormats() const noexcept {
-        // No known Vulkan driver has broken image views
-        return false;
+        return device.GetDriverID() == VK_DRIVER_ID_QUALCOMM_PROPRIETARY;
     }
 
     bool HasNativeBgr() const noexcept {
