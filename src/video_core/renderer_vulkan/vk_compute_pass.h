@@ -43,6 +43,11 @@ public:
                          std::optional<u32> optional_subgroup_size = std::nullopt);
     ~ComputePass();
 
+    VkPipeline Handle() const noexcept { return *pipeline; }
+    VkPipelineLayout Layout() const noexcept { return *layout; }
+    VkDescriptorUpdateTemplate DescriptorTemplate() const noexcept { return *descriptor_template; }
+    VkDescriptorSet CommitDescriptorSet() { return descriptor_allocator.Commit(); }
+
 protected:
     const Device& device;
     vk::DescriptorUpdateTemplate descriptor_template;
@@ -127,14 +132,33 @@ public:
                              MemoryAllocator& memory_allocator_);
     ~ASTCDecoderPass();
 
-    void Assemble(Image& image, const StagingBufferRef& map,
-                  std::span<const VideoCommon::SwizzleParameters> swizzles);
+    void Assemble(Image &image, const StagingBufferRef &map,
+                  std::span<const VideoCommon::SwizzleParameters> swizzles, bool wait_for_completion = true);
 
 private:
     Scheduler& scheduler;
     StagingBufferPool& staging_buffer_pool;
     ComputePassDescriptorQueue& compute_pass_descriptor_queue;
     MemoryAllocator& memory_allocator;
+};
+
+class BcnEncodePass {
+public:
+    explicit BcnEncodePass(const Device& device_, Scheduler& scheduler_,
+                           DescriptorPool& descriptor_pool_,
+                           ComputePassDescriptorQueue& compute_pass_descriptor_queue_);
+    ~BcnEncodePass();
+
+    void Encode(VkImageView src_view, u32 blocks_x, u32 blocks_y, u32 layers,
+                VkBuffer out_buffer, VkDeviceSize out_buffer_offset, VkDeviceSize output_bytes,
+                bool is_bc3);
+
+private:
+    const Device& device;
+    Scheduler& scheduler;
+    ComputePassDescriptorQueue& compute_pass_descriptor_queue;
+    ComputePass bc1_pass;
+    ComputePass bc3_pass;
 };
 
 class BlockLinearUnswizzle3DPass final : public ComputePass {
