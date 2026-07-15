@@ -515,8 +515,6 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken color write enable.");
         RemoveExtensionFeature(extensions.color_write_enable, features.color_write_enable,
                                VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME);
-        LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken shader float controls.");
-        RemoveExtension(extensions.shader_float_controls, VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
         LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken shader atomic int64.");
         RemoveExtensionFeature(extensions.shader_atomic_int64, features.shader_atomic_int64,
                                VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME);
@@ -529,12 +527,6 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
                                VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_EXTENSION_NAME);
         LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken float16 math");
         features.shader_float16_int8.shaderFloat16 = false;
-        LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken storage buffer access.");
-        features.bit8_storage.storageBuffer8BitAccess = false;
-        features.bit8_storage.uniformAndStorageBuffer8BitAccess = false;
-        features.bit16_storage.storageBuffer16BitAccess = false;
-        features.bit16_storage.uniformAndStorageBuffer16BitAccess = false;
-
 
 #if defined(__ANDROID__) && defined(ARCHITECTURE_arm64)
         // BCn patching only safe on Android 9+ (API 28+). Older versions crash on driver load.
