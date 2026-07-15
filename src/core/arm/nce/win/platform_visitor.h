@@ -18,7 +18,7 @@ std::optional<oaknut::XReg> CheckForPlatformRegister(u32 instruction);
 
 class PlatformVisitor final : public VisitorBase {
 public:
-    PlatformVisitor();
+    PlatformVisitor() {};
     ~PlatformVisitor() override = default;
 
     Reg scratch;
