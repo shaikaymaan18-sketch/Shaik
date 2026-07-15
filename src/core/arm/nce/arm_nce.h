@@ -35,7 +35,7 @@ constexpr pthread_key_t ContextKey = 210;
 #elif _WIN32
 
 #define ExceptionLevelChangeSignal 0xE0000001
-thread_local bool is_host_fault = false;
+inline thread_local bool is_host_fault = false;
 
 static const u32 ContextKey = TlsAlloc();
 static const u32 NCEStorage = TlsAlloc();
