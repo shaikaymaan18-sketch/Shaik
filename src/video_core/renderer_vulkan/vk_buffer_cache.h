@@ -7,6 +7,7 @@
 #pragma once
 
 #include <limits>
+#include <utility>
 
 #include "video_core/buffer_cache/buffer_cache_base.h"
 #include "video_core/buffer_cache/memory_tracker_base.h"
@@ -110,6 +111,8 @@ public:
 
     u32 GetStorageBufferAlignment() const;
 
+    u32 GetTexelBufferAlignment() const;
+
     [[nodiscard]] StagingBufferRef UploadStagingBuffer(size_t size);
 
     [[nodiscard]] StagingBufferRef DownloadStagingBuffer(size_t size, bool deferred = false);
@@ -163,6 +166,8 @@ public:
         guest_descriptor_queue.AddTexelBuffer(buffer.View(offset, size, format));
     }
 
+    std::span<u8> BindAlignedTextureBuffer(u32 size, VideoCore::Surface::PixelFormat format);
+
     bool ShouldLimitDynamicStorageBuffers() const {
         return limit_dynamic_storage_buffers;
     }
@@ -199,6 +204,8 @@ private:
 
     bool limit_dynamic_storage_buffers = false;
     u32 max_dynamic_storage_buffers = (std::numeric_limits<u32>::max)();
+
+    std::vector<std::pair<u64, vk::BufferView>> texel_bounce_views;
 };
 
 struct BufferCacheParams {

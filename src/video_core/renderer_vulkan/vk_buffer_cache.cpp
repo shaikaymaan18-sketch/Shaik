@@ -388,12 +388,40 @@ u32 BufferCacheRuntime::GetStorageBufferAlignment() const {
     return static_cast<u32>(device.GetStorageBufferAlignment());
 }
 
+u32 BufferCacheRuntime::GetTexelBufferAlignment() const {
+    return static_cast<u32>(device.GetTexelBufferAlignment());
+}
+
+std::span<u8> BufferCacheRuntime::BindAlignedTextureBuffer(u32 size,
+                                                           VideoCore::Surface::PixelFormat format) {
+    const VkDeviceSize alignment = device.GetTexelBufferAlignment();
+    const StagingBufferRef ref = UploadStagingBuffer(static_cast<size_t>(size) + alignment);
+    const VkDeviceSize aligned_offset = (ref.offset + (alignment - 1)) & ~(alignment - 1);
+    const VkDeviceSize delta = aligned_offset - ref.offset;
+    vk::BufferView view = device.GetLogical().CreateBufferView({
+        .sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .buffer = ref.buffer,
+        .format = MaxwellToVK::SurfaceFormat(device, FormatType::Buffer, false, format).format,
+        .offset = aligned_offset,
+        .range = size,
+    });
+    guest_descriptor_queue.AddTexelBuffer(*view);
+    texel_bounce_views.emplace_back(CurrentTick(), std::move(view));
+    return ref.mapped_span.subspan(delta, size);
+}
+
 void BufferCacheRuntime::TickFrame(Common::SlotVector<Buffer>& slot_buffers) noexcept {
     for (auto it = slot_buffers.begin(); it != slot_buffers.end(); it++) {
         if (scheduler.IsFree(it->LastUsageTick())) {
             it->ResetUsageTracking();
         }
     }
+    std::erase_if(texel_bounce_views,
+                  [this](const std::pair<u64, vk::BufferView>& entry) {
+                      return scheduler.IsFree(entry.first);
+                  });
 }
 
 u64 BufferCacheRuntime::CurrentTick() {
