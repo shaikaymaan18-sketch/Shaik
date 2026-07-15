@@ -1041,14 +1041,6 @@ void BufferCache<P>::BindHostGraphicsTextureBuffers(size_t stage) {
         const u32 offset = buffer.Offset(binding.device_addr);
         const PixelFormat format = binding.format;
         buffer.MarkUsage(offset, size);
-        if constexpr (!IS_OPENGL) {
-            const u32 texel_alignment = runtime.GetTexelBufferAlignment();
-            if (!is_written && texel_alignment > 1 && (offset % texel_alignment) != 0) {
-                const std::span<u8> span = runtime.BindAlignedTextureBuffer(size, format);
-                device_memory.ReadBlockUnsafe(binding.device_addr, span.data(), size);
-                return;
-            }
-        }
         if constexpr (SEPARATE_IMAGE_BUFFERS_BINDINGS) {
             if (((channel_state->image_texture_buffers[stage] >> index) & 1) != 0) {
                 runtime.BindImageBuffer(buffer, offset, size, format);
@@ -1187,14 +1179,6 @@ void BufferCache<P>::BindHostComputeTextureBuffers() {
         const u32 offset = buffer.Offset(binding.device_addr);
         const PixelFormat format = binding.format;
         buffer.MarkUsage(offset, size);
-        if constexpr (!IS_OPENGL) {
-            const u32 texel_alignment = runtime.GetTexelBufferAlignment();
-            if (!is_written && texel_alignment > 1 && (offset % texel_alignment) != 0) {
-                const std::span<u8> span = runtime.BindAlignedTextureBuffer(size, format);
-                device_memory.ReadBlockUnsafe(binding.device_addr, span.data(), size);
-                return;
-            }
-        }
         if constexpr (SEPARATE_IMAGE_BUFFERS_BINDINGS) {
             if (((channel_state->image_compute_texture_buffers >> index) & 1) != 0) {
                 runtime.BindImageBuffer(buffer, offset, size, format);
