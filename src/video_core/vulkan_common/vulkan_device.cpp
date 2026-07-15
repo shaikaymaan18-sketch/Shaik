@@ -504,8 +504,8 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
     CollectToolingInfo();
 
     if (is_qualcomm) {
-        LOG_WARNING(Render_Vulkan, "Qualcomm drivers require scaled vertex format emulation");
         must_emulate_scaled_formats = true;
+        LOG_WARNING(Render_Vulkan, "Qualcomm drivers require scaled vertex format emulation");
         LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken custom border color.");
         RemoveExtensionFeature(extensions.custom_border_color, features.custom_border_color,
                                VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME);
