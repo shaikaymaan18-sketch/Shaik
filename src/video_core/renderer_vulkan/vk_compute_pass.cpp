@@ -819,80 +819,53 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
             const u32 z_dst = z_image_start + r.start + sub_offset;
 
             if (!r.has_data) {
-                // Uncomment if junk data appears - FMX
+                // Uncomment if junk data appears
                 //UnswizzleZeroChunk(image, z_dst, sub_len);
                 sub_offset += sub_len;
                 continue;
             }
 
-            u32 win_offset = 0;
-            while (win_offset < sub_len) {
-                const u32 win_len = (std::min)(sub_len - win_offset, 1u);
-                const u32 wz_src = z_src + win_offset;
-                const u32 wz_dst = z_dst + win_offset;
-
-                u32 ox0 = 0, oy0 = 0, ox1 = blocks_x, oy1 = blocks_y;
-                bool window_is_empty = false;
-
-                if (!slice_bounds.empty()) {
-                    bool has_valid_bounds = false;
-                    bool out_of_bounds = false;
-                    u32 ux0 = blocks_x, uy0 = blocks_y, ux1 = 0, uy1 = 0;
-
-                    for (u32 z = wz_src; z < wz_src + win_len; ++z) {
-                        if (z >= static_cast<u32>(slice_bounds.size())) {
-                            out_of_bounds = true;
-                            break;
-                        }
-                        const auto& b = slice_bounds[z];
-
-                        if (b.x1 <= b.x0 || b.y1 <= b.y0) continue;
-
-                        ux0 = (std::min)(ux0, b.x0);
-                        uy0 = (std::min)(uy0, b.y0);
-                        ux1 = (std::max)(ux1, b.x1);
-                        uy1 = (std::max)(uy1, b.y1);
-                        has_valid_bounds = true;
-                    }
-
-                    if (out_of_bounds) {
-                        ox0 = 0; oy0 = 0; ox1 = blocks_x; oy1 = blocks_y;
-                    } else if (has_valid_bounds) {
-                        ox0 = ux0; oy0 = uy0; ox1 = ux1; oy1 = uy1;
-                    } else {
-                        window_is_empty = true;
-                    }
+            u32 ox0 = 0, oy0 = 0, ox1 = blocks_x, oy1 = blocks_y;
+            if (!slice_bounds.empty()) {
+                bool any = false;
+                u32 ux0 = blocks_x, uy0 = blocks_y, ux1 = 0, uy1 = 0;
+                for (u32 z = z_src; z < z_src + sub_len; ++z) {
+                    if (z >= static_cast<u32>(slice_bounds.size())) { any = false; break; }
+                    const auto& b = slice_bounds[z];
+                    if (b.x1 <= b.x0 || b.y1 <= b.y0) continue;
+                    ux0 = (std::min)(ux0, b.x0);
+                    uy0 = (std::min)(uy0, b.y0);
+                    ux1 = (std::max)(ux1, b.x1);
+                    uy1 = (std::max)(uy1, b.y1);
+                    any = true;
                 }
-
-                if (window_is_empty) {
-                    win_offset += win_len;
-                    continue;
-                }
-
-                scheduler.Record([dst_image = image.Handle(), aspect = image.AspectMask()](vk::CommandBuffer cmdbuf) {
-                    if (dst_image == VK_NULL_HANDLE) return;
-                    const VkImageMemoryBarrier barrier{
-                        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                        .pNext = nullptr,
-                        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-                        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-                        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                        .image = dst_image,
-                        .subresourceRange = {aspect, 0, 1, 0, 1},
-                    };
-                    cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                           VK_PIPELINE_STAGE_TRANSFER_BIT, 0, barrier);
-                });
-
-                UnswizzleChunk(image, swizzled, sw, params,
-                               ox0, oy0, ox1 - ox0, oy1 - oy0,
-                               wz_src, wz_dst, win_len);
-
-                win_offset += win_len;
+                if (any) { ox0 = ux0; oy0 = uy0; ox1 = ux1; oy1 = uy1; }
             }
+
+            // Uncomment if junk data appears
+            //UnswizzleZeroChunk(image, z_dst, sub_len);
+
+            scheduler.Record([dst_image = image.Handle(), aspect = image.AspectMask()](vk::CommandBuffer cmdbuf) {
+                if (dst_image == VK_NULL_HANDLE) return;
+                const VkImageMemoryBarrier barrier{
+                    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                    .pNext = nullptr,
+                    .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                    .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                    .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .image = dst_image,
+                    .subresourceRange = {aspect, 0, 1, 0, 1},
+                };
+                cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                       VK_PIPELINE_STAGE_TRANSFER_BIT, 0, barrier);
+            });
+
+            UnswizzleChunk(image, swizzled, sw, params,
+                           ox0, oy0, ox1 - ox0, oy1 - oy0,
+                           z_src, z_dst, sub_len);
 
             sub_offset += sub_len;
         }
