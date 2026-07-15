@@ -527,6 +527,14 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         RemoveExtensionFeature(extensions.workgroup_memory_explicit_layout,
                                features.workgroup_memory_explicit_layout,
                                VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_EXTENSION_NAME);
+        LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken float16 math");
+        features.shader_float16_int8.shaderFloat16 = false;
+        LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken storage buffer access.");
+        features.bit8_storage.storageBuffer8BitAccess = false;
+        features.bit8_storage.uniformAndStorageBuffer8BitAccess = false;
+        features.bit16_storage.storageBuffer16BitAccess = false;
+        features.bit16_storage.uniformAndStorageBuffer16BitAccess = false;
+
 
 #if defined(__ANDROID__) && defined(ARCHITECTURE_arm64)
         // BCn patching only safe on Android 9+ (API 28+). Older versions crash on driver load.
