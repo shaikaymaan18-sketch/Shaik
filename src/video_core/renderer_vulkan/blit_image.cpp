@@ -924,14 +924,8 @@ void BlitImageHelper::CopyMSAA(RenderPassCache& render_pass_cache, VkImage dst_i
         vk::ImageView dst_view =
             MakeMSAACopyView(device.GetLogical(), dst_image, dst_vk_format,
                              static_cast<u32>(copy.dst_subresource.base_level));
-        const VkOffset2D dst_offset =
-            msaa_to_non_msaa ? VkOffset2D{copy.dst_offset.x, copy.dst_offset.y}
-                             : VkOffset2D{copy.dst_offset.x / scale_x, copy.dst_offset.y / scale_y};
-        const VkExtent2D dst_extent =
-            msaa_to_non_msaa
-                ? VkExtent2D{copy.extent.width, copy.extent.height}
-                : VkExtent2D{Common::DivCeil(copy.extent.width, static_cast<u32>(scale_x)),
-                             Common::DivCeil(copy.extent.height, static_cast<u32>(scale_y))};
+        const VkOffset2D dst_offset{copy.dst_offset.x, copy.dst_offset.y};
+        const VkExtent2D dst_extent{copy.extent.width, copy.extent.height};
         const VkRect2D render_area{
             .offset = dst_offset,
             .extent = dst_extent,
