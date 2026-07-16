@@ -137,8 +137,6 @@ HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(int tid, void *tpidr) {
 YUZU_NAKED_END
 #else
 HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(void* tid, void *tpidr) {
-    DEBUG_ASSERT(TlsGetValue(ContextKey) == tpidr);
-
     RaiseException(ExceptionLevelChangeSignal, 0, 0, nullptr); // TODO: pass tpidr through arguments?
     __builtin_unreachable();
 }
@@ -229,7 +227,7 @@ static_assert(offsetof(HostContext, host_sp) == 0xE0); // TODO: don't use magic 
 
 void ArmNce::BreakFromRunCodeSignalHandler(int sig, void *info, void *raw_context) {
     NativeExecutionParameters* tpidr = static_cast<NativeExecutionParameters *>(GetGuestParameters());
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(_WIN32)
     if (tpidr->is_actually_running) {
         tpidr->is_actually_running = false;
 #else
@@ -309,7 +307,7 @@ void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_co
         return;
 
         ret:
-#ifndef __APPLE__
+#if defined(__linux__)
         asm volatile(
             "msr TPIDR_EL0, %0\n"
             :: "r"(nep));
@@ -457,7 +455,7 @@ HaltReason ArmNce::RunThread(Kernel::KThread* thread) {
 #if defined(__APPLE__)
     ASSERT(pthread_setspecific(ContextKey, &thread_params) == 0);
 #elif defined(_WIN32)
-    ASSERT(TlsSetValue(ContextKey, &thread_params) == 0);
+    ASSERT_MSG(TlsSetValue(ContextKey, &thread_params) == 0, "Failed to set TLS value: id {}, error {}", ContextKey, GetLastError());
 #endif
 
     // Move non-critical operations outside the locked section

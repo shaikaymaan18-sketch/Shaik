@@ -37,9 +37,9 @@ constexpr pthread_key_t ContextKey = 210;
 #define ExceptionLevelChangeSignal 0xE0000001
 inline thread_local bool is_host_fault = false;
 
-static const u32 ContextKey = TlsAlloc();
-static const u32 NCEStorage = TlsAlloc();
-static const u64 TlsSlots = offsetof(TEB, TlsSlots);
+inline u32 ContextKey = TlsAlloc();
+inline u32 NCEStorage = TlsAlloc();
+constexpr u64 TlsSlots = offsetof(TEB, TlsSlots);
 #endif
 
 
