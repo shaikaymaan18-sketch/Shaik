@@ -203,7 +203,7 @@ public:
             virtual_base = static_cast<u8*>(pfn_VirtualAlloc2
                         (process, nullptr, virtual_size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS, nullptr, 0));
         }
-
+        virtual_map_base = virtual_base;
         if (!virtual_base) {
             Release();
             LOG_CRITICAL(HW_Memory, "Failed to reserve {} GiB of virtual memory", virtual_size >> 30);
@@ -217,6 +217,7 @@ public:
     }
 
     void Map(size_t virtual_offset, size_t host_offset, size_t length, MemoryPermission perms) {
+        AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
         std::unique_lock lock{placeholder_mutex};
         if (!IsNiechePlaceholder(virtual_offset, length)) {
             Split(virtual_offset, length);
@@ -228,6 +229,7 @@ public:
     }
 
     void Unmap(size_t virtual_offset, size_t length) {
+        AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
         std::scoped_lock lock{placeholder_mutex};
 
         // Unmap until there are no more placeholders
@@ -236,15 +238,21 @@ public:
     }
 
     void Protect(size_t virtual_offset, size_t length, bool read, bool write, bool execute) {
+        AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
+
         DWORD new_flags{};
-        if (read && write) {
+        if (read && write && execute) {
+            new_flags = PAGE_EXECUTE_READWRITE;
+        } else if (read && write) {
             new_flags = PAGE_READWRITE;
+        } else if (read && execute) {
+            new_flags = PAGE_EXECUTE_READ;
         } else if (read && !write) {
             new_flags = PAGE_READONLY;
-        } else if (!read && !write) {
+        } else if (!read && !write && !execute) {
             new_flags = PAGE_NOACCESS;
         } else {
-            UNIMPLEMENTED_MSG("Protection flag combination read={} write={}", read, write);
+            UNIMPLEMENTED_MSG("Protection flag combination read={} write={} execute={}", read, write, execute);
         }
         const size_t virtual_end = virtual_offset + length;
 
@@ -263,7 +271,7 @@ public:
 
     void EnableDirectMappedAddress() {
         // TODO
-        UNREACHABLE();
+        virtual_base = nullptr;
     }
 
     const size_t backing_size; ///< Size of the backing memory in bytes
@@ -271,6 +279,7 @@ public:
 
     u8* backing_base{};
     u8* virtual_base{};
+    u8* virtual_map_base{};
 
 private:
     /// Release all resources in the object
@@ -284,8 +293,8 @@ private:
             }
             Coalesce(0, virtual_size);
         }
-        if (virtual_base) {
-            if (!VirtualFree(virtual_base, 0, MEM_RELEASE)) {
+        if (virtual_map_base) {
+            if (!VirtualFree(virtual_map_base, 0, MEM_RELEASE)) {
                 LOG_CRITICAL(HW_Memory, "Failed to free virtual memory");
             }
         }
@@ -668,7 +677,7 @@ public:
 
     void Map(size_t virtual_offset, size_t host_offset, size_t length, MemoryPermission perms) {
         // Intersect the range with our address space.
-        AdjustMap(&virtual_offset, &length);
+        AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
 
         // We are removing a placeholder.
         free_manager.AllocateBlock(virtual_base + virtual_offset, length);
@@ -693,7 +702,7 @@ public:
         // We don't want to unmap, we want to reserve this memory.
 
         // Intersect the range with our address space.
-        AdjustMap(&virtual_offset, &length);
+        AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
 
         // Merge with any adjacent placeholder mappings.
         auto [merged_pointer, merged_size] =
@@ -705,7 +714,7 @@ public:
 
     void Protect(size_t virtual_offset, size_t length, bool read, bool write, bool execute) {
         // Intersect the range with our address space.
-        AdjustMap(&virtual_offset, &length);
+        AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
 
         int flags = PROT_NONE;
         if (read) {
@@ -750,27 +759,6 @@ private:
         if (fd != -1) {
             int ret = close(fd);
             ASSERT_MSG(ret == 0, "close failed: {}", strerror(errno));
-        }
-    }
-
-    void AdjustMap(size_t* virtual_offset, size_t* length) {
-        if (virtual_base != nullptr) {
-            return;
-        }
-
-        // If we are direct mapped, we want to make sure we are operating on a region
-        // that is in range of our virtual mapping.
-        size_t intended_start = *virtual_offset;
-        size_t intended_end = intended_start + *length;
-        size_t address_space_start = reinterpret_cast<size_t>(virtual_map_base);
-        size_t address_space_end = address_space_start + virtual_size;
-
-        if (address_space_start > intended_end || intended_start > address_space_end) {
-            *virtual_offset = 0;
-            *length = 0;
-        } else {
-            *virtual_offset = (std::max)(intended_start, address_space_start);
-            *length = (std::min)(intended_end, address_space_end) - *virtual_offset;
         }
     }
 

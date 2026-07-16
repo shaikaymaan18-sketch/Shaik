@@ -94,6 +94,23 @@ public:
         return address >= virtual_base && address < virtual_base + virtual_size;
     }
 
+    static void AdjustMap(u8* virtual_map_base, size_t virtual_size, size_t* virtual_offset, size_t* length) {
+        // If we are direct mapped, we want to make sure we are operating on a region
+        // that is in range of our virtual mapping.
+        size_t intended_start = *virtual_offset;
+        size_t intended_end = intended_start + *length;
+        size_t address_space_start = reinterpret_cast<size_t>(virtual_map_base);
+        size_t address_space_end = address_space_start + virtual_size;
+
+        if (address_space_start > intended_end || intended_start > address_space_end) {
+            *virtual_offset = 0;
+            *length = 0;
+        } else {
+            *virtual_offset = (std::max)(intended_start, address_space_start);
+            *length = (std::min)(intended_end, address_space_end) - *virtual_offset;
+        }
+    }
+
     using by_vaddr = bi::set_base_hook<bi::tag<struct _by_vaddr>>;
 
     struct MisalignedMapping : by_vaddr {
