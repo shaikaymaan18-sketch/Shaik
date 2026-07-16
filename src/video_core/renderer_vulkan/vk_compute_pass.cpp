@@ -23,8 +23,7 @@
 #include "video_core/host_shaders/vulkan_quad_indexed_comp_spv.h"
 #include "video_core/host_shaders/vulkan_uint8_comp_spv.h"
 #include "video_core/host_shaders/block_linear_unswizzle_3d_bcn_comp_spv.h"
-#include "video_core/host_shaders/bcn_encoder_bc1_comp_spv.h"
-#include "video_core/host_shaders/bcn_encoder_bc3_comp_spv.h"
+#include "video_core/host_shaders/bcn_encoder_comp_spv.h"
 #include "video_core/renderer_vulkan/vk_compute_pass.h"
 #include "video_core/surface.h"
 #include "video_core/renderer_vulkan/vk_descriptor_pool.h"
@@ -672,19 +671,17 @@ constexpr std::array<VkDescriptorUpdateTemplateEntry, BCN_NUM_BINDINGS>
 
 struct BcnEncodePushConstants {
     u32 blocks_dim[2];
+    u32 is_bc3;
 };
 
 BcnEncodePass::BcnEncodePass(const Device& device_, Scheduler& scheduler_,
                              DescriptorPool& descriptor_pool_,
                              ComputePassDescriptorQueue& compute_pass_descriptor_queue_)
-    : device(device_), scheduler{scheduler_}, compute_pass_descriptor_queue{compute_pass_descriptor_queue_},
-      bc1_pass(device_, scheduler_, descriptor_pool_, BCN_DESCRIPTOR_SET_BINDINGS,
+    : ComputePass(device_, scheduler_, descriptor_pool_, BCN_DESCRIPTOR_SET_BINDINGS,
                BCN_PASS_DESCRIPTOR_UPDATE_TEMPLATE_ENTRY, BCN_BANK_INFO,
-               COMPUTE_PUSH_CONSTANT_RANGE<sizeof(BcnEncodePushConstants)>, BCN_ENCODER_BC1_COMP_SPV),
-      bc3_pass(device_, scheduler_, descriptor_pool_, BCN_DESCRIPTOR_SET_BINDINGS,
-               BCN_PASS_DESCRIPTOR_UPDATE_TEMPLATE_ENTRY, BCN_BANK_INFO,
-               COMPUTE_PUSH_CONSTANT_RANGE<sizeof(BcnEncodePushConstants)>, BCN_ENCODER_BC3_COMP_SPV) {
-}
+               COMPUTE_PUSH_CONSTANT_RANGE<sizeof(BcnEncodePushConstants)>, BCN_ENCODER_COMP_SPV),
+      device{device_}, scheduler{scheduler_},
+      compute_pass_descriptor_queue{compute_pass_descriptor_queue_} {}
 
 BcnEncodePass::~BcnEncodePass() = default;
 
@@ -698,15 +695,17 @@ void BcnEncodePass::Encode(VkImageView src_view, u32 blocks_x, u32 blocks_y, u32
     compute_pass_descriptor_queue.AddBuffer(out_buffer, out_buffer_offset, output_bytes);
     const void* const descriptor_data = compute_pass_descriptor_queue.UpdateData();
 
-    const BcnEncodePushConstants pc{ .blocks_dim = {blocks_x, blocks_y} };
+    const BcnEncodePushConstants pc{
+        .blocks_dim = {blocks_x, blocks_y},
+        .is_bc3 = is_bc3
+    };
     const u32 gx = Common::DivCeil(blocks_x, 2u);
     const u32 gy = Common::DivCeil(blocks_y, 2u);
 
-    ComputePass& active = is_bc3 ? bc3_pass : bc1_pass;
-    const VkPipeline vk_pipeline = active.Handle();
-    const VkPipelineLayout vk_layout = active.Layout();
-    const VkDescriptorUpdateTemplate vk_template = active.DescriptorTemplate();
-    const VkDescriptorSet set = active.CommitDescriptorSet();
+    const VkPipeline vk_pipeline = *pipeline;
+    const VkPipelineLayout vk_layout = *layout;
+    const VkDescriptorUpdateTemplate vk_template = *descriptor_template;
+    const VkDescriptorSet set = descriptor_allocator.Commit();
 
     scheduler.Record([dev = &device, vk_pipeline, vk_layout, vk_template, set, pc, gx, gy, layers,
                       descriptor_data, out_buffer, out_buffer_offset, output_bytes](vk::CommandBuffer cmdbuf) {

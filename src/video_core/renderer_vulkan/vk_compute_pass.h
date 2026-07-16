@@ -43,11 +43,6 @@ public:
                          std::optional<u32> optional_subgroup_size = std::nullopt);
     ~ComputePass();
 
-    VkPipeline Handle() const noexcept { return *pipeline; }
-    VkPipelineLayout Layout() const noexcept { return *layout; }
-    VkDescriptorUpdateTemplate DescriptorTemplate() const noexcept { return *descriptor_template; }
-    VkDescriptorSet CommitDescriptorSet() { return descriptor_allocator.Commit(); }
-
 protected:
     const Device& device;
     vk::DescriptorUpdateTemplate descriptor_template;
@@ -142,7 +137,7 @@ private:
     MemoryAllocator& memory_allocator;
 };
 
-class BcnEncodePass {
+class BcnEncodePass final : public ComputePass {
 public:
     explicit BcnEncodePass(const Device& device_, Scheduler& scheduler_,
                            DescriptorPool& descriptor_pool_,
@@ -157,8 +152,6 @@ private:
     const Device& device;
     Scheduler& scheduler;
     ComputePassDescriptorQueue& compute_pass_descriptor_queue;
-    ComputePass bc1_pass;
-    ComputePass bc3_pass;
 };
 
 class BlockLinearUnswizzle3DPass final : public ComputePass {
