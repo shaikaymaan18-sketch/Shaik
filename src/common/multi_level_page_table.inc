@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // SPDX-FileCopyrightText: 2021 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -28,6 +31,7 @@ MultiLevelPageTable<BaseAddr>::MultiLevelPageTable(std::size_t address_space_bit
     first_level_map.resize(first_level_size, nullptr);
 #ifdef _WIN32
     void* base{VirtualAlloc(nullptr, alloc_size, MEM_RESERVE, PAGE_READWRITE)};
+    ASSERT_MSG(base, "Failed to allocate {} memory for page table, error {}", alloc_size, GetLastError());
 #else
     void* base{mmap(nullptr, alloc_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)};
     if (base == MAP_FAILED)
@@ -63,7 +67,7 @@ void MultiLevelPageTable<BaseAddr>::AllocateLevel(u64 index) {
     void* ptr = reinterpret_cast<char *>(base_ptr) + index * first_level_chunk_size;
 #ifdef _WIN32
     void* base = VirtualAlloc(ptr, first_level_chunk_size, MEM_COMMIT, PAGE_READWRITE);
-    ASSERT(base);
+    ASSERT_MSG(base, "Failed to allocate page level {} for page level, error {}", index, GetLastError());
 #else
     void* base = ptr;
 #endif

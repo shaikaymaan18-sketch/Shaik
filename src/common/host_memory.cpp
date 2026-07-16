@@ -149,21 +149,21 @@ public:
         // Allocate backing file map
         backing_handle = pfn_CreateFileMapping2(INVALID_HANDLE_VALUE, nullptr, FILE_MAP_WRITE | FILE_MAP_READ, PAGE_READWRITE, SEC_COMMIT, backing_size, nullptr, nullptr, 0);
         if (!backing_handle) {
-            LOG_CRITICAL(HW_Memory, "Failed to allocate {} MiB of backing memory", backing_size >> 20);
+            LOG_CRITICAL(HW_Memory, "Failed to allocate {} MiB of backing memory, error {}", backing_size >> 20, GetLastError());
             return false;
         }
         // Allocate a virtual memory for the backing file map as placeholder
         backing_base = static_cast<u8*>(pfn_VirtualAlloc2(process, nullptr, backing_size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS, nullptr, 0));
         if (!backing_base) {
             Release();
-            LOG_CRITICAL(HW_Memory, "Failed to reserve {} MiB of virtual memory", backing_size >> 20);
+            LOG_CRITICAL(HW_Memory, "Failed to reserve {} MiB of virtual memory, error {}", backing_size >> 20, GetLastError());
             return false;
         }
         // Map backing placeholder
         void* const ret = pfn_MapViewOfFile3(backing_handle, process, backing_base, 0, backing_size, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, nullptr, 0);
         if (ret != backing_base) {
             Release();
-            LOG_CRITICAL(HW_Memory, "Failed to map {} MiB of virtual memory", backing_size >> 20);
+            LOG_CRITICAL(HW_Memory, "Failed to map {} MiB of virtual memory, error {}", backing_size >> 20, GetLastError());
             return false;
         }
 
@@ -176,7 +176,7 @@ public:
             auto res = pfn_VirtualQuery(reinterpret_cast<LPCVOID>(cursor), &info, sizeof(info));
 
             if (res == 0) {
-                LOG_WARNING(HW_Memory, "Failed to check memory region: {}", GetLastError());
+                LOG_WARNING(HW_Memory, "Failed to check memory region, error {}", GetLastError());
                 break;
             }
 
@@ -190,12 +190,18 @@ public:
                     if (virtual_base) {
                         break;
                     } else {
-                        LOG_WARNING(HW_Memory, "Failed to allocate buffer at {:#x}, trying at at new address", start_aligned);
+                        LOG_WARNING(HW_Memory, "Failed to allocate buffer at {:#x} with error {}, trying at at new address", start_aligned, GetLastError());
                     }
                 }
             }
 
-            cursor = reinterpret_cast<SIZE_T>(info.BaseAddress) + info.RegionSize;
+            auto new_cursor = reinterpret_cast<SIZE_T>(info.BaseAddress) + info.RegionSize;
+            if (new_cursor <= cursor) {
+                // weird unknown error, let's just continue cursor so this isn't an infinite loop
+                cursor = cursor + HugePageSize;
+                continue;
+            }
+            cursor = new_cursor;
         }
         // Check if we failed to allocate for direct-mapping, otherwise map normally
         if (!virtual_base) {
@@ -206,7 +212,7 @@ public:
         virtual_map_base = virtual_base;
         if (!virtual_base) {
             Release();
-            LOG_CRITICAL(HW_Memory, "Failed to reserve {} GiB of virtual memory", virtual_size >> 30);
+            LOG_CRITICAL(HW_Memory, "Failed to reserve {} GiB of virtual memory, error {}", virtual_size >> 30, GetLastError());
             return false;
         }
         return true;
