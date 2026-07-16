@@ -515,18 +515,22 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
         LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken color write enable.");
         RemoveExtensionFeature(extensions.color_write_enable, features.color_write_enable,
                                VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME);
+        LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken shader float controls");
+        RemoveExtension(extensions.shader_float_controls, VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
         LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken shader atomic int64.");
         RemoveExtensionFeature(extensions.shader_atomic_int64, features.shader_atomic_int64,
                                VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME);
         features.shader_atomic_int64.shaderBufferInt64Atomics = false;
         features.shader_atomic_int64.shaderSharedInt64Atomics = false;
         features.features.shaderInt64 = false;
-        LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken workgroup memory explicit layout.");
-        RemoveExtensionFeature(extensions.workgroup_memory_explicit_layout,
-                               features.workgroup_memory_explicit_layout,
-                               VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_EXTENSION_NAME);
-        LOG_WARNING(Render_Vulkan, "Qualcomm drivers have broken float16 math");
-        features.shader_float16_int8.shaderFloat16 = false;
+        if (properties.properties.driverVersion <= VK_MAKE_VERSION(512, 762, 24)) {
+            LOG_WARNING(Render_Vulkan,
+                        "Qualcomm drivers 512.762.24 and older have broken workgroup memory "
+                        "explicit layout.");
+            RemoveExtensionFeature(extensions.workgroup_memory_explicit_layout,
+                                   features.workgroup_memory_explicit_layout,
+                                   VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_EXTENSION_NAME);
+        }
 
 #if defined(__ANDROID__) && defined(ARCHITECTURE_arm64)
         // BCn patching only safe on Android 9+ (API 28+). Older versions crash on driver load.
