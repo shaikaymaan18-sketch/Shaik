@@ -922,8 +922,7 @@ TextureCacheRuntime::TextureCacheRuntime(const Device& device_, Scheduler& sched
         }
         for (size_t index_b = 0; index_b < VideoCore::Surface::MaxPixelFormat; index_b++) {
             const auto view_format = static_cast<PixelFormat>(index_b);
-            if (VideoCore::Surface::IsViewCompatible(image_format, view_format,
-                                                     HasBrokenTextureViewFormats(), true)) {
+            if (VideoCore::Surface::IsViewCompatible(image_format, view_format, false, true)) {
                 const auto view_info =
                     MaxwellToVK::SurfaceFormat(device, FormatType::Optimal, true, view_format);
                 view_formats[index_a].push_back(view_info.format);
