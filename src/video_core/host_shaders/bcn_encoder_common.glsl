@@ -25,10 +25,7 @@ uint PackRGB565(vec3 c) {
 }
 
 vec3 UnpackRGB565(uint v) {
-    float r = float((v >> 11) & 0x1Fu) / 31.0;
-    float g = float((v >> 5)  & 0x3Fu) / 63.0;
-    float b = float(v & 0x1Fu) / 31.0;
-    return vec3(r, g, b);
+    return vec3(uvec3(v) & uvec3(0x1Fu << 11, 0x3Fu << 5, 0x1Fu << 0)) / vec3(float(31 << 11), float(63 << 5), float(31 << 0));
 }
 
 float DistSq(vec3 a, vec3 b) {
