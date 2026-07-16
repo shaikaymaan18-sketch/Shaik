@@ -177,7 +177,7 @@ public:
 
             if (res == 0) {
                 LOG_WARNING(HW_Memory, "Failed to check memory region: {}", GetLastError());
-                continue;
+                break;
             }
 
             auto start_aligned = AlignUp(reinterpret_cast<SIZE_T>(info.BaseAddress), HugePageSize);
@@ -187,6 +187,11 @@ public:
                 if (info.RegionSize - (start_aligned - reinterpret_cast<SIZE_T>(info.BaseAddress)) >= virtual_size) {
                     virtual_base = static_cast<u8*>(pfn_VirtualAlloc2
                         (process, reinterpret_cast<PVOID>(start_aligned), virtual_size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS, nullptr, 0));
+                    if (virtual_base) {
+                        break;
+                    } else {
+                        LOG_WARNING(HW_Memory, "Failed to allocate buffer at {:#x}, trying at at new address", start_aligned);
+                    }
                 }
             }
 
