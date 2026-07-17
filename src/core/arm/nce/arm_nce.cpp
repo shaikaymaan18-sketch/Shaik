@@ -335,7 +335,7 @@ void* ArmNce::RestoreGuestContext(void* raw_context) {
     // Retrieve the host context.
     auto host_ctx = KernelContext(raw_context);
 
-#ifndef _WIN32
+#ifdef __linux__
     // Thread-local parameters will be located in x9.
     auto* tpidr = reinterpret_cast<NativeExecutionParameters*>(host_ctx.regs()[9]);
 #else
@@ -453,9 +453,9 @@ HaltReason ArmNce::RunThread(Kernel::KThread* thread) {
     auto* process = thread->GetOwnerProcess();
 
 #if defined(__APPLE__)
-    ASSERT(pthread_setspecific(ContextKey, &thread_params) == 0);
+    ASSERT(pthread_setspecific(ContextKey, thread_params) == 0);
 #elif defined(_WIN32)
-    ASSERT_MSG(TlsSetValue(ContextKey, &thread_params), "Failed to set TLS value: id {}, error {}", ContextKey, GetLastError());
+    ASSERT_MSG(TlsSetValue(ContextKey, thread_params), "Failed to set TLS value: id {}, error {}", ContextKey, GetLastError());
 #endif
 
     // Move non-critical operations outside the locked section
