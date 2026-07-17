@@ -223,7 +223,11 @@ public:
     }
 
     void Map(size_t virtual_offset, size_t host_offset, size_t length, MemoryPermission perms) {
-        AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
+        // If we are direct mapping, intersect the range with our address space.
+        if (virtual_base == nullptr) {
+            AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
+        }
+
         std::unique_lock lock{placeholder_mutex};
         if (!IsNiechePlaceholder(virtual_offset, length)) {
             Split(virtual_offset, length);
@@ -235,7 +239,10 @@ public:
     }
 
     void Unmap(size_t virtual_offset, size_t length) {
-        AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
+        // If we are direct mapping, intersect the range with our address space.
+        if (virtual_base == nullptr) {
+            AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
+        }
         std::scoped_lock lock{placeholder_mutex};
 
         // Unmap until there are no more placeholders
@@ -244,7 +251,10 @@ public:
     }
 
     void Protect(size_t virtual_offset, size_t length, bool read, bool write, bool execute) {
-        AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
+        // If we are direct mapping, intersect this region with
+        if (virtual_base == nullptr) {
+            AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
+        }
 
         DWORD new_flags{};
         if (read && write && execute) {
@@ -682,8 +692,10 @@ public:
     }
 
     void Map(size_t virtual_offset, size_t host_offset, size_t length, MemoryPermission perms) {
-        // Intersect the range with our address space.
-        AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
+        // If we are direct mapping, intersect the range with our address space.
+        if (virtual_base == nullptr) {
+            AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
+        }
 
         // We are removing a placeholder.
         free_manager.AllocateBlock(virtual_base + virtual_offset, length);
@@ -707,8 +719,10 @@ public:
         // The method name is wrong. We're still talking about the virtual range.
         // We don't want to unmap, we want to reserve this memory.
 
-        // Intersect the range with our address space.
-        AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
+        // If we are using direct mapping, intersect the range with our address space.
+        if (virtual_base == nullptr) {
+            AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
+        }
 
         // Merge with any adjacent placeholder mappings.
         auto [merged_pointer, merged_size] =
@@ -719,8 +733,10 @@ public:
     }
 
     void Protect(size_t virtual_offset, size_t length, bool read, bool write, bool execute) {
-        // Intersect the range with our address space.
-        AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
+        // If we are using direct mapping, intersect the range with our address space.
+        if (virtual_base == nullptr) {
+            AdjustMap(virtual_map_base, virtual_size, &virtual_offset, &length);
+        }
 
         int flags = PROT_NONE;
         if (read) {
