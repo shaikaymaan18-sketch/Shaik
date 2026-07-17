@@ -625,7 +625,15 @@ void ArmNce::Initialize() {
     });
 #else
     static std::once_flag flag;
-    std::call_once(flag, [] { AddVectoredExceptionHandler(1, VectoredExceptionHandler); });
+    std::call_once(flag, [] {
+        // Initialize exception handler
+        AddVectoredExceptionHandler(1, VectoredExceptionHandler);
+
+        // Disable control flow guard to allow context switching to guest code without causing a security error
+        PROCESS_MITIGATION_CONTROL_FLOW_GUARD_POLICY cfg_policy{};
+        cfg_policy.EnableControlFlowGuard = 0;
+        SetProcessMitigationPolicy(ProcessControlFlowGuardPolicy, &cfg_policy, sizeof(cfg_policy));
+    });
 #endif
 }
 
