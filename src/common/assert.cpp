@@ -17,12 +17,12 @@ void AssertFailSoftImpl() {
     if (Settings::values.use_debug_asserts) {
         Common::Log::Stop();
 #ifndef _MSC_VER
-#   if defined(ARCHITECTURE_x86_64)
+#   if __has_builtin(__builtin_debugtrap)
+        __builtin_debugtrap();
+#   elif defined(ARCHITECTURE_x86_64)
         __asm__ __volatile__("int $3");
 #   elif defined(ARCHITECTURE_arm64)
         __asm__ __volatile__("brk #0");
-#   else
-        __builtin_debugtrap();
 #   endif
 #else // Clang/GCC ^^^ MSVC vvv
         DebugBreak();
