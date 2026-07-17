@@ -16,7 +16,7 @@ __declspec(dllimport) void __stdcall DebugBreak(void);
 void AssertFailSoftImpl() {
     if (Settings::values.use_debug_asserts) {
         Common::Log::Stop();
-#ifndef _WIN32
+#ifndef _MSC_VER
 #   if defined(ARCHITECTURE_x86_64)
         __asm__ __volatile__("int $3");
 #   elif defined(ARCHITECTURE_arm64)
@@ -24,7 +24,7 @@ void AssertFailSoftImpl() {
 #   else
         __builtin_debugtrap();
 #   endif
-#else // Non-Windows Clang/GCC ^^^ Windows vvv
+#else // Clang/GCC ^^^ MSVC vvv
         DebugBreak();
 #endif
     }
