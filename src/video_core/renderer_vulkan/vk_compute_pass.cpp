@@ -709,9 +709,12 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
     using namespace VideoCommon::Accelerated;
 
     const u32 MAX_BATCH_SLICES = (std::min)(z_count, image.info.size.depth);
+    static constexpr u32 MAX_WINDOW_SLICES = 4;
+    static constexpr float AREA_GROWTH_LIMIT = 3.0f;
 
     // Removing the if (!image.has_compute_unswizzle_buffer) check here is not ideal but MAX_BATCH_SLICES can changed mid-way through and I don't want to cause device loss or corruption
-    image.AllocateComputeUnswizzleBuffer(MAX_BATCH_SLICES);
+    // This may cause issues so needs thorough testing, if works fine this is a win to reduce vram usage
+    image.AllocateComputeUnswizzleBuffer((std::min)(MAX_BATCH_SLICES, MAX_WINDOW_SLICES));
 
     ASSERT(swizzles.size() == 1);
     const auto& sw = swizzles[0];
@@ -787,25 +790,8 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
                 continue;
             }
 
-            u32 ox0 = 0, oy0 = 0, ox1 = blocks_x, oy1 = blocks_y;
-            if (!slice_bounds.empty()) {
-                bool any = false;
-                u32 ux0 = blocks_x, uy0 = blocks_y, ux1 = 0, uy1 = 0;
-                for (u32 z = z_src; z < z_src + sub_len; ++z) {
-                    if (z >= static_cast<u32>(slice_bounds.size())) { any = false; break; }
-                    const auto& b = slice_bounds[z];
-                    if (b.x1 <= b.x0 || b.y1 <= b.y0) continue;
-                    ux0 = (std::min)(ux0, b.x0);
-                    uy0 = (std::min)(uy0, b.y0);
-                    ux1 = (std::max)(ux1, b.x1);
-                    uy1 = (std::max)(uy1, b.y1);
-                    any = true;
-                }
-                if (any) { ox0 = ux0; oy0 = uy0; ox1 = ux1; oy1 = uy1; }
-            }
-
             // Uncomment if junk data appears
-            //UnswizzleZeroChunk(image, z_dst, sub_len);
+            /*UnswizzleZeroChunk(image, z_dst, sub_len);
 
             scheduler.Record([dst_image = image.Handle(), aspect = image.AspectMask()](vk::CommandBuffer cmdbuf) {
                 if (dst_image == VK_NULL_HANDLE) return;
@@ -823,11 +809,60 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
                 };
                 cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT,
                                        VK_PIPELINE_STAGE_TRANSFER_BIT, 0, barrier);
-            });
+            });*/
 
-            UnswizzleChunk(image, swizzled, sw, params,
-                           ox0, oy0, ox1 - ox0, oy1 - oy0,
-                           z_src, z_dst, sub_len);
+            u32 win_offset = 0;
+            while (win_offset < sub_len) {
+                const u32 wz_start = z_src + win_offset;
+                const u32 wz_dst   = z_dst + win_offset;
+
+                u32 win_len = 0;
+                u32 ux0 = blocks_x, uy0 = blocks_y, ux1 = 0, uy1 = 0;
+                u64 slice_area_sum = 0;
+                bool any_in_window = false;
+
+                while (win_offset + win_len < sub_len && win_len < MAX_WINDOW_SLICES) {
+                    const u32 z = wz_start + win_len;
+                    const bool have_box = !slice_bounds.empty() &&
+                        z < static_cast<u32>(slice_bounds.size());
+                    const auto b = have_box ? slice_bounds[z] : SliceBBox{};
+                    const bool slice_populated = b.x1 > b.x0 && b.y1 > b.y0;
+
+                    if (slice_populated) {
+                        const u32 cx0 = any_in_window ? (std::min)(ux0, b.x0) : b.x0;
+                        const u32 cy0 = any_in_window ? (std::min)(uy0, b.y0) : b.y0;
+                        const u32 cx1 = any_in_window ? (std::max)(ux1, b.x1) : b.x1;
+                        const u32 cy1 = any_in_window ? (std::max)(uy1, b.y1) : b.y1;
+                        const u64 candidate_area =
+                            static_cast<u64>(cx1 - cx0) * (cy1 - cy0);
+                        const u64 candidate_slice_sum = slice_area_sum +
+                            static_cast<u64>(b.x1 - b.x0) * (b.y1 - b.y0);
+
+                        if (any_in_window && static_cast<float>(candidate_area) > (AREA_GROWTH_LIMIT * static_cast<float>(candidate_slice_sum))) {
+                            break;
+                        }
+
+                        ux0 = cx0; uy0 = cy0; ux1 = cx1; uy1 = cy1;
+                        slice_area_sum = candidate_slice_sum;
+                        any_in_window = true;
+                    }
+                    ++win_len;
+                }
+                if (win_len == 0) {
+                    win_len = 1;
+                }
+
+                const u32 ox0 = any_in_window ? ux0 : 0;
+                const u32 oy0 = any_in_window ? uy0 : 0;
+                const u32 ox1 = any_in_window ? ux1 : blocks_x;
+                const u32 oy1 = any_in_window ? uy1 : blocks_y;
+
+                UnswizzleChunk(image, swizzled, sw, params,
+                               ox0, oy0, ox1 - ox0, oy1 - oy0,
+                               wz_start, wz_dst, win_len);
+
+                win_offset += win_len;
+            }
 
             sub_offset += sub_len;
         }
