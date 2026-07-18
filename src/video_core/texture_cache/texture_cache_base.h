@@ -438,7 +438,6 @@ private:
 
     void QueueAsyncUnswizzle(Image& image, ImageId image_id);
     void TickAsyncUnswizzle();
-    void TickCompletedSparseImages();
 
     struct CompletedSparseImage {
         ImageId image_id;
@@ -540,7 +539,6 @@ private:
     std::vector<std::unique_ptr<AsyncDecodeContext>> async_decodes;
 
     std::deque<PendingUnswizzle> unswizzle_queue;
-    std::deque<CompletedSparseImage> completed_sparse_images;
 
     // Join caching
     boost::container::small_vector<ImageId, 4> join_overlap_ids;
