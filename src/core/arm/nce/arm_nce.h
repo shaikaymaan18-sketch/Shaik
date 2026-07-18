@@ -43,6 +43,28 @@ constexpr u64 TlsSlots = offsetof(TEB, TlsSlots);
 #endif
 
 
+struct NativeExecutionParameters {
+
+#if (defined(__APPLE__) || defined(_WIN32)) && HAS_NCE
+    // Are we in actual guest code?
+    bool is_actually_running{};
+#endif
+    // Are we in any stage of performing guest operations?
+    bool is_running{};
+    u32 magic{Common::MakeMagic('Y', 'U', 'Z', 'U')};
+    std::atomic<u32> lock{1};
+    u64 tpidr_el0{};
+    u64 tpidrro_el0{};
+    GuestContext* native_context{};
+
+#ifdef _WIN32
+    u64 guest_stack_base;
+    u64 guest_stack_limit;
+    u64 host_stack_base;
+    u64 host_stack_limit;
+#endif
+};
+
 class ArmNce final : public ArmInterface {
 public:
     ArmNce(System& system, bool uses_wall_clock, std::size_t core_index);
@@ -81,11 +103,11 @@ protected:
 
 private:
     // Only confirmed to be valid on Apple systems.
-    static void* GetGuestParameters();
+    static NativeExecutionParameters* GetGuestParameters();
 
-    static HaltReason ReturnToRunCodeByTrampoline(void* tpidr, u64 trampoline_addr);
+    static HaltReason ReturnToRunCodeByTrampoline(NativeExecutionParameters* tpidr, u64 trampoline_addr);
 #ifndef _WIN32
-    static HaltReason ReturnToRunCodeByExceptionLevelChange(int tid, void* tpidr);
+    static HaltReason ReturnToRunCodeByExceptionLevelChange(int tid, NativeExecutionParameters* tpidr);
 #else
     static HaltReason ReturnToRunCodeByExceptionLevelChange(void* tid, void* tpidr);
     static LONG VectoredExceptionHandler(PEXCEPTION_POINTERS info);
@@ -97,10 +119,10 @@ private:
     static void GuestMemoryFaultSignalHandler(int sig, void* info, void* raw_context);
     static bool HandleFailedGuestFault(GuestContext* ctx, void* info, void* raw_context);
 
-    static void LockThreadParameters(void* tpidr);
-    static void UnlockThreadParameters(void* tpidr);
+    static void LockThreadParameters(NativeExecutionParameters* tpidr);
+    static void UnlockThreadParameters(NativeExecutionParameters* tpidr);
 
-    static void* RestoreGuestContext(void* raw_context);
+    static NativeExecutionParameters* RestoreGuestContext(void* raw_context);
     static void SaveGuestContext(GuestContext* ctx, void* raw_context);
 
 public:

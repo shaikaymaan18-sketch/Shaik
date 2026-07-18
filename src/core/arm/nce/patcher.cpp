@@ -27,8 +27,6 @@ namespace Core::NCE {
 using namespace Common::Literals;
 using namespace oaknut::util;
 
-using NativeExecutionParameters = Kernel::KThread::NativeExecutionParameters;
-
 constexpr size_t MaxRelativeBranch = 128_MiB;
 constexpr u32 ModuleCodeIndex = 0x24 / sizeof(u32);
 

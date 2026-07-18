@@ -25,7 +25,6 @@
 #define YUZU_NAKED_END
 #endif
 
-#include <cinttypes>
 #include <memory>
 
 #include "common/signal_chain.h"
@@ -52,26 +51,18 @@ struct sigaction g_orig_bus_action;
 struct sigaction g_orig_segv_action;
 #endif
 
-using NativeExecutionParameters = Kernel::KThread::NativeExecutionParameters;
-
 using namespace Common::Literals;
 constexpr u32 StackSize = 128_KiB;
 
 } // namespace
 
 YUZU_ALWAYS_INLINE
-void* ArmNce::GetGuestParameters() {
-    void* nep; /* NativeExecutionParameters* */
+NativeExecutionParameters* ArmNce::GetGuestParameters() {
+    NativeExecutionParameters* nep = nullptr;
 #if defined(__APPLE__)
-    // https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/libsyscall/os/tsd.h#L156-L189
-    asm volatile(
-        "mrs %[out], TPIDRRO_EL0\n"         // load pthreads TLS storage
-        "ldr %[out], [ %[out], #%[off] ]\n" // accessed like an array, so i * sizeof(u64)
-        : [out] "=&r"(nep)
-        : [off] "i"((ContextKey - 1) * 8)
-        : "memory");
+    nep = static_cast<NativeExecutionParameters*>(pthread_getspecific(ContextKey));
 #elif defined(_WIN32)
-    nep = TlsGetValue(ContextKey);
+    nep = static_cast<NativeExecutionParameters*>(TlsGetValue(ContextKey));
 #elif defined(__linux__)
     asm volatile(
         "mrs %0, TPIDR_EL0\n"
@@ -81,9 +72,7 @@ void* ArmNce::GetGuestParameters() {
 }
 
 YUZU_ALWAYS_INLINE
-void ArmNce::LockThreadParameters(void* tpidr) {
-    auto* nep = static_cast<NativeExecutionParameters*>(tpidr);
-
+void ArmNce::LockThreadParameters(NativeExecutionParameters* nep) {
     u32 value;
     do {
         do {
@@ -95,28 +84,27 @@ void ArmNce::LockThreadParameters(void* tpidr) {
 }
 
 YUZU_ALWAYS_INLINE
-void ArmNce::UnlockThreadParameters(void* tpidr) {
-    static_cast<NativeExecutionParameters*>(tpidr)->lock.store(SpinLockUnlocked, std::memory_order_release);
+void ArmNce::UnlockThreadParameters(NativeExecutionParameters* nep) {
+    nep->lock.store(SpinLockUnlocked, std::memory_order_release);
 }
 
 #ifndef _WIN32
 YUZU_NAKED
 YUZU_NO_INLINE
-HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(int tid, void *tpidr) {
+HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(int tid, NativeExecutionParameters* tpidr) {
     // x0  - tid
     // x1  - tpidr
 
-    // x9 - NativeExecutionParameters*
+    // x9 - NativeExecutionParameters* (on Linux)
     //
     // uses tkill on linux and pthread_kill on macOS, both have the same signature:
     /* syscall (u32 tid, u64 signal) */
     // tid is already in x0 so we don't have to explicitly pass it
 
     asm volatile(
-        "mov x9, x1\n" // move tpidr to x9 so it doesn't get clobbered
-
         "mov x1, #%[sig]\n"  // set x1 to SIGUSR2
 #if defined(__linux__)
+        "mov x9, x1\n" // move tpidr to x9 so it doesn't get clobbered
         "mov x8, %[syscall]\n"
         "svc #0\n"
         "brk 0x0\n"
@@ -136,36 +124,36 @@ HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(int tid, void *tpidr) {
 }
 YUZU_NAKED_END
 #else
-HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(void* tid, void *tpidr) {
+HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(void* tid, NativeExecutionParameters *tpidr) {
     RaiseException(ExceptionLevelChangeSignal, 0, 0, nullptr); // TODO: pass tpidr through arguments?
     __builtin_unreachable();
 }
 #endif
 
 void ArmNce::ReturnToRunCodeByExceptionLevelChangeSignalHandler(int sig, void *info, void *raw_context) {
-    auto tpidr = static_cast<NativeExecutionParameters*>(RestoreGuestContext(raw_context));
+    NativeExecutionParameters* nep = RestoreGuestContext(raw_context);
 
 #if !defined(__APPLE__) && !defined(_WIN32)
     // Save old value of TPIDR_EL0, load guest one
-    u64 tpidr_el0;
+    u64 tpidr;
     asm volatile("mrs %0, TPIDR_EL0\n"
                  "msr TPIDR_EL0, %1\n"
-                 : "=r"(tpidr_el0)
-                 : "r"(tpidr));
-    tpidr->tpidr_el0 = tpidr_el0;
+                 : "=r"(tpidr)
+                 : "r"(nep));
+    nep->tpidr_el0 = tpidr;
 #else
-    tpidr->is_actually_running = true;
+    nep->is_actually_running = true;
 #endif
 
-    UnlockThreadParameters(tpidr);
+    UnlockThreadParameters(nep);
     // sigaction restores context and returns to guest
 }
 
 YUZU_NAKED
 YUZU_NO_INLINE
-HaltReason ArmNce::ReturnToRunCodeByTrampoline(void *tpidr, u64 trampoline_addr) {
+HaltReason ArmNce::ReturnToRunCodeByTrampoline(NativeExecutionParameters* nep, u64 trampoline_addr) {
     // x0 - NativeExecutionParameters*
-    // x1 - addr
+    // x1 - trampoline_addr
 
     // x2 - GuestContext*
     // x3 - Host SP
@@ -226,19 +214,19 @@ static_assert(offsetof(HostContext, host_sp) == 0xE0); // TODO: don't use magic 
 #ifndef _WIN32
 
 void ArmNce::BreakFromRunCodeSignalHandler(int sig, void *info, void *raw_context) {
-    NativeExecutionParameters* tpidr = static_cast<NativeExecutionParameters *>(GetGuestParameters());
+    NativeExecutionParameters* tpidr = GetGuestParameters();
 #if defined(__APPLE__) || defined(_WIN32)
     if (tpidr->is_actually_running) {
         tpidr->is_actually_running = false;
 #else
     if (tpidr->magic == Common::MakeMagic('Y', 'U', 'Z', 'U')) {
         // Load the host's TPIDR_EL0 value
-        void* host_tpidr = reinterpret_cast<GuestContext*>(&tpidr->native_context)->host_ctx.host_tpidr_el0;
+        void* host_tpidr = tpidr->native_context->host_ctx.host_tpidr_el0;
         asm volatile(
             "msr TPIDR_EL0, %[host_tpidr]\n"
             :: [host_tpidr] "r"(host_tpidr));
 #endif
-        SaveGuestContext(static_cast<GuestContext *>(tpidr->native_context), raw_context);
+        SaveGuestContext(tpidr->native_context, raw_context);
         // SaveGuestContext loads host context, returning from here will enter host code.
     }
 }
@@ -246,7 +234,7 @@ void ArmNce::BreakFromRunCodeSignalHandler(int sig, void *info, void *raw_contex
 #endif
 
 void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_context) {
-    NativeExecutionParameters* nep = static_cast<NativeExecutionParameters*>(GetGuestParameters());
+    NativeExecutionParameters* nep = GetGuestParameters();
 
 #if defined(__APPLE__) || defined(_WIN32)
     if (nep->is_actually_running) {
@@ -254,13 +242,13 @@ void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_co
 #else
     if (nep->magic == Common::MakeMagic('Y', 'U', 'Z', 'U')) {
         // Load the host's TPIDR_EL0 value
-        void* host_tpidr = reinterpret_cast<GuestContext*>(&nep->native_context)->host_ctx.host_tpidr_el0;
+        void* host_tpidr = nep->native_context->host_ctx.host_tpidr_el0;
         asm volatile(
             "msr TPIDR_EL0, %[host_tpidr]\n"
             :: [host_tpidr] "r"(host_tpidr));
 #endif
 
-        auto* guest_ctx = static_cast<GuestContext*>(nep->native_context);
+        auto* guest_ctx = nep->native_context;
         auto& memory = guest_ctx->parent->m_running_thread->GetOwnerProcess()->GetMemory();
 
 #ifndef _WIN32
@@ -331,17 +319,18 @@ void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_co
 #endif
 }
 
-void* ArmNce::RestoreGuestContext(void* raw_context) {
+NativeExecutionParameters* ArmNce::RestoreGuestContext(void* raw_context) {
     // Retrieve the host context.
     auto host_ctx = KernelContext(raw_context);
 
 #ifdef __linux__
     // Thread-local parameters will be located in x9.
-    auto* tpidr = reinterpret_cast<NativeExecutionParameters*>(host_ctx.regs()[9]);
+    auto* nep = reinterpret_cast<NativeExecutionParameters*>(host_ctx.regs()[9]);
 #else
-    auto* tpidr = static_cast<NativeExecutionParameters*>(GetGuestParameters());
+    auto* nep = GetGuestParameters();
 #endif
-    auto* guest_ctx = static_cast<GuestContext*>(tpidr->native_context);
+
+    auto* guest_ctx = nep->native_context;
 
     // Save host callee-saved registers.
     std::memcpy(guest_ctx->host_ctx.host_saved_vregs.data(), &host_ctx.vregs()[8],
@@ -361,8 +350,18 @@ void* ArmNce::RestoreGuestContext(void* raw_context) {
     std::memcpy(host_ctx.regs(), guest_ctx->cpu_registers.data(), sizeof(guest_ctx->cpu_registers));
     std::memcpy(host_ctx.vregs(), guest_ctx->vector_registers.data(), sizeof(guest_ctx->vector_registers));
 
+#ifdef _WIN32
+    auto tib = (PNT_TIB)NtCurrentTeb();
+    // Save host stack base/limit
+    nep->host_stack_base = tib->StackBase;
+    nep->host_stack_limit = tib->StackLimit;
+    // Set guest stack base/limit for CET
+    tib->StackBase = nep->guest_stack_base;
+    tib->StartLimit = nep->guest_stack_limit;
+#endif
+
     // Return the new thread-local storage pointer.
-    return tpidr;
+    return nep;
 }
 
 void ArmNce::SaveGuestContext(GuestContext* guest_ctx, void* raw_context) {
@@ -380,6 +379,13 @@ void ArmNce::SaveGuestContext(GuestContext* guest_ctx, void* raw_context) {
 
     // Restore stack pointer.
     *host_ctx.sp() = guest_ctx->host_ctx.host_sp;
+
+#ifdef _WIN32
+    // Restore stack base/limit for CET
+    auto tib = (PNT_TIB)NtCurrentTeb();
+    tib->StackBase = nep->host_stack_base;
+    tib->StartLimit = nep->host_stack_limit;
+#endif
 
     // Restore host callee-saved registers.
     std::memcpy(&host_ctx.regs()[19], guest_ctx->host_ctx.host_saved_regs.data(),
@@ -456,6 +462,11 @@ HaltReason ArmNce::RunThread(Kernel::KThread* thread) {
     ASSERT(pthread_setspecific(ContextKey, thread_params) == 0);
 #elif defined(_WIN32)
     ASSERT_MSG(TlsSetValue(ContextKey, thread_params), "Failed to set TLS value: id {}, error {}", ContextKey, GetLastError());
+    ASSERT_MSG(TlsSetValue(NCEStorage, thread_params->native_context->cpu_registers[18]),
+        "Failed to set TLS value: id {}, error {}", ContextKey, GetLastError());
+
+    thread_params->guest_stack_base = thread->GetOwnerProcess()->GetPageTable().GetStackRegionStart() + thread->GetOwnerProcess()->GetPageTable().GetStackRegionSize();
+    thread_params->guest_stack_limit = thread->GetOwnerProcess()->GetPageTable().GetStackRegionStart();
 #endif
 
     // Move non-critical operations outside the locked section
@@ -529,6 +540,8 @@ ArmNce::~ArmNce() = default;
 
 #ifdef _WIN32
 LONG WINAPI ArmNce::VectoredExceptionHandler(PEXCEPTION_POINTERS info) {
+    // TODO: Windows doesn't allocate a separate stack so either on the guest
+    // or current host stack, is that okay?
     DWORD code = info->ExceptionRecord->ExceptionCode;
 
     if (code == EXCEPTION_ACCESS_VIOLATION || code == EXCEPTION_DATATYPE_MISALIGNMENT) {

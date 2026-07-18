@@ -33,6 +33,10 @@
 #include "core/hle/kernel/svc_types.h"
 #include "core/hle/result.h"
 
+#ifdef HAS_NCE
+#include "core/arm/nce/arm_nce.h"
+#endif
+
 namespace Common {
 class Fiber;
 }
@@ -665,25 +669,11 @@ public:
         return m_stack_top;
     }
 
-public:
-    // TODO: This shouldn't be defined in kernel namespace
-    struct NativeExecutionParameters {
-#if (defined(__APPLE__) || defined(_WIN32)) && HAS_NCE
-        // Are we in actual guest code?
-        bool is_actually_running{};
-#endif
-        // Are we in any stage of performing guest operations?
-        bool is_running{};
-        u32 magic{Common::MakeMagic('Y', 'U', 'Z', 'U')};
-        std::atomic<u32> lock{1};
-        u64 tpidr_el0{};
-        u64 tpidrro_el0{};
-        void* native_context{};
-    };
-
-    NativeExecutionParameters& GetNativeExecutionParameters() {
+#ifdef HAS_NCE
+    Core::NativeExecutionParameters& GetNativeExecutionParameters() {
         return m_native_execution_parameters;
     }
+#endif
 
 private:
     KThread* RemoveWaiterByKey(KernelCore& kernel, bool* out_has_waiters, KProcessAddress key, bool is_kernel_address_key);
@@ -941,7 +931,9 @@ private:
     ThreadWaitReasonForDebugging m_wait_reason_for_debugging{};
     uintptr_t m_argument{};
     KProcessAddress m_stack_top{};
-    NativeExecutionParameters m_native_execution_parameters{};
+#ifdef HAS_NCE
+    Core::NativeExecutionParameters m_native_execution_parameters{};
+#endif
 
 public:
     using ConditionVariableThreadTreeType = ConditionVariableThreadTree;
