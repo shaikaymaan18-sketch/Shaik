@@ -21,6 +21,7 @@
 #include "common/logging.h"
 #include "common/settings.h"
 #include "common/random.h"
+#include "core/arm/nce/arm_nce.h"
 #include "core/core.h"
 #include "core/cpu_manager.h"
 #include "core/hardware_properties.h"
@@ -110,7 +111,11 @@ namespace Kernel {
     } // namespace
 
     KThread::KThread(KernelCore& kernel)
-        : KAutoObjectWithSlabHeapAndContainer{kernel}, m_activity_pause_lock{kernel} {}
+        : KAutoObjectWithSlabHeapAndContainer{kernel}, m_activity_pause_lock{kernel} {
+#ifdef HAS_NCE
+        m_native_execution_parameters = std::make_unique<Core::NativeExecutionParameters>();
+#endif
+    }
     KThread::~KThread() = default;
 
     Result KThread::Initialize(KernelCore& kernel, KThreadFunction func, uintptr_t arg, KProcessAddress user_stack_top,

@@ -33,15 +33,12 @@
 #include "core/hle/kernel/svc_types.h"
 #include "core/hle/result.h"
 
-#ifdef HAS_NCE
-#include "core/arm/nce/arm_nce.h"
-#endif
-
 namespace Common {
 class Fiber;
 }
 
 namespace Core {
+struct NativeExecutionParameters;
 namespace Memory {
 class Memory;
 }
@@ -670,8 +667,8 @@ public:
     }
 
 #ifdef HAS_NCE
-    Core::NativeExecutionParameters& GetNativeExecutionParameters() {
-        return m_native_execution_parameters;
+    Core::NativeExecutionParameters& GetNativeExecutionParameters() const {
+        return *m_native_execution_parameters;
     }
 #endif
 
@@ -932,7 +929,7 @@ private:
     uintptr_t m_argument{};
     KProcessAddress m_stack_top{};
 #ifdef HAS_NCE
-    Core::NativeExecutionParameters m_native_execution_parameters{};
+    std::unique_ptr<Core::NativeExecutionParameters> m_native_execution_parameters;
 #endif
 
 public:
