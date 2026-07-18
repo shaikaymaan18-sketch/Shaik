@@ -463,7 +463,7 @@ HaltReason ArmNce::RunThread(Kernel::KThread* thread) {
     ASSERT(pthread_setspecific(ContextKey, thread_params) == 0);
 #elif defined(_WIN32)
     ASSERT_MSG(TlsSetValue(ContextKey, thread_params), "Failed to set TLS value: id {}, error {}", ContextKey, GetLastError());
-    ASSERT_MSG(TlsSetValue(NCEStorage, reinterpret_cast<void*>(thread_params->native_context->cpu_registers[18])),
+    ASSERT_MSG(TlsSetValue(NCEStorage, reinterpret_cast<void*>(m_guest_ctx.cpu_registers[18])),
         "Failed to set TLS value: id {}, error {}", ContextKey, GetLastError());
 
     thread_params->guest_stack_base = reinterpret_cast<void*>(GetInteger(
