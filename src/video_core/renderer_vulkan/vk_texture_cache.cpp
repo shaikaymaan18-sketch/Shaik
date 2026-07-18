@@ -145,8 +145,6 @@ constexpr VkBorderColor ConvertBorderColor(const std::array<float, 4>& color) {
 }
 
 [[nodiscard]] bool WillUseWidenedAstcFormat(const Device& device, const ImageInfo& info) {
-    // Disable widened ASTC formats to avoid VkFormat / GLSL image format mismatches
-    // that can cause Vulkan device loss. Always use A8B8G8R8_UNORM_PACK32 for ASTC decode.
     return false;
 }
 
