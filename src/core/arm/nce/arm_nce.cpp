@@ -91,7 +91,7 @@ void ArmNce::UnlockThreadParameters(NativeExecutionParameters* nep) {
 #ifndef _WIN32
 YUZU_NAKED
 YUZU_NO_INLINE
-HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(int tid, NativeExecutionParameters* tpidr) {
+HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(thread_id tid, NativeExecutionParameters* tpidr) {
     // x0  - tid
     // x1  - tpidr
 
@@ -124,7 +124,7 @@ HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(int tid, NativeExecutio
 }
 YUZU_NAKED_END
 #else
-HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(void* tid, NativeExecutionParameters *tpidr) {
+HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(thread_id tid, NativeExecutionParameters *tpidr) {
     RaiseException(ExceptionLevelChangeSignal, 0, 0, nullptr); // TODO: pass tpidr through arguments?
     __builtin_unreachable();
 }
@@ -357,7 +357,7 @@ NativeExecutionParameters* ArmNce::RestoreGuestContext(void* raw_context) {
     nep->host_stack_limit = tib->StackLimit;
     // Set guest stack base/limit for CET
     tib->StackBase = nep->guest_stack_base;
-    tib->StartLimit = nep->guest_stack_limit;
+    tib->StackLimit = nep->guest_stack_limit;
 #endif
 
     // Return the new thread-local storage pointer.
@@ -382,9 +382,10 @@ void ArmNce::SaveGuestContext(GuestContext* guest_ctx, void* raw_context) {
 
 #ifdef _WIN32
     // Restore stack base/limit for CET
+    // TODO: store this in Context instead of NEP?
     auto tib = (PNT_TIB)NtCurrentTeb();
-    tib->StackBase = nep->host_stack_base;
-    tib->StartLimit = nep->host_stack_limit;
+    tib->StackBase = GetGuestParameters()->host_stack_base;
+    tib->StackLimit = GetGuestParameters()->host_stack_limit;
 #endif
 
     // Restore host callee-saved registers.
@@ -462,11 +463,12 @@ HaltReason ArmNce::RunThread(Kernel::KThread* thread) {
     ASSERT(pthread_setspecific(ContextKey, thread_params) == 0);
 #elif defined(_WIN32)
     ASSERT_MSG(TlsSetValue(ContextKey, thread_params), "Failed to set TLS value: id {}, error {}", ContextKey, GetLastError());
-    ASSERT_MSG(TlsSetValue(NCEStorage, thread_params->native_context->cpu_registers[18]),
+    ASSERT_MSG(TlsSetValue(NCEStorage, reinterpret_cast<void*>(thread_params->native_context->cpu_registers[18])),
         "Failed to set TLS value: id {}, error {}", ContextKey, GetLastError());
 
-    thread_params->guest_stack_base = thread->GetOwnerProcess()->GetPageTable().GetStackRegionStart() + thread->GetOwnerProcess()->GetPageTable().GetStackRegionSize();
-    thread_params->guest_stack_limit = thread->GetOwnerProcess()->GetPageTable().GetStackRegionStart();
+    thread_params->guest_stack_base = reinterpret_cast<void*>(GetInteger(
+        thread->GetOwnerProcess()->GetPageTable().GetStackRegionStart() + thread->GetOwnerProcess()->GetPageTable().GetStackRegionSize()));
+    thread_params->guest_stack_limit = reinterpret_cast<void*>(GetInteger(thread->GetOwnerProcess()->GetPageTable().GetStackRegionStart()));
 #endif
 
     // Move non-critical operations outside the locked section
@@ -563,26 +565,26 @@ LONG WINAPI ArmNce::VectoredExceptionHandler(PEXCEPTION_POINTERS info) {
 
 #ifdef __APPLE__
 // https://github.com/apple-oss-distributions/libpthread/blob/42d026df5b07825070f60134b980a1ec2552dfee/src/pthread_tsd.c#L418-L435
+// Equivalent to pthread_key_create but allows for setting a specific key value.
+// Used in internal WebKit and certain Apple programs to define and use a reserved key.
 extern "C" int pthread_key_init_np(int, void (*)(void *));
 #endif
 
 void ArmNce::Initialize() {
-#ifdef __APPLE__
-    if (m_thread_id == -1) {
-        m_thread_id = pthread_mach_thread_np(pthread_self());
-    }
 
-    ASSERT(pthread_key_init_np(ContextKey, [](void*) -> void {}) == 0);
-#elif defined(__linux__)
-    if (m_thread_id == -1) {
+    if (m_thread_id == NULL_THREAD_ID) {
+
+#if defined(__APPLE__)
+        m_thread_id = pthread_mach_thread_np(pthread_self());
+        ASSERT(pthread_key_init_np(ContextKey, [](void*) -> void {}) == 0);
+#elif defined(__linux)
         m_thread_id = gettid();
-    }
 #elif defined(_WIN32)
-    if (m_thread_id == nullptr) {
         DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(),
             &m_thread_id, 0, false, DUPLICATE_SAME_ACCESS);
-    }
 #endif
+
+    }
 
 #ifndef _WIN32
     // Configure signal stack.
@@ -700,7 +702,7 @@ void ArmNce::SignalInterrupt(Kernel::KThread* thread) {
             :: "r"(static_cast<u64>(m_thread_id)), "r"(static_cast<u64>(SIGURG))
             : "x0", "x1", "x16", "memory", "cc");
 #elif defined(_WIN32)
-        // TODO: use SetThreadState to emulate BreakFromRunCodeSignalHandler
+        // TODO: use Get/SetThreadState to emulate BreakFromRunCodeSignalHandler
         SuspendThread(m_thread_id);
         UnlockThreadParameters(params);
 #endif

@@ -45,10 +45,11 @@ constexpr u64 TlsSlots = offsetof(TEB, TlsSlots);
 
 struct NativeExecutionParameters {
 
-#if (defined(__APPLE__) || defined(_WIN32)) && HAS_NCE
+#if defined(__APPLE__) || defined(_WIN32)
     // Are we in actual guest code?
     bool is_actually_running{};
 #endif
+
     // Are we in any stage of performing guest operations?
     bool is_running{};
     u32 magic{Common::MakeMagic('Y', 'U', 'Z', 'U')};
@@ -58,10 +59,10 @@ struct NativeExecutionParameters {
     GuestContext* native_context{};
 
 #ifdef _WIN32
-    u64 guest_stack_base;
-    u64 guest_stack_limit;
-    u64 host_stack_base;
-    u64 host_stack_limit;
+    void* guest_stack_base;
+    void* guest_stack_limit;
+    void* host_stack_base;
+    void* host_stack_limit;
 #endif
 };
 
@@ -94,6 +95,17 @@ public:
     void LockThread(Kernel::KThread* thread) override;
     void UnlockThread(Kernel::KThread* thread) override;
 
+#ifdef __linux__
+    typedef pid_t thread_id;
+    static constexpr thread_id NULL_THREAD_ID = -1;
+#elif __APPLE__
+    typedef mach_port_t thread_id;
+    static constexpr thread_id NULL_THREAD_ID = -1U;
+#elif _WIN32
+    typedef HANDLE thread_id;
+    static constexpr thread_id NULL_THREAD_ID = nullptr;
+#endif
+
 protected:
     const Kernel::DebugWatchpoint* HaltedWatchpoint() const override {
         return nullptr;
@@ -106,18 +118,16 @@ private:
     static NativeExecutionParameters* GetGuestParameters();
 
     static HaltReason ReturnToRunCodeByTrampoline(NativeExecutionParameters* tpidr, u64 trampoline_addr);
-#ifndef _WIN32
-    static HaltReason ReturnToRunCodeByExceptionLevelChange(int tid, NativeExecutionParameters* tpidr);
-#else
-    static HaltReason ReturnToRunCodeByExceptionLevelChange(void* tid, void* tpidr);
-    static LONG VectoredExceptionHandler(PEXCEPTION_POINTERS info);
-#endif
+    static HaltReason ReturnToRunCodeByExceptionLevelChange(thread_id tid, NativeExecutionParameters* tpidr);
 
     static void ReturnToRunCodeByExceptionLevelChangeSignalHandler(int sig, void* info,
                                                                    void* raw_context);
     static void BreakFromRunCodeSignalHandler(int sig, void* info, void* raw_context);
     static void GuestMemoryFaultSignalHandler(int sig, void* info, void* raw_context);
     static bool HandleFailedGuestFault(GuestContext* ctx, void* info, void* raw_context);
+#ifdef _WIN32
+    static LONG VectoredExceptionHandler(PEXCEPTION_POINTERS info);
+#endif
 
     static void LockThreadParameters(NativeExecutionParameters* tpidr);
     static void UnlockThreadParameters(NativeExecutionParameters* tpidr);
@@ -130,11 +140,7 @@ public:
 
     // Members set on initialization.
     std::size_t m_core_index{};
-#ifndef _WIN32
-    pid_t m_thread_id{-1};
-#else
-    void* m_thread_id{};
-#endif
+    thread_id m_thread_id{NULL_THREAD_ID};
 
     // Core context.
     GuestContext m_guest_ctx{};

@@ -21,7 +21,6 @@
 #include "common/logging.h"
 #include "common/settings.h"
 #include "common/random.h"
-#include "core/arm/nce/arm_nce.h"
 #include "core/core.h"
 #include "core/cpu_manager.h"
 #include "core/hardware_properties.h"
@@ -42,6 +41,10 @@
 #include "core/hle/kernel/svc_types.h"
 #include "core/hle/result.h"
 #include "core/memory.h"
+
+#ifdef HAS_NCE
+#include "core/arm/nce/arm_nce.h"
+#endif
 
 namespace {
 
