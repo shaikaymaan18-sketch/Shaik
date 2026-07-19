@@ -12,11 +12,11 @@
 
 #include "shader_recompiler/shader_info.h"
 #include "video_core/renderer_vulkan/vk_compute_pass.h"
+#include "video_core/renderer_vulkan/vk_render_pass_cache.h"
 #include "video_core/renderer_vulkan/vk_staging_buffer_pool.h"
 #include "video_core/texture_cache/image_view_base.h"
 #include "video_core/vulkan_common/vulkan_memory_allocator.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
-#include "video_core/delayed_destruction_ring.h"
 
 namespace Settings {
 struct ResolutionScalingInfo;
@@ -58,8 +58,6 @@ public:
 
     void FreeDeferredStagingBuffer(StagingBufferRef& ref);
 
-    void ReleaseSparseUnswizzleBuffer(Image& image);
-
     void TickFrame();
 
     u64 GetDeviceLocalMemory() const;
@@ -90,15 +88,12 @@ public:
     }
 
     bool CanUploadMSAA() const noexcept {
-        return msaa_copy_pass.operator bool();
+        return true;
     }
 
     void AccelerateImageUpload(Image&, const StagingBufferRef&,
-                             std::span<const VideoCommon::SwizzleParameters>,
-                             u32 z_src_start, u32 z_image_start, u32 z_count,
-                             std::span<const u8> slice_has_data = {},
-                             std::span<const VideoCommon::Accelerated::SliceBBox> slice_bounds = {},
-                             bool image_already_uploaded = false);
+                               std::span<const VideoCommon::SwizzleParameters>,
+                               u32 z_start, u32 z_count);
 
     void InsertUploadMemoryBarrier() {}
 
@@ -115,6 +110,24 @@ public:
     }
 
     [[nodiscard]] VkBuffer GetTemporaryBuffer(size_t needed_size);
+
+    struct ResolveShadow {
+        vk::Image image;
+        vk::ImageView view;
+        VkFormat format = VK_FORMAT_UNDEFINED;
+        VkExtent2D extent{};
+        u32 layers = 0;
+        bool up_to_date = false;
+    };
+
+    [[nodiscard]] VkImageView GetOrCreateResolveShadow(VkImage msaa_image, VkFormat format,
+                                                       VkExtent2D extent, u32 layers);
+
+    [[nodiscard]] const ResolveShadow* GetValidResolveShadow(VkImage msaa_image) const;
+
+    void InvalidateResolveShadow(VkImage msaa_image);
+
+    void EraseResolveShadow(VkImage msaa_image);
 
     std::span<const VkFormat> ViewFormats(PixelFormat format) {
         return view_formats[static_cast<std::size_t>(format)];
@@ -136,14 +149,13 @@ public:
     std::optional<ASTCDecoderPass> astc_decoder_pass;
 
     std::optional<BlockLinearUnswizzle3DPass> bl3d_unswizzle_pass;
-    std::optional<MSAACopyPass> msaa_copy_pass;
     const Settings::ResolutionScalingInfo& resolution;
     std::array<std::vector<VkFormat>, VideoCore::Surface::MaxPixelFormat> view_formats;
 
     static constexpr size_t indexing_slots = 8 * sizeof(size_t);
     std::array<vk::Buffer, indexing_slots> buffers{};
-
-    VideoCommon::DelayedDestructionRing<vk::Buffer, 8> sentenced_unswizzle_buffers;
+    std::vector<std::pair<u64, vk::Image>> pending_msaa_images;
+    ankerl::unordered_dense::map<VkImage, ResolveShadow> resolve_shadows;
 };
 
 class Framebuffer {
@@ -173,6 +185,13 @@ public:
     [[nodiscard]] VkRenderPass RenderPass() const noexcept {
         return renderpass;
     }
+
+    [[nodiscard]] const RenderPassKey& RenderPassKeyBase() const noexcept {
+        return render_pass_key;
+    }
+
+    [[nodiscard]] VkRenderPass RenderPassVariant(u32 color_clear_mask, bool depth_stencil_clear,
+                                                 u32 color_discard_mask) const;
 
     [[nodiscard]] VkExtent2D RenderArea() const noexcept {
         return render_area;
@@ -214,6 +233,18 @@ public:
         return is_rescaled;
     }
 
+    [[nodiscard]] bool HasResolveColor() const noexcept {
+        return !resolve_images.empty();
+    }
+
+    [[nodiscard]] VkImage ResolveColorImage(size_t index) const noexcept {
+        return index < resolve_images.size() ? *resolve_images[index] : VK_NULL_HANDLE;
+    }
+
+    [[nodiscard]] bool DiscardsMsaaColor() const noexcept {
+        return discard_msaa_color;
+    }
+
 private:
     vk::Framebuffer framebuffer;
     VkRenderPass renderpass{};
@@ -227,6 +258,11 @@ private:
     bool has_depth{};
     bool has_stencil{};
     bool is_rescaled{};
+    std::vector<vk::Image> resolve_images;
+    std::vector<vk::ImageView> resolve_image_views;
+    RenderPassKey render_pass_key{};
+    RenderPassCache* render_pass_cache{nullptr};
+    bool discard_msaa_color{};
 };
 
 class Image : public VideoCommon::ImageBase {
@@ -288,7 +324,6 @@ public:
     u64 allocation_tick;
 
     friend class BlockLinearUnswizzle3DPass;
-    friend class TextureCacheRuntime;
 
 private:
     bool BlitScaleHelper(bool scale_up);
@@ -304,7 +339,6 @@ private:
     vk::Buffer compute_unswizzle_buffer;
     VkDeviceSize compute_unswizzle_buffer_size = 0;
     bool has_compute_unswizzle_buffer = false;
-    bool compute_unswizzle_buffer_is_zero = false;
 
     void AllocateComputeUnswizzleBuffer(u32 max_slices);
 
