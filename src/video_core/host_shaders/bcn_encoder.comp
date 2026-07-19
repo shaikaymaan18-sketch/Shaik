@@ -17,8 +17,12 @@ layout(binding = 1, std430) writeonly buffer OutputBuffer {
 
 layout(push_constant) uniform PushConstants {
     uvec2 blocks_dim;
-    uint is_bc3;
+    uint format; // 0 = BC1, 1 = BC3, 2 = BC7
 } pc;
+
+const uint FORMAT_BC1 = 0u;
+const uint FORMAT_BC3 = 1u;
+const uint FORMAT_BC7 = 2u;
 
 const float ALPHA_THRESHOLD = 128.0 / 255.0;
 
@@ -36,6 +40,33 @@ float DistSq(vec3 a, vec3 b) {
     return dot(d, d);
 }
 
+float DistSq4(vec4 a, vec4 b) {
+    vec4 d = a - b;
+    return dot(d, d);
+}
+
+const uint BC7_WEIGHTS4[16] = uint[16](0u,4u,9u,13u,17u,21u,26u,30u,34u,38u,43u,47u,51u,55u,60u,64u);
+
+void PutBits(inout uvec4 data, inout uint bit_pos, uint value, uint width) {
+    uint word_idx = bit_pos / 32u;
+    uint bit_off  = bit_pos % 32u;
+    value &= (width >= 32u) ? 0xFFFFFFFFu : ((1u << width) - 1u);
+    data[word_idx] |= (value << bit_off);
+    if (bit_off + width > 32u && word_idx < 3u) {
+        data[word_idx + 1u] |= (value >> (32u - bit_off));
+    }
+    bit_pos += width;
+}
+
+void QuantizeChannelP(float target01, uint p, out uint comp7) {
+    float target8 = clamp(target01, 0.0, 1.0) * 255.0;
+    comp7 = uint(clamp(round((target8 - float(p)) / 2.0), 0.0, 127.0));
+}
+
+float ReconstructChannelP(uint comp7, uint p) {
+    return float((comp7 << 1) | p) / 255.0;
+}
+
 void main() {
     const uint local_idx = gl_LocalInvocationIndex;
     const uint subgroup_block_idx = local_idx / 16u;
@@ -51,25 +82,148 @@ void main() {
     const uvec2 texel_coord = (block_coord.xy * 4u) + uvec2(texel_idx % 4u, texel_idx / 4u);
     const vec4 texel = imageLoad(src_image, ivec3(texel_coord, int(gl_GlobalInvocationID.z)));
 
-    const bool IS_BC3_FLAG = (pc.is_bc3 != 0u);
+    const bool IS_BC3 = (pc.format == FORMAT_BC3);
+    const bool IS_BC7 = (pc.format == FORMAT_BC7);
 
-    const bool opaque = IS_BC3_FLAG || (texel.a >= ALPHA_THRESHOLD);
+    // This is using just mode 6 from BC7, getting all of them would be out of bounds of what I can do atm
+    if (IS_BC7) {
+        const vec4 block_sum = subgroupClusteredAdd(texel, 16u);
+        const vec4 mean = block_sum / 16.0;
+
+        vec4 d = texel - mean;
+        float c00 = subgroupClusteredAdd(d.x*d.x, 16u);
+        float c01 = subgroupClusteredAdd(d.x*d.y, 16u);
+        float c02 = subgroupClusteredAdd(d.x*d.z, 16u);
+        float c03 = subgroupClusteredAdd(d.x*d.w, 16u);
+        float c11 = subgroupClusteredAdd(d.y*d.y, 16u);
+        float c12 = subgroupClusteredAdd(d.y*d.z, 16u);
+        float c13 = subgroupClusteredAdd(d.y*d.w, 16u);
+        float c22 = subgroupClusteredAdd(d.z*d.z, 16u);
+        float c23 = subgroupClusteredAdd(d.z*d.w, 16u);
+        float c33 = subgroupClusteredAdd(d.w*d.w, 16u);
+
+        vec4 axis = vec4(1.0);
+        for (int iter = 0; iter < 4; ++iter) {
+            vec4 next_axis;
+            next_axis.x = c00*axis.x + c01*axis.y + c02*axis.z + c03*axis.w;
+            next_axis.y = c01*axis.x + c11*axis.y + c12*axis.z + c13*axis.w;
+            next_axis.z = c02*axis.x + c12*axis.y + c22*axis.z + c23*axis.w;
+            next_axis.w = c03*axis.x + c13*axis.y + c23*axis.z + c33*axis.w;
+            axis = next_axis;
+            float len_sq = dot(axis, axis);
+            axis = len_sq > 1e-12 ? axis * inversesqrt(len_sq) : vec4(1.0, 0.0, 0.0, 0.0);
+        }
+
+        const float proj = dot(texel - mean, axis);
+        const float min_proj = subgroupClusteredMin(proj, 16u);
+        const float max_proj = subgroupClusteredMax(proj, 16u);
+
+        vec4 e0 = mean + axis * max_proj;
+        vec4 e1 = mean + axis * min_proj;
+
+        uint p0 = 0u, p1 = 0u;
+        uint e0c[4], e1c[4];
+        {
+            float best_err = 1e9;
+            for (uint p = 0u; p < 2u; ++p) {
+                uint c[4]; float err = 0.0;
+                for (int ch = 0; ch < 4; ++ch) {
+                    QuantizeChannelP(e0[ch], p, c[ch]);
+                    float recon = ReconstructChannelP(c[ch], p);
+                    err += (recon - e0[ch]) * (recon - e0[ch]);
+                }
+                if (err < best_err) { best_err = err; p0 = p; e0c = c; }
+            }
+            best_err = 1e9;
+            for (uint p = 0u; p < 2u; ++p) {
+                uint c[4]; float err = 0.0;
+                for (int ch = 0; ch < 4; ++ch) {
+                    QuantizeChannelP(e1[ch], p, c[ch]);
+                    float recon = ReconstructChannelP(c[ch], p);
+                    err += (recon - e1[ch]) * (recon - e1[ch]);
+                }
+                if (err < best_err) { best_err = err; p1 = p; e1c = c; }
+            }
+        }
+
+        vec4 rc0 = vec4(ReconstructChannelP(e0c[0], p0), ReconstructChannelP(e0c[1], p0),
+        ReconstructChannelP(e0c[2], p0), ReconstructChannelP(e0c[3], p0));
+        vec4 rc1 = vec4(ReconstructChannelP(e1c[0], p1), ReconstructChannelP(e1c[1], p1),
+        ReconstructChannelP(e1c[2], p1), ReconstructChannelP(e1c[3], p1));
+
+        float best_d = DistSq4(texel, mix(rc0, rc1, float(BC7_WEIGHTS4[0]) / 64.0));
+        uint best = 0u;
+        for (uint w = 1u; w < 16u; ++w) {
+            float d2 = DistSq4(texel, mix(rc0, rc1, float(BC7_WEIGHTS4[w]) / 64.0));
+            if (d2 < best_d) { best_d = d2; best = w; }
+        }
+
+        const uint shifted = best << ((texel_idx % 8u) * 4u);
+        const uint g0_contrib = (texel_idx < 8u)  ? shifted : 0u;
+        const uint g1_contrib = (texel_idx >= 8u) ? shifted : 0u;
+        uint idx_word0 = subgroupClusteredOr(g0_contrib, 16u);
+        uint idx_word1 = subgroupClusteredOr(g1_contrib, 16u);
+
+        const uint anchor_index = idx_word0 & 0xFu;
+        if (anchor_index >= 8u) {
+            uint tmp_p = p0; p0 = p1; p1 = tmp_p;
+            uint tmp_c0 = e0c[0], tmp_c1 = e0c[1], tmp_c2 = e0c[2], tmp_c3 = e0c[3];
+            e0c[0] = e1c[0]; e0c[1] = e1c[1]; e0c[2] = e1c[2]; e0c[3] = e1c[3];
+            e1c[0] = tmp_c0; e1c[1] = tmp_c1; e1c[2] = tmp_c2; e1c[3] = tmp_c3;
+            idx_word0 = ~idx_word0;
+            idx_word1 = ~idx_word1;
+        }
+
+        if (texel_idx == 0u) {
+            uint out_index = (gl_GlobalInvocationID.z * pc.blocks_dim.y * pc.blocks_dim.x) +
+            (block_coord.y * pc.blocks_dim.x) + block_coord.x;
+
+            uvec4 result = uvec4(0u);
+            uint bit_pos = 0u;
+
+            PutBits(result, bit_pos, 1u << 6, 7u);
+
+            PutBits(result, bit_pos, e0c[0], 7u); PutBits(result, bit_pos, e1c[0], 7u); // R
+            PutBits(result, bit_pos, e0c[1], 7u); PutBits(result, bit_pos, e1c[1], 7u); // G
+            PutBits(result, bit_pos, e0c[2], 7u); PutBits(result, bit_pos, e1c[2], 7u); // B
+            PutBits(result, bit_pos, e0c[3], 7u); PutBits(result, bit_pos, e1c[3], 7u); // A
+
+            PutBits(result, bit_pos, p0, 1u);
+            PutBits(result, bit_pos, p1, 1u);
+
+            PutBits(result, bit_pos, idx_word0 & 0x7u, 3u);
+            for (uint i = 1u; i < 8u; ++i) {
+                PutBits(result, bit_pos, (idx_word0 >> (i * 4u)) & 0xFu, 4u);
+            }
+            for (uint i = 0u; i < 8u; ++i) {
+                PutBits(result, bit_pos, (idx_word1 >> (i * 4u)) & 0xFu, 4u);
+            }
+
+            out_blocks[out_index * 4u]      = result.x;
+            out_blocks[out_index * 4u + 1u] = result.y;
+            out_blocks[out_index * 4u + 2u] = result.z;
+            out_blocks[out_index * 4u + 3u] = result.w;
+        }
+        return;
+    }
+
+    const bool opaque = IS_BC3 || (texel.a >= ALPHA_THRESHOLD);
     const uint active_count = opaque ? 1u : 0u;
     const uint opaque_count = subgroupClusteredAdd(active_count, 16u);
-    const bool any_transparent = (!IS_BC3_FLAG) && (opaque_count < 16u);
+    const bool any_transparent = (!IS_BC3) && (opaque_count < 16u);
 
-    if (!IS_BC3_FLAG && opaque_count == 0u) {
+    if (!IS_BC3 && opaque_count == 0u) {
         if (texel_idx == 0u) {
-                               uint out_index = (gl_GlobalInvocationID.z * pc.blocks_dim.y * pc.blocks_dim.x) + (block_coord.y * pc.blocks_dim.x) + block_coord.x;
-                               out_blocks[out_index * 2u + 0u] = 0u;
-                               out_blocks[out_index * 2u + 1u] = 0xFFFFFFFFu;
+            uint out_index = (gl_GlobalInvocationID.z * pc.blocks_dim.y * pc.blocks_dim.x) + (block_coord.y * pc.blocks_dim.x) + block_coord.x;
+            out_blocks[out_index * 2u + 0u] = 0u;
+            out_blocks[out_index * 2u + 1u] = 0xFFFFFFFFu;
         }
         return;
     }
 
     const vec3 active_texel = opaque ? texel.rgb : vec3(0.0);
     const vec3 block_sum = subgroupClusteredAdd(active_texel, 16u);
-    const vec3 mean = IS_BC3_FLAG ? (block_sum / 16.0) : (block_sum / max(float(opaque_count), 1.0));
+    const vec3 mean = IS_BC3 ? (block_sum / 16.0) : (block_sum / max(float(opaque_count), 1.0));
 
     float c00 = 0.0, c01 = 0.0, c02 = 0.0;
     float c11 = 0.0, c12 = 0.0, c22 = 0.0;
@@ -112,7 +266,7 @@ void main() {
     uint p0 = PackRGB565(ep_max);
     uint p1 = PackRGB565(ep_min);
 
-    if (IS_BC3_FLAG || !any_transparent) {
+    if (IS_BC3 || !any_transparent) {
         if (p0 < p1) {
             uint tmp = p0; p0 = p1; p1 = tmp;
             vec3 tmpv = ep_max; ep_max = ep_min; ep_min = tmpv;
@@ -128,7 +282,7 @@ void main() {
     const vec3 c1 = UnpackRGB565(p1);
 
     vec3 c2, c3;
-    if (IS_BC3_FLAG) {
+    if (IS_BC3) {
         c2 = (2.0 * c0 + c1) / 3.0;
         c3 = (c0 + 2.0 * c1) / 3.0;
     } else {
@@ -137,7 +291,7 @@ void main() {
     }
 
     uint best = 0u;
-    if (!IS_BC3_FLAG && any_transparent && !opaque) {
+    if (!IS_BC3 && any_transparent && !opaque) {
         best = 3u;
     } else {
         float best_d = DistSq(texel.rgb, c0);
@@ -147,7 +301,7 @@ void main() {
         float d2 = DistSq(texel.rgb, c2);
         if (d2 < best_d) { best = 2u; best_d = d2; }
 
-        if (IS_BC3_FLAG || !any_transparent) {
+        if (IS_BC3 || !any_transparent) {
             float d3 = DistSq(texel.rgb, c3);
             if (d3 < best_d) { best = 3u; best_d = d3; }
         }
@@ -158,7 +312,7 @@ void main() {
     uint alpha_low = 0u;
     uint alpha_high = 0u;
 
-    if (IS_BC3_FLAG) {
+    if (IS_BC3) {
         const float a_min = subgroupClusteredMin(texel.a, 16u);
         const float a_max = subgroupClusteredMax(texel.a, 16u);
 
@@ -198,7 +352,7 @@ void main() {
     if (texel_idx == 0u) {
         uint out_index = (gl_GlobalInvocationID.z * pc.blocks_dim.y * pc.blocks_dim.x) + (block_coord.y * pc.blocks_dim.x) + block_coord.x;
 
-        if (IS_BC3_FLAG) {
+        if (IS_BC3) {
             out_blocks[out_index * 4u] = alpha_low;
             out_blocks[out_index * 4u + 1u] = alpha_high;
             out_blocks[out_index * 4u + 2u] = p0 | (p1 << 16u);

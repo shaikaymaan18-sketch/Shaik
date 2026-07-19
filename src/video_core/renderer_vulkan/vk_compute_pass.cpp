@@ -671,7 +671,7 @@ constexpr std::array<VkDescriptorUpdateTemplateEntry, BCN_NUM_BINDINGS>
 
 struct BcnEncodePushConstants {
     u32 blocks_dim[2];
-    u32 is_bc3;
+    u32 format;
 };
 
 BcnEncodePass::BcnEncodePass(const Device& device_, Scheduler& scheduler_,
@@ -687,7 +687,7 @@ BcnEncodePass::~BcnEncodePass() = default;
 
 void BcnEncodePass::Encode(VkImageView src_view, u32 blocks_x, u32 blocks_y, u32 layers,
                            VkBuffer out_buffer, VkDeviceSize out_buffer_offset,
-                           VkDeviceSize output_bytes, bool is_bc3) {
+                           VkDeviceSize output_bytes, u32 format) {
     scheduler.RequestOutsideRenderPassOperationContext();
 
     compute_pass_descriptor_queue.Acquire(scheduler, 2);
@@ -697,7 +697,7 @@ void BcnEncodePass::Encode(VkImageView src_view, u32 blocks_x, u32 blocks_y, u32
 
     const BcnEncodePushConstants pc{
         .blocks_dim = {blocks_x, blocks_y},
-        .is_bc3 = is_bc3
+        .format = format
     };
     const u32 gx = Common::DivCeil(blocks_x, 2u);
     const u32 gy = Common::DivCeil(blocks_y, 2u);

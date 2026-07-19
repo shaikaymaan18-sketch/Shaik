@@ -139,10 +139,7 @@ constexpr VkBorderColor ConvertBorderColor(const std::array<float, 4>& color) {
     if (Settings::values.accelerate_astc.GetValue() != Settings::AstcDecodeMode::Gpu) {
         return false;
     }
-    const auto recompression = Settings::values.astc_recompression.GetValue();
-    return (recompression == Settings::AstcRecompression::Uncompressed ||
-            recompression == Settings::AstcRecompression::Bc1) &&
-          info.size.depth == 1;
+    return info.size.depth == 1;
 }
 
 [[nodiscard]] bool WillUseWidenedAstcFormat(const Device& device, const ImageInfo& info) {
@@ -933,6 +930,10 @@ TextureCacheRuntime::TextureCacheRuntime(const Device& device_, Scheduler& sched
                 case Settings::AstcRecompression::Bc3:
                     view_formats[index_a].push_back(VK_FORMAT_BC3_UNORM_BLOCK);
                     view_formats[index_a].push_back(VK_FORMAT_BC3_SRGB_BLOCK);
+                    break;
+                case Settings::AstcRecompression::Bc7:
+                    view_formats[index_a].push_back(VK_FORMAT_BC7_UNORM_BLOCK);
+                    view_formats[index_a].push_back(VK_FORMAT_BC7_SRGB_BLOCK);
                     break;
                 default:
                     view_formats[index_a].push_back(VK_FORMAT_A8B8G8R8_UNORM_PACK32);
@@ -2900,13 +2901,17 @@ void TextureCacheRuntime::AccelerateAstcBCnRecompress(
     Image& image, const StagingBufferRef& map,
     std::span<const VideoCommon::SwizzleParameters> swizzles) {
 
-    bool is_bc3 = Settings::values.astc_recompression.GetValue() == Settings::AstcRecompression::Bc3;
+    const auto recompression = Settings::values.astc_recompression.GetValue();
+    const u32 format = recompression == Settings::AstcRecompression::Bc7 ? 2u
+                      : recompression == Settings::AstcRecompression::Bc3 ? 1u : 0u;
+    const bool is_16_byte = format != 0u;
+
     ImageInfo temp_info = image.info;
     VkImageCreateInfo image_ci = MakeImageCreateInfo(device, temp_info);
     image_ci.format = NeedsWidenedAstcIntermediate(device, image.info)
                           ? VK_FORMAT_R32G32B32A32_SFLOAT
                           : VK_FORMAT_A8B8G8R8_UNORM_PACK32;
-    image_ci.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    image_ci.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
     vk::Image temp_vk_image = memory_allocator.CreateImage(image_ci);
 
     Image temp_wrapper(*this, temp_info, 0, 0);
@@ -2948,7 +2953,7 @@ void TextureCacheRuntime::AccelerateAstcBCnRecompress(
         const u32 blocks_x = Common::DivCeil(level_width, 4u);
         const u32 blocks_y = Common::DivCeil(level_height, 4u);
 
-        const VkDeviceSize mip_bytes = static_cast<VkDeviceSize>(blocks_x) * blocks_y * (is_bc3 ? 16u : 8u) * layers;
+        const VkDeviceSize mip_bytes = static_cast<VkDeviceSize>(blocks_x) * blocks_y * (is_16_byte ? 16u : 8u) * layers;
         mip_offsets.push_back(total_staging_bytes);
         total_staging_bytes += mip_bytes;
     }
@@ -2962,23 +2967,23 @@ void TextureCacheRuntime::AccelerateAstcBCnRecompress(
         const u32 blocks_x = Common::DivCeil(level_width, 4u);
         const u32 blocks_y = Common::DivCeil(level_height, 4u);
 
-        const VkDeviceSize mip_bytes = static_cast<VkDeviceSize>(blocks_x) * blocks_y * (is_bc3 ? 16u : 8u) * layers;
+        const VkDeviceSize mip_bytes = static_cast<VkDeviceSize>(blocks_x) * blocks_y * (is_16_byte ? 16u : 8u) * layers;
         const VkDeviceSize current_offset = out_buffer.offset + mip_offsets[i];
 
         bcn_encode_pass->Encode(temp_wrapper.StorageImageView(level), blocks_x, blocks_y, layers,
-                                    out_buffer.buffer, current_offset, mip_bytes, is_bc3);
+                                    out_buffer.buffer, current_offset, mip_bytes, format);
 
         const VkBuffer src_buffer = out_buffer.buffer;
         const VkDeviceSize per_layer_bytes = mip_bytes / layers;
 
         scheduler.Record([dst_image, aspect, src_buffer, current_offset, level_width, level_height,
-                          per_layer_bytes, layers, level](vk::CommandBuffer cmdbuf) {
+                          per_layer_bytes, layers, level, blocks_x, blocks_y](vk::CommandBuffer cmdbuf) {
             boost::container::small_vector<VkBufferImageCopy, 8> regions;
             for (u32 layer = 0; layer < layers; ++layer) {
                 regions.push_back(VkBufferImageCopy{
                     .bufferOffset = current_offset + per_layer_bytes * layer,
-                    .bufferRowLength = 0,
-                    .bufferImageHeight = 0,
+                    .bufferRowLength = blocks_x * 4u,
+                    .bufferImageHeight = blocks_y * 4u,
                     .imageSubresource = {aspect, level, layer, 1},
                     .imageOffset = {0, 0, 0},
                     .imageExtent = {level_width, level_height, 1},

@@ -146,7 +146,7 @@ public:
 
     void Encode(VkImageView src_view, u32 blocks_x, u32 blocks_y, u32 layers,
                 VkBuffer out_buffer, VkDeviceSize out_buffer_offset, VkDeviceSize output_bytes,
-                bool is_bc3);
+                u32 format);
 
 private:
     const Device& device;
