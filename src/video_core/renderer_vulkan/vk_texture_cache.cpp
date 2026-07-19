@@ -1577,7 +1577,18 @@ std::optional<size_t> TextureCacheRuntime::GetSamplerHeapBudget() const {
     return device.GetSamplerHeapBudget();
 }
 
-void TextureCacheRuntime::TickFrame() {}
+void TextureCacheRuntime::TickFrame() {
+    sentenced_unswizzle_buffers.Tick();
+}
+
+void TextureCacheRuntime::ReleaseSparseUnswizzleBuffer(Image& image) {
+    if (image.has_compute_unswizzle_buffer) {
+        sentenced_unswizzle_buffers.Push(std::move(image.compute_unswizzle_buffer));
+        image.has_compute_unswizzle_buffer = false;
+        image.compute_unswizzle_buffer_size = 0;
+        image.compute_unswizzle_buffer_is_zero = false;
+    }
+}
 
 Image::Image(TextureCacheRuntime& runtime_, const ImageInfo& info_, GPUVAddr gpu_addr_,
              VAddr cpu_addr_)
@@ -1674,6 +1685,7 @@ void Image::AllocateComputeUnswizzleBuffer(u32 max_slices) {
         runtime->memory_allocator.CreateBuffer(ci, MemoryUsage::DeviceLocal);
 
     has_compute_unswizzle_buffer = true;
+    compute_unswizzle_buffer_is_zero = false;
 }
 
 void Image::UploadMemory(VkBuffer buffer, VkDeviceSize offset,
@@ -2537,7 +2549,10 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
 void TextureCacheRuntime::AccelerateImageUpload(
     Image& image, const StagingBufferRef& map,
     std::span<const VideoCommon::SwizzleParameters> swizzles,
-    u32 z_start, u32 z_count) {
+    u32 z_src_start, u32 z_image_start, u32 z_count,
+    std::span<const u8> slice_has_data,
+    std::span<const VideoCommon::Accelerated::SliceBBox> slice_bounds,
+    bool image_already_uploaded) {
 
     if (IsPixelFormatASTC(image.info.format)) {
         return astc_decoder_pass->Assemble(image, map, swizzles);
@@ -2551,8 +2566,16 @@ void TextureCacheRuntime::AccelerateImageUpload(
         return;
     }
 
-    if (bl3d_unswizzle_pass && IsPixelFormatBCn(image.info.format) && image.info.type == ImageType::e3D && image.info.resources.levels == 1 && image.info.resources.layers == 1) {
-        return bl3d_unswizzle_pass->Unswizzle(image, map, swizzles, z_start, z_count);
+    if (bl3d_unswizzle_pass &&
+        IsPixelFormatBCn(image.info.format) &&
+        image.info.type == ImageType::e3D &&
+        image.info.resources.levels == 1 &&
+        image.info.resources.layers == 1) {
+
+        return bl3d_unswizzle_pass->Unswizzle(image, map, swizzles,
+                                               z_src_start, z_image_start, z_count,
+                                               slice_has_data, slice_bounds,
+                                               image_already_uploaded);
     }
 
     ASSERT(false);

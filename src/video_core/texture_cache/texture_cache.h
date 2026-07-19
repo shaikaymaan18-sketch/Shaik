@@ -24,6 +24,7 @@
 #include "video_core/texture_cache/samples_helper.h"
 #include "video_core/texture_cache/texture_cache_base.h"
 #include "video_core/texture_cache/util.h"
+#include "video_core/texture_cache/accelerated_swizzle.h"
 #include "video_core/textures/decoders.h"
 
 namespace VideoCommon {
@@ -95,6 +96,7 @@ TextureCache<P>::TextureCache(Runtime& runtime_, Tegra::MaxwellDeviceMemoryManag
             case Settings::GpuUnswizzle::Normal:  swizzle_chunk_size = 16_MiB; break;
             case Settings::GpuUnswizzle::Medium:  swizzle_chunk_size = 32_MiB; break;
             case Settings::GpuUnswizzle::High:    swizzle_chunk_size = 64_MiB; break;
+            case Settings::GpuUnswizzle::Off:     swizzle_chunk_size = 0; break;
             default:                              swizzle_chunk_size = 16_MiB;
         }
 
@@ -104,6 +106,7 @@ TextureCache<P>::TextureCache(Runtime& runtime_, Tegra::MaxwellDeviceMemoryManag
             case Settings::GpuUnswizzleChunk::Normal:  swizzle_slices_per_batch = 128; break;
             case Settings::GpuUnswizzleChunk::Medium:  swizzle_slices_per_batch = 256; break;
             case Settings::GpuUnswizzleChunk::High:    swizzle_slices_per_batch = 512; break;
+            case Settings::GpuUnswizzleChunk::Off:     swizzle_slices_per_batch = 0; break;
             default:                                   swizzle_slices_per_batch = 128;
         }
     } else {
@@ -1144,7 +1147,7 @@ void TextureCache<P>::UploadImageContents(Image& image, StagingBuffer& staging) 
         gpu_memory->ReadBlock(gpu_addr, mapped_span.data(), mapped_span.size_bytes(),
                               VideoCommon::CacheType::NoTextureCache);
         const auto uploads = FullUploadSwizzles(image.info);
-        runtime.AccelerateImageUpload(image, staging, FixSmallVectorADL(uploads), 0, 0);
+        runtime.AccelerateImageUpload(image, staging, FixSmallVectorADL(uploads), 0, 0, 0);
         return;
     }
 
@@ -1401,74 +1404,230 @@ void TextureCache<P>::TickAsyncUnswizzle() {
         return;
     }
 
-    if(current_unswizzle_frame > 0) {
-        current_unswizzle_frame--;
-        return;
-    }
-
     PendingUnswizzle& task = unswizzle_queue.front();
     Image& image = slot_images[task.image_id];
 
     if (!task.initialized) {
-        task.total_size = MapSizeBytes(image);
+        if (!task.is_incremental) {
+            task.total_size = MapSizeBytes(image);
+        }
         task.staging_buffer = runtime.UploadStagingBuffer(task.total_size, true);
 
-        const auto& info = image.info;
-        const u32 bytes_per_block = BytesPerBlock(info.format);
-        const u32 width_blocks = Common::DivCeil(info.size.width, 4u);
-        const u32 height_blocks = Common::DivCeil(info.size.height, 4u);
+        if (!task.is_incremental) {
+            const auto& info = image.info;
+            const u32 bytes_per_block = BytesPerBlock(info.format);
+            const u32 width_blocks = Common::DivCeil(info.size.width, 4u);
+            const u32 height_blocks = Common::DivCeil(info.size.height, 4u);
+            task.bytes_per_slice = static_cast<size_t>(width_blocks * bytes_per_block) * height_blocks;
+            task.last_submitted_offset = 0;
 
-        const u32 stride = width_blocks * bytes_per_block;
-        const u32 aligned_height = height_blocks;
-        task.bytes_per_slice = static_cast<size_t>(stride) * aligned_height;
-        task.last_submitted_offset = 0;
+            task.is_sparse = True(image.flags & ImageFlagBits::Sparse);
+            if (task.is_sparse) {
+                const auto segs =
+                    gpu_memory->GetSubmappedRange(image.gpu_addr, image.guest_size_bytes);
+                task.sparse_segments.assign(segs.begin(), segs.end());
+
+                std::sort(task.sparse_segments.begin(), task.sparse_segments.end(),
+                          [](const auto& a, const auto& b) { return a.first < b.first; });
+
+                task.segment_scan_cursor = 0;
+
+                task.slice_has_data.assign(image.info.size.depth, 0u);
+                task.slice_bounds.assign(image.info.size.depth, {});
+
+                if (image.info.size.depth > 1) {
+                    const auto uploads = FullUploadSwizzles(task.info);
+                    const auto sp = VideoCommon::Accelerated::MakeBlockLinearSwizzle3DParams(
+                        uploads[0], task.info);
+                    const u64 swizzled_slice_size = sp.slice_size;
+                    task.swizzled_slice_size  = swizzled_slice_size;
+                    task.swizzle_block_depth  = sp.block_depth;
+
+                    const u32 blocks_x = Common::DivCeil(task.info.size.width, 4u);
+                    const u32 blocks_y = Common::DivCeil(task.info.size.height, 4u);
+
+                    const u32 zz_count = 1u << sp.block_depth;
+                    const u32 total_groups = Common::DivCeil(
+                        static_cast<u32>(image.info.size.depth), zz_count);
+                    u32 group_watermark = 0;
+
+                    for (const auto& [seg_gpu_addr, seg_size] : task.sparse_segments) {
+                        const u64 seg_start = seg_gpu_addr - image.gpu_addr;
+                        const u64 seg_end   = seg_start + seg_size;
+
+                        while (group_watermark < total_groups &&
+                               static_cast<u64>(group_watermark) * swizzled_slice_size + swizzled_slice_size <= seg_start) {
+                            ++group_watermark;
+                        }
+
+                        for (u32 g = group_watermark; g < total_groups; ++g) {
+                            const u64 group_base = static_cast<u64>(g) * swizzled_slice_size;
+                            if (group_base >= seg_end) break;
+
+                            const u64 local_start = (std::max)(seg_start, group_base) - group_base;
+                            const u64 local_end   = (std::min)(seg_end, group_base + swizzled_slice_size) - group_base;
+
+                            VideoCommon::Accelerated::ForEachZInGroupOverlap(
+                                local_start, local_end,
+                                sp.block_size, sp.x_shift, sp.block_height, sp.block_height_mask,
+                                sp.block_depth, sp.block_depth_mask, bytes_per_block, blocks_x, blocks_y,
+                                [&](u32 zz, const VideoCommon::Accelerated::SliceBBox& box) {
+                                    const u32 z = g * zz_count + zz;
+                                    if (z >= static_cast<u32>(image.info.size.depth)) return;
+
+                                    task.slice_has_data[z] = 1u;
+                                    auto& acc = task.slice_bounds[z];
+                                    if (acc.x1 <= acc.x0 || acc.y1 <= acc.y0) {
+                                        acc = box;
+                                    } else {
+                                        acc.x0 = (std::min)(acc.x0, box.x0);
+                                        acc.y0 = (std::min)(acc.y0, box.y0);
+                                        acc.x1 = (std::max)(acc.x1, box.x1);
+                                        acc.y1 = (std::max)(acc.y1, box.y1);
+                                    }
+                                });
+                        }
+                    }
+                } else {
+                    std::fill(task.slice_has_data.begin(), task.slice_has_data.end(), 1u);
+                }
+            }
+        }
+
         task.initialized = true;
     }
 
     // Read data
     if (task.current_offset < task.total_size) {
-        const size_t remaining = task.total_size - task.current_offset;
+        const size_t remaining   = task.total_size - task.current_offset;
+        size_t copy_amount = (swizzle_chunk_size == 0 || task.is_incremental)
+                             ? remaining
+                             : (std::min)(swizzle_chunk_size, remaining);
 
-        size_t copy_amount = (std::min)(swizzle_chunk_size, remaining);
-
-        if (remaining > swizzle_chunk_size) {
+        if (swizzle_chunk_size > 0 && !task.is_incremental && copy_amount < remaining) {
             copy_amount = (copy_amount / task.bytes_per_slice) * task.bytes_per_slice;
             if (copy_amount == 0) copy_amount = task.bytes_per_slice;
+            copy_amount = (std::min)(copy_amount, remaining);
         }
 
-        gpu_memory->ReadBlock(image.gpu_addr + task.current_offset,
-                              task.staging_buffer.mapped_span.data() + task.current_offset,
-                              copy_amount);
+        u8* const staging_base = task.staging_buffer.mapped_span.data();
+
+        const size_t base_off   = task.staging_base_byte_offset;
+        const size_t read_start = task.current_offset;
+        const size_t read_end   = read_start + copy_amount;
+        const size_t abs_start  = read_start + base_off;
+        const size_t abs_end    = read_end   + base_off;
+
+        if (task.is_sparse) {
+            size_t cursor = read_start;
+
+            const bool can_smart_skip =
+                task.swizzle_block_depth == 0 &&
+                task.swizzled_slice_size > 0 &&
+                !task.slice_has_data.empty();
+
+            auto fill_gap = [&](size_t gap_start_rel, size_t gap_end_rel) {
+                if (gap_start_rel >= gap_end_rel) return;
+                if (!can_smart_skip) {
+                    std::memset(staging_base + gap_start_rel, 0, gap_end_rel - gap_start_rel);
+                    return;
+                }
+                size_t pos = gap_start_rel;
+                while (pos < gap_end_rel) {
+                    const u64 abs_pos  = pos + base_off;
+                    const u32 z_abs    = static_cast<u32>(abs_pos / task.swizzled_slice_size);
+                    const u32 z_in_bm  = z_abs - task.incremental_z_start;
+                    if (z_in_bm >= static_cast<u32>(task.slice_has_data.size())) break;
+                    const size_t slice_abs_end =
+                        (static_cast<size_t>(z_abs) + 1) * task.swizzled_slice_size;
+                    const size_t end_rel = (std::min)(gap_end_rel,
+                                                    slice_abs_end - base_off);
+                    if (task.slice_has_data[z_in_bm])
+                        std::memset(staging_base + pos, 0, end_rel - pos);
+                    pos = end_rel;
+                }
+            };
+
+            while (task.segment_scan_cursor < task.sparse_segments.size()) {
+                const auto& [seg_gpu_addr, seg_size] =
+                    task.sparse_segments[task.segment_scan_cursor];
+                const size_t seg_abs_start =
+                    static_cast<size_t>(seg_gpu_addr - image.gpu_addr);
+                const size_t seg_abs_end = seg_abs_start + seg_size;
+
+                if (seg_abs_end <= abs_start) { ++task.segment_scan_cursor; continue; }
+                if (seg_abs_start >= abs_end)  { break; }
+
+                const size_t ol_abs_start = (std::max)(seg_abs_start, abs_start);
+                const size_t ol_abs_end   = (std::min)(seg_abs_end,   abs_end);
+
+                const size_t ol_rel_start = ol_abs_start - base_off;
+                const size_t ol_rel_end   = ol_abs_end   - base_off;
+
+                fill_gap(cursor, ol_rel_start);
+
+                gpu_memory->ReadBlockUnsafe(image.gpu_addr + ol_abs_start,
+                                            staging_base + ol_rel_start,
+                                            ol_abs_end - ol_abs_start);
+                cursor = ol_rel_end;
+
+                if (seg_abs_end > abs_end) break;
+                ++task.segment_scan_cursor;
+            }
+            fill_gap(cursor, read_end);
+
+        } else {
+            gpu_memory->ReadBlockUnsafe(image.gpu_addr + abs_start,
+                                        staging_base + read_start,
+                                        copy_amount);
+        }
         task.current_offset += copy_amount;
     }
 
     const bool is_final_batch = task.current_offset >= task.total_size;
-    const size_t bytes_ready = task.current_offset - task.last_submitted_offset;
+    const size_t bytes_ready  = task.current_offset - task.last_submitted_offset;
     const u32 complete_slices = static_cast<u32>(bytes_ready / task.bytes_per_slice);
 
-    if (complete_slices >= swizzle_slices_per_batch || (is_final_batch && complete_slices > 0)) {
-        const u32 z_start = static_cast<u32>(task.last_submitted_offset / task.bytes_per_slice);
-        const u32 slices_to_process = (std::min)(complete_slices, swizzle_slices_per_batch);
-        const u32 z_count = (std::min)(slices_to_process, image.info.size.depth - z_start);
+    const std::span<const u8> sparse_hint =
+        task.is_sparse ? std::span<const u8>(task.slice_has_data)
+                       : std::span<const u8>{};
 
+    const u32 total_slices = task.is_incremental
+        ? task.incremental_z_count
+        : image.info.size.depth;
+    const u32 batch = task.is_incremental
+        ? task.incremental_z_count
+        : (swizzle_slices_per_batch == 0 ? image.info.size.depth : swizzle_slices_per_batch);
+
+    if (complete_slices >= batch || (is_final_batch && complete_slices > 0)) {
+        const u32 z_src   = static_cast<u32>(task.last_submitted_offset / task.bytes_per_slice);
+        const u32 z_image = task.incremental_z_start + z_src; // + 0 for full tasks
+        const u32 z_count = (std::min)({complete_slices, batch, total_slices - z_src});
         if (z_count > 0) {
-            const auto uploads = FullUploadSwizzles(task.info);
-            runtime.AccelerateImageUpload(image, task.staging_buffer, FixSmallVectorADL(uploads), z_start, z_count);
-            task.last_submitted_offset += (static_cast<size_t>(z_count) * task.bytes_per_slice);
+            auto uploads = FullUploadSwizzles(task.info);
+            if (task.is_incremental) {
+                uploads[0].num_tiles.depth = task.incremental_z_count;
+            }
+            runtime.AccelerateImageUpload(image, task.staging_buffer,
+                                          FixSmallVectorADL(uploads),
+                                          z_src, z_image, z_count,
+                                          sparse_hint,
+                                          std::span<const VideoCommon::Accelerated::SliceBBox>(task.slice_bounds),
+                                          task.is_incremental);
+            task.last_submitted_offset += static_cast<size_t>(z_count) * task.bytes_per_slice;
         }
     }
 
     // Check if complete
     const u32 slices_submitted = static_cast<u32>(task.last_submitted_offset / task.bytes_per_slice);
-    const bool all_slices_submitted = slices_submitted >= image.info.size.depth;
+    const bool all_submitted = slices_submitted >= total_slices ||
+                               (is_final_batch && bytes_ready < task.bytes_per_slice);
 
-    if (is_final_batch && all_slices_submitted) {
+    if (is_final_batch && all_submitted) {
         runtime.FreeDeferredStagingBuffer(task.staging_buffer);
         image.flags &= ~ImageFlagBits::IsDecoding;
+        runtime.ReleaseSparseUnswizzleBuffer(image);
         unswizzle_queue.pop_front();
-
-        // Wait 4 frames to process the next entry
-        current_unswizzle_frame = 4u;
     }
 }
 

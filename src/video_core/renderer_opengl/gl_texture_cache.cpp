@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // SPDX-FileCopyrightText: Copyright 2019 yuzu Emulator Project
@@ -650,9 +650,11 @@ void TextureCacheRuntime::BlitFramebuffer(Framebuffer* dst, Framebuffer* src,
                            is_linear ? GL_LINEAR : GL_NEAREST);
 }
 
-void TextureCacheRuntime::AccelerateImageUpload(Image& image, const StagingBufferMap& map,
+void TextureCacheRuntime::AccelerateImageUpload(Image &image, const StagingBufferMap &map,
                                                 std::span<const SwizzleParameters> swizzles,
-                                                u32 z_start, u32 z_count) {
+                                                u32 z_src_start, u32 z_image_start, u32 z_count,
+                                                [[maybe_unused]] std::span<const u8> slice_has_data,
+                                                std::span<const VideoCommon::Accelerated::SliceBBox> slice_bounds, [[maybe_unused]] bool image_already_uploaded) {
     switch (image.info.type) {
     case ImageType::e2D:
         if (IsPixelFormatASTC(image.info.format)) {
