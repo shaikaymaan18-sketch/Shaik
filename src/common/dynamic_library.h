@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // SPDX-FileCopyrightText: 2019 Dolphin Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -74,5 +77,7 @@ private:
     /// Platform-dependent data type representing a dynamic library handle.
     void* handle = nullptr;
 };
+
+static_assert(sizeof(DynamicLibrary) == sizeof(void*), "DynamicLibrary is not a pointer-sized type");
 
 } // namespace Common

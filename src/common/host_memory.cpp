@@ -91,13 +91,6 @@ namespace Common {
 #define MEM_PRESERVE_PLACEHOLDER 0x00000002
 #endif
 
-using PFN_CreateFileMapping2 = _Ret_maybenull_ HANDLE(WINAPI*)(
-    _In_ HANDLE File, _In_opt_ SECURITY_ATTRIBUTES* SecurityAttributes, _In_ ULONG DesiredAccess,
-    _In_ ULONG PageProtection, _In_ ULONG AllocationAttributes, _In_ ULONG64 MaximumSize,
-    _In_opt_ PCWSTR Name,
-    _Inout_updates_opt_(ParameterCount) MEM_EXTENDED_PARAMETER* ExtendedParameters,
-    _In_ ULONG ParameterCount);
-
 using PFN_VirtualAlloc2 = _Ret_maybenull_ PVOID(WINAPI*)(
     _In_opt_ HANDLE Process, _In_opt_ PVOID BaseAddress, _In_ SIZE_T Size,
     _In_ ULONG AllocationType, _In_ ULONG PageProtection,
@@ -113,6 +106,11 @@ using PFN_MapViewOfFile3 = _Ret_maybenull_ PVOID(WINAPI*)(
 using PFN_UnmapViewOfFile2 = BOOL(WINAPI*)(_In_ HANDLE Process, _In_ PVOID BaseAddress,
                                            _In_ ULONG UnmapFlags);
 
+DynamicLibrary kernelbase_dll {};
+PFN_VirtualAlloc2 pfn_VirtualAlloc2 {};
+PFN_MapViewOfFile3 pfn_MapViewOfFile3 {};
+PFN_UnmapViewOfFile2 pfn_UnmapViewOfFile2 {};
+
 template <typename T>
 static void GetFuncAddress(Common::DynamicLibrary& dll, const char* name, T& pfn) {
     if (!dll.GetSymbol(name, &pfn)) {
@@ -126,27 +124,28 @@ public:
     explicit Impl(size_t backing_size_, size_t virtual_size_)
         : backing_size{backing_size_}
         , virtual_size{virtual_size_}
-        , process{GetCurrentProcess()}
-        , kernelbase_dll("Kernelbase")
-    {}
+        , process{GetCurrentProcess()} {
+        if (!kernelbase_dll.IsOpen()) {
+            void(kernelbase_dll.Open("Kernelbase"));
+        }
+    }
 
     bool Init() {
         if (!kernelbase_dll.IsOpen()) {
             LOG_CRITICAL(HW_Memory, "Failed to load Kernelbase.dll");
             return false;
         }
-        GetFuncAddress(kernelbase_dll, "CreateFileMapping2", pfn_CreateFileMapping2);
         GetFuncAddress(kernelbase_dll, "VirtualAlloc2", pfn_VirtualAlloc2);
         GetFuncAddress(kernelbase_dll, "MapViewOfFile3", pfn_MapViewOfFile3);
         GetFuncAddress(kernelbase_dll, "UnmapViewOfFile2", pfn_UnmapViewOfFile2);
 
-        if (!pfn_CreateFileMapping2 || !pfn_VirtualAlloc2 || !pfn_MapViewOfFile3 || !pfn_UnmapViewOfFile2) {
-            LOG_CRITICAL(HW_Memory, "Failed to find functions for virtual allocs");
+        if (!pfn_VirtualAlloc2 || !pfn_MapViewOfFile3 || !pfn_UnmapViewOfFile2) {
+            LOG_CRITICAL(HW_Memory, "Windows 1809 or higher is needed for fastmem; falling back to VirtualBuffer");
             return false;
         }
 
         // Allocate backing file map
-        backing_handle = pfn_CreateFileMapping2(INVALID_HANDLE_VALUE, nullptr, FILE_MAP_WRITE | FILE_MAP_READ, PAGE_READWRITE, SEC_COMMIT, backing_size, nullptr, nullptr, 0);
+        backing_handle = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_EXECUTE_READWRITE, static_cast<DWORD>(backing_size >> 32), static_cast<DWORD>(backing_size 0xFFFFFFFF), nullptr);
         if (!backing_handle) {
             LOG_CRITICAL(HW_Memory, "Failed to allocate {} MiB of backing memory", backing_size >> 20);
             return false;
@@ -382,12 +381,6 @@ private:
 
     HANDLE process{};        ///< Current process handle
     HANDLE backing_handle{}; ///< File based backing memory
-
-    DynamicLibrary kernelbase_dll;
-    PFN_CreateFileMapping2 pfn_CreateFileMapping2{};
-    PFN_VirtualAlloc2 pfn_VirtualAlloc2{};
-    PFN_MapViewOfFile3 pfn_MapViewOfFile3{};
-    PFN_UnmapViewOfFile2 pfn_UnmapViewOfFile2{};
 
     std::mutex placeholder_mutex;                                 ///< Mutex for placeholders
     boost::icl::separate_interval_set<size_t> placeholders;       ///< Mapped placeholders
