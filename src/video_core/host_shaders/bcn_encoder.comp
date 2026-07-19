@@ -316,8 +316,17 @@ void main() {
         const float a_min = subgroupClusteredMin(texel.a, 16u);
         const float a_max = subgroupClusteredMax(texel.a, 16u);
 
-        const uint a0 = uint(round(a_max * 255.0));
-        const uint a1 = uint(round(a_min * 255.0));
+        uint a0 = uint(round(clamp(a_max, 0.0, 1.0) * 255.0));
+        uint a1 = uint(round(clamp(a_min, 0.0, 1.0) * 255.0));
+
+        if (a0 == a1) {
+            if (a0 < 255u) {
+                a0++;
+            } else {
+                a1--;
+            }
+        }
+
         const float fa0 = float(a0) / 255.0;
         const float fa1 = float(a1) / 255.0;
 
