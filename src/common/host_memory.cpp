@@ -168,41 +168,16 @@ public:
         }
 
         // Allocate virtual address placeholder within a 39-bit address space
-        SIZE_T cursor = 0;
-        while (cursor < (1ULL << 39) - virtual_size) {
-            MEMORY_BASIC_INFORMATION info{};
+        MEM_ADDRESS_REQUIREMENTS addr_reqs {};
+        addr_reqs.Alignment = HugePageSize;
+        addr_reqs.HighestEndingAddress = reinterpret_cast<PVOID>(1ULL << 39);
 
-            // find the next mapped region of memory
-            auto res = pfn_VirtualQuery(reinterpret_cast<LPCVOID>(cursor), &info, sizeof(info));
+        MEM_EXTENDED_PARAMETER ext_param {};
+        ext_param.Type = MemExtendedParameterAddressRequirements;
+        ext_param.Pointer = &addr_reqs;
 
-            if (res == 0) {
-                LOG_WARNING(HW_Memory, "Failed to check memory region, error {}", GetLastError());
-                break;
-            }
+        virtual_base = static_cast<u8*>(pfn_VirtualAlloc2(process, nullptr, virtual_size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS, &ext_param, 1));
 
-            auto start_aligned = AlignUp(reinterpret_cast<SIZE_T>(info.BaseAddress), HugePageSize);
-            // is this region free?
-            if (info.State == MEM_FREE && start_aligned < reinterpret_cast<SIZE_T>(info.BaseAddress) + info.RegionSize) {
-                // is this region big enough for us to use?
-                if (info.RegionSize - (start_aligned - reinterpret_cast<SIZE_T>(info.BaseAddress)) >= virtual_size) {
-                    virtual_base = static_cast<u8*>(pfn_VirtualAlloc2
-                        (process, reinterpret_cast<PVOID>(start_aligned), virtual_size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS, nullptr, 0));
-                    if (virtual_base) {
-                        break;
-                    } else {
-                        LOG_WARNING(HW_Memory, "Failed to allocate buffer at {:#x} with error {}, trying at at new address", start_aligned, GetLastError());
-                    }
-                }
-            }
-
-            auto new_cursor = reinterpret_cast<SIZE_T>(info.BaseAddress) + info.RegionSize;
-            if (new_cursor <= cursor) {
-                // weird unknown error, let's just continue cursor so this isn't an infinite loop
-                cursor = cursor + HugePageSize;
-                continue;
-            }
-            cursor = new_cursor;
-        }
         // Check if we failed to allocate for direct-mapping, otherwise map normally
         if (!virtual_base) {
             LOG_WARNING(HW_Memory, "Failed to allocate within 39-bit address space, direct mapping is not supported");
