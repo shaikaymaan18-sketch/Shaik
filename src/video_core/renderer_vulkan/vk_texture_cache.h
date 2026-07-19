@@ -17,6 +17,7 @@
 #include "video_core/texture_cache/image_view_base.h"
 #include "video_core/vulkan_common/vulkan_memory_allocator.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
+#include "video_core/delayed_destruction_ring.h"
 
 namespace Settings {
 struct ResolutionScalingInfo;
@@ -58,6 +59,8 @@ public:
 
     void FreeDeferredStagingBuffer(StagingBufferRef& ref);
 
+  	void ReleaseSparseUnswizzleBuffer(Image& image);
+
     void TickFrame();
 
     u64 GetDeviceLocalMemory() const;
@@ -92,8 +95,11 @@ public:
     }
 
     void AccelerateImageUpload(Image&, const StagingBufferRef&,
-                               std::span<const VideoCommon::SwizzleParameters>,
-                               u32 z_start, u32 z_count);
+                             std::span<const VideoCommon::SwizzleParameters>,
+                             u32 z_src_start, u32 z_image_start, u32 z_count,
+                             std::span<const u8> slice_has_data = {},
+                             std::span<const VideoCommon::Accelerated::SliceBBox> slice_bounds = {},
+                             bool image_already_uploaded = false);
 
     void InsertUploadMemoryBarrier() {}
 
@@ -154,6 +160,7 @@ public:
 
     static constexpr size_t indexing_slots = 8 * sizeof(size_t);
     std::array<vk::Buffer, indexing_slots> buffers{};
+    VideoCommon::DelayedDestructionRing<vk::Buffer, 8> sentenced_unswizzle_buffers;
     std::vector<std::pair<u64, vk::Image>> pending_msaa_images;
     ankerl::unordered_dense::map<VkImage, ResolveShadow> resolve_shadows;
 };
@@ -324,6 +331,7 @@ public:
     u64 allocation_tick;
 
     friend class BlockLinearUnswizzle3DPass;
+    friend class TextureCacheRuntime;
 
 private:
     bool BlitScaleHelper(bool scale_up);
@@ -339,6 +347,7 @@ private:
     vk::Buffer compute_unswizzle_buffer;
     VkDeviceSize compute_unswizzle_buffer_size = 0;
     bool has_compute_unswizzle_buffer = false;
+    bool compute_unswizzle_buffer_is_zero = false;
 
     void AllocateComputeUnswizzleBuffer(u32 max_slices);
 
