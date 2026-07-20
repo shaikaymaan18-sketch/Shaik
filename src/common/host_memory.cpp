@@ -145,7 +145,7 @@ public:
         }
 
         // Allocate backing file map
-        backing_handle = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_EXECUTE_READWRITE, static_cast<DWORD>(backing_size >> 32), static_cast<DWORD>(backing_size 0xFFFFFFFF), nullptr);
+        backing_handle = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_EXECUTE_READWRITE, static_cast<DWORD>(backing_size >> 32), static_cast<DWORD>(backing_size & 0xFFFFFFFF), nullptr);
         if (!backing_handle) {
             LOG_CRITICAL(HW_Memory, "Failed to allocate {} MiB of backing memory", backing_size >> 20);
             return false;
