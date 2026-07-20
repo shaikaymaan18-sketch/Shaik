@@ -45,7 +45,7 @@ float DistSq4(vec4 a, vec4 b) {
     return dot(d, d);
 }
 
-const uint BC7_WEIGHTS4[16] = uint[16](0u,4u,9u,13u,17u,21u,26u,30u,34u,38u,43u,47u,51u,55u,60u,64u);
+const uint BC7_WEIGHTS2[4] = uint[4](0u, 21u, 43u, 64u);
 
 void PutBits(inout uvec4 data, inout uint bit_pos, uint value, uint width) {
     uint word_idx = bit_pos / 32u;
@@ -58,13 +58,20 @@ void PutBits(inout uvec4 data, inout uint bit_pos, uint value, uint width) {
     bit_pos += width;
 }
 
-void QuantizeChannelP(float target01, uint p, out uint comp7) {
-    float target8 = clamp(target01, 0.0, 1.0) * 255.0;
-    comp7 = uint(clamp(round((target8 - float(p)) / 2.0), 0.0, 127.0));
+void Quantize7(float target01, out uint comp7) {
+    comp7 = uint(clamp(round(target01 * 127.0), 0.0, 127.0));
 }
 
-float ReconstructChannelP(uint comp7, uint p) {
-    return float((comp7 << 1) | p) / 255.0;
+float Reconstruct7(uint comp7) {
+    return float((comp7 << 1) | (comp7 >> 6)) / 255.0;
+}
+
+void Quantize8(float target01, out uint comp8) {
+    comp8 = uint(clamp(round(target01 * 255.0), 0.0, 255.0));
+}
+
+float Reconstruct8(uint comp8) {
+    return float(comp8) / 255.0;
 }
 
 void main() {
@@ -85,93 +92,88 @@ void main() {
     const bool IS_BC3 = (pc.format == FORMAT_BC3);
     const bool IS_BC7 = (pc.format == FORMAT_BC7);
 
-    // This is using just mode 6 from BC7, getting all of them would be out of bounds of what I can do atm
+    // This is using just mode 5 from BC7, getting all of them would be out of bounds of what I can do atm
     if (IS_BC7) {
-        const vec4 block_sum = subgroupClusteredAdd(texel, 16u);
-        const vec4 mean = block_sum / 16.0;
+        const vec3 rgb = texel.rgb;
+        const vec3 block_sum_rgb = subgroupClusteredAdd(rgb, 16u);
+        const vec3 mean_rgb = block_sum_rgb / 16.0;
 
-        vec4 d = texel - mean;
-        float c00 = subgroupClusteredAdd(d.x*d.x, 16u);
-        float c01 = subgroupClusteredAdd(d.x*d.y, 16u);
-        float c02 = subgroupClusteredAdd(d.x*d.z, 16u);
-        float c03 = subgroupClusteredAdd(d.x*d.w, 16u);
-        float c11 = subgroupClusteredAdd(d.y*d.y, 16u);
-        float c12 = subgroupClusteredAdd(d.y*d.z, 16u);
-        float c13 = subgroupClusteredAdd(d.y*d.w, 16u);
-        float c22 = subgroupClusteredAdd(d.z*d.z, 16u);
-        float c23 = subgroupClusteredAdd(d.z*d.w, 16u);
-        float c33 = subgroupClusteredAdd(d.w*d.w, 16u);
+        vec3 d_rgb = rgb - mean_rgb;
+        float c00 = subgroupClusteredAdd(d_rgb.x*d_rgb.x, 16u);
+        float c01 = subgroupClusteredAdd(d_rgb.x*d_rgb.y, 16u);
+        float c02 = subgroupClusteredAdd(d_rgb.x*d_rgb.z, 16u);
+        float c11 = subgroupClusteredAdd(d_rgb.y*d_rgb.y, 16u);
+        float c12 = subgroupClusteredAdd(d_rgb.y*d_rgb.z, 16u);
+        float c22 = subgroupClusteredAdd(d_rgb.z*d_rgb.z, 16u);
 
-        vec4 axis = vec4(1.0);
+        vec3 axis = vec3(1.0);
         for (int iter = 0; iter < 4; ++iter) {
-            vec4 next_axis;
-            next_axis.x = c00*axis.x + c01*axis.y + c02*axis.z + c03*axis.w;
-            next_axis.y = c01*axis.x + c11*axis.y + c12*axis.z + c13*axis.w;
-            next_axis.z = c02*axis.x + c12*axis.y + c22*axis.z + c23*axis.w;
-            next_axis.w = c03*axis.x + c13*axis.y + c23*axis.z + c33*axis.w;
+            vec3 next_axis;
+            next_axis.x = c00*axis.x + c01*axis.y + c02*axis.z;
+            next_axis.y = c01*axis.x + c11*axis.y + c12*axis.z;
+            next_axis.z = c02*axis.x + c12*axis.y + c22*axis.z;
             axis = next_axis;
             float len_sq = dot(axis, axis);
-            axis = len_sq > 1e-12 ? axis * inversesqrt(len_sq) : vec4(1.0, 0.0, 0.0, 0.0);
+            axis = len_sq > 1e-12 ? axis * inversesqrt(len_sq) : vec3(1.0, 0.0, 0.0);
         }
 
-        const float proj = dot(texel - mean, axis);
-        const float min_proj = subgroupClusteredMin(proj, 16u);
-        const float max_proj = subgroupClusteredMax(proj, 16u);
+        const float proj_rgb = dot(rgb - mean_rgb, axis);
+        const float min_proj_rgb = subgroupClusteredMin(proj_rgb, 16u);
+        const float max_proj_rgb = subgroupClusteredMax(proj_rgb, 16u);
 
-        vec4 e0 = mean + axis * max_proj;
-        vec4 e1 = mean + axis * min_proj;
+        vec3 e0_rgb = mean_rgb + axis * max_proj_rgb;
+        vec3 e1_rgb = mean_rgb + axis * min_proj_rgb;
 
-        uint p0 = 0u, p1 = 0u;
-        uint e0c[4], e1c[4];
-        {
-            float best_err = 1e9;
-            for (uint p = 0u; p < 2u; ++p) {
-                uint c[4]; float err = 0.0;
-                for (int ch = 0; ch < 4; ++ch) {
-                    QuantizeChannelP(e0[ch], p, c[ch]);
-                    float recon = ReconstructChannelP(c[ch], p);
-                    err += (recon - e0[ch]) * (recon - e0[ch]);
-                }
-                if (err < best_err) { best_err = err; p0 = p; e0c = c; }
-            }
-            best_err = 1e9;
-            for (uint p = 0u; p < 2u; ++p) {
-                uint c[4]; float err = 0.0;
-                for (int ch = 0; ch < 4; ++ch) {
-                    QuantizeChannelP(e1[ch], p, c[ch]);
-                    float recon = ReconstructChannelP(c[ch], p);
-                    err += (recon - e1[ch]) * (recon - e1[ch]);
-                }
-                if (err < best_err) { best_err = err; p1 = p; e1c = c; }
-            }
+        uint e0c[3], e1c[3];
+        for (int ch = 0; ch < 3; ++ch) {
+            Quantize7(e0_rgb[ch], e0c[ch]);
+            Quantize7(e1_rgb[ch], e1c[ch]);
         }
 
-        vec4 rc0 = vec4(ReconstructChannelP(e0c[0], p0), ReconstructChannelP(e0c[1], p0),
-        ReconstructChannelP(e0c[2], p0), ReconstructChannelP(e0c[3], p0));
-        vec4 rc1 = vec4(ReconstructChannelP(e1c[0], p1), ReconstructChannelP(e1c[1], p1),
-        ReconstructChannelP(e1c[2], p1), ReconstructChannelP(e1c[3], p1));
+        vec3 rc0 = vec3(Reconstruct7(e0c[0]), Reconstruct7(e0c[1]), Reconstruct7(e0c[2]));
+        vec3 rc1 = vec3(Reconstruct7(e1c[0]), Reconstruct7(e1c[1]), Reconstruct7(e1c[2]));
 
-        float best_d = DistSq4(texel, mix(rc0, rc1, float(BC7_WEIGHTS4[0]) / 64.0));
-        uint best = 0u;
-        for (uint w = 1u; w < 16u; ++w) {
-            float d2 = DistSq4(texel, mix(rc0, rc1, float(BC7_WEIGHTS4[w]) / 64.0));
-            if (d2 < best_d) { best_d = d2; best = w; }
+        float best_d_rgb = DistSq(rgb, mix(rc0, rc1, float(BC7_WEIGHTS2[0]) / 64.0));
+        uint best_idx_rgb = 0u;
+        for (uint w = 1u; w < 4u; ++w) {
+            float d2 = DistSq(rgb, mix(rc0, rc1, float(BC7_WEIGHTS2[w]) / 64.0));
+            if (d2 < best_d_rgb) { best_d_rgb = d2; best_idx_rgb = w; }
         }
 
-        const uint shifted = best << ((texel_idx % 8u) * 4u);
-        const uint g0_contrib = (texel_idx < 8u)  ? shifted : 0u;
-        const uint g1_contrib = (texel_idx >= 8u) ? shifted : 0u;
-        uint idx_word0 = subgroupClusteredOr(g0_contrib, 16u);
-        uint idx_word1 = subgroupClusteredOr(g1_contrib, 16u);
+        float a = texel.a;
+        float min_a = subgroupClusteredMin(a, 16u);
+        float max_a = subgroupClusteredMax(a, 16u);
 
-        const uint anchor_index = idx_word0 & 0xFu;
-        if (anchor_index >= 8u) {
-            uint tmp_p = p0; p0 = p1; p1 = tmp_p;
-            uint tmp_c0 = e0c[0], tmp_c1 = e0c[1], tmp_c2 = e0c[2], tmp_c3 = e0c[3];
-            e0c[0] = e1c[0]; e0c[1] = e1c[1]; e0c[2] = e1c[2]; e0c[3] = e1c[3];
-            e1c[0] = tmp_c0; e1c[1] = tmp_c1; e1c[2] = tmp_c2; e1c[3] = tmp_c3;
-            idx_word0 = ~idx_word0;
-            idx_word1 = ~idx_word1;
+        uint a0c, a1c;
+        Quantize8(max_a, a0c);
+        Quantize8(min_a, a1c);
+
+        float ra0 = Reconstruct8(a0c);
+        float ra1 = Reconstruct8(a1c);
+
+        float best_d_a = abs(a - mix(ra0, ra1, float(BC7_WEIGHTS2[0]) / 64.0));
+        uint best_idx_a = 0u;
+        for (uint w = 1u; w < 4u; ++w) {
+            float d2 = abs(a - mix(ra0, ra1, float(BC7_WEIGHTS2[w]) / 64.0));
+            if (d2 < best_d_a) { best_d_a = d2; best_idx_a = w; }
+        }
+
+        const uint shifted_rgb = best_idx_rgb << (texel_idx * 2u);
+        const uint shifted_a = best_idx_a << (texel_idx * 2u);
+
+        uint idx_rgb_word = subgroupClusteredOr(shifted_rgb, 16u);
+        uint idx_a_word = subgroupClusteredOr(shifted_a, 16u);
+
+        if ((idx_rgb_word & 0x3u) >= 2u) {
+            uint tmp_c0 = e0c[0], tmp_c1 = e0c[1], tmp_c2 = e0c[2];
+            e0c[0] = e1c[0]; e0c[1] = e1c[1]; e0c[2] = e1c[2];
+            e1c[0] = tmp_c0; e1c[1] = tmp_c1; e1c[2] = tmp_c2;
+            idx_rgb_word = (~idx_rgb_word) & 0xFFFFFFFFu;
+        }
+
+        if ((idx_a_word & 0x3u) >= 2u) {
+            uint tmp_a = a0c; a0c = a1c; a1c = tmp_a;
+            idx_a_word = (~idx_a_word) & 0xFFFFFFFFu;
         }
 
         if (texel_idx == 0u) {
@@ -181,23 +183,20 @@ void main() {
             uvec4 result = uvec4(0u);
             uint bit_pos = 0u;
 
-            PutBits(result, bit_pos, 1u << 6, 7u);
+            PutBits(result, bit_pos, 1u << 5, 6u);
+            PutBits(result, bit_pos, 0u, 2u);
 
             PutBits(result, bit_pos, e0c[0], 7u); PutBits(result, bit_pos, e1c[0], 7u); // R
             PutBits(result, bit_pos, e0c[1], 7u); PutBits(result, bit_pos, e1c[1], 7u); // G
             PutBits(result, bit_pos, e0c[2], 7u); PutBits(result, bit_pos, e1c[2], 7u); // B
-            PutBits(result, bit_pos, e0c[3], 7u); PutBits(result, bit_pos, e1c[3], 7u); // A
 
-            PutBits(result, bit_pos, p0, 1u);
-            PutBits(result, bit_pos, p1, 1u);
+            PutBits(result, bit_pos, a0c, 8u); PutBits(result, bit_pos, a1c, 8u);
 
-            PutBits(result, bit_pos, idx_word0 & 0x7u, 3u);
-            for (uint i = 1u; i < 8u; ++i) {
-                PutBits(result, bit_pos, (idx_word0 >> (i * 4u)) & 0xFu, 4u);
-            }
-            for (uint i = 0u; i < 8u; ++i) {
-                PutBits(result, bit_pos, (idx_word1 >> (i * 4u)) & 0xFu, 4u);
-            }
+            PutBits(result, bit_pos, idx_rgb_word & 0x1u, 1u);
+            PutBits(result, bit_pos, (idx_rgb_word >> 2u) & 0x3FFFFFFFu, 30u);
+
+            PutBits(result, bit_pos, idx_a_word & 0x1u, 1u);
+            PutBits(result, bit_pos, (idx_a_word >> 2u) & 0x3FFFFFFFu, 30u);
 
             out_blocks[out_index * 4u]      = result.x;
             out_blocks[out_index * 4u + 1u] = result.y;
