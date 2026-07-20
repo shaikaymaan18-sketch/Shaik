@@ -1511,6 +1511,10 @@ void TextureCache<P>::TickAsyncUnswizzle() {
         }
 
         task.initialized = true;
+        task.was_rescaled = image.IsRescaled();
+        if (task.was_rescaled) {
+            image.ScaleDown(true);
+        }
     }
 
     // Read data
@@ -1641,8 +1645,11 @@ void TextureCache<P>::TickAsyncUnswizzle() {
 
     if (is_final_batch && all_submitted) {
         runtime.FreeDeferredStagingBuffer(task.staging_buffer);
-        image.flags &= ~ImageFlagBits::IsDecoding;
         runtime.ReleaseSparseUnswizzleBuffer(image);
+        image.flags &= ~ImageFlagBits::IsDecoding;
+        if (task.was_rescaled) {
+            image.ScaleUp();
+        }
         unswizzle_queue.pop_front();
     }
 }

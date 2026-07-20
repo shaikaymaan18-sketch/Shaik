@@ -142,6 +142,7 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
         size_t last_submitted_offset = 0;
         size_t bytes_per_slice;
         bool initialized = false;
+        bool was_rescaled = false;
         bool is_sparse = false;
         std::vector<u8> slice_has_data;
         std::vector<VideoCommon::Accelerated::SliceBBox> slice_bounds;
@@ -442,18 +443,6 @@ private:
 
     void QueueAsyncUnswizzle(Image& image, ImageId image_id);
     void TickAsyncUnswizzle();
-
-    struct CompletedSparseImage {
-        ImageId image_id;
-        VideoCommon::ImageInfo info;
-        GPUVAddr gpu_addr;
-        size_t guest_size_bytes;
-        std::vector<std::pair<GPUVAddr, size_t>> last_segments;
-        std::vector<u8> slice_uploaded;
-        size_t bytes_per_slice;
-        u64 swizzled_slice_size;
-        u32 swizzle_block_depth;
-    };
 
     Runtime& runtime;
 
