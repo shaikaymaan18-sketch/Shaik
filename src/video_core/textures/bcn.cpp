@@ -10,6 +10,8 @@
 #include "video_core/textures/bcn.h"
 
 #include <algorithm>
+#include <cstring>
+#include <cmath>
 
 #include "video_core/textures/workers.h"
 
@@ -151,9 +153,9 @@ void CompressBC7(std::span<const uint8_t> data, uint32_t width, uint32_t height,
             float e1_b = mean_b + axis_b * min_proj_rgb;
 
             auto quantize7 = [](float v) { return (uint32_t)std::clamp((int)std::round(v * 127.0f), 0, 127); };
-            auto recon7 = [](uint32_t v) { return ((v << 1) | (v >> 6)) / 255.0f; };
+            auto recon7 = [](uint32_t v) { return static_cast<float>((v << 1) | (v >> 6)) / 255.0f; };
             auto quantize8 = [](float v) { return (uint32_t)std::clamp((int)std::round(v * 255.0f), 0, 255); };
-            auto recon8 = [](uint32_t v) { return v / 255.0f; };
+            auto recon8 = [](uint32_t v) { return static_cast<float>(v) / 255.0f; };
 
             uint32_t e0c[3] = {quantize7(e0_r), quantize7(e0_g), quantize7(e0_b)};
             uint32_t e1c[3] = {quantize7(e1_r), quantize7(e1_g), quantize7(e1_b)};
@@ -214,17 +216,17 @@ void CompressBC7(std::span<const uint8_t> data, uint32_t width, uint32_t height,
 
             uint64_t out[2] = {0, 0};
             uint32_t bit_pos = 0;
-            auto put_bits = [&](uint32_t value, uint32_t width) {
-                uint64_t v = value & ((1ULL << width) - 1);
+            auto put_bits = [&](uint32_t value, uint32_t bit_width) {
+                uint64_t v = value & ((1ULL << bit_width) - 1);
                 if (bit_pos < 64) {
                     out[0] |= (v << bit_pos);
-                    if (bit_pos + width > 64) {
+                    if (bit_pos + bit_width > 64) {
                         out[1] |= (v >> (64 - bit_pos));
                     }
                 } else {
                     out[1] |= (v << (bit_pos - 64));
                 }
-                bit_pos += width;
+                bit_pos += bit_width;
             };
 
             put_bits(1 << 5, 6);
