@@ -579,7 +579,7 @@ struct Values {
     SwitchableSetting<bool> enable_gpu_buffer_readback{linkage,
                                                        false,
                                                        "enable_gpu_buffer_readback",
-                                                       Category::RendererAdvanced,
+                                                       Category::RendererHacks,
                                                        Specialization::Default,
                                                        true,
                                                        true};
