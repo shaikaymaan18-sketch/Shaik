@@ -10,7 +10,6 @@
 #include <boost/icl/interval_set.hpp>
 #include <dynarmic/interface/A64/a64.h>
 #include <dynarmic/interface/A64/config.h>
-#include <dynarmic/interface/code_page.h>
 
 #include "common/alignment.h"
 #include "common/common_funcs.h"
@@ -56,17 +55,26 @@ public:
         : memory{memory_}
         , local_memory{local_memory_}
         , mapped_ranges{mapped_ranges_}
-        , parent{parent_}
-    {}
+        , parent{parent_} {
+#ifdef _WIN32
+        page_size = 4096;
+#else
+        page_size = sysconf(_SC_PAGESIZE);
+#endif
+        cached_code_page = static_cast<u32*>(malloc(page_size));
+    }
+
+    ~DynarmicCallbacks64() override {
+        free(cached_code_page);
+    }
 
     std::optional<std::uint32_t> MemoryReadCode(VAddr vaddr) override {
-        static_assert(Core::Memory::YUZU_PAGESIZE == Dynarmic::CODE_PAGE_SIZE);
         auto const aligned_vaddr = vaddr & ~Core::Memory::YUZU_PAGEMASK;
         if (last_code_addr != aligned_vaddr) {
-            cached_code_page = ReadMemory<Dynarmic::CodePage>(aligned_vaddr);
+            ReadMemory(cached_code_page, page_size, aligned_vaddr);
             last_code_addr = aligned_vaddr;
         }
-        return cached_code_page.inst[(vaddr & Core::Memory::YUZU_PAGEMASK) / sizeof(u32)];
+        return cached_code_page[(vaddr & Core::Memory::YUZU_PAGEMASK) / sizeof(u32)];
     }
     void InstructionSynchronizationBarrierRaised() override {
         last_code_addr = u64(-1); //reset back, force refetch
@@ -139,14 +147,18 @@ public:
 
     template<typename T> T ReadMemory(u64 vaddr) {
         T ret{};
+        ReadMemory(reinterpret_cast<u8*>(&ret), sizeof(T), vaddr);
+        return ret;
+    }
+
+    void ReadMemory(void* ret, u64 size, u64 vaddr) {
         if (boost::icl::contains(mapped_ranges, vaddr)) {
-            memory.ReadBlock(vaddr, &ret, sizeof(T));
-        } else if (vaddr + sizeof(T) > local_memory.size()) {
+            memory.ReadBlock(vaddr, ret, size);
+        } else if (vaddr + size > local_memory.size()) {
             LOG_CRITICAL(Service_JIT, "plugin: unmapped read @ {:#016x}", vaddr);
         } else {
-            std::memcpy(&ret, local_memory.data() + vaddr, sizeof(T));
+            std::memcpy(ret, local_memory.data() + vaddr, size);
         }
-        return ret;
     }
 
     template <class T>
@@ -166,7 +178,8 @@ private:
     std::vector<u8>& local_memory;
     IntervalSet& mapped_ranges;
     JITContextImpl& parent;
-    Dynarmic::CodePage cached_code_page;
+    u32* cached_code_page;
+    u64 page_size;
     u64 last_code_addr = u64(-1);
 };
 

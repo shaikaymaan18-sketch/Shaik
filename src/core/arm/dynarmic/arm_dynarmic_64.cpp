@@ -18,8 +18,18 @@ using namespace Common::Literals;
 DynarmicCallbacks64::DynarmicCallbacks64(ArmDynarmic64& parent, Kernel::KProcess* process)
     : m_parent{parent}, m_memory(process->GetMemory())
     , m_process(process), m_debugger_enabled{parent.m_system.DebuggerEnabled()}
-    , m_check_memory_access{m_debugger_enabled || !Settings::values.cpuopt_ignore_memory_aborts.GetValue()}
-{}
+    , m_check_memory_access{m_debugger_enabled || !Settings::values.cpuopt_ignore_memory_aborts.GetValue()} {
+#ifdef _WIN32
+    page_size = 4096;
+#else
+    page_size = sysconf(_SC_PAGESIZE);
+#endif
+    cached_code_page = static_cast<u32*>(malloc(page_size));
+}
+
+DynarmicCallbacks64::~DynarmicCallbacks64() {
+    free(cached_code_page);
+}
 
 u8 DynarmicCallbacks64::MemoryRead8(u64 vaddr) {
     CheckMemoryAccess(vaddr, 1, Kernel::DebugWatchpointType::Read);
@@ -47,10 +57,10 @@ std::optional<u32> DynarmicCallbacks64::MemoryReadCode(u64 vaddr) {
         return std::nullopt;
     auto const aligned_vaddr = vaddr & ~Core::Memory::YUZU_PAGEMASK;
     if (last_code_addr != aligned_vaddr) {
-        m_memory.ReadBlock(aligned_vaddr, &cached_code_page, sizeof(cached_code_page));
+        m_memory.ReadBlock(aligned_vaddr, cached_code_page, page_size);
         last_code_addr = aligned_vaddr;
     }
-    return cached_code_page.inst[(vaddr & Core::Memory::YUZU_PAGEMASK) / sizeof(u32)];
+    return cached_code_page[(vaddr & Core::Memory::YUZU_PAGEMASK) / sizeof(u32)];
 }
 
 void DynarmicCallbacks64::MemoryWrite8(u64 vaddr, u8 value) {
