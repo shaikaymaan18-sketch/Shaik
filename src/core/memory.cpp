@@ -125,14 +125,14 @@ struct Memory::Impl {
     [[nodiscard]] u8* GetPointerFromRasterizerCachedMemory(u64 vaddr) const {
         Common::PhysicalAddress const paddr = current_page_table->entries[vaddr >> YUZU_PAGEBITS].addr;
         if (paddr)
-            return system.DeviceMemory().GetPointer<u8>(paddr + vaddr);
+            return system.DeviceMemory().GetPointer<u8>((paddr << YUZU_PAGEBITS) + vaddr);
         return {};
     }
 
     [[nodiscard]] u8* GetPointerFromDebugMemory(u64 vaddr) const {
         const Common::PhysicalAddress paddr = current_page_table->entries[vaddr >> YUZU_PAGEBITS].addr;
         if (paddr != 0)
-            return system.DeviceMemory().GetPointer<u8>(paddr + vaddr);
+            return system.DeviceMemory().GetPointer<u8>((paddr << YUZU_PAGEBITS) + vaddr);
         return {};
     }
 
@@ -548,12 +548,11 @@ struct Memory::Impl {
             auto orig_base = base;
             while (base != end) {
                 auto host_ptr = uintptr_t(system.DeviceMemory().GetPointer<u8>(target)) - (base << YUZU_PAGEBITS);
-                auto backing = GetInteger(target) - (base << YUZU_PAGEBITS);
 
                 auto& entry = page_table.entries.GetAndFault(base);
                 entry.ptr.Store(host_ptr, type);
-                entry.addr = backing;
-                entry.block = orig_base << YUZU_PAGEBITS;
+                entry.addr = static_cast<u32>((GetInteger(target) >> YUZU_PAGEBITS) - base);
+                entry.block = static_cast<u32>(orig_base);
 
                 ASSERT_MSG(page_table.entries[base].ptr.Pointer(),
                            "memory mapping base yield a nullptr within the table");

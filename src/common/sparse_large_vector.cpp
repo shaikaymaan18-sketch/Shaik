@@ -19,7 +19,7 @@
 namespace Common {
 
 #ifdef _WIN32
-static std::vector<std::pair<u64, u64>> vector_regions;
+static std::vector<std::pair<u64, u64>> vector_regions {};
 
 // Workaround for handling non-commited memory accessed by Dynarmic; usually result of an error
 static LONG WINAPI FakePageFaultHandler(PEXCEPTION_POINTERS info) {

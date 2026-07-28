@@ -127,7 +127,7 @@ struct PageTable {
             return false;
         }
 
-        *out_phys_addr = entries[virt_addr / page_size].addr + GetInteger(virt_addr);
+        *out_phys_addr = (entries[GetInteger(virt_addr) >> current_page_bits].addr >> current_page_bits) + GetInteger(virt_addr);
         return true;
     }
 
@@ -135,16 +135,15 @@ struct PageTable {
     /// corresponding attribute element is of type `Memory`.
     struct PageEntryData {
         PageInfo ptr;
-        u64 block;
-        u64 addr;
-        u64 padding;
+        u32 block;
+        u32 addr;
     };
     SparseLargeVector<PageEntryData> entries;
-    static_assert(sizeof(PageEntryData) == 32);
+    static_assert(sizeof(PageEntryData) == 16);
 
     u8* fastmem_arena{};
     std::size_t current_address_space_width_in_bits{};
-    std::size_t page_size{};
+    std::size_t current_page_bits{};
 };
 
 } // namespace Common

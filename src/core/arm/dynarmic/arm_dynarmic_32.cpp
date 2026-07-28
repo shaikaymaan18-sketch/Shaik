@@ -172,7 +172,7 @@ void ArmDynarmic32::MakeJit(Common::PageTable* page_table) {
     if (page_table) {
         constexpr size_t PageBits = 12;
         constexpr size_t NumPageTableEntries = 1 << (32 - PageBits);
-        constexpr size_t PageLog2Stride = 5;
+        constexpr size_t PageLog2Stride = 4;
         static_assert(1 << PageLog2Stride == sizeof(Common::PageTable::PageEntryData));
 
         // Dynarmic will not write to the page table, const_cast is safe here
