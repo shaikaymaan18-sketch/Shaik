@@ -100,9 +100,8 @@ struct PageTable {
 
     PageTable(const PageTable&) = delete;
     PageTable& operator=(const PageTable&) = delete;
-
-    PageTable(PageTable&&) noexcept = default;
-    PageTable& operator=(PageTable&&) noexcept = default;
+    PageTable(PageTable&&) noexcept = delete;
+    PageTable& operator=(PageTable&&) noexcept = delete;
 
     bool BeginTraversal(TraversalEntry* out_entry, TraversalContext* out_context,
                         Common::ProcessAddress address) const;

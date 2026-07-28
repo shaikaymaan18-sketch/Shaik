@@ -85,7 +85,7 @@ private:
     u8* virtual_base{};
     size_t virtual_base_offset{};
     // Windows requires it for kernels whom lack proper support for some functions!
-    bool fallback_buffer;
+    bool fallback_buffer{false};
 };
 
 } // namespace Common

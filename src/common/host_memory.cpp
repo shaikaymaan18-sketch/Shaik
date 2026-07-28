@@ -183,7 +183,7 @@ public:
         if (ptr == nullptr) {
             LOG_CRITICAL(HW_Memory, "Failed to allocate fallback buffer with size {:#x}, error {}", size, GetLastError());
         }
-        return VirtualAlloc(nullptr, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+        return ptr;
     }
 
     void Map(size_t virtual_offset, size_t host_offset, size_t length, MemoryPermission perms) {
@@ -706,7 +706,7 @@ HostMemory::HostMemory(size_t backing_size_, size_t virtual_size_)
 {
 #if defined(__OPENORBIS__) || defined(__managarm__)
     LOG_WARNING(HW_Memory, "Platform doesn't support fastmem");
-    backing_base = malloc(backing_size);
+    backing_base = static_cast<u8*>(malloc(backing_size));
     virtual_base = nullptr;
 #else
     // Try to allocate a fastmem arena.

@@ -58,19 +58,8 @@ public:
 
     SparseLargeVector(const SparseLargeVector&) = delete;
     SparseLargeVector& operator=(const SparseLargeVector&) = delete;
-
-    SparseLargeVector(SparseLargeVector&& other) noexcept
-        : alloc_size{std::exchange(other.alloc_size, 0)}
-        , base_ptr{std::exchange(other.base_ptr, nullptr)}
-        , committed_pages{std::exchange(other.base_ptr, nullptr)}
-    {}
-
-    SparseLargeVector& operator=(SparseLargeVector&& other) noexcept {
-        alloc_size = std::exchange(other.alloc_size, 0);
-        base_ptr = std::exchange(other.base_ptr, nullptr);
-        committed_pages = std::exchange(other.base_ptr, nullptr);
-        return *this;
-    }
+    SparseLargeVector(SparseLargeVector&& other) = delete;
+    SparseLargeVector& operator=(SparseLargeVector&& other) = delete;
 
     void ResizeAndClear(std::size_t count) noexcept {
         if (auto const new_size = count * sizeof(T); new_size != alloc_size) {
