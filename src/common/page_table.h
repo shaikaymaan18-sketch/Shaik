@@ -127,7 +127,7 @@ struct PageTable {
             return false;
         }
 
-        *out_phys_addr = (entries[GetInteger(virt_addr) >> current_page_bits].addr >> current_page_bits) + GetInteger(virt_addr);
+        *out_phys_addr = entries[GetInteger(virt_addr) >> current_page_bits].GetPhysOffset(current_page_bits) + GetInteger(virt_addr);
         return true;
     }
 
@@ -137,6 +137,15 @@ struct PageTable {
         PageInfo ptr;
         u32 block;
         u32 addr;
+
+        constexpr u64 GetPhysOffset(u64 page_bits) const {
+            // TODO: For whatever reason, when storing the "physical address" of a large page group, yuzu code writes it as:
+            // `addr = base_phys_addr - vaddr`, where base_phys_addr is the base address of the first entry in the page group.
+            // This 90% of the time results in a negative pointer. However, as of #4219, `addr` is stored as a u32 instead of a u64,
+            // so we use sign extension to work around this issue.
+            s64 result = (static_cast<s64>(static_cast<s32>(addr))) << page_bits;
+            return static_cast<u64>(result);
+        }
     };
     SparseLargeVector<PageEntryData> entries;
     static_assert(sizeof(PageEntryData) == 16);

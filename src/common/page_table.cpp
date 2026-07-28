@@ -22,18 +22,19 @@ bool PageTable::BeginTraversal(TraversalEntry* out_entry, TraversalContext* out_
 }
 
 bool PageTable::ContinueTraversal(TraversalEntry* out_entry, TraversalContext* context) const {
+    auto page_size = 1 << current_page_bits;
     // Setup invalid defaults.
     out_entry->phys_addr = 0;
-    out_entry->block_size = 1 << current_page_bits;
-    // Setup context
+    out_entry->block_size = page_size;
+    // Setup return context
     context->next_page += 1;
-    context->next_offset += 1 << current_page_bits;
+    context->next_offset += page_size;
     // Validate that we can read the actual entry.
     if (auto const page = context->next_page; page < entries.size()) {
         // Validate that the entry is mapped.
         if (auto const paddr = entries[page].addr; paddr != 0) {
             // Populate the results and return true
-            out_entry->phys_addr = (paddr << current_page_bits) + context->next_offset;
+            out_entry->phys_addr = (entries[page].GetPhysOffset(current_page_bits)) + context->next_offset;
             return true;
         }
     }
