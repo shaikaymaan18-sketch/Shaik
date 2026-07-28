@@ -179,14 +179,17 @@ DeviceMemoryManager<Traits>::DeviceMemoryManager(const DeviceMemory& device_memo
     cached_pages = std::make_unique<CachedPages>();
 
     const size_t total_virtual = device_as_size >> Memory::YUZU_PAGEBITS;
+
+    auto virtual_entry = TrackedEntry {};
+    virtual_entry.compressed_physical_ptr = 0;
+    virtual_entry.continuity_tracker = 1;
+    virtual_entry.cpu_backing_address = 0;
     for (size_t i = 0; i < total_virtual; i++) {
-        tracked_entries[i].compressed_physical_ptr = 0;
-        tracked_entries[i].continuity_tracker = 1;
-        tracked_entries[i].cpu_backing_address = 0;
+        tracked_entries.Set(i, virtual_entry);
     }
     const size_t total_phys = 1ULL << ((Settings::values.memory_layout_mode.GetValue() == Settings::MemoryLayout::Memory_4Gb ? physical_min_bits : physical_max_bits) - Memory::YUZU_PAGEBITS);
     for (size_t i = 0; i < total_phys; i++) {
-        compressed_device_addr[i] = 0;
+        compressed_device_addr.Zero(i);
     }
 }
 
@@ -224,22 +227,24 @@ void DeviceMemoryManager<Traits>::Map(DAddr address, VAddr virtual_address, size
         const VAddr new_vaddress = virtual_address + i * Memory::YUZU_PAGESIZE;
         auto* ptr = process_memory->GetPointerSilent(Common::ProcessAddress(new_vaddress));
         if (ptr == nullptr) [[unlikely]] {
-            tracked_entries[start_page_d + i].compressed_physical_ptr = 0;
+            if (auto v = tracked_entries.GetNoFault(start_page_d + i); v) {
+                v->compressed_physical_ptr = 0;
+            }
             continue;
         }
         auto phys_addr = static_cast<u32>(GetRawPhysicalAddr(ptr) >> Memory::YUZU_PAGEBITS) + 1U;
-        tracked_entries[start_page_d + i].compressed_physical_ptr = phys_addr;
+        tracked_entries.GetAndFault(start_page_d + i).compressed_physical_ptr = phys_addr;
         InsertCPUBacking(start_page_d + i, new_vaddress, asid);
         const u32 base_dev = compressed_device_addr[phys_addr - 1U];
         const u32 new_dev = static_cast<u32>(start_page_d + i);
         if (base_dev == 0) [[likely]] {
-            compressed_device_addr[phys_addr - 1U] = new_dev;
+            compressed_device_addr.GetAndFault(phys_addr - 1U) = new_dev;
             continue;
         }
         u32 start_id = base_dev & MULTI_MASK;
         if ((base_dev >> MULTI_FLAG_BITS) == 0) {
             start_id = impl->multi_dev_address.Register(base_dev);
-            compressed_device_addr[phys_addr - 1U] = MULTI_FLAG | start_id;
+            compressed_device_addr.GetAndFault(phys_addr - 1U) = MULTI_FLAG | start_id;
         }
         impl->multi_dev_address.Register(new_dev, start_id);
     }
@@ -256,23 +261,24 @@ void DeviceMemoryManager<Traits>::Unmap(DAddr address, size_t size) {
     device_inter->InvalidateRegion(address, size);
     std::scoped_lock lk(mapping_guard);
     for (size_t i = 0; i < num_pages; i++) {
-        auto phys_addr = tracked_entries[start_page_d + i].compressed_physical_ptr;
-        tracked_entries[start_page_d + i].compressed_physical_ptr = 0;
-        tracked_entries[start_page_d + i].cpu_backing_address = 0;
+        auto& entry = tracked_entries.GetAndFault(start_page_d + i);
+        auto phys_addr = entry.compressed_physical_ptr;
+        entry.compressed_physical_ptr = 0;
+        entry.cpu_backing_address = 0;
         if (phys_addr != 0) [[likely]] {
             const u32 base_dev = compressed_device_addr[phys_addr - 1U];
             if ((base_dev >> MULTI_FLAG_BITS) == 0) [[likely]] {
-                compressed_device_addr[phys_addr - 1] = 0;
+                compressed_device_addr.Zero(phys_addr - 1);
                 continue;
             }
             const auto [more_entries, new_start] = impl->multi_dev_address.Unregister(
                 static_cast<u32>(start_page_d + i), base_dev & MULTI_MASK);
             if (!more_entries) {
-                compressed_device_addr[phys_addr - 1] =
-                    impl->multi_dev_address.ReleaseEntry(new_start);
+                compressed_device_addr.Set(phys_addr - 1,
+                    impl->multi_dev_address.ReleaseEntry(new_start));
                 continue;
             }
-            compressed_device_addr[phys_addr - 1] = new_start | MULTI_FLAG;
+            compressed_device_addr.Set(phys_addr - 1, new_start | MULTI_FLAG);
         }
     }
     t_slot = {};
@@ -296,7 +302,7 @@ void DeviceMemoryManager<Traits>::TrackContinuityImpl(DAddr address, VAddr virtu
             page_count = 1;
         }
         last_ptr = new_ptr;
-        tracked_entries[start_page_d + index].continuity_tracker = static_cast<u32>(page_count);
+        tracked_entries.GetAndFault(start_page_d + index).continuity_tracker = static_cast<u32>(page_count);
     }
 }
 template <typename Traits>

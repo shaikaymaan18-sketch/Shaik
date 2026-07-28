@@ -9,8 +9,8 @@
 #include <atomic>
 
 #include "common/common_types.h"
+#include "common/sparse_large_vector.h"
 #include "common/typed_address.h"
-#include "common/virtual_buffer.h"
 
 namespace Common {
 
@@ -139,7 +139,7 @@ struct PageTable {
         u64 addr;
         u64 padding;
     };
-    VirtualBuffer<PageEntryData> entries;
+    SparseLargeVector<PageEntryData> entries;
     static_assert(sizeof(PageEntryData) == 32);
 
     u8* fastmem_arena{};

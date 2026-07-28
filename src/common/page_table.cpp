@@ -43,7 +43,7 @@ bool PageTable::ContinueTraversal(TraversalEntry* out_entry, TraversalContext* c
 
 void PageTable::Resize(std::size_t address_space_width_in_bits, std::size_t page_size_in_bits) {
     auto const num_page_table_entries = 1ULL << (address_space_width_in_bits - page_size_in_bits);
-    entries.resize(num_page_table_entries);
+    entries.ResizeAndClear(num_page_table_entries);
     current_address_space_width_in_bits = address_space_width_in_bits;
     page_size = 1ULL << page_size_in_bits;
 }

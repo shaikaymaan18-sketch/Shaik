@@ -178,6 +178,14 @@ public:
         Release();
     }
 
+    void* Allocate(size_t size) {
+        auto* ptr = VirtualAlloc(nullptr, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+        if (ptr == nullptr) {
+            LOG_CRITICAL(HW_Memory, "Failed to allocate fallback buffer with size {:#x}, error {}", size, GetLastError());
+        }
+        return VirtualAlloc(nullptr, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    }
+
     void Map(size_t virtual_offset, size_t host_offset, size_t length, MemoryPermission perms) {
         std::unique_lock lock{placeholder_mutex};
         if (!IsNiechePlaceholder(virtual_offset, length)) {
@@ -570,6 +578,14 @@ public:
         Release();
     }
 
+    void* Allocate(size_t size) {
+        auto* ptr = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+        if (ptr == MAP_FAILED) {
+            LOG_CRITICAL(HW_Memory, "Failed to allocate fallback buffer with size {:#x}, {}", size, strerror(errno));
+        }
+        return ptr;
+    }
+
     void Map(size_t virtual_offset, size_t host_offset, size_t length, MemoryPermission perms) {
         // Intersect the range with our address space.
         AdjustMap(&virtual_offset, &length);
@@ -690,8 +706,7 @@ HostMemory::HostMemory(size_t backing_size_, size_t virtual_size_)
 {
 #if defined(__OPENORBIS__) || defined(__managarm__)
     LOG_WARNING(HW_Memory, "Platform doesn't support fastmem");
-    fallback_buffer.emplace(backing_size);
-    backing_base = fallback_buffer->data();
+    backing_base = malloc(backing_size);
     virtual_base = nullptr;
 #else
     // Try to allocate a fastmem arena.
@@ -706,16 +721,28 @@ HostMemory::HostMemory(size_t backing_size_, size_t virtual_size_)
             virtual_base_offset = virtual_base - impl->virtual_base;
         }
     } else {
-        impl.reset();
         LOG_WARNING(HW_Memory, "Platform can support fastmem, but can't create it");
-        fallback_buffer.emplace(backing_size);
-        backing_base = fallback_buffer->data();
+        fallback_buffer = true;
+        backing_base = static_cast<u8*>(impl->Allocate(backing_size));
         virtual_base = nullptr;
+        impl.reset();
     }
 #endif
 }
 
-HostMemory::~HostMemory() = default;
+HostMemory::~HostMemory() {
+#if defined(__OPENORBIS__) || defined(__managarm__)
+    free(backing_base);
+#elif _WIN32
+    if (fallback_buffer) {
+        VirtualFree(backing_base, backing_size, MEM_RELEASE);
+    }
+#else
+    if (fallback_buffer) {
+        munmap(backing_base, backing_size);
+    }
+#endif
+}
 
 HostMemory::HostMemory(HostMemory&&) noexcept = default;
 

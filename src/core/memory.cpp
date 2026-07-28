@@ -417,7 +417,7 @@ struct Memory::Impl {
                     // Page is already marked.
                     break;
                 case Common::PageType::Memory:
-                    current_page_table->entries[vaddr >> YUZU_PAGEBITS].ptr.Store(0, Common::PageType::DebugMemory);
+                    current_page_table->entries.GetAndFault(vaddr >> YUZU_PAGEBITS).ptr.Store(0, Common::PageType::DebugMemory);
                     break;
                 default:
                     UNREACHABLE();
@@ -434,7 +434,7 @@ struct Memory::Impl {
                     break;
                 case Common::PageType::DebugMemory: {
                     u8* const pointer = GetPointerFromDebugMemory(vaddr & ~YUZU_PAGEMASK);
-                    current_page_table->entries[vaddr >> YUZU_PAGEBITS].ptr.Store(uintptr_t(pointer) - (vaddr & ~YUZU_PAGEMASK), Common::PageType::Memory);
+                    current_page_table->entries.GetAndFault(vaddr >> YUZU_PAGEBITS).ptr.Store(uintptr_t(pointer) - (vaddr & ~YUZU_PAGEMASK), Common::PageType::Memory);
                     break;
                 }
                 default:
@@ -477,7 +477,7 @@ struct Memory::Impl {
                     break;
                 case Common::PageType::DebugMemory:
                 case Common::PageType::Memory:
-                    current_page_table->entries[vaddr >> YUZU_PAGEBITS].ptr.Store(0, Common::PageType::RasterizerCachedMemory);
+                    current_page_table->entries.GetAndFault(vaddr >> YUZU_PAGEBITS).ptr.Store(0, Common::PageType::RasterizerCachedMemory);
                     break;
                 case Common::PageType::RasterizerCachedMemory:
                     // There can be more than one GPU region mapped per CPU region, so it's common
@@ -503,9 +503,9 @@ struct Memory::Impl {
                         // It's possible that this function has been called while updating the
                         // pagetable after unmapping a VMA. In that case the underlying VMA will no
                         // longer exist, and we should just leave the pagetable entry blank.
-                        current_page_table->entries[vaddr >> YUZU_PAGEBITS].ptr.Store(0, Common::PageType::Unmapped);
+                        current_page_table->entries.GetAndFault(vaddr >> YUZU_PAGEBITS).ptr.Store(0, Common::PageType::Unmapped);
                     } else {
-                        current_page_table->entries[vaddr >> YUZU_PAGEBITS].ptr.Store(uintptr_t(pointer) - (vaddr & ~YUZU_PAGEMASK), Common::PageType::Memory);
+                        current_page_table->entries.GetAndFault(vaddr >> YUZU_PAGEBITS).ptr.Store(uintptr_t(pointer) - (vaddr & ~YUZU_PAGEMASK), Common::PageType::Memory);
                     }
                     break;
                 }
@@ -540,9 +540,8 @@ struct Memory::Impl {
                        "Mapping memory page without a pointer @ {:016x}", base * YUZU_PAGESIZE);
 
             while (base != end) {
-                page_table.entries[base].ptr.Store(0, type);
-                page_table.entries[base].addr = 0;
-                page_table.entries[base].block = 0;
+                // TODO: add a ZeroRegion function
+                page_table.entries.Zero(base);
                 base += 1;
             }
         } else {
@@ -550,9 +549,11 @@ struct Memory::Impl {
             while (base != end) {
                 auto host_ptr = uintptr_t(system.DeviceMemory().GetPointer<u8>(target)) - (base << YUZU_PAGEBITS);
                 auto backing = GetInteger(target) - (base << YUZU_PAGEBITS);
-                page_table.entries[base].ptr.Store(host_ptr, type);
-                page_table.entries[base].addr = backing;
-                page_table.entries[base].block = orig_base << YUZU_PAGEBITS;
+
+                auto& entry = page_table.entries.GetAndFault(base);
+                entry.ptr.Store(host_ptr, type);
+                entry.addr = backing;
+                entry.block = orig_base << YUZU_PAGEBITS;
 
                 ASSERT_MSG(page_table.entries[base].ptr.Pointer(),
                            "memory mapping base yield a nullptr within the table");
