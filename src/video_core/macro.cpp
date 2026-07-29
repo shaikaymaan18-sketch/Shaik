@@ -8,6 +8,7 @@
 #include <fstream>
 #include <optional>
 #include <span>
+#include <type_traits>
 
 #include <fstream>
 #include <variant>
@@ -415,14 +416,6 @@ void HLE_TransformFeedbackSetup::Execute(Core::System& system, Engines::Maxwell3
     HLE_MACRO_LIST
 #undef HLE_MACRO_ELEM
     default: return std::monostate{};
-    }
-}
-[[nodiscard]] inline bool CanBeHLEProgram(u64 hash) noexcept {
-    switch (hash) {
-#define HLE_MACRO_ELEM(HASH, TY, VAL) case HASH: return true;
-    HLE_MACRO_LIST
-#undef HLE_MACRO_ELEM
-    default: return false;
     }
 }
 
@@ -1345,80 +1338,79 @@ static void Dump(u64 hash, std::span<const u32> code, bool decompiled = false) {
     macro_file.write(reinterpret_cast<const char*>(code.data()), code.size_bytes());
 }
 
-void MacroEngine::Execute(Core::System& system, Engines::Maxwell3D& maxwell3d, u32 method, std::span<const u32> parameters) {
-    auto const execute_variant = [&system, &maxwell3d, &parameters, method](AnyCachedMacro& acm) {
-        if (auto a = std::get_if<HLE_DrawArraysIndirect>(&acm))
-            return a->Execute(system, maxwell3d, parameters, method);
-        if (auto a = std::get_if<HLE_DrawIndexedIndirect>(&acm))
-            return a->Execute(system, maxwell3d, parameters, method);
-        if (auto a = std::get_if<HLE_MultiDrawIndexedIndirectCount>(&acm))
-            return a->Execute(system, maxwell3d, parameters, method);
-        if (auto a = std::get_if<HLE_MultiLayerClear>(&acm))
-            return a->Execute(system, maxwell3d, parameters, method);
-        if (auto a = std::get_if<HLE_C713C83D8F63CCF3>(&acm))
-            return a->Execute(system, maxwell3d, parameters, method);
-        if (auto a = std::get_if<HLE_D7333D26E0A93EDE>(&acm))
-            return a->Execute(system, maxwell3d, parameters, method);
-        if (auto a = std::get_if<HLE_BindShader>(&acm))
-            return a->Execute(system, maxwell3d, parameters, method);
-        if (auto a = std::get_if<HLE_SetRasterBoundingBox>(&acm))
-            return a->Execute(system, maxwell3d, parameters, method);
-        if (auto a = std::get_if<HLE_ClearConstBuffer>(&acm))
-            return a->Execute(system, maxwell3d, parameters, method);
-        if (auto a = std::get_if<HLE_ClearMemory>(&acm))
-            return a->Execute(system, maxwell3d, parameters, method);
-        if (auto a = std::get_if<HLE_TransformFeedbackSetup>(&acm))
-            return a->Execute(system, maxwell3d, parameters, method);
-        if (auto a = std::get_if<HLE_DrawIndirectByteCount>(&acm))
-            return a->Execute(system, maxwell3d, parameters, method);
-        if (auto a = std::get_if<MacroInterpreterImpl>(&acm))
-            return a->Execute(system, maxwell3d, parameters, method);
-        if (auto a = std::get_if<std::unique_ptr<DynamicCachedMacro>>(&acm))
-            return a->get()->Execute(system, maxwell3d, parameters, method);
+void MacroEngine::Execute(Core::System& system, Engines::Maxwell3D& maxwell3d, u32 method,
+                          std::span<const u32> parameters) {
+    const auto execute_variant = [&system, &maxwell3d, &parameters,
+                                  method](AnyCachedMacro& cached) {
+        std::visit(
+            [&](auto& program) {
+                using Program = std::remove_cvref_t<decltype(program)>;
+
+                if constexpr (std::is_same_v<Program, std::monostate> ||
+                              std::is_same_v<Program, HLEMacro>) {
+                    UNREACHABLE();
+                } else {
+                    if constexpr (std::is_same_v<Program, MacroInterpreterImpl> ||
+                                  std::is_same_v<Program, std::unique_ptr<DynamicCachedMacro>>) {
+                        maxwell3d.RefreshParameters();
+                    } else if (Settings::values.disable_macro_hle) {
+                        maxwell3d.RefreshParameters();
+                    }
+
+                    if constexpr (std::is_same_v<Program, std::unique_ptr<DynamicCachedMacro>>) {
+                        program->Execute(system, maxwell3d, parameters, method);
+                    } else {
+                        program.Execute(system, maxwell3d, parameters, method);
+                    }
+                }
+            },
+            cached);
     };
     if (auto const it = macro_cache.find(method); it != macro_cache.end()) {
-        auto& ci = it->second;
-        if (!CanBeHLEProgram(ci.hash) || Settings::values.disable_macro_hle)
-            maxwell3d.RefreshParameters(); //LLE must reload parameters
-        execute_variant(ci.program);
-    } else {
-        // Macro not compiled, check if it's uploaded and if so, compile it
+        execute_variant(it->second.program);
+        return;
+    }
+
+    // Macro not compiled, check if it's uploaded and if so, compile it
+    std::span<const u32> code;
+    auto macro_code = uploaded_macro_code.find(method);
+    if (macro_code == uploaded_macro_code.end()) {
         std::optional<u32> mid_method;
-        const auto macro_code = uploaded_macro_code.find(method);
-        if (macro_code == uploaded_macro_code.end()) {
-            for (const auto& [method_base, code] : uploaded_macro_code) {
-                if (method >= method_base && (method - method_base) < code.size()) {
-                    mid_method = method_base;
-                    break;
-                }
-            }
-            if (!mid_method.has_value()) {
-                ASSERT_MSG(false, "Macro 0x{0:x} was not uploaded", method);
-                return;
+        for (const auto& [method_base, uploaded_code] : uploaded_macro_code) {
+            if (method >= method_base && (method - method_base) < uploaded_code.size()) {
+                mid_method = method_base;
+                break;
             }
         }
-        auto& ci = macro_cache[method];
-        if (mid_method) {
-            const auto& macro_cached = uploaded_macro_code[mid_method.value()];
-            const auto rebased_method = method - mid_method.value();
-            auto& code = uploaded_macro_code[method];
-            code.resize(macro_cached.size() - rebased_method);
-            std::memcpy(code.data(), macro_cached.data() + rebased_method, code.size() * sizeof(u32));
-            ci.hash = Common::HashValue(code);
-            ci.program = Compile(system, maxwell3d, code);
-        } else {
-            ci.program = Compile(system, maxwell3d, macro_code->second);
-            ci.hash = Common::HashValue(macro_code->second);
+        if (!mid_method) {
+            ASSERT_MSG(false, "Macro 0x{0:x} was not uploaded", method);
+            return;
         }
-        if (CanBeHLEProgram(ci.hash) && !Settings::values.disable_macro_hle) {
-            ci.program = GetHLEProgram(ci.hash);
-        } else {
-            maxwell3d.RefreshParameters();
-        }
-        execute_variant(ci.program);
-        if (Settings::values.dump_macros) {
-            Dump(ci.hash, macro_code->second, !std::holds_alternative<std::monostate>(ci.program));
-        }
+
+        const auto source = uploaded_macro_code.find(*mid_method);
+        ASSERT(source != uploaded_macro_code.end());
+        const auto rebased_method = method - *mid_method;
+        std::vector<u32> rebased_code(source->second.begin() + rebased_method,
+                                      source->second.end());
+        const auto [it, inserted] = uploaded_macro_code.emplace(method, std::move(rebased_code));
+        ASSERT(inserted);
+        code = it->second;
+    } else {
+        code = macro_code->second;
+    }
+
+    auto& ci = macro_cache[method];
+    ci.hash = Common::HashRange(code.begin(), code.end());
+    if (!Settings::values.disable_macro_hle) {
+        ci.program = GetHLEProgram(ci.hash);
+    }
+    if (std::holds_alternative<std::monostate>(ci.program)) {
+        ci.program = Compile(system, maxwell3d, code);
+    }
+
+    execute_variant(ci.program);
+    if (Settings::values.dump_macros) {
+        Dump(ci.hash, code, !std::holds_alternative<std::monostate>(ci.program));
     }
 }
 
