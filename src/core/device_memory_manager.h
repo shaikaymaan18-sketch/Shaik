@@ -200,8 +200,8 @@ private:
         return std::make_pair(asid, address);
     }
 
-    void InsertCPUBacking(size_t page_index, VAddr address, Asid asid) {
-        tracked_entries.GetAndFault(page_index).cpu_backing_address = address | (asid.id << asid_start_bit);
+    constexpr void InsertCPUBacking(size_t page_index, VAddr address, Asid asid) {
+        tracked_entries.GetUnchecked(page_index).cpu_backing_address = address | (asid.id << asid_start_bit);
     }
 
     std::array<TranslationEntry, 4> t_slot{};

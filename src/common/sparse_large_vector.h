@@ -17,6 +17,7 @@
 #include <sys/mman.h>
 #endif
 
+#include "common/alignment.h"
 #include "common/assert.h"
 
 namespace Common {
@@ -120,6 +121,20 @@ public:
         // reinterpret_cast because C++ doesn't like memset'ing, but this should be valid
         // because of std::is_trivially_copyable_v
         std::memset(reinterpret_cast<void*>(&base_ptr[index]), 0, sizeof(T));
+    }
+
+    constexpr void CommitRegion(size_t index, size_t end_) {
+        auto base = index * sizeof(T);
+        auto end = end_ * sizeof(T);
+
+        while (base < end) {
+            CommitPage(base);
+            base = AlignDown(base, HostPageSize) + HostPageSize;
+        }
+    }
+
+    constexpr T& GetUnchecked(size_t index) {
+        return base_ptr[index];
     }
 
     [[nodiscard]] constexpr const T& operator[](std::size_t index) const noexcept {

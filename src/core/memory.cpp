@@ -101,8 +101,10 @@ struct Memory::Impl {
         }
 
         u64 protect_bytes = 0, protect_begin = 0;
+
+        current_page_table->entries.CommitRegion(vaddr >> YUZU_PAGEBITS, (vaddr + size) >> YUZU_PAGEBITS);
         for (u64 addr = vaddr; addr < vaddr + size; addr += YUZU_PAGESIZE) {
-            const Common::PageType page_type = current_page_table->entries[addr >> YUZU_PAGEBITS].ptr.Type();
+            const Common::PageType page_type = current_page_table->entries.GetUnchecked(addr >> YUZU_PAGEBITS).ptr.Type();
             switch (page_type) {
             case Common::PageType::RasterizerCachedMemory:
                 if (protect_bytes > 0) {
@@ -243,10 +245,12 @@ struct Memory::Impl {
         std::size_t page_index = addr >> YUZU_PAGEBITS;
         std::size_t page_offset = addr & YUZU_PAGEMASK;
         bool user_accessible = true;
+
+        current_page_table->entries.CommitRegion(page_index, page_index + (size >> YUZU_PAGEBITS) + 1);
         while (remaining_size != 0) {
             const std::size_t copy_amount = (std::min)(std::size_t(YUZU_PAGESIZE) - page_offset, remaining_size);
             const auto current_vaddr = u64((page_index << YUZU_PAGEBITS) + page_offset);
-            const auto [pointer, type] = current_page_table->entries[page_index].ptr.PointerType();
+            const auto [pointer, type] = current_page_table->entries.GetUnchecked(page_index).ptr.PointerType();
             switch (type) {
             case Common::PageType::Unmapped: {
                 user_accessible = false;
@@ -404,8 +408,11 @@ struct Memory::Impl {
         // The region is at a granularity of CPU pages.
 
         const u64 num_pages = ((vaddr + size - 1) >> YUZU_PAGEBITS) - (vaddr >> YUZU_PAGEBITS) + 1;
+
+        current_page_table->entries.CommitRegion(vaddr >> YUZU_PAGEBITS, (vaddr >> YUZU_PAGEBITS) + num_pages);
         for (u64 i = 0; i < num_pages; ++i, vaddr += YUZU_PAGESIZE) {
-            const Common::PageType page_type = current_page_table->entries[vaddr >> YUZU_PAGEBITS].ptr.Type();
+            auto& entry = current_page_table->entries.GetUnchecked(vaddr >> YUZU_PAGEBITS);
+            const Common::PageType page_type = entry.ptr.Type();
             if (debug) {
                 // Switch page type to debug if now debug
                 switch (page_type) {
@@ -417,7 +424,7 @@ struct Memory::Impl {
                     // Page is already marked.
                     break;
                 case Common::PageType::Memory:
-                    current_page_table->entries.GetAndFault(vaddr >> YUZU_PAGEBITS).ptr.Store(0, Common::PageType::DebugMemory);
+                    entry.ptr.Store(0, Common::PageType::DebugMemory);
                     break;
                 default:
                     UNREACHABLE();
@@ -434,7 +441,7 @@ struct Memory::Impl {
                     break;
                 case Common::PageType::DebugMemory: {
                     u8* const pointer = GetPointerFromDebugMemory(vaddr & ~YUZU_PAGEMASK);
-                    current_page_table->entries.GetAndFault(vaddr >> YUZU_PAGEBITS).ptr.Store(uintptr_t(pointer) - (vaddr & ~YUZU_PAGEMASK), Common::PageType::Memory);
+                    entry.ptr.Store(uintptr_t(pointer) - (vaddr & ~YUZU_PAGEMASK), Common::PageType::Memory);
                     break;
                 }
                 default:
@@ -466,8 +473,10 @@ struct Memory::Impl {
         // is different). This assumes the specified GPU address region is contiguous as well.
 
         const u64 num_pages = ((vaddr + size - 1) >> YUZU_PAGEBITS) - (vaddr >> YUZU_PAGEBITS) + 1;
+        current_page_table->entries.CommitRegion(vaddr >> YUZU_PAGEBITS, (vaddr >> YUZU_PAGEBITS) + num_pages);
         for (u64 i = 0; i < num_pages; ++i, vaddr += YUZU_PAGESIZE) {
-            const Common::PageType page_type= current_page_table->entries[vaddr >> YUZU_PAGEBITS].ptr.Type();
+            auto& entry = current_page_table->entries.GetUnchecked(vaddr >> YUZU_PAGEBITS);
+            const Common::PageType page_type = entry.ptr.Type();
             if (cached) {
                 // Switch page type to cached if now cached
                 switch (page_type) {
@@ -477,7 +486,7 @@ struct Memory::Impl {
                     break;
                 case Common::PageType::DebugMemory:
                 case Common::PageType::Memory:
-                    current_page_table->entries.GetAndFault(vaddr >> YUZU_PAGEBITS).ptr.Store(0, Common::PageType::RasterizerCachedMemory);
+                    entry.ptr.Store(0, Common::PageType::RasterizerCachedMemory);
                     break;
                 case Common::PageType::RasterizerCachedMemory:
                     // There can be more than one GPU region mapped per CPU region, so it's common
@@ -503,9 +512,9 @@ struct Memory::Impl {
                         // It's possible that this function has been called while updating the
                         // pagetable after unmapping a VMA. In that case the underlying VMA will no
                         // longer exist, and we should just leave the pagetable entry blank.
-                        current_page_table->entries.GetAndFault(vaddr >> YUZU_PAGEBITS).ptr.Store(0, Common::PageType::Unmapped);
+                        entry.ptr.Store(0, Common::PageType::Unmapped);
                     } else {
-                        current_page_table->entries.GetAndFault(vaddr >> YUZU_PAGEBITS).ptr.Store(uintptr_t(pointer) - (vaddr & ~YUZU_PAGEMASK), Common::PageType::Memory);
+                        entry.ptr.Store(uintptr_t(pointer) - (vaddr & ~YUZU_PAGEMASK), Common::PageType::Memory);
                     }
                     break;
                 }
@@ -546,16 +555,16 @@ struct Memory::Impl {
             }
         } else {
             auto orig_base = base;
+
+            page_table.entries.CommitRegion(base, end);
             while (base != end) {
                 auto host_ptr = uintptr_t(system.DeviceMemory().GetPointer<u8>(target)) - (base << YUZU_PAGEBITS);
 
-                auto& entry = page_table.entries.GetAndFault(base);
+                auto& entry = page_table.entries.GetUnchecked(base);
                 entry.ptr.Store(host_ptr, type);
                 // TODO: see comments in PageTable::GetPhysOffset
                 entry.addr = static_cast<u32>(GetInteger(target) >> YUZU_PAGEBITS) - static_cast<u32>(base);
                 entry.block = static_cast<u32>(orig_base);
-
-                ASSERT_MSG(entry.GetPhysOffset(YUZU_PAGEBITS) == GetInteger(target) - (base << YUZU_PAGEBITS), "assert failed; {:#x} == {:#x}", entry.GetPhysOffset(YUZU_PAGEBITS), GetInteger(target) - (base << YUZU_PAGEBITS));
 
                 ASSERT_MSG(page_table.entries[base].ptr.Pointer(),
                            "memory mapping base yield a nullptr within the table");
