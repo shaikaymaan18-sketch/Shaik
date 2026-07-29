@@ -124,12 +124,11 @@ public:
     }
 
     constexpr void CommitRegion(size_t index, size_t end_) {
-        auto base = index * sizeof(T);
-        auto end = end_ * sizeof(T);
+        const u64 base = static_cast<u64>(index) * sizeof(T);
+        const u64 end = static_cast<u64>(end_) * sizeof(T);
 
-        while (base < end) {
-            CommitPage(base);
-            base = AlignDown(base, HostPageSize) + HostPageSize;
+        for (u64 page = AlignDown(base, HostPageSize); page < end; page += HostPageSize) {
+            CommitPage(page / sizeof(T));
         }
     }
 
