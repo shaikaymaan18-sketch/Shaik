@@ -128,7 +128,7 @@ public:
         const u64 end = static_cast<u64>(end_) * sizeof(T);
 
         for (u64 page = AlignDown(base, HostPageSize); page < end; page += HostPageSize) {
-            if (!IsCommittedPage(page)) {
+            if (!IsCommittedPage(page / sizeof(T))) {
                 CommitPage(page / sizeof(T));
             }
         }
