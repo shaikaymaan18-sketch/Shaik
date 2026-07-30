@@ -548,11 +548,7 @@ struct Memory::Impl {
             ASSERT_MSG(type != Common::PageType::Memory,
                        "Mapping memory page without a pointer @ {:016x}", base * YUZU_PAGESIZE);
 
-            while (base != end) {
-                // TODO: add a ZeroRegion function
-                page_table.entries.Zero(base);
-                base += 1;
-            }
+            page_table.entries.ZeroRegion(base, end);
         } else {
             auto orig_base = base;
 

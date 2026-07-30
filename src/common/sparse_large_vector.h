@@ -73,14 +73,6 @@ public:
         }
     }
 
-    /// Returns a pointer to the value of the requested index if that page has been allocated, or otherwise return nullptr.
-    T* GetNoFault(std::size_t index) const noexcept {
-        if (!IsCommittedPage(index)) {
-            return nullptr;
-        }
-        return &base_ptr[index];
-    }
-
     /// Returns a reference to the value of the requested index and allocates memory if needed.
     T& GetAndFault(std::size_t index) noexcept {
         if (index > alloc_size / sizeof(T)) {
@@ -114,13 +106,29 @@ public:
         base_ptr[index] = value;
     }
 
-    void Zero(std::size_t index) noexcept {
-        if (!IsCommittedPage(index)) {
-            return;
+    void ZeroRegion(std::size_t start, std::size_t end_) noexcept {
+        u64 base = static_cast<u64>(start) * sizeof(T);
+        const u64 end = static_cast<u64>(end_) * sizeof(T);
+
+        const u64 end_page = AlignUp(base, HostPageSize);
+        const u64 first_size = std::min(end_page, end) - base;
+
+        if (IsCommittedPage(base / sizeof(T))) {
+            std::memset(reinterpret_cast<void*>(base), 0, first_size);
         }
-        // reinterpret_cast because C++ doesn't like memset'ing, but this should be valid
-        // because of std::is_trivially_copyable_v
-        std::memset(reinterpret_cast<void*>(&base_ptr[index]), 0, sizeof(T));
+
+        if (end <= end_page)
+            return;
+
+        base = end_page;
+
+        for (u64 page = base; page < end; page += HostPageSize) {
+            if (!IsCommittedPage(page / sizeof(T))) {
+                continue;
+            }
+
+            std::memset(reinterpret_cast<void*>(page), 0, std::min( HostPageSize, end - page));
+        }
     }
 
     constexpr void CommitRegion(size_t index, size_t end_) {
