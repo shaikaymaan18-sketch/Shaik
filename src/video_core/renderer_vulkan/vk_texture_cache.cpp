@@ -1021,7 +1021,7 @@ TextureCacheRuntime::TextureCacheRuntime(const Device& device_, Scheduler& sched
     }
 }
 
-[nodiscard] bool ByteWidthSupported(u32 bpp, const Device& device) {
+[[nodiscard]] bool ByteWidthSupported(u32 bpp, const Device& device) {
     switch (bpp) {
         case 1:
             return device.IsStorageBuffer8BitAccessSupported();
