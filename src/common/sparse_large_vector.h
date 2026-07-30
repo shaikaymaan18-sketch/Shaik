@@ -111,7 +111,7 @@ public:
         const u64 end = static_cast<u64>(end_) * sizeof(T);
 
         const u64 end_page = AlignUp(base, HostPageSize);
-        const u64 first_size = std::min(end_page, end) - base;
+        const u64 first_size = (std::min)(end_page, end) - base;
 
         if (IsCommittedPage(base / sizeof(T))) {
             std::memset(reinterpret_cast<void*>(base), 0, first_size);
@@ -127,7 +127,7 @@ public:
                 continue;
             }
 
-            std::memset(reinterpret_cast<void*>(page), 0, std::min( HostPageSize, end - page));
+            std::memset(reinterpret_cast<void*>(page), 0, (std::min)( HostPageSize, end - page));
         }
     }
 
