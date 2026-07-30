@@ -64,6 +64,7 @@ SETTING(u16, false);
 SWITCHABLE(AnisotropyMode, true);
 SWITCHABLE(AntiAliasing, false);
 SWITCHABLE(AspectRatio, true);
+SWITCHABLE(TexUnswizzleMode, true);
 SWITCHABLE(AstcDecodeMode, true);
 SWITCHABLE(AstcRecompression, true);
 SWITCHABLE(AudioMode, true);
@@ -551,6 +552,10 @@ struct Values {
 #endif
                                                            "max_anisotropy",
                                                            Category::RendererAdvanced};
+    SwitchableSetting<TexUnswizzleMode, true> accelerate_unswizzle{linkage,
+                                                            TexUnswizzleMode::Cpu,
+                                                            "accelerate_unswizzle",
+                                                            Category::RendererAdvanced};
     SwitchableSetting<AstcDecodeMode, true> accelerate_astc{linkage,
                                                             AstcDecodeMode::Gpu,
                                                             "accelerate_astc",

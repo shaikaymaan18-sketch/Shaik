@@ -552,6 +552,10 @@ TextureCacheRuntime::TextureCacheRuntime(const Device& device_, ProgramManager& 
 
 TextureCacheRuntime::~TextureCacheRuntime() = default;
 
+bool TextureCacheRuntime::IsUnswizzleStorageFormatSupported(PixelFormat format) {
+    return false;
+}
+
 void TextureCacheRuntime::Finish() {
     glFinish();
 }
@@ -652,9 +656,7 @@ void TextureCacheRuntime::BlitFramebuffer(Framebuffer* dst, Framebuffer* src,
 
 void TextureCacheRuntime::AccelerateImageUpload(Image &image, const StagingBufferMap &map,
                                                 std::span<const SwizzleParameters> swizzles,
-                                                u32 z_src_start, u32 z_image_start, u32 z_count,
-                                                [[maybe_unused]] std::span<const u8> slice_has_data,
-                                                std::span<const VideoCommon::Accelerated::SliceBBox> slice_bounds, [[maybe_unused]] bool image_already_uploaded) {
+                                                u32 z_src_start, u32 z_image_start) {
     switch (image.info.type) {
     case ImageType::e2D:
         if (IsPixelFormatASTC(image.info.format)) {

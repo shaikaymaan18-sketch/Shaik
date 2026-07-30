@@ -145,11 +145,10 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
         bool was_rescaled = false;
         bool is_sparse = false;
         std::vector<u8> slice_has_data;
-        std::vector<VideoCommon::Accelerated::SliceBBox> slice_bounds;
         std::vector<std::pair<GPUVAddr, size_t>> sparse_segments;
         size_t segment_scan_cursor = 0;
-        u64 swizzled_slice_size = 0;
-        u32 swizzle_block_depth = 0;
+        size_t swizzle_group_size = 0;
+        u32 slices_per_group   = 0;
         bool is_incremental = false;
         size_t staging_base_byte_offset = 0;
         u32 incremental_z_start = 0;
@@ -443,6 +442,10 @@ private:
 
     void QueueAsyncUnswizzle(Image& image, ImageId image_id);
     void TickAsyncUnswizzle();
+
+    bool IsUnswizzleStorageFormatSupported(PixelFormat format) {
+        return runtime.IsUnswizzleStorageFormatSupported(format);
+    }
 
     Runtime& runtime;
 

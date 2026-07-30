@@ -51,6 +51,8 @@ public:
                                  DescriptorPool& descriptor_pool,
                                  ComputePassDescriptorQueue& compute_pass_descriptor_queue);
 
+    bool IsUnswizzleStorageFormatSupported(PixelFormat format) const;
+
     void Finish();
 
     StagingBufferRef UploadStagingBuffer(size_t size, bool deferred = false);
@@ -100,12 +102,14 @@ public:
         return true;
     }
 
-    void AccelerateImageUpload(Image&, const StagingBufferRef&,
-                             std::span<const VideoCommon::SwizzleParameters>,
-                             u32 z_src_start, u32 z_image_start, u32 z_count,
-                             std::span<const u8> slice_has_data = {},
-                             std::span<const VideoCommon::Accelerated::SliceBBox> slice_bounds = {},
-                             bool image_already_uploaded = false);
+    bool CanAccelerateUnswizzle() const noexcept {
+        return Settings::values.accelerate_unswizzle.GetValue() ==
+            Settings::TexUnswizzleMode::Gpu;
+    }
+
+    void AccelerateImageUpload(Image &, const StagingBufferRef &,
+                               std::span<const VideoCommon::SwizzleParameters>,
+                               u32 z_src_start, u32 z_image_start);
 
     void InsertUploadMemoryBarrier() {}
 
@@ -165,6 +169,12 @@ public:
     std::optional<ASTCDecoderPass> astc_decoder_pass;
 
     std::optional<BlockLinearUnswizzle3DPass> bl3d_unswizzle_pass;
+    std::optional<MSAACopyPass> msaa_copy_pass;
+    std::optional<BlockLinearUnswizzle2DPass> bl2d_unswizzle_pass;
+    std::optional<BlockLinearUnswizzle2DImagePass> generic_2d_unswizzle_pass;
+    std::optional<BlockLinearUnswizzle3DImagePass> generic_3d_unswizzle_pass;
+    std::optional<BlockLinearUnswizzleLinearImagePass> generic_linear_unswizzle_pass;
+    std::optional<MSAACopyPass> msaa_copy_pass;
     const Settings::ResolutionScalingInfo& resolution;
     std::array<std::vector<VkFormat>, VideoCore::Surface::MaxPixelFormat> view_formats;
 
@@ -372,6 +382,7 @@ public:
     u64 allocation_tick;
 
     friend class BlockLinearUnswizzle3DPass;
+    friend class BlockLinearUnswizzle2DPass;
     friend class TextureCacheRuntime;
 
 private:

@@ -41,6 +41,8 @@ using VideoCommon::NUM_RT;
 using VideoCommon::Region2D;
 using VideoCommon::RenderTargets;
 
+using VideoCore::Surface::PixelFormat;
+
 struct FormatProperties {
     GLenum compatibility_class;
     bool compatibility_by_size;
@@ -73,6 +75,8 @@ public:
                                  StagingBufferPool& staging_buffer_pool);
     ~TextureCacheRuntime();
 
+    bool IsUnswizzleStorageFormatSupported(PixelFormat format);
+
     void Finish();
 
     void FlushDeferredClear() {}
@@ -102,6 +106,10 @@ public:
         return true;
     }
 
+    bool CanAccelerateUnswizzle() const noexcept {
+        return false;
+    }
+
     void CopyImage(Image& dst, Image& src, std::span<const VideoCommon::ImageCopy> copies);
 
     void CopyImageMSAA(Image& dst, Image& src, std::span<const VideoCommon::ImageCopy> copies);
@@ -120,12 +128,9 @@ public:
                          const Region2D& src_region, Tegra::Engines::Fermi2D::Filter filter,
                          Tegra::Engines::Fermi2D::Operation operation);
 
-    void AccelerateImageUpload(Image&, const StagingBufferMap&,
-                             std::span<const VideoCommon::SwizzleParameters>,
-                             u32 z_src_start, u32 z_image_start, u32 z_count,
-                             std::span<const u8> slice_has_data = {},
-                             std::span<const VideoCommon::Accelerated::SliceBBox> slice_bounds = {},
-                             bool image_already_uploaded = false);
+    void AccelerateImageUpload(Image &, const StagingBufferMap &,
+                               std::span<const VideoCommon::SwizzleParameters>,
+                               u32 z_src_start, u32 z_image_start);
 
     void InsertUploadMemoryBarrier();
 

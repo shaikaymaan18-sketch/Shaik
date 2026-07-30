@@ -12,7 +12,7 @@
 #define END_PUSH_CONSTANTS };
 #define UNIFORM(n)
 #define BINDING_INPUT_BUFFER 0
-#define BINDING_OUTPUT_IMAGE 1
+#define BINDING_OUTPUT_BUFFER 1
 
 #else // ^^^ Vulkan ^^^ // vvv OpenGL vvv
 
@@ -26,7 +26,7 @@
 #define END_PUSH_CONSTANTS
 #define UNIFORM(n) layout (location = n) uniform
 #define BINDING_INPUT_BUFFER 0
-#define BINDING_OUTPUT_IMAGE 0
+#define BINDING_OUTPUT_BUFFER 0
 
 #endif
 
@@ -34,14 +34,14 @@ BEGIN_PUSH_CONSTANTS
 UNIFORM(0) uvec3 origin;
 UNIFORM(1) ivec3 destination;
 UNIFORM(2) uint bytes_per_block_log2;
-UNIFORM(3) uint slice_size;
+UNIFORM(3) uint layer_stride;
 UNIFORM(4) uint block_size;
 UNIFORM(5) uint x_shift;
 UNIFORM(6) uint block_height;
 UNIFORM(7) uint block_height_mask;
-UNIFORM(8) uint block_depth;
-UNIFORM(9) uint block_depth_mask;
-UNIFORM(10) uvec3 valid_extent;
+UNIFORM(8) uvec3 valid_extent;
+UNIFORM(9) uint out_pitch;
+UNIFORM(10) uint out_layer_stride;
 END_PUSH_CONSTANTS
 
 #if HAS_EXTENDED_TYPES
@@ -52,9 +52,16 @@ layout(binding = BINDING_INPUT_BUFFER, std430) buffer InputBufferU32 { uint u32d
 layout(binding = BINDING_INPUT_BUFFER, std430) buffer InputBufferU64 { uvec2 u64data[]; };
 layout(binding = BINDING_INPUT_BUFFER, std430) buffer InputBufferU128 { uvec4 u128data[]; };
 
-layout(binding = BINDING_OUTPUT_IMAGE) uniform writeonly uimage3D output_image;
+#if HAS_EXTENDED_TYPES
+layout(binding = BINDING_OUTPUT_BUFFER, std430) writeonly buffer OutputBufferU8 { uint8_t out8data[]; };
+layout(binding = BINDING_OUTPUT_BUFFER, std430) writeonly buffer OutputBufferU16 { uint16_t out16data[]; };
+#endif
+layout(binding = BINDING_OUTPUT_BUFFER, std430) buffer OutputBufferU32 { uint out32data[]; };
 
-layout(local_size_x = 16, local_size_y = 8, local_size_z = 8) in;
+layout(binding = BINDING_OUTPUT_BUFFER, std430) writeonly buffer OutputBufferU64 { uvec2 out64data[]; };
+layout(binding = BINDING_OUTPUT_BUFFER, std430) writeonly buffer OutputBufferU128 { uvec4 out128data[]; };
+
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 const uint GOB_SIZE_X = 64;
 const uint GOB_SIZE_Y = 8;
@@ -85,25 +92,60 @@ uint SwizzleOffset(uvec2 pos) {
 
 uvec4 ReadTexel(uint offset) {
     switch (bytes_per_block_log2) {
-#if HAS_EXTENDED_TYPES
-    case 0:
-        return uvec4(u8data[offset], 0, 0, 0);
-    case 1:
-        return uvec4(u16data[offset / 2], 0, 0, 0);
-#else
-    case 0:
-        return uvec4(bitfieldExtract(u32data[offset / 4], int((offset * 8) & 24), 8), 0, 0, 0);
-    case 1:
-        return uvec4(bitfieldExtract(u32data[offset / 4], int((offset * 8) & 16), 16), 0, 0, 0);
-#endif
-    case 2:
-        return uvec4(u32data[offset / 4], 0, 0, 0);
-    case 3:
-        return uvec4(u64data[offset / 8], 0, 0);
-    case 4:
-        return u128data[offset / 16];
+        #if HAS_EXTENDED_TYPES
+        case 0:
+            return uvec4(u8data[offset], 0, 0, 0);
+        case 1:
+            return uvec4(u16data[offset / 2], 0, 0, 0);
+        #else
+        case 0:
+            return uvec4(bitfieldExtract(u32data[offset / 4], int((offset * 8) & 24), 8), 0, 0, 0);
+        case 1:
+            return uvec4(bitfieldExtract(u32data[offset / 4], int((offset * 8) & 16), 16), 0, 0, 0);
+        #endif
+        case 2:
+            return uvec4(u32data[offset / 4], 0, 0, 0);
+        case 3:
+            return uvec4(u64data[offset / 8], 0, 0);
+        case 4:
+            return u128data[offset / 16];
     }
     return uvec4(0);
+}
+
+void WriteTexel(uint offset, uvec4 texel) {
+    switch (bytes_per_block_log2) {
+        #if HAS_EXTENDED_TYPES
+         case 0:
+            out8data[offset] = uint8_t(texel.x);
+            break;
+        case 1:
+            out16data[offset / 2] = uint16_t(texel.x);
+            break;
+        #else
+        case 0: {
+            const uint shift = (offset & 3) * 8;
+            atomicAnd(out32data[offset / 4], ~(0xFFu << shift));
+            atomicOr(out32data[offset / 4], texel.x << shift);
+            break;
+        }
+        case 1: {
+            const uint shift = (offset & 2) * 8;
+            atomicAnd(out32data[offset / 4], ~(0xFFFFu << shift));
+            atomicOr(out32data[offset / 4], texel.x << shift);
+            break;
+        }
+        #endif
+        case 2:
+            out32data[offset / 4] = texel.x;
+            break;
+        case 3:
+            out64data[offset / 8] = texel.xy;
+            break;
+        case 4:
+            out128data[offset / 16] = texel;
+            break;
+    }
 }
 
 void main() {
@@ -114,20 +156,21 @@ void main() {
     uvec3 pos = gl_GlobalInvocationID + origin;
     pos.x <<= bytes_per_block_log2;
 
-    // Read as soon as possible due to its latency
     const uint swizzle = SwizzleOffset(pos.xy);
-
     const uint block_y = pos.y >> GOB_SIZE_Y_SHIFT;
 
     uint offset = 0;
-    offset += (pos.z >> block_depth) * slice_size;
-    offset += (pos.z & block_depth_mask) << (GOB_SIZE_SHIFT + block_height);
-    offset += (block_y >> block_height) * block_size;
+    offset += pos.z * layer_stride;
+    const uint width_in_gobs = (out_pitch + 63) / 64;
+    const uint row_stride = width_in_gobs * block_size;
+    offset += (block_y >> block_height) * row_stride;
     offset += (block_y & block_height_mask) << GOB_SIZE_SHIFT;
     offset += (pos.x >> GOB_SIZE_X_SHIFT) << x_shift;
     offset += swizzle;
 
     const uvec4 texel = ReadTexel(offset);
     const ivec3 coord = ivec3(gl_GlobalInvocationID) + destination;
-    imageStore(output_image, coord, texel);
+    const uint out_offset = (coord.z * out_layer_stride) + (coord.y * out_pitch) + (coord.x << bytes_per_block_log2);
+
+    WriteTexel(out_offset, texel);
 }

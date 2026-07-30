@@ -172,4 +172,110 @@ private:
     ComputePassDescriptorQueue& compute_pass_descriptor_queue;
 };
 
+
+class MSAACopyPass final : public ComputePass {
+public:
+    explicit MSAACopyPass(const Device& device_, Scheduler& scheduler_,
+                          DescriptorPool& descriptor_pool_, StagingBufferPool& staging_buffer_pool_,
+                          ComputePassDescriptorQueue& compute_pass_descriptor_queue_);
+    ~MSAACopyPass();
+
+    void CopyImage(Image& dst_image, Image& src_image,
+                   std::span<const VideoCommon::ImageCopy> copies, bool msaa_to_non_msaa);
+
+private:
+    Scheduler& scheduler;
+    StagingBufferPool& staging_buffer_pool;
+    ComputePassDescriptorQueue& compute_pass_descriptor_queue;
+    std::array<vk::ShaderModule, 2> modules;
+    std::array<vk::Pipeline, 2> pipelines;
+};
+
+class BlockLinearUnswizzle2DPass final : public ComputePass {
+public:
+    explicit BlockLinearUnswizzle2DPass(const Device& device_, Scheduler& scheduler_,
+                             DescriptorPool& descriptor_pool_,
+                             StagingBufferPool& staging_buffer_pool_,
+                             ComputePassDescriptorQueue& compute_pass_descriptor_queue_);
+    ~BlockLinearUnswizzle2DPass();
+
+    void Unswizzle(Image& image, const StagingBufferRef& map,
+                   std::span<const VideoCommon::SwizzleParameters> swizzles);
+
+private:
+    Scheduler& scheduler;
+    StagingBufferPool& staging_buffer_pool;
+    ComputePassDescriptorQueue& compute_pass_descriptor_queue;
+};
+
+class BlockLinearUnswizzle2DImagePass final : public ComputePass {
+public:
+    explicit BlockLinearUnswizzle2DImagePass(const Device& device_, Scheduler& scheduler_,
+                             DescriptorPool& descriptor_pool_,
+                             StagingBufferPool& staging_buffer_pool_,
+                             ComputePassDescriptorQueue& compute_pass_descriptor_queue_);
+    ~BlockLinearUnswizzle2DImagePass();
+
+    void Unswizzle(Image& image, const StagingBufferRef& map,
+                   std::span<const VideoCommon::SwizzleParameters> swizzles);
+
+private:
+    Scheduler& scheduler;
+    StagingBufferPool& staging_buffer_pool;
+    ComputePassDescriptorQueue& compute_pass_descriptor_queue;
+};
+
+class BlockLinearUnswizzle3DImagePass final : public ComputePass {
+public:
+    explicit BlockLinearUnswizzle3DImagePass(const Device& device_, Scheduler& scheduler_,
+                             DescriptorPool& descriptor_pool_,
+                             StagingBufferPool& staging_buffer_pool_,
+                             ComputePassDescriptorQueue& compute_pass_descriptor_queue_);
+    ~BlockLinearUnswizzle3DImagePass();
+
+    void Unswizzle(Image& image, const StagingBufferRef& map,
+                   std::span<const VideoCommon::SwizzleParameters> swizzles,
+                   u32 z_src = 0, u32 z_image_start = 0);
+
+private:
+    Scheduler& scheduler;
+    StagingBufferPool& staging_buffer_pool;
+    ComputePassDescriptorQueue& compute_pass_descriptor_queue;
+};
+
+class BlockLinearUnswizzleLinearImagePass final : public ComputePass {
+public:
+    explicit BlockLinearUnswizzleLinearImagePass(const Device& device_, Scheduler& scheduler_,
+                             DescriptorPool& descriptor_pool_,
+                             StagingBufferPool& staging_buffer_pool_,
+                             ComputePassDescriptorQueue& compute_pass_descriptor_queue_);
+    ~BlockLinearUnswizzleLinearImagePass();
+
+    void Unswizzle(Image& image, const StagingBufferRef& map,
+                   std::span<const VideoCommon::SwizzleParameters> swizzles);
+
+private:
+    Scheduler& scheduler;
+    StagingBufferPool& staging_buffer_pool;
+    ComputePassDescriptorQueue& compute_pass_descriptor_queue;
+};
+
+class MSAACopyPass final : public ComputePass {
+public:
+    explicit MSAACopyPass(const Device& device_, Scheduler& scheduler_,
+                          DescriptorPool& descriptor_pool_, StagingBufferPool& staging_buffer_pool_,
+                          ComputePassDescriptorQueue& compute_pass_descriptor_queue_);
+    ~MSAACopyPass();
+
+    void CopyImage(Image& dst_image, Image& src_image,
+                   std::span<const VideoCommon::ImageCopy> copies, bool msaa_to_non_msaa);
+
+private:
+    Scheduler& scheduler;
+    StagingBufferPool& staging_buffer_pool;
+    ComputePassDescriptorQueue& compute_pass_descriptor_queue;
+    std::array<vk::ShaderModule, 2> modules;
+    std::array<vk::Pipeline, 2> pipelines;
+};
+
 } // namespace Vulkan
