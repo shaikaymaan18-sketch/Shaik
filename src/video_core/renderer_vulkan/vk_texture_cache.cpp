@@ -968,6 +968,33 @@ void BlitScale(Scheduler& scheduler, VkImage src_image, VkImage dst_image, const
                        0, nullptr, nullptr, write_barriers);
     });
 }
+
+[[nodiscard]] bool ByteWidthSupported(u32 bpp, const Device& device) {
+    switch (bpp) {
+        case 1:
+            return device.IsStorageBuffer8BitAccessSupported();
+        case 2:
+            return device.IsStorageBuffer16BitAccessSupported();
+        case 4:
+        case 8:
+        case 16:
+            return true;
+        default:
+            return false;
+    }
+}
+
+[[nodiscard]] boost::container::small_vector<VkFormat, 8> BuildViewFormats(
+            const ImageInfo& info, std::span<const VkFormat> base_view_formats) {
+    boost::container::small_vector<VkFormat, 8> formats(base_view_formats.begin(),
+                                                         base_view_formats.end());
+    if (Settings::values.gpu_unswizzle_enabled.GetValue()) {
+        if (const auto block_view_format = BlockTexelViewFormat(info.format)) {
+            formats.push_back(*block_view_format);
+        }
+    }
+    return formats;
+}
 } // Anonymous namespace
 
 TextureCacheRuntime::TextureCacheRuntime(const Device& device_, Scheduler& scheduler_,
@@ -1018,21 +1045,6 @@ TextureCacheRuntime::TextureCacheRuntime(const Device& device_, Scheduler& sched
                                    staging_buffer_pool, compute_pass_descriptor_queue);
         generic_linear_unswizzle_pass.emplace(device, scheduler, descriptor_pool,
                                    staging_buffer_pool, compute_pass_descriptor_queue);
-    }
-}
-
-[[nodiscard]] bool ByteWidthSupported(u32 bpp, const Device& device) {
-    switch (bpp) {
-        case 1:
-            return device.IsStorageBuffer8BitAccessSupported();
-        case 2:
-            return device.IsStorageBuffer16BitAccessSupported();
-        case 4:
-        case 8:
-        case 16:
-            return true;
-        default:
-            return false;
     }
 }
 
@@ -1976,18 +1988,6 @@ void TextureCacheRuntime::ReleaseSparseUnswizzleBuffer(Image& image) {
         image.compute_unswizzle_buffer_size = 0;
         image.compute_unswizzle_buffer_is_zero = false;
     }
-}
-
-[[nodiscard]] boost::container::small_vector<VkFormat, 8> BuildViewFormats(
-        const ImageInfo& info, std::span<const VkFormat> base_view_formats) {
-    boost::container::small_vector<VkFormat, 8> formats(base_view_formats.begin(),
-                                                         base_view_formats.end());
-    if (Settings::values.gpu_unswizzle_enabled.GetValue()) {
-        if (const auto block_view_format = BlockTexelViewFormat(info.format)) {
-            formats.push_back(*block_view_format);
-        }
-    }
-    return formats;
 }
 
 Image::Image(TextureCacheRuntime& runtime_, const ImageInfo& info_, GPUVAddr gpu_addr_,
