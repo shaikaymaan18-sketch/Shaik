@@ -67,15 +67,34 @@ struct Memory::Impl {
     void MapMemoryRegion(Common::PageTable& page_table, Common::ProcessAddress base, u64 size,
                          Common::PhysicalAddress target, Common::MemoryPermission perms,
                          bool separate_heap) {
-        ASSERT_MSG((size & YUZU_PAGEMASK) == 0, "non-page aligned size: {:016X}", size);
-        ASSERT_MSG((base & YUZU_PAGEMASK) == 0, "non-page aligned base: {:016X}", GetInteger(base));
-        ASSERT_MSG(target >= DramMemoryMap::Base, "Out of bounds target: {:016X}",
+        ASSERT_MSG((size & YUZU_PAGEMASK) == 0, "non-page aligned size: {:#x}", size);
+        ASSERT_MSG((base & YUZU_PAGEMASK) == 0, "non-page aligned base: {:#x}", GetInteger(base));
+        ASSERT_MSG((target & YUZU_PAGEMASK) == 0, "non-page aligned target: {:#x}", GetInteger(target));
+        ASSERT_MSG(target >= DramMemoryMap::Base, "Out of bounds target: {:#x}",
                    GetInteger(target));
-        MapPages(page_table, base / YUZU_PAGESIZE, size / YUZU_PAGESIZE, target,
+
+        auto out = MapPages(page_table, base / YUZU_PAGESIZE, size / YUZU_PAGESIZE, target,
                  Common::PageType::Memory);
 
         if (current_page_table->fastmem_arena) {
-            host_buffer->Map(GetInteger(base), GetInteger(target) - DramMemoryMap::Base, size, perms, separate_heap);
+            ASSERT_MSG(GetInteger(base) % Common::HostPageSize == GetInteger(target) % Common::HostPageSize,
+                "base {:#x} and target {:#x} aren't aligned in relation to host page size {}",
+                GetInteger(base), GetInteger(target), Common::HostPageSize);
+            LOG_WARNING(HW_Memory, "fastmem called");
+
+            auto align = [&](bool b, u64 v) {
+                return b ? Common::AlignUp(v, Common::HostPageSize) : Common::AlignDown(v, Common::HostPageSize);
+            };
+
+            auto aligned_base = align(out.first, GetInteger(base));
+            auto aligned_target = align(out.first, GetInteger(target) - DramMemoryMap::Base);
+            auto aligned_end = align(!out.second, GetInteger(base) + size);
+
+            host_buffer->Map(
+                aligned_base,
+                aligned_target,
+                aligned_end - aligned_base,
+                perms, separate_heap);
         }
     }
 
@@ -525,7 +544,7 @@ struct Memory::Impl {
      * @param target     The target address to begin mapping from.
      * @param type       The page type to map the memory as.
      */
-    void MapPages(Common::PageTable& page_table, Common::ProcessAddress base_address, u64 size,
+    /*[[nodiscard]]*/ std::pair<bool, bool> MapPages(Common::PageTable& page_table, Common::ProcessAddress base_address, u64 size,
                   Common::PhysicalAddress target, Common::PageType type) {
         auto base = GetInteger(base_address);
 
@@ -539,17 +558,59 @@ struct Memory::Impl {
             ASSERT_MSG(type != Common::PageType::Memory,
                        "Mapping memory page without a pointer @ {:016x}", base * YUZU_PAGESIZE);
 
+            // TODO: remove extra pages
             while (base != end) {
                 page_table.entries[base].ptr.Store(0, type);
                 page_table.entries[base].addr = 0;
                 page_table.entries[base].block = 0;
                 base += 1;
             }
+            return {false, false};
         } else {
+            std::pair out = {false, false};
+            // keep track of mappings that are unaligned to host page size
+            if (auto off = base % Common::GuestHostAlignment; off != 0) {
+                // using `block` here for storage vs. keeping it in another set is a hack to save memory;
+                // it'll never gets used as a direct value, just as a marker by GetSpan,
+                // and the value we input here should never be the same so we don't have to worry about GetSpan
+                // returning the wrong value
+                auto e = base - off;
+
+                for (u64 i = 0; i < off; ++i, ++e) {
+                    if (page_table.entries[e].addr == 0 && page_table.entries[e].block == 0) {
+                        LOG_WARNING(HW_Memory, "marked before");
+                        page_table.entries[e].block = (GetInteger(target) >> YUZU_PAGEBITS) - off + i;
+                    } else {
+                        // Either an irregular mapping or unaligned one; either way we'll just skip this anyway
+                        out.first = true;
+                    }
+                }
+            }
+            if (auto off = end & (Common::GuestHostAlignment - 1); off != 0) {
+                auto remaining = Common::GuestHostAlignment - off;
+                auto e = end;
+
+                for (u64 i = 0; i < remaining; ++i, ++e) {
+                    if (page_table.entries[e].addr == 0 && page_table.entries[e].block == 0) {
+                        LOG_WARNING(HW_Memory, "marked end");
+                        page_table.entries[e].block = (GetInteger(target) >> YUZU_PAGEBITS) + size + i;
+                    } else {
+                        out.second = true;
+                    }
+                }
+            }
+
             auto orig_base = base;
             while (base != end) {
-                auto host_ptr = uintptr_t(system.DeviceMemory().GetPointer<u8>(target)) - (base << YUZU_PAGEBITS);
-                auto backing = GetInteger(target) - (base << YUZU_PAGEBITS);
+                auto target_paddr = target;
+                if (auto real_paddr = page_table.entries[base].block; real_paddr != 0 && page_table.entries[base].addr == 0) {
+                    // Irregular mapping; let's just map its original physical address and continue
+                    LOG_WARNING(HW_Memory, "Mapping irregular address; {:#x} points to {:#x} instead of {:#x}",
+                        base << YUZU_PAGEBITS, real_paddr << YUZU_PAGEBITS, GetInteger(target));
+                    target_paddr = real_paddr << YUZU_PAGEBITS;
+                }
+                auto host_ptr = uintptr_t(system.DeviceMemory().GetPointer<u8>(target_paddr)) - (base << YUZU_PAGEBITS);
+                auto backing = GetInteger(target_paddr) - (base << YUZU_PAGEBITS);
                 page_table.entries[base].ptr.Store(host_ptr, type);
                 page_table.entries[base].addr = backing;
                 page_table.entries[base].block = orig_base << YUZU_PAGEBITS;
@@ -560,6 +621,7 @@ struct Memory::Impl {
                 base += 1;
                 target += YUZU_PAGESIZE;
             }
+            return out;
         }
     }
 
