@@ -1,6 +1,9 @@
 # SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# TODO: remove this
+set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "" FORCE)
+
 cmake_minimum_required(VERSION 3.31)
 
 project(yuzu)
