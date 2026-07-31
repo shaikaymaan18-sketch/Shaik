@@ -107,13 +107,13 @@ public:
     }
 
     void ZeroRegion(std::size_t start, std::size_t end_) noexcept {
-        u64 base = static_cast<u64>(start) * sizeof(T);
-        const u64 end = static_cast<u64>(end_) * sizeof(T);
+        u64 base = reinterpret_cast<u64>(base_ptr[start]);
+        const u64 end = reinterpret_cast<u64>(base_ptr[end_]);
 
         const u64 end_page = AlignUp(base, HostPageSize);
         const u64 first_size = (std::min)(end_page, end) - base;
 
-        if (IsCommittedPage(base / sizeof(T))) {
+        if (IsCommittedPage(start / sizeof(T))) {
             std::memset(reinterpret_cast<void*>(base), 0, first_size);
         }
 
@@ -123,7 +123,7 @@ public:
         base = end_page;
 
         for (u64 page = base; page < end; page += HostPageSize) {
-            if (!IsCommittedPage(page / sizeof(T))) {
+            if (!IsCommittedPage((page - reinterpret_cast<u64>(base_ptr)) / sizeof(T))) {
                 continue;
             }
 
