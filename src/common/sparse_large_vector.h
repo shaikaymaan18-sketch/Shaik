@@ -107,8 +107,8 @@ public:
     }
 
     void ZeroRegion(std::size_t start, std::size_t end_) noexcept {
-        u64 base = reinterpret_cast<u64>(base_ptr[start]);
-        const u64 end = reinterpret_cast<u64>(base_ptr[end_]);
+        u64 base = reinterpret_cast<u64>(&base_ptr[start]);
+        const u64 end = reinterpret_cast<u64>(&base_ptr[end_]);
 
         const u64 end_page = AlignUp(base, HostPageSize);
         const u64 first_size = (std::min)(end_page, end) - base;
