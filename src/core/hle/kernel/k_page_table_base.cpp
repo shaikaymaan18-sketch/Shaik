@@ -5755,7 +5755,7 @@ Result KPageTableBase::Operate(PageLinkedList* page_list, KProcessAddress virt_a
     ASSERT(this->IsLockedByCurrentThread());
     ASSERT(Common::IsAligned(GetInteger(virt_addr), PageSize));
     ASSERT(num_pages > 0);
-    ASSERT(Common::AlignUp(num_pages, Common::GuestHostAlignment) == page_group.GetNumPages());
+    ASSERT(num_pages == page_group.GetNumPages());
 
     // As we don't allocate page entries in guest memory, we don't need to allocate them from
     // the page list, and so it goes unused (along with page properties).

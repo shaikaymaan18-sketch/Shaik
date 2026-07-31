@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
+// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // SPDX-FileCopyrightText: Copyright 2020 yuzu Emulator Project
@@ -212,9 +212,6 @@ KPhysicalAddress KMemoryManager::AllocateAndOpenContinuous(size_t num_pages, siz
         return 0;
     }
 
-    // todo: does this waste too much space?
-    align_pages = Common::AlignUp(align_pages, Common::GuestHostAlignment);
-
     // Lock the pool that we're allocating from.
     const auto [pool, dir] = DecodeOption(option);
     KScopedLightLock lk(m_pool_locks[static_cast<std::size_t>(pool)]);
@@ -251,9 +248,6 @@ KPhysicalAddress KMemoryManager::AllocateAndOpenContinuous(size_t num_pages, siz
 
 Result KMemoryManager::AllocatePageGroupImpl(KPageGroup* out, size_t num_pages, Pool pool,
                                              Direction dir, bool unoptimized, bool random) {
-    // todo: does this waste too much space?
-    num_pages = Common::AlignUp(num_pages, Common::GuestHostAlignment);
-
     // Choose a heap based on our page size request.
     const s32 heap_index = KPageHeap::GetBlockIndex(num_pages);
     R_UNLESS(0 <= heap_index, ResultOutOfMemory);
@@ -276,15 +270,7 @@ Result KMemoryManager::AllocatePageGroupImpl(KPageGroup* out, size_t num_pages, 
              cur_manager = this->GetNextManager(cur_manager, dir)) {
             while (num_pages >= pages_per_alloc) {
                 // Allocate a block.
-                KPhysicalAddress allocated_block = 0;
-                if (random) {
-                    allocated_block = cur_manager->AllocateAligned(index, pages_per_alloc, Common::GuestHostAlignment);
-                } else {
-                    // TODO: linear search support for Aligned?
-                    allocated_block = cur_manager->AllocateBlock(index, random);
-                }
-
-                ASSERT(Common::IsAligned(GetInteger(allocated_block), Common::HostPageSize));
+                KPhysicalAddress allocated_block = cur_manager->AllocateBlock(index, random);
                 if (allocated_block == 0) {
                     break;
                 }
@@ -457,7 +443,7 @@ size_t KMemoryManager::Impl::Initialize(KPhysicalAddress address, size_t size,
     const size_t page_heap_size = KPageHeap::CalculateManagementOverheadSize(size);
     const size_t total_management_size = manager_size + page_heap_size;
     ASSERT(manager_size <= total_management_size);
-    ASSERT(management + total_management_size <= Common::AlignUp(GetInteger(management_end), Common::HostPageSize));
+    ASSERT(management + total_management_size <= management_end);
     ASSERT(Common::IsAligned(total_management_size, PageSize));
 
     // Setup region.
@@ -559,7 +545,7 @@ size_t KMemoryManager::Impl::CalculateManagementOverheadSize(size_t region_size)
         sizeof(u64);
     const size_t manager_meta_size = Common::AlignUp(optimize_map_size + ref_count_size, PageSize);
     const size_t page_heap_size = KPageHeap::CalculateManagementOverheadSize(region_size);
-    return Common::AlignUp(manager_meta_size + page_heap_size, Common::HostPageSize);
+    return manager_meta_size + page_heap_size;
 }
 
 } // namespace Kernel
