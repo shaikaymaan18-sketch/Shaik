@@ -80,7 +80,6 @@ struct Memory::Impl {
             ASSERT_MSG(GetInteger(base) % Common::HostPageSize == GetInteger(target) % Common::HostPageSize,
                 "base {:#x} and target {:#x} aren't aligned in relation to host page size {}",
                 GetInteger(base), GetInteger(target), Common::HostPageSize);
-            LOG_WARNING(HW_Memory, "fastmem called");
 
             auto align = [&](bool b, u64 v) {
                 return b ? Common::AlignUp(v, Common::HostPageSize) : Common::AlignDown(v, Common::HostPageSize);
@@ -578,7 +577,6 @@ struct Memory::Impl {
 
                 for (u64 i = 0; i < off; ++i, ++e) {
                     if (page_table.entries[e].addr == 0 && page_table.entries[e].block == 0) {
-                        LOG_WARNING(HW_Memory, "marked before");
                         page_table.entries[e].block = (GetInteger(target) >> YUZU_PAGEBITS) - off + i;
                     } else {
                         // Either an irregular mapping or unaligned one; either way we'll just skip this anyway
@@ -592,7 +590,6 @@ struct Memory::Impl {
 
                 for (u64 i = 0; i < remaining; ++i, ++e) {
                     if (page_table.entries[e].addr == 0 && page_table.entries[e].block == 0) {
-                        LOG_WARNING(HW_Memory, "marked end");
                         page_table.entries[e].block = (GetInteger(target) >> YUZU_PAGEBITS) + size + i;
                     } else {
                         out.second = true;
