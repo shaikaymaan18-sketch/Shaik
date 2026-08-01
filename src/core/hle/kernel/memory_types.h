@@ -10,7 +10,7 @@
 
 namespace Kernel {
 
-constexpr u8 PageBits{12};
+constexpr std::size_t PageBits{12};
 constexpr std::size_t PageSize{1 << PageBits};
 
 using Page = std::array<u8, PageSize>;
