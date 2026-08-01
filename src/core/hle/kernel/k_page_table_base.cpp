@@ -1397,7 +1397,7 @@ Result KPageTableBase::MapInsecureMemory(KProcessAddress address, size_t size) {
     KPageGroup pg(m_system.Kernel(), m_block_info_manager);
     R_TRY(m_system.Kernel().MemoryManager().AllocateAndOpen(
         std::addressof(pg), size / PageSize,
-        KMemoryManager::EncodeOption(insecure_pool, KMemoryManager::Direction::FromFront)));
+        KMemoryManager::EncodeOption(insecure_pool, KMemoryManager::Direction::FromFront), GetInteger(address)));
 
     // Close the opened pages when we're done with them.
     // If the mapping succeeds, each page will gain an extra reference, otherwise they will be freed
@@ -1607,7 +1607,7 @@ Result KPageTableBase::AllocateAndMapPagesImpl(PageLinkedList* page_list, KProce
 
     // Allocate the pages.
     R_TRY(
-        m_system.Kernel().MemoryManager().AllocateAndOpen(std::addressof(pg), num_pages, m_allocate_option));
+        m_system.Kernel().MemoryManager().AllocateAndOpen(std::addressof(pg), num_pages, m_allocate_option, GetInteger(address)));
 
     // Ensure that the page group is closed when we're done working with it.
     SCOPE_EXIT {
@@ -2735,8 +2735,10 @@ Result KPageTableBase::MapPages(KProcessAddress* out_addr, size_t num_pages, siz
     KScopedLightLock lk(m_general_lock);
 
     // Find a random address to map at.
+    // Note: on non-4KiB paged systems this function no longer mimics Horizon (offset should be 0) and instead
+    // will attempt to align to host page size to support fastmem
     KProcessAddress addr = this->FindFreeArea(region_start, region_num_pages, num_pages, alignment,
-                                              0, this->GetNumGuardPages());
+                                              GetInteger(phys_addr) % Common::HostPageSize, this->GetNumGuardPages());
     R_UNLESS(addr != 0, ResultOutOfMemory);
     ASSERT(Common::IsAligned(GetInteger(addr), alignment));
     ASSERT(this->CanContain(addr, num_pages * PageSize, state));

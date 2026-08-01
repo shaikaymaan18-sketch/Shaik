@@ -104,6 +104,11 @@ public:
         return GetBlockSize(index) / PageSize;
     }
 
+    static constexpr size_t NumMemoryBlockPageShifts{7};
+    static constexpr std::array<size_t, NumMemoryBlockPageShifts> MemoryBlockPageShifts{
+        0xC, 0x10, 0x15, 0x16, 0x19, 0x1D, 0x1E,
+    };
+
 private:
     class Block {
     public:
@@ -204,11 +209,6 @@ private:
     size_t GetNumFreePages() const;
 
     void FreeBlock(KPhysicalAddress block, s32 index);
-
-    static constexpr size_t NumMemoryBlockPageShifts{7};
-    static constexpr std::array<size_t, NumMemoryBlockPageShifts> MemoryBlockPageShifts{
-        0xC, 0x10, 0x15, 0x16, 0x19, 0x1D, 0x1E,
-    };
 
 private:
     KPhysicalAddress AllocateByLinearSearch(s32 index);

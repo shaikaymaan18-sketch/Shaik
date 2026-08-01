@@ -247,10 +247,25 @@ KPhysicalAddress KMemoryManager::AllocateAndOpenContinuous(size_t num_pages, siz
 }
 
 Result KMemoryManager::AllocatePageGroupImpl(KPageGroup* out, size_t num_pages, Pool pool,
-                                             Direction dir, bool unoptimized, bool random) {
-    // Choose a heap based on our page size request.
-    const s32 heap_index = KPageHeap::GetBlockIndex(num_pages);
+                                             Direction dir, bool unoptimized, bool random, KProcessAddress expected_vaddr) {
+    // Choose a heap based on our page size request
+    s32 heap_index = KPageHeap::GetAlignedBlockIndex(num_pages, Common::GuestHostAlignment);
     R_UNLESS(0 <= heap_index, ResultOutOfMemory);
+
+    // Every block we use has to have the same or greater alignment than the host page size,
+    // so we have to determine the smallest heap index we can use and use that.
+    s32 min_index = 0;
+    for (s32 i = 0; i < static_cast<s32>(KPageHeap::NumMemoryBlockPageShifts); ++i) {
+        if (KPageHeap::GetBlockNumPages(i) >= Common::GuestHostAlignment) {
+            min_index = i;
+            break;
+        }
+    }
+    R_UNLESS(0 <= min_index, ResultOutOfMemory);
+
+    if (heap_index < min_index) {
+        heap_index = min_index;
+    }
 
     // Ensure that we don't leave anything un-freed.
     ON_RESULT_FAILURE {
@@ -264,32 +279,54 @@ Result KMemoryManager::AllocatePageGroupImpl(KPageGroup* out, size_t num_pages, 
     };
 
     // Keep allocating until we've allocated all our pages.
-    for (s32 index = heap_index; index >= 0 && num_pages > 0; index--) {
+    for (s32 index = heap_index; index >= min_index && num_pages > 0; index--) {
         const size_t pages_per_alloc = KPageHeap::GetBlockNumPages(index);
         for (Impl* cur_manager = this->GetFirstManager(pool, dir); cur_manager != nullptr;
              cur_manager = this->GetNextManager(cur_manager, dir)) {
-            while (num_pages >= pages_per_alloc) {
+            while (num_pages > 0 && (num_pages >= pages_per_alloc || index == min_index)) {
                 // Allocate a block.
                 KPhysicalAddress allocated_block = cur_manager->AllocateBlock(index, random);
                 if (allocated_block == 0) {
                     break;
                 }
 
+                const size_t host_page_off = GetInteger(expected_vaddr) % Common::HostPageSize;
+
+                // Cut off the start of the page to match expected_vaddr.
+                const size_t cut_pages = host_page_off >> PageBits;
+                const size_t remainder = pages_per_alloc - cut_pages;
+                const size_t used_pages = std::min(num_pages, remainder);
+                // Cut off end of block if needed
+                const size_t tail_pages = remainder - used_pages;
+
+                const KPhysicalAddress start = allocated_block + (cut_pages << PageBits);
+
+                // Free the unused blocks.
+                if (cut_pages > 0) {
+                    cur_manager->Free(allocated_block, cut_pages);
+                }
+                if (tail_pages > 0) {
+                    cur_manager->Free(start + (used_pages << PageBits), tail_pages);
+                }
+
+                ASSERT(GetInteger(start) % Common::HostPageSize ==
+                       GetInteger(expected_vaddr) % Common::HostPageSize);
+
                 // Ensure we don't leak the block if we fail.
                 ON_RESULT_FAILURE_2 {
-                    cur_manager->Free(allocated_block, pages_per_alloc);
+                    cur_manager->Free(start, used_pages);
                 };
 
                 // Add the block to our group.
-                R_TRY(out->AddBlock(allocated_block, pages_per_alloc));
+                R_TRY(out->AddBlock(start, used_pages));
 
                 // Maintain the optimized memory bitmap, if we should.
                 if (unoptimized) {
-                    cur_manager->TrackUnoptimizedAllocation(m_system.Kernel(), allocated_block,
-                                                            pages_per_alloc);
+                    cur_manager->TrackUnoptimizedAllocation(m_system.Kernel(), start, used_pages);
                 }
 
-                num_pages -= pages_per_alloc;
+                num_pages -= used_pages;
+                expected_vaddr += used_pages << PageBits;
             }
         }
     }
@@ -301,7 +338,7 @@ Result KMemoryManager::AllocatePageGroupImpl(KPageGroup* out, size_t num_pages, 
     R_SUCCEED();
 }
 
-Result KMemoryManager::AllocateAndOpen(KPageGroup* out, size_t num_pages, u32 option) {
+Result KMemoryManager::AllocateAndOpen(KPageGroup* out, size_t num_pages, u32 option, KProcessAddress expected_vaddr) {
     ASSERT(out != nullptr);
     ASSERT(out->GetNumPages() == 0);
 
@@ -314,7 +351,8 @@ Result KMemoryManager::AllocateAndOpen(KPageGroup* out, size_t num_pages, u32 op
 
     // Allocate the page group.
     R_TRY(this->AllocatePageGroupImpl(out, num_pages, pool, dir,
-                                      m_has_optimized_process[static_cast<size_t>(pool)], true));
+                                          m_has_optimized_process[static_cast<size_t>(pool)], true,
+                                          expected_vaddr));
 
     // Open the first reference to the pages.
     for (const auto& block : *out) {
@@ -358,7 +396,7 @@ Result KMemoryManager::AllocateForProcess(KPageGroup* out, size_t num_pages, u32
 
         // Allocate the page group.
         R_TRY(this->AllocatePageGroupImpl(out, num_pages, pool, dir, has_optimized && !is_optimized,
-                                          false));
+                                              false, 0));
 
         // Set whether we should optimize.
         optimized = has_optimized && is_optimized;

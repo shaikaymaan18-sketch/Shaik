@@ -59,7 +59,7 @@ public:
     void FinalizeOptimizedMemory(u64 process_id, Pool pool);
 
     KPhysicalAddress AllocateAndOpenContinuous(size_t num_pages, size_t align_pages, u32 option);
-    Result AllocateAndOpen(KPageGroup* out, size_t num_pages, u32 option);
+    Result AllocateAndOpen(KPageGroup* out, size_t num_pages, u32 option, KProcessAddress expected_vaddr = 0);
     Result AllocateForProcess(KPageGroup* out, size_t num_pages, u32 option, u64 process_id,
                               u8 fill_pattern);
 
@@ -355,7 +355,7 @@ private:
     }
 
     Result AllocatePageGroupImpl(KPageGroup* out, size_t num_pages, Pool pool, Direction dir,
-                                 bool unoptimized, bool random);
+                                 bool unoptimized, bool random, KProcessAddress expected_vaddr);
 
 private:
     template <typename T>
