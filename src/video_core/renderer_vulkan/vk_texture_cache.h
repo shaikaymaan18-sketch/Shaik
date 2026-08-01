@@ -133,6 +133,15 @@ public:
         return view_formats[static_cast<std::size_t>(format)];
     }
 
+    struct StorageUsagePolicy {
+        bool has_storage_view_format = false;
+        bool grant_extended_storage = false;
+    };
+
+    [[nodiscard]] StorageUsagePolicy StoragePolicy(PixelFormat format) const {
+        return storage_policies[static_cast<std::size_t>(format)];
+    }
+
     void BarrierFeedbackLoop();
 
     bool IsFormatDitherable(VideoCore::Surface::PixelFormat format);
@@ -151,6 +160,7 @@ public:
     std::optional<BlockLinearUnswizzle3DPass> bl3d_unswizzle_pass;
     const Settings::ResolutionScalingInfo& resolution;
     std::array<std::vector<VkFormat>, VideoCore::Surface::MaxPixelFormat> view_formats;
+    std::array<StorageUsagePolicy, VideoCore::Surface::MaxPixelFormat> storage_policies{};
 
     static constexpr size_t indexing_slots = 8 * sizeof(size_t);
     std::array<vk::Buffer, indexing_slots> buffers{};
@@ -432,6 +442,7 @@ private:
     vk::ImageView color_view;
     vk::Image null_image;
     VkImage image_handle = VK_NULL_HANDLE;
+    VkImageUsageFlags image_usage = 0;
     VkImageView render_target = VK_NULL_HANDLE;
     VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
     u32 buffer_size = 0;

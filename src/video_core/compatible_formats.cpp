@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // SPDX-FileCopyrightText: Copyright 2020 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -121,6 +124,11 @@ constexpr std::array VIEW_CLASS_ASTC_8x5_RGBA{
     PixelFormat::ASTC_2D_8X5_SRGB,
 };
 
+constexpr std::array VIEW_CLASS_ASTC_8x6_RGBA{
+    PixelFormat::ASTC_2D_8X6_UNORM,
+    PixelFormat::ASTC_2D_8X6_SRGB,
+};
+
 constexpr std::array VIEW_CLASS_ASTC_8x8_RGBA{
     PixelFormat::ASTC_2D_8X8_UNORM,
     PixelFormat::ASTC_2D_8X8_SRGB,
@@ -228,6 +236,7 @@ constexpr Table MakeViewTable() {
     EnableRange(view, VIEW_CLASS_ASTC_6x5_RGBA);
     EnableRange(view, VIEW_CLASS_ASTC_6x6_RGBA);
     EnableRange(view, VIEW_CLASS_ASTC_8x5_RGBA);
+    EnableRange(view, VIEW_CLASS_ASTC_8x6_RGBA);
     EnableRange(view, VIEW_CLASS_ASTC_8x8_RGBA);
     EnableRange(view, VIEW_CLASS_ASTC_10x5_RGBA);
     EnableRange(view, VIEW_CLASS_ASTC_10x6_RGBA);
