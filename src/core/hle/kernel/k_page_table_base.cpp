@@ -2735,10 +2735,8 @@ Result KPageTableBase::MapPages(KProcessAddress* out_addr, size_t num_pages, siz
     KScopedLightLock lk(m_general_lock);
 
     // Find a random address to map at.
-    // Note: on non-4KiB paged systems this function no longer mimics Horizon (offset should be 0) and instead
-    // will attempt to align to host page size to support fastmem
-    KProcessAddress addr = this->FindFreeArea(region_start, region_num_pages, num_pages, alignment,
-                                              GetInteger(phys_addr) % Common::HostPageSize, this->GetNumGuardPages());
+    KProcessAddress addr = this->FindFreeArea(region_start, region_num_pages, num_pages, std::max(alignment, Common::HostPageSize),
+                                              0, this->GetNumGuardPages());
     R_UNLESS(addr != 0, ResultOutOfMemory);
     ASSERT(Common::IsAligned(GetInteger(addr), alignment));
     ASSERT(this->CanContain(addr, num_pages * PageSize, state));
