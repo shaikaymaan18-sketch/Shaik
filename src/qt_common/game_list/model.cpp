@@ -167,7 +167,7 @@ void GameListModel::RefreshGameDirectory() {
     ResetExternalWatcher();
     if (!UISettings::values.game_dirs.empty() && current_worker != nullptr) {
         LOG_INFO(Frontend, "Change detected in the games directory. Reloading game list.");
-        Repopulate();
+        //Repopulate();
     }
 }
 

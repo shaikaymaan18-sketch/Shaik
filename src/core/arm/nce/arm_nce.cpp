@@ -260,12 +260,12 @@ void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_co
             // TODO: handle accesses which split a page?
 #ifndef _WIN32
             const Common::ProcessAddress addr =
-                (reinterpret_cast<u64>(static_cast<siginfo_t*>(raw_info)->si_addr) & ~Memory::YUZU_PAGEMASK);
+                reinterpret_cast<u64>(static_cast<siginfo_t*>(raw_info)->si_addr) & ~(Common::HostPageSize - 1);
 #else
             const Common::ProcessAddress addr =
-                (reinterpret_cast<u64>(*static_cast<u64*>(raw_info)) & ~Memory::YUZU_PAGEMASK);
+                reinterpret_cast<u64>(*static_cast<u64*>(raw_info)) & ~(Common::HostPageSize - 1);
 #endif
-            if (memory.InvalidateNCE(addr, Memory::YUZU_PAGESIZE)) {
+            if (memory.InvalidateNCE(addr, Common::HostPageSize)) {
                 // We handled the access successfully and are returning to guest code.
                 goto ret;
             }
