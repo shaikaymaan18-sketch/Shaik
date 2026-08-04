@@ -457,12 +457,12 @@ struct KernelCore::Impl {
             GetInteger(kernel_region_start), kernel_region_size, KMemoryRegionType_Kernel));
 
         // Setup the code region.
-        const size_t CodeRegionAlign = PageSize;
-        const KVirtualAddress code_region_start =
+        constexpr size_t CodeRegionAlign = PageSize;
+        constexpr KVirtualAddress code_region_start =
             Common::AlignDown(GetInteger(code_start_virt_addr), CodeRegionAlign);
-        const KVirtualAddress code_region_end =
+        constexpr KVirtualAddress code_region_end =
             Common::AlignUp(GetInteger(code_end_virt_addr), CodeRegionAlign);
-        const size_t code_region_size = code_region_end - code_region_start;
+        constexpr size_t code_region_size = code_region_end - code_region_start;
         ASSERT(memory_layout->GetVirtualMemoryRegionTree().Insert(
             GetInteger(code_region_start), code_region_size, KMemoryRegionType_KernelCode));
 

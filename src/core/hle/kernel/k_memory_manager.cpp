@@ -8,6 +8,7 @@
 
 #include "common/alignment.h"
 #include "common/assert.h"
+#include "common/settings.h"
 #include "common/scope_exit.h"
 #include "core/core.h"
 #include "core/device_memory.h"
@@ -248,20 +249,25 @@ KPhysicalAddress KMemoryManager::AllocateAndOpenContinuous(size_t num_pages, siz
 
 Result KMemoryManager::AllocatePageGroupImpl(KPageGroup* out, size_t num_pages, Pool pool,
                                              Direction dir, bool unoptimized, bool random, KProcessAddress expected_vaddr) {
+    // Should we align all virtual page offsets to their backing page offsets?
+    // Necessary for fastmem on non-4KiB page size systems
+    const bool fix_addr = expected_vaddr != 0 && Settings::IsFastmemEnabled();
+
     // Choose a heap based on our page size request
     s32 heap_index = KPageHeap::GetAlignedBlockIndex(num_pages, Common::GuestHostAlignment);
     R_UNLESS(0 <= heap_index, ResultOutOfMemory);
 
-    // Every block we use has to have the same or greater alignment than the host page size,
-    // so we have to determine the smallest heap index we can use and use that.
     s32 min_index = 0;
-    for (s32 i = 0; i < static_cast<s32>(KPageHeap::NumMemoryBlockPageShifts); ++i) {
-        if (KPageHeap::GetBlockNumPages(i) >= Common::GuestHostAlignment) {
-            min_index = i;
-            break;
+    if (fix_addr) {
+        // Every block we use has to have the same or greater alignment than the host page size,
+        // so we have to determine the smallest heap index we can use and use that.
+        for (s32 i = 0; i < static_cast<s32>(KPageHeap::NumMemoryBlockPageShifts); ++i) {
+            if (KPageHeap::GetBlockNumPages(i) >= Common::GuestHostAlignment) {
+                min_index = i;
+                break;
+            }
         }
     }
-    R_UNLESS(0 <= min_index, ResultOutOfMemory);
 
     if (heap_index < min_index) {
         heap_index = min_index;
@@ -283,34 +289,39 @@ Result KMemoryManager::AllocatePageGroupImpl(KPageGroup* out, size_t num_pages, 
         const size_t pages_per_alloc = KPageHeap::GetBlockNumPages(index);
         for (Impl* cur_manager = this->GetFirstManager(pool, dir); cur_manager != nullptr;
              cur_manager = this->GetNextManager(cur_manager, dir)) {
-            while (num_pages > 0 && (num_pages >= pages_per_alloc || index == min_index)) {
+            while (num_pages >= pages_per_alloc) {
                 // Allocate a block.
                 KPhysicalAddress allocated_block = cur_manager->AllocateBlock(index, random);
                 if (allocated_block == 0) {
                     break;
                 }
 
-                const size_t host_page_off = GetInteger(expected_vaddr) % Common::HostPageSize;
+                KPhysicalAddress start = allocated_block;
+                size_t used_pages = pages_per_alloc;
+                if (fix_addr) {
+                    const size_t host_page_off = GetInteger(expected_vaddr) % Common::HostPageSize;
 
-                // Cut off the start of the page to match expected_vaddr.
-                const size_t cut_pages = host_page_off >> PageBits;
-                const size_t remainder = pages_per_alloc - cut_pages;
-                const size_t used_pages = std::min(num_pages, remainder);
-                // Cut off end of block if needed
-                const size_t tail_pages = remainder - used_pages;
+                    // Cut off the start of the page to match expected_vaddr.
+                    const size_t cut_pages = host_page_off >> PageBits;
+                    const size_t remainder = pages_per_alloc - cut_pages;
 
-                const KPhysicalAddress start = allocated_block + (cut_pages << PageBits);
+                    // Cut off end of block if needed
+                    used_pages = std::min(num_pages, remainder);
+                    const size_t tail_pages = remainder - used_pages;
 
-                // Free the unused blocks.
-                if (cut_pages > 0) {
-                    cur_manager->Free(allocated_block, cut_pages);
-                }
-                if (tail_pages > 0) {
-                    cur_manager->Free(start + (used_pages << PageBits), tail_pages);
-                }
+                    start = allocated_block + (cut_pages << PageBits);
 
-                ASSERT(GetInteger(start) % Common::HostPageSize ==
+                    // Free the unused blocks.
+                    if (cut_pages > 0) {
+                        cur_manager->Free(allocated_block, cut_pages);
+                    }
+                    if (tail_pages > 0) {
+                        cur_manager->Free(start + (used_pages << PageBits), tail_pages);
+                    }
+
+                    ASSERT(GetInteger(start) % Common::HostPageSize ==
                        GetInteger(expected_vaddr) % Common::HostPageSize);
+                }
 
                 // Ensure we don't leak the block if we fail.
                 ON_RESULT_FAILURE_2 {

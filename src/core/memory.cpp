@@ -567,32 +567,34 @@ struct Memory::Impl {
             return {false, false};
         } else {
             std::pair out = {false, false};
-            // keep track of mappings that are unaligned to host page size
-            if (auto off = base % Common::GuestHostAlignment; off != 0) {
-                // using `block` here for storage vs. keeping it in another set is a hack to save memory;
-                // it'll never gets used as a direct value, just as a marker by GetSpan,
-                // and the value we input here should never be the same so we don't have to worry about GetSpan
-                // returning the wrong value
-                auto e = base - off;
+            if (Settings::IsFastmemEnabled()) {
+                // keep track of mappings that are unaligned to host page size
+                if (auto off = base & (Common::GuestHostAlignment - 1); off != 0) {
+                    // using `block` here for storage vs. keeping it in a set is a hack to save memory;
+                    // it'll never gets used as a direct value, just as a marker by GetSpan,
+                    // and the value we input here should never be the same so we don't have to worry about GetSpan
+                    // returning the wrong value
+                    auto e = base - off;
 
-                for (u64 i = 0; i < off; ++i, ++e) {
-                    if (page_table.entries[e].addr == 0 && page_table.entries[e].block == 0) {
-                        page_table.entries[e].block = (GetInteger(target) >> YUZU_PAGEBITS) - off + i;
-                    } else {
-                        // Either an irregular mapping or unaligned one; either way we'll just skip this anyway
-                        out.first = true;
+                    for (u64 i = 0; i < off; ++i, ++e) {
+                        if (page_table.entries[e].addr == 0 && page_table.entries[e].block == 0) {
+                            page_table.entries[e].block = (GetInteger(target) >> YUZU_PAGEBITS) - off + i;
+                        } else {
+                            // Either an irregular mapping or unaligned one; either way we'll just skip this anyway
+                            out.first = true;
+                        }
                     }
                 }
-            }
-            if (auto off = end & (Common::GuestHostAlignment - 1); off != 0) {
-                auto remaining = Common::GuestHostAlignment - off;
-                auto e = end;
+                if (auto off = end & (Common::GuestHostAlignment - 1); off != 0) {
+                    auto remaining = Common::GuestHostAlignment - off;
+                    auto e = end;
 
-                for (u64 i = 0; i < remaining; ++i, ++e) {
-                    if (page_table.entries[e].addr == 0 && page_table.entries[e].block == 0) {
-                        page_table.entries[e].block = (GetInteger(target) >> YUZU_PAGEBITS) + size + i;
-                    } else {
-                        out.second = true;
+                    for (u64 i = 0; i < remaining; ++i, ++e) {
+                        if (page_table.entries[e].addr == 0 && page_table.entries[e].block == 0) {
+                            page_table.entries[e].block = (GetInteger(target) >> YUZU_PAGEBITS) + size + i;
+                        } else {
+                            out.second = true;
+                        }
                     }
                 }
             }

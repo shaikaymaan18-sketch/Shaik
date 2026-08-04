@@ -176,7 +176,8 @@ public:
 
         // Check if we failed to allocate for direct-mapping, otherwise map normally
         if (!virtual_base) {
-            LOG_WARNING(HW_Memory, "Failed to allocate within 39-bit address space, direct mapping is not supported");
+            // TODO: force disable NCE
+            LOG_ERROR(HW_Memory, "Failed to allocate within 39-bit address space, direct mapping is not supported");
             virtual_base = static_cast<u8*>(pfn_VirtualAlloc2
                         (process, nullptr, virtual_size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS, nullptr, 0));
         }
