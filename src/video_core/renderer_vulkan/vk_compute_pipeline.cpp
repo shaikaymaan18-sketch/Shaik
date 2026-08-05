@@ -287,10 +287,18 @@ bool ComputePipeline::Configure(Tegra::Engines::KeplerCompute& kepler_compute,
         descriptor_buffer_chunk = alloc.chunk;
     }
 
+    const bool bind_descriptor_buffer{
+        uses_descriptor_buffer && scheduler.UpdateDescriptorBufferChunk(descriptor_buffer_chunk)};
+
     const bool is_rescaling = !info.texture_descriptors.empty() || !info.image_descriptors.empty();
     scheduler.Record([this, descriptor_data, is_rescaling, descriptor_buffer_offset,
-                      descriptor_buffer_chunk,
+                      descriptor_buffer_chunk, bind_descriptor_buffer,
                       rescaling_data = rescaling.Data()](vk::CommandBuffer cmdbuf) {
+        if (bind_descriptor_buffer) {
+            const VkDescriptorBufferBindingInfoEXT binding_info{
+                descriptor_buffer_ring.BindingInfo(descriptor_buffer_chunk)};
+            cmdbuf.BindDescriptorBuffersEXT(binding_info);
+        }
         if (!pipeline) {
             return;
         }
@@ -304,9 +312,6 @@ bool ComputePipeline::Configure(Tegra::Engines::KeplerCompute& kepler_compute,
                                  rescaling_data.data());
         }
         if (uses_descriptor_buffer) {
-            const VkDescriptorBufferBindingInfoEXT binding_info{
-                descriptor_buffer_ring.BindingInfo(descriptor_buffer_chunk)};
-            cmdbuf.BindDescriptorBuffersEXT(binding_info);
             const u32 buffer_index{};
             cmdbuf.SetDescriptorBufferOffsetsEXT(VK_PIPELINE_BIND_POINT_COMPUTE, *pipeline_layout,
                                                  0, buffer_index, descriptor_buffer_offset);

@@ -592,6 +592,9 @@ bool GraphicsPipeline::ConfigureDraw(const RescalingPushConstant& rescaling,
     const bool is_rescaling{texture_cache.IsRescaling()};
     const bool update_rescaling{scheduler.UpdateRescaling(is_rescaling)};
     const bool bind_pipeline{scheduler.UpdateGraphicsPipeline(this)};
+    const bool bind_descriptor_buffer{
+        descriptor_set_layout && uses_descriptor_buffer &&
+        scheduler.UpdateDescriptorBufferChunk(descriptor_buffer_chunk)};
 
     // Log graphics pipeline binding
     if (bind_pipeline && GPU::Logging::IsActive() &&
@@ -612,10 +615,15 @@ bool GraphicsPipeline::ConfigureDraw(const RescalingPushConstant& rescaling,
         }
     }
     scheduler.Record([this, descriptor_data, bind_pipeline, update_descriptors,
-                      descriptor_buffer_offset, descriptor_buffer_chunk,
+                      descriptor_buffer_offset, descriptor_buffer_chunk, bind_descriptor_buffer,
                       rescaling_data = rescaling.Data(), is_rescaling, update_rescaling,
                       uses_render_area = render_area.uses_render_area,
                       render_area_data = render_area.words](vk::CommandBuffer cmdbuf) {
+        if (bind_descriptor_buffer) {
+            const VkDescriptorBufferBindingInfoEXT binding_info{
+                descriptor_buffer_ring.BindingInfo(descriptor_buffer_chunk)};
+            cmdbuf.BindDescriptorBuffersEXT(binding_info);
+        }
         if (bind_pipeline) {
             if (!pipeline) {
                 return;
@@ -641,9 +649,6 @@ bool GraphicsPipeline::ConfigureDraw(const RescalingPushConstant& rescaling,
             return;
         }
         if (uses_descriptor_buffer) {
-            const VkDescriptorBufferBindingInfoEXT binding_info{
-                descriptor_buffer_ring.BindingInfo(descriptor_buffer_chunk)};
-            cmdbuf.BindDescriptorBuffersEXT(binding_info);
             const u32 buffer_index{};
             cmdbuf.SetDescriptorBufferOffsetsEXT(VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline_layout,
                                                  0, buffer_index, descriptor_buffer_offset);

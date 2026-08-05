@@ -26,17 +26,15 @@ DescriptorBufferRing::DescriptorBufferRing(const Device& device_,
                                            props.samplerDescriptorBufferAddressSpaceSize,
                                            props.resourceDescriptorBufferAddressSpaceSize,
                                            props.descriptorBufferAddressSpaceSize})};
-    const VkDeviceSize chunk_size{Common::AlignDown(std::min(FRAME_SIZE, max_bound), alignment)};
+    const VkDeviceSize frame_size{device.IsTiler() ? TILER_FRAME_SIZE : DESKTOP_FRAME_SIZE};
+    const VkDeviceSize chunk_size{Common::AlignDown(std::min(frame_size, max_bound), alignment)};
     if (chunk_size <= alignment) {
         LOG_DEBUG(Render_Vulkan, "Descriptor buffer binding limit of {} is unusable, disabling",
                   max_bound);
         return;
     }
-    // Buffer addresses have to be aligned to descriptorBufferOffsetAlignment when bound, so the
-    // last alignment worth of bytes is reserved to absorb the padding without ever growing a chunk
-    // past the binding limit.
     chunk_capacity = chunk_size - alignment;
-    chunks_per_frame = static_cast<size_t>(FRAME_SIZE / chunk_size);
+    chunks_per_frame = static_cast<size_t>(frame_size / chunk_size);
 
     const VkBufferCreateInfo buffer_ci{
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
