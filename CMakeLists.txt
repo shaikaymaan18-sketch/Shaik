@@ -571,7 +571,12 @@ endif()
 # Qt stuff
 if (ENABLE_QT)
     if (YUZU_USE_BUNDLED_QT)
-        AddQt(Eden-CI/Qt 6.11.1)
+        # Qt 6.8+ is broken on macOS
+        if (APPLE)
+            AddQt(Eden-CI/Qt 6.7.3)
+        else()
+            AddQt(Eden-CI/Qt 6.11.1)
+        endif()
     else()
         message(STATUS "Using system Qt")
         if (NOT Qt6_DIR)
