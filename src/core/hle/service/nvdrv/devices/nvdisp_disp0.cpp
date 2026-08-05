@@ -91,7 +91,6 @@ void nvdisp_disp0::Composite(std::span<const Nvnflinger::HwcLayer> sorted_layers
     system.SpeedLimiter().DoSpeedLimiting(system.CoreTiming().GetGlobalTimeUs());
     system.GetPerfStats().EndSystemFrame();
     system.GetPerfStats().BeginSystemFrame();
-    Common::ADPF::BeginFrameWork();
 }
 
 void nvdisp_disp0::WaitForComposite() {

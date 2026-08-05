@@ -70,6 +70,8 @@ void Conductor::UnlinkVsyncEvent(u64 display_id, Event* event) {
 }
 
 void Conductor::ProcessVsync() {
+    Common::ADPF::BeginFrameWork();
+
     Common::PollThreadPolicies();
     Common::ADPF::SetTargetWorkDuration(std::chrono::nanoseconds{this->GetNextTicks()});
 
