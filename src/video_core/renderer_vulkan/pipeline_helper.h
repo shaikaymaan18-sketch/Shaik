@@ -173,12 +173,12 @@ public:
         const vk::Device& dev = device->GetLogical();
         result.size = dev.GetDescriptorSetLayoutSizeEXT(layout);
         result.bindings.reserve(bindings.size());
-        for (const VkDescriptorSetLayoutBinding& binding : bindings) {
+        for (const VkDescriptorSetLayoutBinding& entry : bindings) {
             result.bindings.push_back(DescriptorBufferBinding{
-                .type = binding.descriptorType,
-                .count = binding.descriptorCount,
-                .offset = dev.GetDescriptorSetLayoutBindingOffsetEXT(layout, binding.binding),
-                .stride = DescriptorSizeForType(*device, binding.descriptorType),
+                .type = entry.descriptorType,
+                .count = entry.descriptorCount,
+                .offset = dev.GetDescriptorSetLayoutBindingOffsetEXT(layout, entry.binding),
+                .stride = DescriptorSizeForType(*device, entry.descriptorType),
             });
         }
         return result;

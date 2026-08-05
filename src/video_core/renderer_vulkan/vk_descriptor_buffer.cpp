@@ -21,13 +21,14 @@ DescriptorBufferRing::DescriptorBufferRing(const Device& device_,
     const VkPhysicalDeviceDescriptorBufferPropertiesEXT& props{device.DescriptorBufferProperties()};
     alignment = std::max<VkDeviceSize>(props.descriptorBufferOffsetAlignment, 1);
 
-    const VkDeviceSize max_bound{std::min({props.maxSamplerDescriptorBufferRange,
-                                           props.maxResourceDescriptorBufferRange,
-                                           props.samplerDescriptorBufferAddressSpaceSize,
-                                           props.resourceDescriptorBufferAddressSpaceSize,
-                                           props.descriptorBufferAddressSpaceSize})};
+    const VkDeviceSize max_bound{(std::min)({props.maxSamplerDescriptorBufferRange,
+                                             props.maxResourceDescriptorBufferRange,
+                                             props.samplerDescriptorBufferAddressSpaceSize,
+                                             props.resourceDescriptorBufferAddressSpaceSize,
+                                             props.descriptorBufferAddressSpaceSize})};
     const VkDeviceSize frame_size{device.IsTiler() ? TILER_FRAME_SIZE : DESKTOP_FRAME_SIZE};
-    const VkDeviceSize chunk_size{Common::AlignDown(std::min(frame_size, max_bound), alignment)};
+    const VkDeviceSize chunk_size{
+        Common::AlignDown((std::min)(frame_size, max_bound), alignment)};
     if (chunk_size <= alignment) {
         LOG_DEBUG(Render_Vulkan, "Descriptor buffer binding limit of {} is unusable, disabling",
                   max_bound);
