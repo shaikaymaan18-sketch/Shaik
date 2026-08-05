@@ -23,6 +23,21 @@ namespace Core::Timing {
 
 constexpr s64 MAX_SLICE_LENGTH = 10000;
 
+constexpr u32 CPU_CLOCK_BASE_MHZ = 1020;
+constexpr u32 CPU_CLOCK_BOOST_MHZ = 1734;
+constexpr u32 CPU_CLOCK_FAST_MHZ = 2040;
+
+constexpr u32 CpuClockTargetMhz(Settings::CpuClock clock) {
+    switch (clock) {
+    case Settings::CpuClock::Boost:
+        return CPU_CLOCK_BOOST_MHZ;
+    case Settings::CpuClock::Fast:
+        return CPU_CLOCK_FAST_MHZ;
+    default:
+        return CPU_CLOCK_BASE_MHZ;
+    }
+}
+
 std::shared_ptr<EventType> CreateEvent(std::string name, TimedCallback&& callback) {
     return std::make_shared<EventType>(std::move(callback), std::move(name));
 }
@@ -210,8 +225,9 @@ void CoreTiming::ResetTicks() {
 
 u64 CoreTiming::GetClockTicks() const {
     u64 fres = is_multicore ? Common::g_wall_clock.GetCNTPCT() : Common::WallClock::CPUTickToCNTPCT(cpu_ticks);
-    if (auto const overclock = Settings::values.fast_cpu_time.GetValue(); overclock != Settings::CpuClock::Off) {
-        fres = u64(f64(fres) * (1.7 + 0.3 * u32(overclock)));
+    if (const u32 target = CpuClockTargetMhz(Settings::values.cpu_clock.GetValue());
+        target != CPU_CLOCK_BASE_MHZ) {
+        fres = fres * target / CPU_CLOCK_BASE_MHZ;
     }
     if (::Settings::values.sync_core_speed.GetValue()) {
         auto const ticks = f64(fres);

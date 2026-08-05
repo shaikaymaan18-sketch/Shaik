@@ -39,6 +39,19 @@
 
 namespace Tegra {
 
+namespace {
+constexpr u64 GpuClockMultiplier(Settings::GpuClock clock) {
+    switch (clock) {
+    case Settings::GpuClock::Boost:
+        return 256;
+    case Settings::GpuClock::Fast:
+        return 512;
+    default:
+        return 1;
+    }
+}
+} // Anonymous namespace
+
 struct GPU::Impl {
     explicit Impl(Core::System& system_, bool is_async_, bool use_nvdec_)
         : system{system_}
@@ -145,14 +158,8 @@ struct GPU::Impl {
     }
 
     [[nodiscard]] u64 GetTicks() const {
-        u64 gpu_tick = system.CoreTiming().GetGPUTicks();
-        Settings::GpuOverclock overclock = Settings::values.fast_gpu_time.GetValue();
-
-        if (overclock != Settings::GpuOverclock::Normal) {
-            gpu_tick /= 256 * u64(overclock);
-        }
-
-        return gpu_tick;
+        const u64 gpu_tick = system.CoreTiming().GetGPUTicks();
+        return gpu_tick / GpuClockMultiplier(Settings::values.gpu_clock.GetValue());
     }
 
     void RendererFrameEndNotify() {
