@@ -247,12 +247,12 @@ bool Scheduler::UpdateRescaling(bool is_rescaling) {
     return true;
 }
 
-bool Scheduler::UpdateDescriptorBufferChunk(u32 chunk) {
-    if (state.descriptor_buffer_bound && chunk == state.descriptor_buffer_chunk) {
+bool Scheduler::UpdateDescriptorBufferChunk(u32 descriptor_chunk) {
+    if (state.descriptor_buffer_bound && descriptor_chunk == state.descriptor_buffer_chunk) {
         return false;
     }
     state.descriptor_buffer_bound = true;
-    state.descriptor_buffer_chunk = chunk;
+    state.descriptor_buffer_chunk = descriptor_chunk;
     return true;
 }
 

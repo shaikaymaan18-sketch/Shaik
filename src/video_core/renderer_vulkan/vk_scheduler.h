@@ -81,7 +81,7 @@ public:
     bool UpdateRescaling(bool is_rescaling);
 
     /// Returns true when the descriptor buffer chunk has to be bound into the command buffer.
-    bool UpdateDescriptorBufferChunk(u32 chunk);
+    bool UpdateDescriptorBufferChunk(u32 descriptor_chunk);
 
     /// Invalidates current command buffer state except for render passes
     void InvalidateState();
