@@ -16,15 +16,15 @@ namespace Common {
 
 enum class PageType : u8 {
     /// Page is unmapped and should cause an access error.
-    Unmapped,
+    Unmapped = 0b00,
     /// Page is mapped to regular memory. This is the only type you can get pointers to.
-    Memory,
+    Memory = 0b01,
     /// Page is mapped to regular memory, but inaccessible from CPU fastmem and must use
     /// the callbacks.
-    DebugMemory,
+    DebugMemory = 0b10,
     /// Page is mapped to regular memory, but also needs to check for rasterizer cache flushing and
     /// invalidation
-    RasterizerCachedMemory,
+    RasterizerCachedMemory = 0b11,
 };
 
 /**
@@ -44,55 +44,75 @@ struct PageTable {
 
     /// Number of bits reserved for attribute tagging.
     /// This can be at most the guaranteed alignment of the pointers in the page table.
-    static constexpr int ATTRIBUTE_BITS = 2;
+    static constexpr int ATTRIBUTE_BITS = 12;
 
     /**
-     * Pair of host pointer and page type attribute.
-     * This uses the lower bits of a given pointer to store the attribute tag.
+     * Atomic tuple of host pointer, page type, and block id.
+     * This uses the lower bits of a given pointer to store the attributes.
      * Writing and reading the pointer attribute pair is guaranteed to be atomic for the same method
      * call. In other words, they are guaranteed to be synchronized at all times.
      */
-    class PageInfo {
+    class PageEntryData {
     public:
+        struct Data {
+            Data(bool marked_, PageType type_, u16 block_, u64 page)
+                : marked(marked_), type(static_cast<u64>(type_)), block(block_), page(page >> ATTRIBUTE_BITS) {}
+            u64 marked : 1;
+            u64 type   : 2;
+            u64 block  : 9; // TODO: is 9 bits to little? we can use the upper 8 bits if needed
+            u64 page   : 52;
+        };
+
+        [[nodiscard]] Data Raw() const noexcept {
+            return data.load(std::memory_order_relaxed);
+        }
+
         /// Returns the page pointer
-        [[nodiscard]] uintptr_t Pointer() const noexcept {
-            return ExtractPointer(raw.load(std::memory_order_relaxed));
+        [[nodiscard]] uintptr_t Pointer(bool ignored_marked = false) const noexcept {
+            return ExtractPointer(data.load(std::memory_order_relaxed), ignored_marked);
         }
 
         /// Returns the page type attribute
         [[nodiscard]] PageType Type() const noexcept {
-            return ExtractType(raw.load(std::memory_order_relaxed));
+            return static_cast<PageType>(data.load(std::memory_order_relaxed).type);
+        }
+
+        /// Returns the block identifier.
+        [[nodiscard]] u16 Block() const noexcept {
+            return static_cast<u16>(data.load(std::memory_order_relaxed).block);
         }
 
         /// Returns the page pointer and attribute pair, extracted from the same atomic read
-        [[nodiscard]] std::pair<uintptr_t, PageType> PointerType() const noexcept {
-            const uintptr_t non_atomic_raw = raw.load(std::memory_order_relaxed);
-            return {ExtractPointer(non_atomic_raw), ExtractType(non_atomic_raw)};
+        [[nodiscard]] std::tuple<uintptr_t, PageType, u16> PointerTypeBlock() const noexcept {
+            const Data non_atomic_raw = data.load(std::memory_order_relaxed);
+            return {ExtractPointer(non_atomic_raw), static_cast<PageType>(non_atomic_raw.type), static_cast<u16>(non_atomic_raw.block)};
         }
 
-        /// Returns the raw representation of the page information.
-        /// Use ExtractPointer and ExtractType to unpack the value.
-        [[nodiscard]] uintptr_t Raw() const noexcept {
-            return raw.load(std::memory_order_relaxed);
+        /// Write page info atomically
+        constexpr void Store(bool marked, PageType type, u16 block, uintptr_t pointer) noexcept {
+            data.store({marked, type, block, pointer});
         }
 
-        /// Write a page pointer and type pair atomically
-        void Store(uintptr_t pointer, PageType type) noexcept {
-            raw.store(pointer | uintptr_t(type));
+        constexpr void MarkRasterizerCached() noexcept {
+            data_raw.fetch_or(0b111);
+        }
+
+        constexpr void MarkDebug(u64 ptr, u16 block) noexcept {
+            Store(true, PageType::RasterizerCachedMemory, block, ptr);
         }
 
         /// Unpack a pointer from a page info raw representation
-        [[nodiscard]] static uintptr_t ExtractPointer(uintptr_t raw) noexcept {
-            return raw & (~uintptr_t{0} << ATTRIBUTE_BITS);
-        }
-
-        /// Unpack a page type from a page info raw representation
-        [[nodiscard]] static PageType ExtractType(uintptr_t raw) noexcept {
-            return static_cast<PageType>(raw & ((uintptr_t{1} << ATTRIBUTE_BITS) - 1));
+        [[nodiscard]] static uintptr_t ExtractPointer(Data raw, bool ignore_marked = false) noexcept {
+            return raw.marked && !ignore_marked ? 0 : raw.page << ATTRIBUTE_BITS;
         }
 
     private:
-        std::atomic<uintptr_t> raw;
+        union {
+            std::atomic<Data> data;
+            std::atomic<u64> data_raw;
+        };
+        static_assert(sizeof(std::atomic<Data>) == 8);
+        static_assert(std::atomic<Data>::is_always_lock_free);
     };
 
     PageTable();
@@ -102,10 +122,6 @@ struct PageTable {
     PageTable& operator=(const PageTable&) = delete;
     PageTable(PageTable&&) noexcept = delete;
     PageTable& operator=(PageTable&&) noexcept = delete;
-
-    bool BeginTraversal(TraversalEntry* out_entry, TraversalContext* out_context,
-                        Common::ProcessAddress address) const;
-    bool ContinueTraversal(TraversalEntry* out_entry, TraversalContext* context) const;
 
     /**
      * Resizes the page table to be able to accommodate enough pages within
@@ -120,34 +136,10 @@ struct PageTable {
         return current_address_space_width_in_bits;
     }
 
-    bool GetPhysicalAddress(Common::PhysicalAddress* out_phys_addr,
-                            Common::ProcessAddress virt_addr) const {
-        if (virt_addr > (1ULL << this->GetAddressSpaceBits())) {
-            return false;
-        }
-
-        *out_phys_addr = entries[GetInteger(virt_addr) >> current_page_bits].GetPhysOffset(current_page_bits) + GetInteger(virt_addr);
-        return true;
-    }
-
     /// Vector of memory pointers backing each page. An entry can only be non-null if the
     /// corresponding attribute element is of type `Memory`.
-    struct PageEntryData {
-        PageInfo ptr;
-        u32 block;
-        u32 addr;
-
-        constexpr u64 GetPhysOffset(u64 page_bits) const {
-            // TODO: For whatever reason, when storing the "physical address" of a large page group, yuzu code writes it as:
-            // `addr = base_phys_addr - vaddr`, where base_phys_addr is the base address of the first entry in the page group.
-            // This 90% of the time results in a negative pointer. However, as of #4219, `addr` is stored as a u32 instead of a u64,
-            // so we use sign extension to work around this issue.
-            s64 result = (static_cast<s64>(static_cast<s32>(addr))) << page_bits;
-            return static_cast<u64>(result);
-        }
-    };
     SparseLargeVector<PageEntryData> entries;
-    static_assert(sizeof(PageEntryData) == 16);
+    static_assert(sizeof(PageEntryData) == 8);
 
     u8* fastmem_arena{};
     std::size_t current_address_space_width_in_bits{};

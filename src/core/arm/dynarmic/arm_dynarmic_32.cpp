@@ -172,14 +172,12 @@ void ArmDynarmic32::MakeJit(Common::PageTable* page_table) {
     if (page_table) {
         constexpr size_t PageBits = 12;
         constexpr size_t NumPageTableEntries = 1 << (32 - PageBits);
-        constexpr size_t PageLog2Stride = 4;
-        static_assert(1 << PageLog2Stride == sizeof(Common::PageTable::PageEntryData));
 
         // Dynarmic will not write to the page table, const_cast is safe here
         config.page_table = reinterpret_cast<std::array<std::uint8_t*, NumPageTableEntries>*>(
             const_cast<Common::PageTable::PageEntryData*>(page_table->entries.data()));
         config.page_table_pointer_mask_bits = Common::PageTable::ATTRIBUTE_BITS;
-        config.page_table_log2_stride = PageLog2Stride;
+        config.page_table_marked_bit = 0;
         config.absolute_offset_page_table = true;
         config.detect_misaligned_access_via_page_table = 16 | 32 | 64 | 128;
         config.only_detect_misalignment_via_page_table_on_page_boundary = true;

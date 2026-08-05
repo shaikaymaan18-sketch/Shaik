@@ -88,6 +88,20 @@ template<>
     code.shr(tmp, int(page_table_const_bits));
     code.shl(tmp, int(ctx.conf.page_table_log2_stride));
     code.mov(page, qword[r14 + tmp.cvt64()]);
+
+    // check for marked bit, use as unmapped if marked
+    if (ctx.conf.page_table_marked_bit) {
+        // zero page, we can use it as scratch register before it's initialized
+        code.xor_(page, page);
+        if (*ctx.conf.page_table_marked_bit >= 30) {
+            code.bt(tmp, *ctx.conf.page_table_marked_bit);
+            code.cmovc(tmp, page);
+        } else {
+            code.test(tmp, 1ULL << *ctx.conf.page_table_marked_bit);
+            code.cmovnz(tmp, page);
+        }
+    }
+    // mask away attributes
     if (ctx.conf.page_table_pointer_mask_bits == 0) {
         code.test(page, page);
     } else {

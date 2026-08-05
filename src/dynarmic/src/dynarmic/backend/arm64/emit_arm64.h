@@ -130,6 +130,7 @@ struct EmitConfig {
     std::size_t page_table_address_space_bits;
     int page_table_pointer_mask_bits;
     std::size_t page_table_log2_stride;
+    std::optional<std::uint16_t> page_table_marked_bit;
     bool silently_mirror_page_table;
     bool absolute_offset_page_table;
     u8 detect_misaligned_access_via_page_table;
