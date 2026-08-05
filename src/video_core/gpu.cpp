@@ -10,6 +10,7 @@
 #include <condition_variable>
 #include <list>
 #include <memory>
+#include <utility>
 
 #include "common/assert.h"
 #include "common/settings.h"
@@ -129,7 +130,7 @@ struct GPU::Impl {
     [[nodiscard]] u64 RequestSyncOperation(Func&& action) {
         std::unique_lock lck{sync_request_mutex};
         const u64 fence = ++last_sync_fence;
-        sync_requests.emplace_back(action);
+        sync_requests.emplace_back(std::forward<Func>(action));
         return fence;
     }
 
@@ -232,9 +233,9 @@ struct GPU::Impl {
     }
 
     void RequestComposite(std::vector<Tegra::FramebufferConfig>&& layers, std::vector<Service::Nvidia::NvFence>&& fences) {
-        size_t num_fences{fences.size()};
+        const size_t num_fences{fences.size()};
         size_t current_request_counter{};
-        {
+        if (num_fences != 0) {
             std::unique_lock<std::mutex> lk(request_swap_mutex);
             if (free_swap_counters.empty()) {
                 current_request_counter = request_swap_counters.size();
@@ -245,27 +246,41 @@ struct GPU::Impl {
                 free_swap_counters.pop_front();
             }
         }
-        const auto wait_fence = RequestSyncOperation([this, current_request_counter, &layers, &fences, num_fences] {
-            auto& syncpoint_manager = system.Host1x().GetSyncpointManager();
-            if (num_fences == 0) {
-                renderer->Composite(layers);
-            }
-            const auto executer = [this, current_request_counter, layers_copy = layers]() {
-                {
-                    std::unique_lock<std::mutex> lk(request_swap_mutex);
-                    if (--request_swap_counters[current_request_counter] != 0) {
-                        return;
-                    }
-                    free_swap_counters.push_back(current_request_counter);
+        pending_composite_fence = RequestSyncOperation(
+            [this, current_request_counter, num_fences, layers = std::move(layers),
+             fences = std::move(fences)] {
+                if (num_fences == 0) {
+                    renderer->Composite(layers);
+                    return;
                 }
-                renderer->Composite(layers_copy);
-            };
-            for (size_t i = 0; i < num_fences; i++) {
-                syncpoint_manager.RegisterGuestAction(fences[i].id, fences[i].value, executer);
-            }
-        });
+                auto& syncpoint_manager = system.Host1x().GetSyncpointManager();
+                const auto executer = [this, current_request_counter, layers]() {
+                    {
+                        std::unique_lock<std::mutex> lk(request_swap_mutex);
+                        if (--request_swap_counters[current_request_counter] != 0) {
+                            return;
+                        }
+                        free_swap_counters.push_back(current_request_counter);
+                    }
+                    renderer->Composite(layers);
+                };
+                for (size_t i = 0; i < num_fences; i++) {
+                    syncpoint_manager.RegisterGuestAction(fences[i].id, fences[i].value, executer);
+                }
+            });
         gpu_thread.TickGPU(is_async);
-        WaitForSyncOperation(wait_fence);
+    }
+
+    void WaitForComposite() {
+        const u64 fence = pending_composite_fence;
+        if (fence == 0) {
+            return;
+        }
+        pending_composite_fence = 0;
+        if (shutting_down.load(std::memory_order_relaxed)) {
+            return;
+        }
+        WaitForSyncOperation(fence);
     }
 
     std::vector<u8> GetAppletCaptureBuffer() {
@@ -318,6 +333,7 @@ struct GPU::Impl {
     std::deque<size_t> free_swap_counters;
     std::deque<size_t> request_swap_counters;
     std::mutex request_swap_mutex;
+    u64 pending_composite_fence{};
 };
 
 GPU::GPU(Core::System& system, bool is_async, bool use_nvdec)
@@ -433,6 +449,10 @@ const VideoCore::ShaderNotify& GPU::ShaderNotify() const {
 void GPU::RequestComposite(std::vector<Tegra::FramebufferConfig>&& layers,
                            std::vector<Service::Nvidia::NvFence>&& fences) {
     impl->RequestComposite(std::move(layers), std::move(fences));
+}
+
+void GPU::WaitForComposite() {
+    impl->WaitForComposite();
 }
 
 std::vector<u8> GPU::GetAppletCaptureBuffer() {

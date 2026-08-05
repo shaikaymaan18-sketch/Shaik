@@ -37,6 +37,8 @@ public:
     /// Performs a screen flip, compositing each buffer.
     void Composite(std::span<const Nvnflinger::HwcLayer> sorted_layers);
 
+    void WaitForComposite();
+
     Kernel::KEvent* QueryEvent(u32 event_id) override;
 
 private:

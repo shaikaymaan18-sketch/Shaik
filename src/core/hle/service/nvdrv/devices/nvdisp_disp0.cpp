@@ -94,6 +94,10 @@ void nvdisp_disp0::Composite(std::span<const Nvnflinger::HwcLayer> sorted_layers
     Common::ADPF::BeginFrameWork();
 }
 
+void nvdisp_disp0::WaitForComposite() {
+    system.GPU().WaitForComposite();
+}
+
 Kernel::KEvent* nvdisp_disp0::QueryEvent(u32 event_id) {
     LOG_CRITICAL(Service_NVDRV, "Unknown DISP Event {}", event_id);
     return nullptr;

@@ -52,6 +52,7 @@ private:
 private:
     bool TryAcquireFramebufferLocked(Layer& layer, Framebuffer& framebuffer);
     CacheStatus CacheFramebufferLocked(Layer& layer, ConsumerId consumer_id);
+    void ReleaseFramebuffersLocked(Display& display);
 };
 
 } // namespace Service::Nvnflinger
