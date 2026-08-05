@@ -83,9 +83,9 @@ struct PageTable {
         }
 
         /// Returns the page pointer and attribute pair, extracted from the same atomic read
-        [[nodiscard]] std::tuple<uintptr_t, PageType, u16> PointerTypeBlock() const noexcept {
+        [[nodiscard]] std::tuple<uintptr_t, PageType, u16> PointerTypeBlock(bool ignore_marked = false) const noexcept {
             const Data non_atomic_raw = data.load(std::memory_order_relaxed);
-            return {ExtractPointer(non_atomic_raw), static_cast<PageType>(non_atomic_raw.type), static_cast<u16>(non_atomic_raw.block)};
+            return {ExtractPointer(non_atomic_raw, ignore_marked), static_cast<PageType>(non_atomic_raw.type), static_cast<u16>(non_atomic_raw.block)};
         }
 
         /// Write page info atomically

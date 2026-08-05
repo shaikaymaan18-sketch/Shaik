@@ -483,7 +483,7 @@ private:
         }
 
         *out = m_system.DeviceMemory().GetPhysicalAddr(
-            this->GetImpl().entries[virt_addr >> PageBits].Pointer(true));
+            this->GetImpl().entries[GetInteger(virt_addr) >> PageBits].Pointer(true) + GetInteger(virt_addr));
 
         return true;
     }

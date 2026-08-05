@@ -410,7 +410,7 @@ struct Memory::Impl {
         current_page_table->entries.CommitRegion(vaddr >> YUZU_PAGEBITS, (vaddr >> YUZU_PAGEBITS) + num_pages);
         for (u64 i = 0; i < num_pages; ++i, vaddr += YUZU_PAGESIZE) {
             auto& entry = current_page_table->entries.GetUnchecked(vaddr >> YUZU_PAGEBITS);
-            const auto [pointer, type, block] = entry.PointerTypeBlock();
+            const auto [pointer, type, block] = entry.PointerTypeBlock(true);
             if (debug) {
                 // Switch page type to debug if now debug
                 switch (type) {
@@ -505,12 +505,11 @@ struct Memory::Impl {
                     // that this area is already unmarked as cached.
                     break;
                 case Common::PageType::RasterizerCachedMemory: {
-                    if (auto [ptr, _, block] = entry.PointerTypeBlock(); ptr == 0) {
+                    if (auto [ptr, _, block] = entry.PointerTypeBlock(true); ptr == 0) {
                         // It's possible that this function has been called while updating the
                         // pagetable after unmapping a VMA. In that case the underlying VMA will no
                         // longer exist, and we should just leave the pagetable entry blank.
-                        // TODO: can this just set entry to 0?
-                        entry.Store(true, Common::PageType::Unmapped, block, ptr);
+                        entry.Store(false, Common::PageType::Unmapped, block, 0);
                     } else {
                         entry.Store(false, Common::PageType::Memory, block, ptr);
                     }
@@ -589,6 +588,7 @@ struct Memory::Impl {
                     return host_ptr;
                 }
                 case Common::PageType::Unmapped: [[unlikely]] {
+                    __builtin_debugtrap();
                     on_unmapped();
                     return nullptr;
                 }
@@ -625,7 +625,6 @@ struct Memory::Impl {
     inline T Read(Common::ProcessAddress vaddr) noexcept requires(std::is_trivially_copyable_v<T>) {
         const u64 addr = GetInteger(vaddr);
         if (auto const ptr = GetPointerImpl(addr, [addr]() {
-            __builtin_debugtrap();
             LOG_ERROR(HW_Memory, "Unmapped Read{} @ {:#016x}", sizeof(T) * 8, addr);
         }, [&]() {
             HandleRasterizerDownload(addr, sizeof(T));
