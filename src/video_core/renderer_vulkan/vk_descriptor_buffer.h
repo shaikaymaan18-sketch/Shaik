@@ -29,7 +29,14 @@ public:
         u8* host{};
         VkDeviceSize offset{};
         u32 chunk{};
+        u64 generation{};
     };
+
+    [[nodiscard]] u64 CurrentGeneration() const noexcept {
+        return generation;
+    }
+
+    void TouchFrame(Scheduler& scheduler);
 
     [[nodiscard]] bool CanAllocate(VkDeviceSize size) const noexcept {
         return Common::AlignUp(size, alignment) <= chunk_capacity;
@@ -56,6 +63,7 @@ private:
     size_t frame_index{};
     size_t chunk_cursor{};
     VkDeviceSize cursor{};
+    u64 generation{1};
     std::array<u64, FRAMES_IN_FLIGHT> frame_ticks{};
     bool frame_reused{};
 };

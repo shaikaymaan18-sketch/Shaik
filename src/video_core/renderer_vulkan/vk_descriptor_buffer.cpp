@@ -83,7 +83,12 @@ void DescriptorBufferRing::TickFrame() {
     }
     chunk_cursor = 0;
     cursor = 0;
+    ++generation;
     frame_reused = true;
+}
+
+void DescriptorBufferRing::TouchFrame(Scheduler& scheduler) {
+    frame_ticks[frame_index] = scheduler.CurrentTick();
 }
 
 DescriptorBufferRing::Allocation DescriptorBufferRing::Allocate(Scheduler& scheduler,
@@ -106,6 +111,7 @@ DescriptorBufferRing::Allocation DescriptorBufferRing::Allocate(Scheduler& sched
             LOG_DEBUG(Render_Vulkan, "Descriptor buffer frame exhausted, stalling on the GPU");
             scheduler.Finish();
             chunk_cursor = 0;
+            ++generation;
         }
         cursor = 0;
     }
@@ -117,6 +123,7 @@ DescriptorBufferRing::Allocation DescriptorBufferRing::Allocate(Scheduler& sched
         .host = chunk_hosts[chunk] + offset,
         .offset = offset,
         .chunk = static_cast<u32>(chunk),
+        .generation = generation,
     };
 }
 
