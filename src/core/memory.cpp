@@ -126,13 +126,13 @@ struct Memory::Impl {
 
     [[nodiscard]] u8* GetPointerFromRasterizerCachedMemory(u64 vaddr) const {
         if (u64 paddr = current_page_table->entries[vaddr >> YUZU_PAGEBITS].Pointer(true); paddr)
-            return reinterpret_cast<u8*>(paddr) + (vaddr % YUZU_PAGESIZE);
+            return reinterpret_cast<u8*>(paddr) + vaddr;
         return {};
     }
 
     [[nodiscard]] u8* GetPointerFromDebugMemory(u64 vaddr) const {
         if (u64 paddr = current_page_table->entries[vaddr >> YUZU_PAGEBITS].Pointer(true); paddr)
-            return reinterpret_cast<u8*>(paddr) + (vaddr % YUZU_PAGESIZE);
+            return reinterpret_cast<u8*>(paddr) + vaddr;
         return {};
     }
 
@@ -256,7 +256,7 @@ struct Memory::Impl {
                 break;
             }
             case Common::PageType::Memory: {
-                u8* mem_ptr = reinterpret_cast<u8*>(pointer + page_offset);
+                u8* mem_ptr = reinterpret_cast<u8*>(pointer + page_offset + (page_index << YUZU_PAGEBITS));
                 on_memory(offset, copy_amount, mem_ptr);
                 break;
             }
@@ -554,7 +554,7 @@ struct Memory::Impl {
 
             page_table.entries.CommitRegion(base, end);
             while (base != end) {
-                auto host_ptr = reinterpret_cast<u64>(system.DeviceMemory().GetPointer<u8>(target));
+                auto host_ptr = reinterpret_cast<u64>(system.DeviceMemory().GetPointer<u8>(target)) - (base << YUZU_PAGEBITS);;
                 auto& entry = page_table.entries.GetUnchecked(base);
 
                 entry.Store(false, type, current_block, host_ptr);
@@ -575,7 +575,7 @@ struct Memory::Impl {
             // Avoid adding any extra logic to this fast-path block
             const auto raw = current_page_table->entries[vaddr >> YUZU_PAGEBITS].Raw();
             if (auto pointer = Common::PageTable::PageEntryData::ExtractPointer(raw); pointer) [[likely]] {
-                return reinterpret_cast<u8*>(pointer + vaddr % YUZU_PAGESIZE);
+                return reinterpret_cast<u8*>(pointer + vaddr);
             } else {
                 switch (static_cast<Common::PageType>(raw.type)) {
                 case Common::PageType::Memory:
@@ -625,6 +625,7 @@ struct Memory::Impl {
     inline T Read(Common::ProcessAddress vaddr) noexcept requires(std::is_trivially_copyable_v<T>) {
         const u64 addr = GetInteger(vaddr);
         if (auto const ptr = GetPointerImpl(addr, [addr]() {
+            __builtin_debugtrap();
             LOG_ERROR(HW_Memory, "Unmapped Read{} @ {:#016x}", sizeof(T) * 8, addr);
         }, [&]() {
             HandleRasterizerDownload(addr, sizeof(T));
@@ -815,10 +816,8 @@ bool Memory::IsValidVirtualAddress(const Common::ProcessAddress vaddr) const {
     if (page >= page_table.entries.size()) {
         return false;
     }
-    const auto raw = page_table.entries[page].Raw();
-    const auto type = static_cast<Common::PageType>(raw.type);
-
-    return raw.page != 0 || type == Common::PageType::RasterizerCachedMemory ||
+    const auto [pointer, type, _] = page_table.entries[page].PointerTypeBlock();
+    return pointer != 0 || type == Common::PageType::RasterizerCachedMemory ||
            type == Common::PageType::DebugMemory;
 }
 

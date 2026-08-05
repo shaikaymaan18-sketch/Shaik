@@ -651,9 +651,9 @@ bool KPageTableBase::ContinueTraversal(const Common::PageTable &impl, TraversalE
     // Validate that we can read the actual entry.
     if (auto const page = context->next_page; page < impl.entries.size()) {
         // Validate that the entry is mapped.
-        if (auto const paddr = impl.entries[page].Pointer(); paddr != 0) {
+        if (auto const paddr = impl.entries[page].Pointer(true); paddr != 0) {
             // Populate the results and return true
-            out_entry->phys_addr = GetInteger(m_system.DeviceMemory().GetPhysicalAddr(paddr)) + context->next_offset % PageSize;
+            out_entry->phys_addr = GetInteger(m_system.DeviceMemory().GetPhysicalAddr(paddr)) + context->next_offset;
             context->next_page += 1;
             context->next_offset += PageSize;
             return true;
