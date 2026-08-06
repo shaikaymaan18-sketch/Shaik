@@ -67,33 +67,33 @@ struct PageTable {
         };
 
         [[nodiscard]] Data Raw() const noexcept {
-            return data.load(std::memory_order_relaxed);
+            return std::bit_cast<Data>(data_raw.load(std::memory_order_relaxed));
         }
 
         /// Returns the page pointer
         [[nodiscard]] uintptr_t Pointer(bool ignored_marked = false) const noexcept {
-            return ExtractPointer(data.load(std::memory_order_relaxed), ignored_marked);
+            return ExtractPointer(std::bit_cast<Data>(data_raw.load(std::memory_order_relaxed)), ignored_marked);
         }
 
         /// Returns the page type attribute
         [[nodiscard]] PageType Type() const noexcept {
-            return static_cast<PageType>(data.load(std::memory_order_relaxed).type);
+            return static_cast<PageType>(std::bit_cast<Data>(data_raw.load(std::memory_order_relaxed)).type);
         }
 
         /// Returns the block identifier.
         [[nodiscard]] u16 Block() const noexcept {
-            return static_cast<u16>(data.load(std::memory_order_relaxed).block);
+            return static_cast<u16>(std::bit_cast<Data>(data_raw.load(std::memory_order_relaxed)).block);
         }
 
         /// Returns the page pointer and attribute pair, extracted from the same atomic read
         [[nodiscard]] std::tuple<uintptr_t, PageType, u16> PointerTypeBlock(bool ignore_marked = false) const noexcept {
-            const Data non_atomic_raw = data.load(std::memory_order_relaxed);
+            const auto non_atomic_raw = std::bit_cast<Data>(data_raw.load(std::memory_order_relaxed));
             return {ExtractPointer(non_atomic_raw, ignore_marked), static_cast<PageType>(non_atomic_raw.type), static_cast<u16>(non_atomic_raw.block)};
         }
 
         /// Write page info atomically
         constexpr void Store(bool marked, PageType type, u16 block, uintptr_t pointer) noexcept {
-            data.store({marked, type, block, pointer});
+            data_raw.store(std::bit_cast<u64>(Data{marked, type, block, pointer}));
         }
 
         constexpr void MarkRasterizerCached() noexcept {
@@ -110,12 +110,8 @@ struct PageTable {
         }
 
     private:
-        union {
-            std::atomic<Data> data;
-            std::atomic<u64> data_raw;
-        };
-        static_assert(sizeof(std::atomic<Data>) == 8);
-        static_assert(std::atomic<Data>::is_always_lock_free);
+        std::atomic<u64> data_raw;
+        static_assert(sizeof(Data) == sizeof(std::atomic<u64>));
     };
 
     PageTable();
