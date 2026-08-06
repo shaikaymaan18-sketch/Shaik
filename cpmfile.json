@@ -201,7 +201,7 @@
         "name": "openssl",
         "package": "OpenSSL",
         "repo": "crueter-ci/OpenSSL",
-        "version": "3.6.0-1cb0d36b39"
+        "version": "4.0.1-1e963a8680"
     },
     "openssl-cmake": {
         "bundled": true,
