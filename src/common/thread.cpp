@@ -96,6 +96,9 @@ int NiceValueForPriority(Common::ThreadPriority priority) {
 namespace {
 constexpr size_t ANDROID_MINIMUM_PERFORMANCE_CORES = 4;
 
+// A core counts as a performance core while it is within this much of the fastest one.
+constexpr long ANDROID_PERFORMANCE_CAPACITY_PERCENT = 50;
+
 constexpr std::chrono::nanoseconds ANDROID_POLICY_POLL_INTERVAL = std::chrono::milliseconds{500};
 
 enum class CoreGroup {
@@ -279,27 +282,12 @@ void ComputeTopologyLocked() {
         return lhs.cpu < rhs.cpu;
     });
 
-    const bool midr_known = std::none_of(cores.begin(), cores.end(),
-                                         [](const CoreInfo& core) { return core.midr == 0; });
-
-    const size_t allowed_count = static_cast<size_t>(CPU_COUNT(&g_topology.allowed));
-    const size_t maximum =
-        allowed_count > 2 * ANDROID_MINIMUM_PERFORMANCE_CORES
-            ? allowed_count - ANDROID_MINIMUM_PERFORMANCE_CORES
-            : ANDROID_MINIMUM_PERFORMANCE_CORES;
-
+    const long fastest = cores.front().weight;
     size_t taken = 0;
-    long cluster_weight = cores.front().weight;
-    u64 cluster_midr = cores.front().midr;
     for (const auto& core : cores) {
-        if (core.weight != cluster_weight || (midr_known && core.midr != cluster_midr)) {
-            if (taken >= ANDROID_MINIMUM_PERFORMANCE_CORES) {
-                break;
-            }
-            cluster_weight = core.weight;
-            cluster_midr = core.midr;
-        }
-        if (taken >= maximum) {
+        const bool fast_enough =
+            core.weight * 100 >= fastest * ANDROID_PERFORMANCE_CAPACITY_PERCENT;
+        if (!fast_enough && taken >= ANDROID_MINIMUM_PERFORMANCE_CORES) {
             break;
         }
         CPU_SET(core.cpu, &g_topology.performance);

@@ -258,7 +258,7 @@ bool Scheduler::UpdateDescriptorBufferChunk(u32 descriptor_chunk) {
 
 void Scheduler::WorkerThread(std::stop_token stop_token) {
     Common::SetCurrentThreadName("VulkanWorker");
-    Common::SetCurrentThreadPriority(Common::ThreadPriority::VeryHigh);
+    Common::SetCurrentThreadPriority(Common::ThreadPriority::Critical);
     Common::SetCurrentThreadToPerformanceCores();
 
     const auto TryPopQueue{[this](auto& work) -> bool {

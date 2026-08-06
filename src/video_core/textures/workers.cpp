@@ -10,9 +10,7 @@ namespace Tegra::Texture {
 
 Common::ThreadWorker& GetThreadWorkers() {
     static Common::ThreadWorker workers{(std::max)(std::thread::hardware_concurrency(), 2U) / 2,
-                                        "ImageTranscode", {},
-                                        Common::ThreadPlacement::Efficiency};
-
+                                        "ImageTranscode"};
     return workers;
 }
 
