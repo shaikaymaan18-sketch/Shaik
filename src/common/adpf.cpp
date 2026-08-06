@@ -101,8 +101,10 @@ struct SessionState {
 std::mutex g_mutex;
 std::array<SessionState, 2> g_sessions;
 
+constexpr s64 MAX_REPORTED_TARGETS = 4;
+
 std::atomic<s64> g_target_ns{DEFAULT_TARGET.count()};
-thread_local std::chrono::steady_clock::time_point t_work_begin{};
+thread_local std::chrono::steady_clock::time_point t_last_frame{};
 
 SessionState& StateOf(Session session) {
     return g_sessions[static_cast<size_t>(session)];
@@ -119,8 +121,6 @@ void CloseLocked(SessionState& state) {
     }
 }
 
-// Builds a session for the given thread list without touching any existing one, so a refusal
-// costs nothing.
 AHintSession* CreateSessionFor(Session session, const std::vector<pid_t>& threads) {
     const Api& api = Resolve();
     const s64 target = session == Session::Render ? g_target_ns.load(std::memory_order_relaxed) : 0;
@@ -213,8 +213,6 @@ bool AddCurrentThread(Session session) {
         state.threads.push_back(tid);
     }
     if (!SyncLocked(session, state)) {
-        // The session in use survived the refusal and still holds the list without this thread,
-        // so only the addition has to be undone.
         if (added) {
             std::erase(state.threads, tid);
         }
@@ -252,25 +250,26 @@ void SetTargetWorkDuration(std::chrono::nanoseconds target) {
     }
 }
 
-void BeginFrameWork() {
-    if (!Resolve().usable) {
-        return;
-    }
-    t_work_begin = std::chrono::steady_clock::now();
-}
-
-void EndFrameWork() {
+void ReportFrameInterval() {
     const Api& api = Resolve();
-    if (!api.usable || t_work_begin.time_since_epoch().count() == 0) {
+    if (!api.usable) {
         return;
     }
-    const auto elapsed = std::chrono::steady_clock::now() - t_work_begin;
-    t_work_begin = {};
 
-    const s64 actual = std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count();
+    const auto now = std::chrono::steady_clock::now();
+    const auto previous = t_last_frame;
+    t_last_frame = now;
+    if (previous.time_since_epoch().count() == 0) {
+        return;
+    }
+
+    s64 actual = std::chrono::duration_cast<std::chrono::nanoseconds>(now - previous).count();
     if (actual <= 0) {
         return;
     }
+
+    const s64 ceiling = g_target_ns.load(std::memory_order_relaxed) * MAX_REPORTED_TARGETS;
+    actual = (std::min)(actual, ceiling);
 
     std::scoped_lock lock{g_mutex};
     SessionState& state = StateOf(Session::Render);
@@ -309,9 +308,7 @@ void RemoveCurrentThread() {}
 
 void SetTargetWorkDuration(std::chrono::nanoseconds) {}
 
-void BeginFrameWork() {}
-
-void EndFrameWork() {}
+void ReportFrameInterval() {}
 
 void Shutdown() {}
 

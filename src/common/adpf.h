@@ -18,8 +18,8 @@ bool AddCurrentThread(Session session);
 void RemoveCurrentThread();
 
 void SetTargetWorkDuration(std::chrono::nanoseconds target);
-void BeginFrameWork();
-void EndFrameWork();
+
+void ReportFrameInterval();
 
 void Shutdown();
 
