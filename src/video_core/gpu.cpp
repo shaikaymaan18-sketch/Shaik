@@ -247,14 +247,14 @@ struct GPU::Impl {
             }
         }
         pending_composite_fence = RequestSyncOperation(
-            [this, current_request_counter, num_fences, layers = std::move(layers),
-             fences = std::move(fences)] {
+            [this, current_request_counter, num_fences, composite_layers = std::move(layers),
+             composite_fences = std::move(fences)] {
                 if (num_fences == 0) {
-                    renderer->Composite(layers);
+                    renderer->Composite(composite_layers);
                     return;
                 }
                 auto& syncpoint_manager = system.Host1x().GetSyncpointManager();
-                const auto executer = [this, current_request_counter, layers]() {
+                const auto executer = [this, current_request_counter, composite_layers]() {
                     {
                         std::unique_lock<std::mutex> lk(request_swap_mutex);
                         if (--request_swap_counters[current_request_counter] != 0) {
@@ -262,10 +262,11 @@ struct GPU::Impl {
                         }
                         free_swap_counters.push_back(current_request_counter);
                     }
-                    renderer->Composite(layers);
+                    renderer->Composite(composite_layers);
                 };
                 for (size_t i = 0; i < num_fences; i++) {
-                    syncpoint_manager.RegisterGuestAction(fences[i].id, fences[i].value, executer);
+                    syncpoint_manager.RegisterGuestAction(composite_fences[i].id,
+                                                          composite_fences[i].value, executer);
                 }
             });
         gpu_thread.TickGPU(is_async);
