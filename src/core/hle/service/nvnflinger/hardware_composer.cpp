@@ -57,23 +57,8 @@ u32 HardwareComposer::ComposeLocked(f32* out_speed_scale, Display& display,
     // Set default speed limit to 100%.
     *out_speed_scale = 1.0f;
 
-    // The composition queued last frame reads guest memory on the GPU thread, so its framebuffers
-    // may only go back to the guest once it has run.
     nvdisp.WaitForComposite();
     this->ReleaseFramebuffersLocked(display);
-
-    // If no layers are available, skip the logic.
-    bool any_visible = false;
-    for (auto& layer : display.stack.layers) {
-        if (layer->visible) {
-            any_visible = true;
-            break;
-        }
-    }
-    if (!any_visible) {
-        *out_speed_scale = 1.0f;
-        return 1;
-    }
 
     // Determine the number of vsync periods to wait before composing again.
     std::optional<s32> swap_interval{};
