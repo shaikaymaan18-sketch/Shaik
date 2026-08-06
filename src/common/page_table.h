@@ -56,7 +56,10 @@ struct PageTable {
     public:
         struct Data {
             Data(bool marked_, PageType type_, u16 block_, u64 page_)
-                : marked(marked_), type(static_cast<u64>(type_)), block(block_), page(page_ >> ATTRIBUTE_BITS) {}
+                : marked(static_cast<u64>(marked_) & 0b1)
+                , type(static_cast<u64>(type_) & ((1ULL << 2) - 1))
+                , block(static_cast<u64>(block_) & ((1ULL << 9) - 1))
+                , page((page_ >> ATTRIBUTE_BITS) & ((1ULL << 52) - 1)) {}
             u64 marked : 1;
             u64 type   : 2;
             u64 block  : 9; // TODO: is 9 bits to little? we can use the upper 8 bits if needed
