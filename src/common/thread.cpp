@@ -97,7 +97,7 @@ namespace {
 constexpr size_t ANDROID_MINIMUM_PERFORMANCE_CORES = 4;
 
 // A core counts as a performance core while it is within this much of the fastest one.
-constexpr long ANDROID_PERFORMANCE_CAPACITY_PERCENT = 50;
+constexpr s64 ANDROID_PERFORMANCE_CAPACITY_PERCENT = 50;
 
 constexpr std::chrono::nanoseconds ANDROID_POLICY_POLL_INTERVAL = std::chrono::milliseconds{500};
 
@@ -107,85 +107,86 @@ enum class CoreGroup {
     Efficiency,
 };
 
-struct CoreTopology {
-    cpu_set_t allowed;
-    cpu_set_t performance;
-    cpu_set_t efficiency;
-    bool separated;
-    bool initialized;
-};
-
 struct ThreadPolicy {
     pid_t tid;
     CoreGroup group;
-    int nice_value;
+    s32 nice_value;
     bool has_nice;
 };
 
 struct CoreInfo {
-    long weight;
+    s64 weight;
     u64 midr;
-    int cpu;
+    s32 cpu;
 };
 
-std::mutex g_topology_mutex;
-CoreTopology g_topology{};
+struct CpuTopologyState {
+    std::mutex topology_mutex;
+    cpu_set_t allowed{};
+    cpu_set_t performance{};
+    cpu_set_t efficiency{};
+    bool separated = false;
+    bool initialized = false;
 
-pid_t g_canary_tid = 0;
-cpu_set_t g_canary_mask;
-bool g_canary_valid = false;
+    pid_t canary_tid = 0;
+    cpu_set_t canary_mask{};
+    bool canary_valid = false;
 
-std::atomic<s64> g_next_poll_ns{0};
+    std::atomic<s64> next_poll_ns{0};
 
-std::mutex g_policy_mutex;
+    std::mutex policy_mutex;
+    std::vector<ThreadPolicy> policies;
+};
 
-std::vector<ThreadPolicy>& Policies() {
-    static auto* const policies = new std::vector<ThreadPolicy>();
-    return *policies;
+CpuTopologyState& State() {
+    static CpuTopologyState* const state = new CpuTopologyState();
+    return *state;
 }
 
 struct PolicyRegistration {
     ~PolicyRegistration() {
         const pid_t tid = gettid();
         ::Common::ADPF::RemoveCurrentThread();
-        std::scoped_lock lock{g_policy_mutex};
-        std::erase_if(Policies(), [tid](const ThreadPolicy& policy) { return policy.tid == tid; });
+        CpuTopologyState& state = State();
+        std::scoped_lock lock{state.policy_mutex};
+        std::erase_if(state.policies,
+                      [tid](const ThreadPolicy& policy) { return policy.tid == tid; });
     }
 };
 
 thread_local PolicyRegistration t_policy_registration;
 
-int PossibleCpuCount() {
+s32 PossibleCpuCount() {
     std::ifstream file("/sys/devices/system/cpu/possible");
     std::string list;
     if (file && std::getline(file, list) && !list.empty()) {
-        int highest = -1;
+        s64 highest = -1;
         const char* cursor = list.c_str();
         while (*cursor != '\0') {
             char* end = nullptr;
-            const long value = std::strtol(cursor, &end, 10);
+            const s64 value = std::strtol(cursor, &end, 10);
             if (end == cursor) {
                 break;
             }
-            highest = (std::max)(highest, static_cast<int>(value));
+            highest = (std::max)(highest, value);
             cursor = end;
             while (*cursor == '-' || *cursor == ',') {
                 ++cursor;
             }
         }
         if (highest >= 0) {
-            return (std::min)(highest + 1, CPU_SETSIZE);
+            return static_cast<s32>((std::min<s64>)(highest + 1, CPU_SETSIZE));
         }
     }
-    const long configured = sysconf(_SC_NPROCESSORS_CONF);
+    const s64 configured = sysconf(_SC_NPROCESSORS_CONF);
     if (configured > 0) {
-        return static_cast<int>((std::min<long>)(configured, CPU_SETSIZE));
+        return static_cast<s32>((std::min<s64>)(configured, CPU_SETSIZE));
     }
-    return static_cast<int>((std::min<unsigned>)(std::thread::hardware_concurrency(), CPU_SETSIZE));
+    return static_cast<s32>((std::min<s64>)(std::thread::hardware_concurrency(), CPU_SETSIZE));
 }
 
-long ReadCpuScalar(int cpu, const char* node) {
-    long value = 0;
+s64 ReadCpuScalar(s32 cpu, const char* node) {
+    s64 value = 0;
     std::ifstream file("/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/" + node);
     if (!file || !(file >> value) || value <= 0) {
         return 0;
@@ -193,7 +194,7 @@ long ReadCpuScalar(int cpu, const char* node) {
     return value;
 }
 
-u64 ReadCpuMidr(int cpu) {
+u64 ReadCpuMidr(s32 cpu) {
     u64 midr = 0;
     std::ifstream file("/sys/devices/system/cpu/cpu" + std::to_string(cpu) +
                        "/regs/identification/midr_el1");
@@ -203,14 +204,14 @@ u64 ReadCpuMidr(int cpu) {
     return midr;
 }
 
-std::vector<CoreInfo> CollectCores(const cpu_set_t& allowed, int total, const char* node,
+std::vector<CoreInfo> CollectCores(const cpu_set_t& allowed, s32 total, const char* node,
                                    bool require_all) {
     std::vector<CoreInfo> cores;
-    for (int cpu = 0; cpu < total; ++cpu) {
+    for (s32 cpu = 0; cpu < total; ++cpu) {
         if (!CPU_ISSET(cpu, &allowed)) {
             continue;
         }
-        const long weight = ReadCpuScalar(cpu, node);
+        const s64 weight = ReadCpuScalar(cpu, node);
         if (weight <= 0) {
             if (require_all) {
                 return {};
@@ -230,32 +231,29 @@ bool WeightsAreUniform(const std::vector<CoreInfo>& cores) {
 }
 
 bool MidrsAreDistinct(const std::vector<CoreInfo>& cores) {
-    const auto unknown = [](const CoreInfo& core) { return core.midr == 0; };
-    if (std::any_of(cores.begin(), cores.end(), unknown)) {
-        return false;
-    }
-    return std::any_of(cores.begin(), cores.end(),
+    return std::none_of(cores.begin(), cores.end(),
+                        [](const CoreInfo& core) { return core.midr == 0; }) &&
+           std::any_of(cores.begin(), cores.end(),
                        [&](const CoreInfo& core) { return core.midr != cores.front().midr; });
 }
 
-void ComputeTopologyLocked() {
-    g_topology.initialized = true;
-    g_topology.separated = false;
-    CPU_ZERO(&g_topology.allowed);
-    CPU_ZERO(&g_topology.performance);
-    CPU_ZERO(&g_topology.efficiency);
+void ComputeTopologyLocked(CpuTopologyState& state) {
+    state.initialized = true;
+    state.separated = false;
+    CPU_ZERO(&state.allowed);
+    CPU_ZERO(&state.performance);
+    CPU_ZERO(&state.efficiency);
 
-    if (sched_getaffinity(getpid(), sizeof(g_topology.allowed), &g_topology.allowed) != 0) {
+    if (sched_getaffinity(getpid(), sizeof(state.allowed), &state.allowed) != 0) {
         LOG_WARNING(Common, "Could not query process CPU affinity: {}",
                     ::Common::GetLastErrorMsg());
         return;
     }
 
-    const int total = PossibleCpuCount();
-    auto cores = CollectCores(g_topology.allowed, total, "cpu_capacity", true);
+    const s32 total = PossibleCpuCount();
+    auto cores = CollectCores(state.allowed, total, "cpu_capacity", true);
     if (cores.empty() || (WeightsAreUniform(cores) && MidrsAreDistinct(cores))) {
-        auto by_frequency =
-            CollectCores(g_topology.allowed, total, "cpufreq/cpuinfo_max_freq", false);
+        auto by_frequency = CollectCores(state.allowed, total, "cpufreq/cpuinfo_max_freq", false);
         if (!by_frequency.empty()) {
             cores = std::move(by_frequency);
         }
@@ -282,7 +280,7 @@ void ComputeTopologyLocked() {
         return lhs.cpu < rhs.cpu;
     });
 
-    const long fastest = cores.front().weight;
+    const s64 fastest = cores.front().weight;
     size_t taken = 0;
     for (const auto& core : cores) {
         const bool fast_enough =
@@ -290,34 +288,34 @@ void ComputeTopologyLocked() {
         if (!fast_enough && taken >= ANDROID_MINIMUM_PERFORMANCE_CORES) {
             break;
         }
-        CPU_SET(core.cpu, &g_topology.performance);
+        CPU_SET(core.cpu, &state.performance);
         ++taken;
     }
     if (taken == 0) {
         return;
     }
 
-    for (int cpu = 0; cpu < total; ++cpu) {
-        if (CPU_ISSET(cpu, &g_topology.allowed) && !CPU_ISSET(cpu, &g_topology.performance)) {
-            CPU_SET(cpu, &g_topology.efficiency);
+    for (s32 cpu = 0; cpu < total; ++cpu) {
+        if (CPU_ISSET(cpu, &state.allowed) && !CPU_ISSET(cpu, &state.performance)) {
+            CPU_SET(cpu, &state.efficiency);
         }
     }
 
-    g_topology.separated = CPU_COUNT(&g_topology.efficiency) > 0;
+    state.separated = CPU_COUNT(&state.efficiency) > 0;
     LOG_INFO(Common, "CPU topology: {} performance cores, {} efficiency cores, separation {}",
-             CPU_COUNT(&g_topology.performance), CPU_COUNT(&g_topology.efficiency),
-             g_topology.separated ? "enabled" : "unavailable");
+             CPU_COUNT(&state.performance), CPU_COUNT(&state.efficiency),
+             state.separated ? "enabled" : "unavailable");
 }
 
-void EnsureTopologyLocked() {
-    if (!g_topology.initialized) {
-        ComputeTopologyLocked();
+void EnsureTopologyLocked(CpuTopologyState& state) {
+    if (!state.initialized) {
+        ComputeTopologyLocked(state);
     }
 }
 
-void RefreshTopologyLocked() {
-    if (!g_topology.initialized) {
-        ComputeTopologyLocked();
+void RefreshTopologyLocked(CpuTopologyState& state) {
+    if (!state.initialized) {
+        ComputeTopologyLocked(state);
         return;
     }
     cpu_set_t current;
@@ -325,16 +323,17 @@ void RefreshTopologyLocked() {
     if (sched_getaffinity(getpid(), sizeof(current), &current) != 0) {
         return;
     }
-    if (std::memcmp(&current, &g_topology.allowed, sizeof(current)) != 0) {
-        ComputeTopologyLocked();
+    if (std::memcmp(&current, &state.allowed, sizeof(current)) != 0) {
+        ComputeTopologyLocked(state);
     }
 }
 
-bool ApplyCoreGroupLocked(pid_t tid, CoreGroup group, bool* gone = nullptr) {
-    const bool restrict_group = group != CoreGroup::Unrestricted && g_topology.separated;
-    const cpu_set_t* mask = &g_topology.allowed;
+bool ApplyCoreGroupLocked(CpuTopologyState& state, pid_t tid, CoreGroup group,
+                          bool* gone = nullptr) {
+    const bool restrict_group = group != CoreGroup::Unrestricted && state.separated;
+    const cpu_set_t* mask = &state.allowed;
     if (restrict_group) {
-        mask = group == CoreGroup::Performance ? &g_topology.performance : &g_topology.efficiency;
+        mask = group == CoreGroup::Performance ? &state.performance : &state.efficiency;
     }
     if (CPU_COUNT(mask) == 0) {
         return false;
@@ -356,20 +355,20 @@ bool KernelPreservesRequestedAffinity() {
     if (uname(&info) != 0) {
         return false;
     }
-    int major = 0;
-    int minor = 0;
+    s32 major = 0;
+    s32 minor = 0;
     if (std::sscanf(info.release, "%d.%d", &major, &minor) != 2) {
         return false;
     }
     return major > 6 || (major == 6 && minor >= 2);
 }
 
-void SnapshotCanaryLocked() {
-    g_canary_valid = false;
-    if (!g_topology.separated) {
+void SnapshotCanaryLocked(CpuTopologyState& state) {
+    state.canary_valid = false;
+    if (!state.separated) {
         return;
     }
-    for (const auto& policy : Policies()) {
+    for (const auto& policy : state.policies) {
         if (policy.group == CoreGroup::Unrestricted) {
             continue;
         }
@@ -378,32 +377,31 @@ void SnapshotCanaryLocked() {
         if (sched_getaffinity(policy.tid, sizeof(mask), &mask) != 0) {
             continue;
         }
-        g_canary_tid = policy.tid;
-        g_canary_mask = mask;
-        g_canary_valid = true;
+        state.canary_tid = policy.tid;
+        state.canary_mask = mask;
+        state.canary_valid = true;
         return;
     }
 }
 
-bool DueForPoll() {
+bool DueForPoll(CpuTopologyState& state) {
     const auto now = std::chrono::steady_clock::now().time_since_epoch();
     const s64 now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now).count();
-    s64 next = g_next_poll_ns.load(std::memory_order_relaxed);
+    s64 next = state.next_poll_ns.load(std::memory_order_relaxed);
     if (now_ns < next) {
         return false;
     }
-    return g_next_poll_ns.compare_exchange_strong(next, now_ns + ANDROID_POLICY_POLL_INTERVAL.count(),
-                                                  std::memory_order_relaxed);
+    return state.next_poll_ns.compare_exchange_strong(
+        next, now_ns + ANDROID_POLICY_POLL_INTERVAL.count(), std::memory_order_relaxed);
 }
 
-ThreadPolicy& AcquirePolicyLocked(pid_t tid) {
-    auto& policies = Policies();
-    for (auto& policy : policies) {
+ThreadPolicy& AcquirePolicyLocked(CpuTopologyState& state, pid_t tid) {
+    for (auto& policy : state.policies) {
         if (policy.tid == tid) {
             return policy;
         }
     }
-    return policies.emplace_back(ThreadPolicy{tid, CoreGroup::Unrestricted, 0, false});
+    return state.policies.emplace_back(ThreadPolicy{tid, CoreGroup::Unrestricted, 0, false});
 }
 
 void SetCurrentThreadCoreGroup(CoreGroup group) {
@@ -416,21 +414,23 @@ void SetCurrentThreadCoreGroup(CoreGroup group) {
         effective = CoreGroup::Unrestricted;
     }
 
-    std::scoped_lock topology_lock{g_topology_mutex};
-    EnsureTopologyLocked();
-    ApplyCoreGroupLocked(tid, effective);
+    CpuTopologyState& state = State();
+    std::scoped_lock topology_lock{state.topology_mutex};
+    EnsureTopologyLocked(state);
+    ApplyCoreGroupLocked(state, tid, effective);
 
-    std::scoped_lock policy_lock{g_policy_mutex};
-    AcquirePolicyLocked(tid).group = effective;
-    if (!g_canary_valid) {
-        SnapshotCanaryLocked();
+    std::scoped_lock policy_lock{state.policy_mutex};
+    AcquirePolicyLocked(state, tid).group = effective;
+    if (!state.canary_valid) {
+        SnapshotCanaryLocked(state);
     }
 }
 
-void RememberCurrentThreadNice(pid_t tid, int nice_value) {
+void RememberCurrentThreadNice(pid_t tid, s32 nice_value) {
     (void)&t_policy_registration;
-    std::scoped_lock lock{g_policy_mutex};
-    ThreadPolicy& policy = AcquirePolicyLocked(tid);
+    CpuTopologyState& state = State();
+    std::scoped_lock lock{state.policy_mutex};
+    ThreadPolicy& policy = AcquirePolicyLocked(state, tid);
     policy.nice_value = nice_value;
     policy.has_nice = true;
 }
@@ -575,11 +575,12 @@ void SetCurrentThreadToAllCores() {
 
 void RefreshThreadPolicies() {
 #if defined(__ANDROID__)
-    std::scoped_lock topology_lock{g_topology_mutex};
-    RefreshTopologyLocked();
+    CpuTopologyState& state = State();
+    std::scoped_lock topology_lock{state.topology_mutex};
+    RefreshTopologyLocked(state);
 
-    std::scoped_lock policy_lock{g_policy_mutex};
-    std::erase_if(Policies(), [](const ThreadPolicy& policy) {
+    std::scoped_lock policy_lock{state.policy_mutex};
+    std::erase_if(state.policies, [&state](const ThreadPolicy& policy) {
         bool gone = false;
         if (policy.has_nice &&
             setpriority(PRIO_PROCESS, static_cast<id_t>(policy.tid), policy.nice_value) != 0 &&
@@ -587,30 +588,35 @@ void RefreshThreadPolicies() {
             gone = true;
         }
         if (!gone) {
-            ApplyCoreGroupLocked(policy.tid, policy.group, &gone);
+            ApplyCoreGroupLocked(state, policy.tid, policy.group, &gone);
         }
         return gone;
     });
-    SnapshotCanaryLocked();
+    SnapshotCanaryLocked(state);
 #endif
 }
 
 void PollThreadPolicies() {
 #if defined(__ANDROID__)
     static const bool needed = !KernelPreservesRequestedAffinity();
-    if (!needed || !DueForPoll()) {
+    if (!needed) {
+        return;
+    }
+
+    CpuTopologyState& state = State();
+    if (!DueForPoll(state)) {
         return;
     }
 
     pid_t tid;
     cpu_set_t expected;
     {
-        std::scoped_lock lock{g_topology_mutex};
-        if (!g_canary_valid) {
+        std::scoped_lock lock{state.topology_mutex};
+        if (!state.canary_valid) {
             return;
         }
-        tid = g_canary_tid;
-        expected = g_canary_mask;
+        tid = state.canary_tid;
+        expected = state.canary_mask;
     }
 
     cpu_set_t current;
