@@ -119,30 +119,29 @@ void CloseLocked(SessionState& state) {
     }
 }
 
-bool OpenLocked(Session session, SessionState& state) {
+// Builds a session for the given thread list without touching any existing one, so a refusal
+// costs nothing.
+AHintSession* CreateSessionFor(Session session, const std::vector<pid_t>& threads) {
     const Api& api = Resolve();
     const s64 target = session == Session::Render ? g_target_ns.load(std::memory_order_relaxed) : 0;
 
     std::vector<s32> ids;
-    ids.reserve(state.threads.size());
-    for (const pid_t tid : state.threads) {
+    ids.reserve(threads.size());
+    for (const pid_t tid : threads) {
         ids.push_back(static_cast<s32>(tid));
     }
 
-    state.handle = api.create_session(api.manager, ids.data(), ids.size(), target);
-    if (state.handle == nullptr && target == 0) {
-        state.handle =
-            api.create_session(api.manager, ids.data(), ids.size(), DEFAULT_TARGET.count());
+    AHintSession* handle = api.create_session(api.manager, ids.data(), ids.size(), target);
+    if (handle == nullptr && target == 0) {
+        handle = api.create_session(api.manager, ids.data(), ids.size(), DEFAULT_TARGET.count());
     }
-    if (state.handle == nullptr) {
-        state.unsupported = true;
-        LOG_WARNING(Common, "Could not open a performance hint session, falling back");
-        return false;
+    if (handle == nullptr) {
+        return nullptr;
     }
-    if (session == Session::Background) {
-        api.set_power_efficiency(state.handle, true);
+    if (session == Session::Background && api.set_power_efficiency != nullptr) {
+        api.set_power_efficiency(handle, true);
     }
-    return true;
+    return handle;
 }
 
 bool SyncLocked(Session session, SessionState& state) {
@@ -150,19 +149,27 @@ bool SyncLocked(Session session, SessionState& state) {
         CloseLocked(state);
         return false;
     }
-    if (state.handle == nullptr) {
-        return OpenLocked(session, state);
-    }
 
     const Api& api = Resolve();
-    if (api.set_threads != nullptr) {
+    if (state.handle != nullptr && api.set_threads != nullptr) {
         std::vector<pid_t> ids = state.threads;
         if (api.set_threads(state.handle, ids.data(), ids.size()) == 0) {
             return true;
         }
     }
+
+    AHintSession* const replacement = CreateSessionFor(session, state.threads);
+    if (replacement == nullptr) {
+        if (state.handle == nullptr) {
+            state.unsupported = true;
+        }
+        LOG_WARNING(Common, "Could not open a performance hint session for {} threads, falling back",
+                    state.threads.size());
+        return false;
+    }
     CloseLocked(state);
-    return OpenLocked(session, state);
+    state.handle = replacement;
+    return true;
 }
 
 } // Anonymous namespace
@@ -200,11 +207,17 @@ bool AddCurrentThread(Session session) {
     }
 
     SessionState& state = StateOf(session);
-    if (std::find(state.threads.begin(), state.threads.end(), tid) == state.threads.end()) {
+    const bool added =
+        std::find(state.threads.begin(), state.threads.end(), tid) == state.threads.end();
+    if (added) {
         state.threads.push_back(tid);
     }
     if (!SyncLocked(session, state)) {
-        std::erase(state.threads, tid);
+        // The session in use survived the refusal and still holds the list without this thread,
+        // so only the addition has to be undone.
+        if (added) {
+            std::erase(state.threads, tid);
+        }
         return false;
     }
     return true;

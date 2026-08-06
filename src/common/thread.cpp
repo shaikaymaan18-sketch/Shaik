@@ -58,7 +58,7 @@ int LowestAllowedNice() {
         if (getrlimit(RLIMIT_NICE, &limit) != 0) {
             return 0;
         }
-        if (limit.rlim_cur == RLIM_INFINITY) {
+        if (limit.rlim_cur >= 40) {
             return -20;
         }
         return 20 - static_cast<int>(limit.rlim_cur);
@@ -77,7 +77,7 @@ int NiceValueForPriority(Common::ThreadPriority priority) {
         default: return NICE_DEFAULT;
         }
     }();
-    return (std::max)(wanted, LowestAllowedNice());
+    return (std::max)(wanted, (std::min)(NICE_DEFAULT, LowestAllowedNice()));
 }
 } // Anonymous namespace
 #endif
