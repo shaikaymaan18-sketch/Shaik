@@ -451,7 +451,7 @@
 
     <!-- CPU -->
     <string name="fast_cpu_time">CPU Clocks</string>
-    <string name="fast_cpu_time_description">Forces the emulated CPU to run at a higher clock, reducing certain FPS limiters. Normal is the Switch\'s 1020MHz base clock, Boost (1734MHz) matches its highest native clock, and Fast (2040MHz) runs at 2x base.</string>
+    <string name="fast_cpu_time_description">Raises the clock the emulated CPU reports, which removes some FPS limiters. Weaker CPUs may see reduced performance, and certain games may behave improperly.</string>
     <string name="custom_cpu_ticks">Custom CPU Ticks</string>
     <string name="custom_cpu_ticks_description">Set a custom value of CPU ticks. Higher values can increase performance, but may also cause the game to freeze. A range of 77–21000 is recommended.</string>
     <string name="cpu_ticks">Ticks</string>
@@ -513,7 +513,7 @@
     <string name="hacks">Hacks</string>
 
     <string name="fast_gpu_time">GPU Clocks</string>
-    <string name="fast_gpu_time_description">Makes the game believe GPU work finishes faster than it does, which stops it from lowering resolution or framerate to fit the Switch\'s clocks. Multiplies the reported GPU speed by 256x or 512x.</string>
+    <string name="fast_gpu_time_description">Makes the game believe GPU work finishes faster than it does, so it stops lowering resolution and render distance to fit the Switch\'s clocks.</string>
     <string name="skip_cpu_inner_invalidation">Skip CPU Inner Invalidation</string>
     <string name="skip_cpu_inner_invalidation_description">Skips certain CPU-side cache invalidations during memory updates, reducing CPU usage and improving it\'s performance. This may cause glitches or crashes on some games.</string>
     <string name="fix_bloom_effects">Fix Bloom Effects</string>
@@ -969,16 +969,15 @@
     <string name="memory_6gb">6GB (Unsafe)</string>
     <string name="memory_8gb">8GB (Unsafe)</string>
 
-    <!--CPU clock speeds-->
-    <string name="clock_normal">Normal (1020MHz)</string>
-    <string name="clock_boost">Boost (1734MHz)</string>
-    <string name="clock_fast">Fast (2040MHz)</string>
+    <!-- CPU clock levels -->
+    <string name="clock_normal">Normal</string>
+    <string name="clock_boost">Boost</string>
+    <string name="clock_fast">Overclock</string>
 
-    <!-- GPU overclock factors -->
-    <string name="off">Off</string>
-    <string name="fast_gpu_normal">Normal (native)</string>
-    <string name="fast_gpu_medium">Boost (256x)</string>
-    <string name="fast_gpu_high">Fast (512x)</string>
+    <!-- GPU clock levels -->
+    <string name="fast_gpu_normal">Normal</string>
+    <string name="fast_gpu_medium">Boost</string>
+    <string name="fast_gpu_high">Overclock</string>
 
     <!-- GPU swizzle texture size -->
     <string name="gpu_texturesizeswizzle_verysmall">Very Small (16 MB)</string>

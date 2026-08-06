@@ -25,14 +25,14 @@ constexpr s64 MAX_SLICE_LENGTH = 10000;
 
 constexpr u32 CPU_CLOCK_BASE_MHZ = 1020;
 constexpr u32 CPU_CLOCK_BOOST_MHZ = 1734;
-constexpr u32 CPU_CLOCK_FAST_MHZ = 2040;
+constexpr u32 CPU_CLOCK_OVERCLOCK_MHZ = 2040;
 
 constexpr u32 CpuClockTargetMhz(Settings::CpuClock clock) {
     switch (clock) {
     case Settings::CpuClock::Boost:
         return CPU_CLOCK_BOOST_MHZ;
-    case Settings::CpuClock::Fast:
-        return CPU_CLOCK_FAST_MHZ;
+    case Settings::CpuClock::Overclock:
+        return CPU_CLOCK_OVERCLOCK_MHZ;
     default:
         return CPU_CLOCK_BASE_MHZ;
     }
