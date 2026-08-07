@@ -77,11 +77,13 @@ struct Memory::Impl {
                  Common::PageType::Memory);
 
         if (current_page_table->fastmem_arena) {
-            ASSERT_MSG(GetInteger(base) % Common::HostPageSize == GetInteger(target) % Common::HostPageSize,
-                "base {:#x} and target {:#x} aren't aligned in relation to host page size {}",
-                GetInteger(base), GetInteger(target), Common::HostPageSize);
+            bool is_fastmem = GetInteger(base) % Common::HostPageSize != GetInteger(target) % Common::HostPageSize;
+            if (!is_fastmem) {
+                LOG_WARNING(HW_Memory, "base {:#x} and target {:#x} aren't aligned in relation to host page size {}",
+                    GetInteger(base), GetInteger(target), Common::HostPageSize);
+            }
 
-            auto align = [&](bool b, u64 v) {
+            constexpr auto align = [&](bool b, u64 v) {
                 return b ? Common::AlignUp(v, Common::HostPageSize) : Common::AlignDown(v, Common::HostPageSize);
             };
 
@@ -89,11 +91,16 @@ struct Memory::Impl {
             auto aligned_target = align(out.first, GetInteger(target) - DramMemoryMap::Base);
             auto aligned_end = align(!out.second, GetInteger(base) + size);
 
-            host_buffer->Map(
-                aligned_base,
-                aligned_target,
-                aligned_end - aligned_base,
-                perms, separate_heap);
+            if (is_fastmem) {
+                host_buffer->Map(
+                    aligned_base,
+                    aligned_target,
+                    aligned_end - aligned_base,
+                    perms, separate_heap);
+            } else {
+                // Default to signal handlers/fastmem impl
+                host_buffer->Unmap(aligned_base, aligned_end - aligned_base, separate_heap);
+            }
         }
     }
 
@@ -648,7 +655,6 @@ struct Memory::Impl {
                     return host_ptr;
                 }
                 case Common::PageType::Unmapped: [[unlikely]] {
-                    __builtin_debugtrap();
                     on_unmapped();
                     return nullptr;
                 }
