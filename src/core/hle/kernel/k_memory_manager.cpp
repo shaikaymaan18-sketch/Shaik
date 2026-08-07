@@ -289,7 +289,7 @@ Result KMemoryManager::AllocatePageGroupImpl(KPageGroup* out, size_t num_pages, 
         const size_t pages_per_alloc = KPageHeap::GetBlockNumPages(index);
         for (Impl* cur_manager = this->GetFirstManager(pool, dir); cur_manager != nullptr;
              cur_manager = this->GetNextManager(cur_manager, dir)) {
-            while (num_pages >= pages_per_alloc) {
+            while (num_pages > 0 && (num_pages >= pages_per_alloc || index == min_index)) {
                 // Allocate a block.
                 KPhysicalAddress allocated_block = cur_manager->AllocateBlock(index, random);
                 if (allocated_block == 0) {
@@ -342,7 +342,7 @@ Result KMemoryManager::AllocatePageGroupImpl(KPageGroup* out, size_t num_pages, 
         }
     }
 
-    // Only succeed if we allocated as many pages as we wanted.
+    // Only succeed if we allocated as many pages as we wanted. (this should never happen?)
     R_UNLESS(num_pages == 0, ResultOutOfMemory);
 
     // We succeeded!
