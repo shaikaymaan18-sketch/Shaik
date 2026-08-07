@@ -254,7 +254,7 @@ Result KMemoryManager::AllocatePageGroupImpl(KPageGroup* out, size_t num_pages, 
     const bool fix_addr = expected_vaddr != 0 && Settings::IsFastmemEnabled();
 
     // Choose a heap based on our page size request
-    s32 heap_index = KPageHeap::GetAlignedBlockIndex(num_pages, Common::GuestHostAlignment);
+    s32 heap_index = KPageHeap::GetBlockIndex(num_pages);
     R_UNLESS(0 <= heap_index, ResultOutOfMemory);
 
     s32 min_index = 0;
