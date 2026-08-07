@@ -569,21 +569,19 @@ struct Memory::Impl {
         } else {
             std::pair out = {false, false};
             if (Settings::IsFastmemEnabled()) {
-                // keep track of mappings that are unaligned to host page size
+                // if we are unaligned to host page size, allocate extra memory and
+                // keep track of these extra mappings incase they are mapped later
                 if (auto off = base & (Common::GuestHostAlignment - 1); off != 0) {
-                    // using `block` here for storage vs. keeping it in a set is a hack to save memory;
-                    // it'll never gets used as a direct value, just as a marker by GetSpan,
-                    // and the value we input here should never be the same so we don't have to worry about GetSpan
-                    // returning the wrong value
                     auto e = base - off;
 
                     for (u64 i = 0; i < off; ++i, ++e) {
-                        // TODO: store data in a set in Memory::Impl, we can't use this trick anymore (probably?)
-                        if (page_table.entries[e].addr == 0 && page_table.entries[e].block == 0) {
-                            page_table.entries[e].block = (GetInteger(target) >> YUZU_PAGEBITS) - off + i;
-                        } else {
-                            // Either an irregular mapping or unaligned one; either way we'll just skip this anyway
+                        // TODO: this will 100% overwrite other mappings, we need to do something about this,
+                        // maybe pass std::pair further along?
+                        auto [_, insert] = extra_mappings.insert({e, (GetInteger(target) >> YUZU_PAGEBITS) - off + i});
+                        if (!insert) {
                             out.first = true;
+                            // If this page was set the whole page should've been, we can break
+                            break;
                         }
                     }
                 }
@@ -592,10 +590,10 @@ struct Memory::Impl {
                     auto e = end;
 
                     for (u64 i = 0; i < remaining; ++i, ++e) {
-                        if (page_table.entries[e].addr == 0 && page_table.entries[e].block == 0) {
-                            page_table.entries[e].block = (GetInteger(target) >> YUZU_PAGEBITS) + size + i;
-                        } else {
+                        auto [_, insert] = extra_mappings.insert({e, (GetInteger(target) >> YUZU_PAGEBITS) + size + i});
+                        if (!insert) {
                             out.second = true;
+                            break;
                         }
                     }
                 }
@@ -608,11 +606,10 @@ struct Memory::Impl {
             page_table.entries.CommitRegion(base, end);
             while (base != end) {
                 auto target_paddr = target;
-                if (auto real_paddr = page_table.entries[base].block; real_paddr != 0 && page_table.entries[base].addr == 0) {
-                    // Irregular mapping; let's just map its original physical address and continue
+                if (auto iter = extra_mappings.find(base); iter != extra_mappings.end()) {
                     LOG_WARNING(HW_Memory, "Mapping irregular address; {:#x} points to {:#x} instead of {:#x}",
-                        base << YUZU_PAGEBITS, real_paddr << YUZU_PAGEBITS, GetInteger(target));
-                    target_paddr = real_paddr << YUZU_PAGEBITS;
+                        base << YUZU_PAGEBITS, iter->second << YUZU_PAGEBITS, GetInteger(target));
+                    target_paddr = iter->second << YUZU_PAGEBITS;
                 }
                 auto host_ptr = uintptr_t(system.DeviceMemory().GetPointer<u8>(target_paddr)) - (base << YUZU_PAGEBITS);
                 auto& entry = page_table.entries.GetUnchecked(base);
@@ -827,6 +824,11 @@ struct Memory::Impl {
     Core::System& system;
     Tegra::MaxwellDeviceMemoryManager* gpu_device_memory{};
     Common::PageTable* current_page_table = nullptr;
+
+    // Set of virtual mappings that are mapped into memory but have a
+    // different backing address than expected due to host page size limitations.
+    // todo: ankerl sucks for this, use something else
+    ankerl::unordered_dense::map<Common::ProcessAddress, Common::PhysicalAddress> extra_mappings;
 
     std::array<VideoCore::RasterizerDownloadArea, Core::Hardware::NUM_CPU_CORES> rasterizer_read_areas{};
     std::array<GPUDirtyState, Core::Hardware::NUM_CPU_CORES> rasterizer_write_areas{};

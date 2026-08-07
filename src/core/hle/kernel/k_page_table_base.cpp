@@ -2765,7 +2765,7 @@ Result KPageTableBase::MapPages(KProcessAddress* out_addr, size_t num_pages, siz
     KScopedLightLock lk(m_general_lock);
 
     // Find a random address to map at.
-    KProcessAddress addr = this->FindFreeArea(region_start, region_num_pages, num_pages, std::max(alignment, Common::HostPageSize),
+    KProcessAddress addr = this->FindFreeArea(region_start, region_num_pages, num_pages, (std::max)(u64(alignment), Common::HostPageSize),
                                               0, this->GetNumGuardPages());
     R_UNLESS(addr != 0, ResultOutOfMemory);
     ASSERT(Common::IsAligned(GetInteger(addr), alignment));
