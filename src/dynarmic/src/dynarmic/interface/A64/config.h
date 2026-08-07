@@ -179,8 +179,13 @@ struct UserConfig {
     /// If the configured value is 3, all pointers will be forcefully aligned to 8 bytes.
     std::int32_t page_table_pointer_mask_bits = 0;
 
-    // Log2 of the size per page entry, value should be either 3 or 4
-    std::size_t page_table_log2_stride = 3;
+    /// Log2 of the size per page entry, value should be either 3 or 4
+    std::uint32_t page_table_log2_stride = 3;
+
+    /// Setting this value has Dynarmic check the specified bit of the page pointer provided by page table.
+    /// If the bit is set to 1, Dynarmic will treat it as unmapped.
+    /// This bit should be included as part of `page_table_pointer_mask_bits`.
+    std::optional<std::uint16_t> page_table_marked_bit = std::nullopt;
 
     /// Counter-timer frequency register. The value of the register is not interpreted by
     /// dynarmic.

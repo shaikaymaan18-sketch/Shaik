@@ -15,18 +15,22 @@
 
 #include "common/common_funcs.h"
 #include "common/common_types.h"
-#include "common/virtual_buffer.h"
-#include "core/memory.h"
 
 namespace Common {
 
-#ifndef _WIN32
-const size_t HostPageSize = sysconf(_SC_PAGESIZE);
+#ifndef ARCHITECTURE_x86_64
+const u64 HostPageSize = sysconf(_SC_PAGESIZE);
+const u64 HostPageBits = std::countr_zero(HostPageSize);
+const u64 HostPageMask = ~(HostPageSize - 1);
+const u64 GuestHostAlignment = HostPageSize / 0x1000;
 #else
-constexpr size_t HostPageSize = 0x1000;
+constexpr u64 HostPageSize = 0x1000;
+constexpr u64 HostPageBits = 12;
+constexpr u64 HostPageMask = ~(HostPageSize - 1);
+constexpr u64 GuestHostAlignment = 1;
 #endif
-const size_t GuestHostAlignment = HostPageSize / 0x1000;
-constexpr size_t HugePageSize = 0x200000;
+
+constexpr u64 HugePageSize = 0x200000;
 
 enum class MemoryPermission : u32 {
     Read = 1 << 0,
@@ -117,7 +121,7 @@ private:
     u8* virtual_base{};
     size_t virtual_base_offset{};
     // Windows requires it for kernels whom lack proper support for some functions!
-    std::optional<VirtualBuffer<u8>> fallback_buffer;
+    bool fallback_buffer{false};
 };
 
 } // namespace Common
