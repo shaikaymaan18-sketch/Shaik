@@ -159,11 +159,11 @@ struct UserConfig {
     /// Maximum size is limited by the maximum length of a x86_64 / arm64 jump.
     std::uint32_t code_cache_size = 128 * 1024 * 1024;  // bytes
 
-    /// Masks out the first N bits in host pointers from the page table.
+    /// Applies a bit mask to the bits in host pointers from the page table.
     /// The intention behind this is to allow users of Dynarmic to pack attributes in the
     /// same integer and update the pointer attribute pair atomically.
-    /// If the configured value is 3, all pointers will be forcefully aligned to 8 bytes.
-    std::int32_t page_table_pointer_mask_bits = 0;
+    /// If the configured value is ~(0b111ULL), all pointers will be forcefully aligned to 8 bytes.
+    std::uint64_t page_table_pointer_mask = 0;
 
     /// Log2 of the size per page entry, value should be either 3 or 4
     std::uint32_t page_table_log2_stride = 3;

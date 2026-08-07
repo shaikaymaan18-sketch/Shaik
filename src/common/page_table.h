@@ -42,9 +42,8 @@ struct PageTable {
         u64 next_offset{};
     };
 
-    /// Number of bits reserved for attribute tagging.
-    /// This can be at most the guaranteed alignment of the pointers in the page table.
-    static constexpr int ATTRIBUTE_BITS = 12;
+    /// Masks out bits reserved for attribute tagging.
+    static constexpr u64 ATTRIBUTE_MASK = ((1ULL << 44) - 1) << 12;
 
     /**
      * Atomic tuple of host pointer, page type, and block id.
@@ -55,15 +54,17 @@ struct PageTable {
     class PageEntryData {
     public:
         struct Data {
-            Data(bool marked_, PageType type_, u16 block_, u64 page_)
-                : marked(static_cast<u64>(marked_) & 0b1)
-                , type(static_cast<u64>(type_) & ((1ULL << 2) - 1))
-                , block(static_cast<u64>(block_) & ((1ULL << 9) - 1))
-                , page((page_ >> ATTRIBUTE_BITS) & ((1ULL << 52) - 1)) {}
+            Data(bool marked_, PageType type_, u32 block_, u64 page_)
+                : marked(static_cast<u64>(marked_)       & 0b1)
+                , type(static_cast<u64>(type_)           & ((1ULL << 2) - 1))
+                , block(static_cast<u64>(block_)         & ((1ULL << 9) - 1))
+                , page((page_ >> 12)                     & ((1ULL << 44) - 1))
+                , block2((static_cast<u64>(block_) << 9) & ((1ULL << 8) - 1)) {}
             u64 marked : 1;
             u64 type   : 2;
-            u64 block  : 9; // TODO: is 9 bits to little? we can use the upper 8 bits if needed
-            u64 page   : 52;
+            u64 block  : 9;
+            u64 page   : 44; // first 12 bits are page offset, last 8 bits are architecturally reserved
+            u64 block2 : 8;
         };
 
         [[nodiscard]] Data Raw() const noexcept {
@@ -81,18 +82,18 @@ struct PageTable {
         }
 
         /// Returns the block identifier.
-        [[nodiscard]] u16 Block() const noexcept {
-            return static_cast<u16>(std::bit_cast<Data>(data_raw.load(std::memory_order_relaxed)).block);
+        [[nodiscard]] u32 Block() const noexcept {
+            return ExtractBlock(std::bit_cast<Data>(data_raw.load(std::memory_order_relaxed)));
         }
 
         /// Returns the page pointer and attribute pair, extracted from the same atomic read
         [[nodiscard]] std::tuple<uintptr_t, PageType, u16> PointerTypeBlock(bool ignore_marked = false) const noexcept {
             const auto non_atomic_raw = std::bit_cast<Data>(data_raw.load(std::memory_order_relaxed));
-            return {ExtractPointer(non_atomic_raw, ignore_marked), static_cast<PageType>(non_atomic_raw.type), static_cast<u16>(non_atomic_raw.block)};
+            return {ExtractPointer(non_atomic_raw, ignore_marked), static_cast<PageType>(non_atomic_raw.type), ExtractBlock(non_atomic_raw)};
         }
 
         /// Write page info atomically
-        constexpr void Store(bool marked, PageType type, u16 block, uintptr_t pointer) noexcept {
+        constexpr void Store(bool marked, PageType type, u32 block, uintptr_t pointer) noexcept {
             data_raw.store(std::bit_cast<u64>(Data{marked, type, block, pointer}));
         }
 
@@ -106,7 +107,11 @@ struct PageTable {
 
         /// Unpack a pointer from a page info raw representation
         [[nodiscard]] static uintptr_t ExtractPointer(Data raw, bool ignore_marked = false) noexcept {
-            return raw.marked && !ignore_marked ? 0 : raw.page << ATTRIBUTE_BITS;
+            return raw.marked && !ignore_marked ? 0 : raw.page << 12;
+        }
+
+        [[nodiscard]] static u32 ExtractBlock(Data raw) noexcept {
+            return raw.block | (raw.block2 << 9);
         }
 
     private:

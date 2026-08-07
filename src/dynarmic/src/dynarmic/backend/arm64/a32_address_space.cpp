@@ -371,7 +371,7 @@ EmitConfig A32AddressSpace::GetEmitConfig() {
 
         .page_table_pointer = std::bit_cast<u64>(conf.page_table),
         .page_table_address_space_bits = 32,
-        .page_table_pointer_mask_bits = conf.page_table_pointer_mask_bits,
+        .page_table_pointer_mask = conf.page_table_pointer_mask,
         .page_table_log2_stride = conf.page_table_log2_stride,
         .page_table_marked_bit = conf.page_table_marked_bit,
         .silently_mirror_page_table = true,
