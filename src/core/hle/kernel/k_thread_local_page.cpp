@@ -20,6 +20,11 @@ Result KThreadLocalPage::Initialize(KernelCore& kernel, KProcess* process) {
 
     // Allocate a new page.
     KPageBuffer* page_buf = KPageBuffer::Allocate(kernel);
+    // TODO: this sucks and wastes memory don't do this
+    while (!Common::IsAligned(reinterpret_cast<u64>(page_buf), Common::HostPageSize)) {
+        page_buf = KPageBuffer::Allocate(kernel);
+    }
+
     R_UNLESS(page_buf != nullptr, ResultOutOfMemory);
     auto page_buf_guard = SCOPE_GUARD {
         KPageBuffer::Free(kernel, page_buf);

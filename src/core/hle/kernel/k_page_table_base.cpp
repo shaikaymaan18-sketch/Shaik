@@ -5206,7 +5206,7 @@ Result KPageTableBase::MapPhysicalMemory(KProcessAddress address, size_t size) {
             KPageGroup pg(m_system.Kernel(), m_block_info_manager);
             R_TRY(m_system.Kernel().MemoryManager().AllocateForProcess(
                 std::addressof(pg), (size - mapped_size) / PageSize, m_allocate_option,
-                GetCurrentProcess(m_system.Kernel()).GetId(), m_heap_fill_value));
+                GetCurrentProcess(m_system.Kernel()).GetId(), m_heap_fill_value, address));
 
             // If we fail in the next bit (or retry), we need to cleanup the pages.
             auto pg_guard = SCOPE_GUARD {

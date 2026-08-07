@@ -388,7 +388,7 @@ Result KMemoryManager::AllocateAndOpen(KPageGroup* out, size_t num_pages, u32 op
 }
 
 Result KMemoryManager::AllocateForProcess(KPageGroup* out, size_t num_pages, u32 option,
-                                          u64 process_id, u8 fill_pattern) {
+                                          u64 process_id, u8 fill_pattern, KProcessAddress expected_vaddr) {
     ASSERT(out != nullptr);
     ASSERT(out->GetNumPages() == 0);
 
@@ -407,7 +407,7 @@ Result KMemoryManager::AllocateForProcess(KPageGroup* out, size_t num_pages, u32
 
         // Allocate the page group.
         R_TRY(this->AllocatePageGroupImpl(out, num_pages, pool, dir, has_optimized && !is_optimized,
-                                              false, 0));
+                                              false, expected_vaddr));
 
         // Set whether we should optimize.
         optimized = has_optimized && is_optimized;

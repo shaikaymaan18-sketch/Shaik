@@ -61,7 +61,7 @@ public:
     KPhysicalAddress AllocateAndOpenContinuous(size_t num_pages, size_t align_pages, u32 option);
     Result AllocateAndOpen(KPageGroup* out, size_t num_pages, u32 option, KProcessAddress expected_vaddr = 0);
     Result AllocateForProcess(KPageGroup* out, size_t num_pages, u32 option, u64 process_id,
-                              u8 fill_pattern);
+                              u8 fill_pattern, KProcessAddress expected_vaddr = 0);
 
     Pool GetPool(KPhysicalAddress address) const {
         return this->GetManager(address).GetPool();
