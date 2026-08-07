@@ -547,9 +547,9 @@ struct Memory::Impl {
 
             page_table.entries.ZeroRegion(base, end);
         } else {
-            static std::atomic<u16> block = 0;
-            auto current_block = block.fetch_add(1);
-            ASSERT(current_block <= 512);
+            static std::atomic<u32> block = 0;
+            auto current_block = block.fetch_add(1, std::memory_order_relaxed);
+            ASSERT(current_block <= 131071);
 
             page_table.entries.CommitRegion(base, end);
             while (base != end) {
@@ -588,7 +588,6 @@ struct Memory::Impl {
                     return host_ptr;
                 }
                 case Common::PageType::Unmapped: [[unlikely]] {
-                    __builtin_debugtrap();
                     on_unmapped();
                     return nullptr;
                 }

@@ -280,9 +280,8 @@ std::pair<oaknut::XReg, oaknut::XReg> InlinePageTableEmitVAddrLookup(oaknut::Cod
         code.CSEL(Xscratch0, Xscratch0, XZR, EQ);
     }
 
-    if (ctx.conf.page_table_pointer_mask_bits != 0) {
-        const u64 mask = u64(~u64(0)) << ctx.conf.page_table_pointer_mask_bits;
-        code.AND(Xscratch0, Xscratch0, mask);
+    if (ctx.conf.page_table_pointer_mask != 0) {
+        code.AND(Xscratch0, Xscratch0, ctx.conf.page_table_pointer_mask);
     }
 
     code.CBZ(Xscratch0, *fallback);

@@ -102,10 +102,11 @@ template<>
         }
     }
     // mask away attributes
-    if (ctx.conf.page_table_pointer_mask_bits == 0) {
+    if (ctx.conf.page_table_pointer_mask == 0) {
         code.test(page, page);
     } else {
-        code.and_(page, ~u32(0) << ctx.conf.page_table_pointer_mask_bits);
+        code.mov(tmp, ctx.conf.page_table_pointer_mask);
+        code.and_(page, tmp);
     }
     code.jz(abort, code.T_NEAR);
     if (ctx.conf.absolute_offset_page_table) {
@@ -157,10 +158,25 @@ template<>
 
     code.shl(tmp, int(ctx.conf.page_table_log2_stride));
     code.mov(page, qword[r14 + tmp]);
-    if (ctx.conf.page_table_pointer_mask_bits == 0) {
+
+    // check for marked bit, use as unmapped if marked
+    if (ctx.conf.page_table_marked_bit) {
+        // zero page, we can use it as scratch register before it's initialized
+        code.xor_(page, page);
+        if (*ctx.conf.page_table_marked_bit >= 30) {
+            code.bt(tmp, *ctx.conf.page_table_marked_bit);
+            code.cmovc(tmp, page);
+        } else {
+            code.test(tmp, 1ULL << *ctx.conf.page_table_marked_bit);
+            code.cmovnz(tmp, page);
+        }
+    }
+    // mask away attributes
+    if (ctx.conf.page_table_pointer_mask == 0) {
         code.test(page, page);
     } else {
-        code.and_(page, ~u32(0) << ctx.conf.page_table_pointer_mask_bits);
+        code.mov(tmp, ctx.conf.page_table_pointer_mask);
+        code.and_(page, tmp);
     }
     code.jz(abort, code.T_NEAR);
     if (ctx.conf.absolute_offset_page_table) {

@@ -215,7 +215,7 @@ void ArmDynarmic64::MakeJit(Common::PageTable* page_table, std::size_t address_s
         config.page_table = reinterpret_cast<void**>(
             const_cast<Common::PageTable::PageEntryData*>(page_table->entries.data()));
         config.page_table_address_space_bits = std::uint32_t(address_space_bits);
-        config.page_table_pointer_mask_bits = Common::PageTable::ATTRIBUTE_BITS;
+        config.page_table_pointer_mask = Common::PageTable::ATTRIBUTE_MASK;
         config.page_table_marked_bit = 0;
         config.silently_mirror_page_table = false;
         config.absolute_offset_page_table = true;

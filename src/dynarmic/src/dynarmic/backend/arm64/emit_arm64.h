@@ -128,7 +128,7 @@ struct EmitConfig {
     // Page table
     u64 page_table_pointer;
     std::size_t page_table_address_space_bits;
-    int page_table_pointer_mask_bits;
+    u64 page_table_pointer_mask;
     std::size_t page_table_log2_stride;
     std::optional<std::uint16_t> page_table_marked_bit;
     bool silently_mirror_page_table;
