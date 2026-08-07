@@ -77,7 +77,7 @@ struct Memory::Impl {
                  Common::PageType::Memory);
 
         if (current_page_table->fastmem_arena) {
-            bool is_fastmem = GetInteger(base) % Common::HostPageSize != GetInteger(target) % Common::HostPageSize;
+            bool is_fastmem = GetInteger(base) % Common::HostPageSize == GetInteger(target) % Common::HostPageSize;
             if (!is_fastmem) {
                 LOG_WARNING(HW_Memory, "base {:#x} and target {:#x} aren't aligned in relation to host page size {}",
                     GetInteger(base), GetInteger(target), Common::HostPageSize);
