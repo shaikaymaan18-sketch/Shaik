@@ -610,6 +610,7 @@ struct Memory::Impl {
                     LOG_WARNING(HW_Memory, "Mapping irregular address; {:#x} points to {:#x} instead of {:#x}",
                         base << YUZU_PAGEBITS, iter->second << YUZU_PAGEBITS, GetInteger(target));
                     target_paddr = iter->second << YUZU_PAGEBITS;
+                    extra_mappings.erase(iter);
                 }
                 auto host_ptr = uintptr_t(system.DeviceMemory().GetPointer<u8>(target_paddr)) - (base << YUZU_PAGEBITS);
                 auto& entry = page_table.entries.GetUnchecked(base);
