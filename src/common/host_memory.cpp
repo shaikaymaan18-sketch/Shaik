@@ -549,8 +549,10 @@ public:
     {}
 
     bool Init() {
-        long page_size = sysconf(_SC_PAGESIZE);
-        ASSERT_MSG(page_size == 0x1000, "page size {:#x} is incompatible with 4K paging", page_size);
+        if (auto pagesize = sysconf(_SC_PAGESIZE); pagesize != 0x1000) {
+            LOG_WARNING(Common_Memory, "page size {:#x} is incompatible with 4K paging", pagesize);
+            return false;
+        }
         // Backing memory initialization
 #if defined(__sun__) || defined(__HAIKU__) || defined(__NetBSD__) || defined(__DragonFly__)
         fd = shm_open_anon(O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW, 0600);
@@ -1113,11 +1115,11 @@ size_t HostMemory::BackingHardwareBufferWindowSize() const noexcept {
 #endif
 }
 
-bool HostMemory::IsBackingShared() const noexcept {
+bool HostMemory::SupportsUnifiedGPU() const noexcept {
 #if defined(__OPENORBIS__) || defined(__managarm__)
     return false;
 #else
-    return impl && impl->IsBackingShared();
+    return impl ? impl->IsBackingShared() : fallback_buffer->data() != nullptr;
 #endif
 }
 

@@ -122,7 +122,7 @@ public:
     }
 
     bool IsBackingShared() const noexcept {
-        return backing_is_shared;
+        return supports_uma;
     }
 
     PAddr GetPhysicalRawAddressFromDAddr(DAddr address) const {
@@ -205,7 +205,7 @@ private:
     const std::span<AHardwareBuffer* const> ahb_windows;
     const size_t ahb_window_size;
     const size_t ahb_base;
-    const bool backing_is_shared;
+    const bool supports_uma;
     DeviceInterface* device_inter;
 
     struct TrackedEntry {

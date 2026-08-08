@@ -104,7 +104,7 @@ public:
                                 size_t hardware_buffer_window, size_t hardware_buffer_base);
 
     [[nodiscard]] bool HasUnifiedMemory() const noexcept {
-        return unified_memory != nullptr && unified_memory->IsValid();
+        return unified_memory && unified_memory->IsValid();
     }
 
     [[nodiscard]] u64 UnifiedMemorySize() const noexcept {

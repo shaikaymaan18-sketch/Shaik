@@ -79,7 +79,7 @@ public:
 
     [[nodiscard]] size_t BackingHardwareBufferBase() const noexcept;
 
-    [[nodiscard]] bool IsBackingShared() const noexcept;
+    [[nodiscard]] bool SupportsUnifiedGPU() const noexcept;
 
     [[nodiscard]] u8* VirtualBasePointer() noexcept {
         return virtual_base;
