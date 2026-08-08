@@ -90,17 +90,17 @@ template<>
     code.mov(page, qword[r14 + tmp.cvt64()]);
 
     // check for marked bit, use as unmapped if marked
-    if (ctx.conf.page_table_marked_bit) {
-        // zero page, we can use it as scratch register before it's initialized
-        code.xor_(page, page);
-        if (*ctx.conf.page_table_marked_bit >= 30) {
-            code.bt(tmp, *ctx.conf.page_table_marked_bit);
-            code.cmovc(tmp, page);
-        } else {
-            code.test(tmp, 1ULL << *ctx.conf.page_table_marked_bit);
-            code.cmovnz(tmp, page);
-        }
-    }
+	if (ctx.conf.page_table_marked_bit) {
+	    // zero tmp
+	    code.xor_(tmp, tmp);
+	    if (*ctx.conf.page_table_marked_bit >= 30) {
+	        code.bt(page, *ctx.conf.page_table_marked_bit);
+            code.cmovc(page, tmp);
+	    } else {
+	        code.test(page, 1ULL << *ctx.conf.page_table_marked_bit);
+	        code.cmovnz(page, tmp);
+	    }
+	}
     // mask away attributes
     if (ctx.conf.page_table_pointer_mask == 0) {
         code.test(page, page);
