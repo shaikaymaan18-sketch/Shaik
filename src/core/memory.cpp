@@ -79,7 +79,7 @@ struct Memory::Impl {
         if (current_page_table->fastmem_arena) {
             bool is_fastmem = GetInteger(base) % Common::HostPageSize == GetInteger(target) % Common::HostPageSize;
             if (!is_fastmem) {
-                LOG_WARNING(HW_Memory, "base {:#x} and target {:#x} aren't aligned in relation to host page size {}",
+                LOG_DEBUG(HW_Memory, "base {:#x} and target {:#x} aren't aligned in relation to host page size {}",
                     GetInteger(base), GetInteger(target), Common::HostPageSize);
             }
 
@@ -614,7 +614,7 @@ struct Memory::Impl {
             while (base != end) {
                 auto target_paddr = target;
                 if (auto iter = extra_mappings.find(base); iter != extra_mappings.end()) {
-                    LOG_WARNING(HW_Memory, "Mapping irregular address; {:#x} points to {:#x} instead of {:#x}",
+                    LOG_DEBUG(HW_Memory, "Mapping irregular address; {:#x} points to {:#x} instead of {:#x}",
                         base << YUZU_PAGEBITS, iter->second << YUZU_PAGEBITS, GetInteger(target));
                     target_paddr = iter->second << YUZU_PAGEBITS;
                     extra_mappings.erase(iter);

@@ -864,7 +864,8 @@ void HostMemory::Protect(size_t virtual_offset, size_t length, MemoryPermission 
         }
 
         // todo: make this actually inherit most permissive
-        LOG_WARNING(HW_Memory, "Memory is unaligned to page size, surrounding pages will inherit most permissive permissions");
+        LOG_DEBUG(HW_Memory, "Memory addresses {:#x}-{:#x} is unaligned to page size, surrounding pages will inherit most permissive permissions",
+            virtual_offset, virtual_offset + length);
         auto aligned = AlignDown(virtual_offset, HostPageSize);
         auto diff = virtual_offset - aligned;
         virtual_offset = aligned;

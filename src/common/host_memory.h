@@ -18,7 +18,7 @@
 
 namespace Common {
 
-#ifndef ARCHITECTURE_x86_64
+#if !defined(ARCHITECTURE_x86_64) && !defined(__WIN32)
 const u64 HostPageSize = sysconf(_SC_PAGESIZE);
 const u64 HostPageBits = std::countr_zero(HostPageSize);
 const u64 HostPageMask = ~(HostPageSize - 1);
