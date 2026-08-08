@@ -608,7 +608,7 @@ struct Memory::Impl {
 
             static std::atomic<u32> block = 0;
             auto current_block = block.fetch_add(1, std::memory_order_relaxed);
-            ASSERT(current_block <= 131071);
+            ASSERT(current_block <= 65535);
 
             page_table.entries.CommitRegion(base, end);
             while (base != end) {

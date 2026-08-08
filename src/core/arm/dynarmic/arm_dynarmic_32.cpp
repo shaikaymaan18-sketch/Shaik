@@ -188,6 +188,13 @@ void ArmDynarmic32::MakeJit(Common::PageTable* page_table) {
 
         config.fastmem_exclusive_access = config.fastmem_pointer  != std::nullopt;
         config.recompile_on_exclusive_fastmem_failure = true;
+
+        if (reinterpret_cast<u64>(m_system.DeviceMemory().buffer.BackingBasePointer() +
+            Kernel::Board::Nintendo::Nx::KSystemControl::Init::GetIntendedMemorySize()) < (1ULL << 39)) {
+            // Systems like FreeBSD allocate memory really low by default, and since we pack our page table entries,
+            // we have to manually sign extend when our actual pointer is negative.
+            config.page_table_sign_extension = Common::PageTable::SIGN_BIT;
+        }
     }
 
     // Multi-process state

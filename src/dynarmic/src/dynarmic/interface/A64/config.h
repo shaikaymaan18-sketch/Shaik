@@ -185,7 +185,11 @@ struct UserConfig {
     /// Setting this value has Dynarmic check the specified bit of the page pointer provided by page table.
     /// If the bit is set to 1, Dynarmic will treat it as unmapped.
     /// This bit should be included as part of `page_table_pointer_mask`.
-    std::optional<std::uint16_t> page_table_marked_bit = std::nullopt;
+    std::optional<std::uint8_t> page_table_marked_bit = std::nullopt;
+
+    /// If this value is set, Dynarmic will sign extend the page table pointer by this bit.
+    /// Useful for compacting bits into the page table and should be used as part of `page_table_pointer_mask`.
+    std::optional<std::uint8_t> page_table_sign_extension = std::nullopt;
 
     /// Counter-timer frequency register. The value of the register is not interpreted by
     /// dynarmic.

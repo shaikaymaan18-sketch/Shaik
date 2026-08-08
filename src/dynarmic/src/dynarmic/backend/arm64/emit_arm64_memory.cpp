@@ -284,6 +284,11 @@ std::pair<oaknut::XReg, oaknut::XReg> InlinePageTableEmitVAddrLookup(oaknut::Cod
         code.AND(Xscratch0, Xscratch0, ctx.conf.page_table_pointer_mask);
     }
 
+    // TODO: combine this with page_table_pointer_mask
+    if (ctx.conf.page_table_sign_extension) {
+        code.SBFM(Xscratch0, Xscratch0, 0, *ctx.conf.page_table_sign_extension);
+    }
+
     code.CBZ(Xscratch0, *fallback);
 
     if (ctx.conf.absolute_offset_page_table) {

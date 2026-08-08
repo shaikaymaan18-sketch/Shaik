@@ -78,29 +78,27 @@ Xbyak::RegExp EmitVAddrLookup(BlockOfCode& code, EmitContext& ctx, size_t bitsiz
 template<>
 [[maybe_unused]] Xbyak::RegExp EmitVAddrLookup<A32EmitContext>(BlockOfCode& code, A32EmitContext& ctx, size_t bitsize, Xbyak::Label& abort, Xbyak::Reg64 vaddr) {
     const Xbyak::Reg64 page = ctx.reg_alloc.ScratchGpr(code);
-    const Xbyak::Reg32 tmp = ctx.conf.absolute_offset_page_table ? page.cvt32() : ctx.reg_alloc.ScratchGpr(code).cvt32();
+    const Xbyak::Reg64 tmp = ctx.conf.absolute_offset_page_table || ctx.conf.page_table_pointer_mask != 0 ? page : ctx.reg_alloc.ScratchGpr(code);
 
-    EmitDetectMisalignedVAddr(code, ctx, bitsize, abort, vaddr, tmp.cvt64());
+    EmitDetectMisalignedVAddr(code, ctx, bitsize, abort, vaddr, tmp);
 
-    // TODO: This code assumes vaddr has been zext from 32-bits to 64-bits.
-
-    code.mov(tmp, vaddr.cvt32());
+    code.mov(tmp, vaddr);
     code.shr(tmp, int(page_table_const_bits));
     code.shl(tmp, int(ctx.conf.page_table_log2_stride));
     code.mov(page, qword[r14 + tmp.cvt64()]);
 
     // check for marked bit, use as unmapped if marked
-    if (ctx.conf.page_table_marked_bit) {
-        // zero page, we can use it as scratch register before it's initialized
-        code.xor_(page, page);
-        if (*ctx.conf.page_table_marked_bit >= 30) {
-            code.bt(tmp, *ctx.conf.page_table_marked_bit);
-            code.cmovc(tmp, page);
-        } else {
-            code.test(tmp, 1ULL << *ctx.conf.page_table_marked_bit);
-            code.cmovnz(tmp, page);
-        }
-    }
+	if (ctx.conf.page_table_marked_bit) {
+	    // zero tmp
+	    code.xor_(tmp, tmp);
+	    if (*ctx.conf.page_table_marked_bit >= 30) {
+	        code.bt(page, *ctx.conf.page_table_marked_bit);
+            code.cmovc(page, tmp);
+	    } else {
+	        code.test(page, 1ULL << *ctx.conf.page_table_marked_bit);
+	        code.cmovnz(page, tmp);
+	    }
+	}
     // mask away attributes
     if (ctx.conf.page_table_pointer_mask == 0) {
         code.test(page, page);
@@ -108,12 +106,17 @@ template<>
         code.mov(tmp, ctx.conf.page_table_pointer_mask);
         code.and_(page, tmp);
     }
+    if (ctx.conf.page_table_sign_extension) {
+        code.shl(page, *ctx.conf.page_table_sign_extension);
+        code.sar(page, *ctx.conf.page_table_sign_extension);
+    }
+
     code.jz(abort, code.T_NEAR);
     if (ctx.conf.absolute_offset_page_table) {
         return page + vaddr;
     }
-    code.mov(tmp, vaddr.cvt32());
-    code.and_(tmp, static_cast<u32>(page_table_const_mask));
+    code.mov(tmp, vaddr);
+    code.and_(tmp, u32(page_table_const_mask));
     return page + tmp.cvt64();
 }
 
@@ -123,7 +126,7 @@ template<>
     const size_t unused_top_bits = 64 - ctx.conf.page_table_address_space_bits;
 
     const Xbyak::Reg64 page = ctx.reg_alloc.ScratchGpr(code);
-    const Xbyak::Reg64 tmp = ctx.conf.absolute_offset_page_table ? page : ctx.reg_alloc.ScratchGpr(code);
+    const Xbyak::Reg64 tmp = ctx.conf.absolute_offset_page_table || ctx.conf.page_table_pointer_mask != 0 ? page : ctx.reg_alloc.ScratchGpr(code);
 
     EmitDetectMisalignedVAddr(code, ctx, bitsize, abort, vaddr, tmp);
 
@@ -161,14 +164,14 @@ template<>
 
     // check for marked bit, use as unmapped if marked
     if (ctx.conf.page_table_marked_bit) {
-        // zero page, we can use it as scratch register before it's initialized
-        code.xor_(page, page);
+        // zero tmp
+        code.xor_(tmp, tmp);
         if (*ctx.conf.page_table_marked_bit >= 30) {
-            code.bt(tmp, *ctx.conf.page_table_marked_bit);
-            code.cmovc(tmp, page);
+            code.bt(page, *ctx.conf.page_table_marked_bit);
+            code.cmovc(page, tmp);
         } else {
-            code.test(tmp, 1ULL << *ctx.conf.page_table_marked_bit);
-            code.cmovnz(tmp, page);
+            code.test(page, 1ULL << *ctx.conf.page_table_marked_bit);
+            code.cmovnz(page, tmp);
         }
     }
     // mask away attributes
@@ -178,6 +181,11 @@ template<>
         code.mov(tmp, ctx.conf.page_table_pointer_mask);
         code.and_(page, tmp);
     }
+    if (ctx.conf.page_table_sign_extension) {
+        code.shl(page, *ctx.conf.page_table_sign_extension);
+        code.sar(page, *ctx.conf.page_table_sign_extension);
+    }
+
     code.jz(abort, code.T_NEAR);
     if (ctx.conf.absolute_offset_page_table) {
         return page + vaddr;

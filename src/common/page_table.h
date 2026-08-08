@@ -45,6 +45,9 @@ struct PageTable {
     /// Masks out bits reserved for attribute tagging.
     static constexpr u64 ATTRIBUTE_MASK = ((1ULL << 44) - 1) << 12;
 
+    /// Specifies sign bit for page table entries.
+    static constexpr u64 SIGN_BIT = 45 + 12; // 44 bits of data + page offset
+
     /**
      * Atomic tuple of host pointer, page type, and block id.
      * This uses the lower bits of a given pointer to store the attributes.
@@ -58,13 +61,13 @@ struct PageTable {
                 : marked(static_cast<u64>(marked_)       & 0b1)
                 , type(static_cast<u64>(type_)           & ((1ULL << 2) - 1))
                 , block(static_cast<u64>(block_)         & ((1ULL << 9) - 1))
-                , page((page_ >> 12)                     & ((1ULL << 44) - 1))
-                , block2((static_cast<u64>(block_) << 9) & ((1ULL << 8) - 1)) {}
+                , page((page_ >> 12)                     & ((1ULL << 45) - 1))
+                , block2((static_cast<u64>(block_) >> 9) & ((1ULL << 7) - 1)) {}
             u64 marked : 1;
             u64 type   : 2;
             u64 block  : 9;
-            u64 page   : 44; // first 12 bits are page offset, last 8 bits are architecturally reserved
-            u64 block2 : 8;
+            u64 page   : 45; // 44 bits of actual data (64 - page offset (12) - reserved (8)) + a sign bit
+            u64 block2 : 7;
         };
 
         [[nodiscard]] Data Raw() const noexcept {
@@ -82,7 +85,7 @@ struct PageTable {
         }
 
         /// Returns the block identifier.
-        [[nodiscard]] u32 Block() const noexcept {
+        [[nodiscard]] u16 Block() const noexcept {
             return ExtractBlock(std::bit_cast<Data>(data_raw.load(std::memory_order_relaxed)));
         }
 
@@ -102,16 +105,18 @@ struct PageTable {
         }
 
         constexpr void MarkDebug(u64 ptr, u16 block) noexcept {
-            Store(true, PageType::RasterizerCachedMemory, block, ptr);
+            Store(true, PageType::DebugMemory, block, ptr);
         }
 
         /// Unpack a pointer from a page info raw representation
         [[nodiscard]] static uintptr_t ExtractPointer(Data raw, bool ignore_marked = false) noexcept {
-            return raw.marked && !ignore_marked ? 0 : raw.page << 12;
+            return raw.marked && !ignore_marked ? 0
+                // shift raw.page's fake sign bit to the actual sign bit, then sign extend
+                : ((s64)(raw.page << (64 - 44))) >> (64 - 44 - 12);
         }
 
-        [[nodiscard]] static u32 ExtractBlock(Data raw) noexcept {
-            return raw.block | (raw.block2 << 9);
+        [[nodiscard]] static u16 ExtractBlock(Data raw) noexcept {
+            return static_cast<u16>(raw.block | (raw.block2 << 9));
         }
 
     private:
