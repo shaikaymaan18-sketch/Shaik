@@ -161,14 +161,14 @@ template<>
 
     // check for marked bit, use as unmapped if marked
     if (ctx.conf.page_table_marked_bit) {
-        // zero page, we can use it as scratch register before it's initialized
-        code.xor_(page, page);
+        // zero tmp
+        code.xor_(tmp, tmp);
         if (*ctx.conf.page_table_marked_bit >= 30) {
-            code.bt(tmp, *ctx.conf.page_table_marked_bit);
-            code.cmovc(tmp, page);
+            code.bt(page, *ctx.conf.page_table_marked_bit);
+            code.cmovc(page, tmp);
         } else {
-            code.test(tmp, 1ULL << *ctx.conf.page_table_marked_bit);
-            code.cmovnz(tmp, page);
+            code.test(page, 1ULL << *ctx.conf.page_table_marked_bit);
+            code.cmovnz(page, tmp);
         }
     }
     // mask away attributes
