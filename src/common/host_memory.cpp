@@ -166,7 +166,7 @@ public:
         // Allocate virtual address placeholder within a 39-bit address space
         MEM_ADDRESS_REQUIREMENTS addr_reqs {};
         addr_reqs.Alignment = HugePageSize;
-        addr_reqs.HighestEndingAddress = reinterpret_cast<PVOID>(1ULL << 39);
+        addr_reqs.HighestEndingAddress = reinterpret_cast<PVOID>((1ULL << 39) - 1);
 
         MEM_EXTENDED_PARAMETER ext_param {};
         ext_param.Type = MemExtendedParameterAddressRequirements;
@@ -175,7 +175,7 @@ public:
         virtual_base = static_cast<u8*>(pfn_VirtualAlloc2(process, nullptr, virtual_size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS, &ext_param, 1));
 
         // Check if we failed to allocate for direct-mapping, otherwise map normally
-        if (!virtual_base) {
+        if (!virtual_base || u64(virtual_base) > 1ULL << 39) {
             // TODO: force disable NCE
             LOG_ERROR(HW_Memory, "Failed to allocate within 39-bit address space, direct mapping is not supported");
             virtual_base = static_cast<u8*>(pfn_VirtualAlloc2
