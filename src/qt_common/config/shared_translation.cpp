@@ -170,7 +170,7 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent) {
            tr("Specifies how videos should be decoded.\nIt can either use the CPU or the GPU for "
               "decoding, or perform no decoding at all (black screen on videos).\n"
               "In most cases, GPU decoding provides the best performance."));
-    INSERT(Settings, accelerate_unswizzle, tr("Texture Unsiwzzle Method:"),
+    INSERT(Settings, accelerate_unswizzle, tr("Texture Unswizzle Method:"),
            tr("This option controls how generic textures should be unswizzled.\n"
               "CPU: Use the CPU for unswizzling (recommended).\n"
               "GPU: Use the GPU's compute shaders to unswizzling generic textures."));

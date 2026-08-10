@@ -160,6 +160,7 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
         size_t last_submitted_offset = 0;
         size_t staging_base_byte_offset = 0;
         size_t bytes_per_slice = 0;
+        size_t current_batch_start_byte = 0;
         u64 swizzled_slice_size = 0;
 
         std::vector<std::pair<GPUVAddr, size_t>> sparse_segments;
