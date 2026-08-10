@@ -1998,22 +1998,8 @@ Image::Image(TextureCacheRuntime& runtime_, const ImageInfo& info_, GPUVAddr gpu
              VAddr cpu_addr_)
     : VideoCommon::ImageBase(info_, gpu_addr_, cpu_addr_), scheduler{&runtime_.scheduler},
       runtime{&runtime_},
-      original_image(MakeImage(runtime_.device, runtime_.memory_allocator, info,
-                               WillUseWidenedAstcFormat(runtime_.device, info)
-                                   ? std::span<const VkFormat>{}
-                                   : runtime->ViewFormats(info.format),
-                               WillUseWidenedAstcFormat(runtime_.device, info)
-                                   ? std::make_optional(VK_FORMAT_R32G32B32A32_SFLOAT)
-                                   : std::nullopt)),
-                               WillUseWidenedAstcFormat(runtime_.device, info)
-                                   ? std::span<const VkFormat>{}
-                                   : std::span<const VkFormat>(BuildViewFormats(
-                                         info, runtime->ViewFormats(info.format))),
-                               WillUseWidenedAstcFormat(runtime_.device, info)
-                                   ? std::make_optional(VK_FORMAT_R32G32B32A32_SFLOAT)
-                                   : std::nullopt)),
-                               runtime->ViewFormats(info.format))),
-      aspect_mask(ImageAspectMask(info.format)) {
+    original_image(MakeImage(runtime_.device, runtime_.memory_allocator, info, std::span<const VkFormat>(BuildViewFormats(info, runtime->ViewFormats(info.format))))),
+    aspect_mask(ImageAspectMask(info.format)) {
     if (IsPixelFormatASTC(info.format) && !runtime->device.IsOptimalAstcSupported()) {
         switch (Settings::values.accelerate_astc.GetValue()) {
         case Settings::AstcDecodeMode::Gpu:
@@ -2475,12 +2461,8 @@ VkImageView Image::StorageImageView(s32 level) noexcept {
         auto format_info =
             MaxwellToVK::SurfaceFormat(runtime->device, FormatType::Optimal, true, info.format);
         if (WillUseAcceleratedAstcDecode(runtime->device, info)) {
-            format_info.format = WillUseWidenedAstcFormat(runtime->device, info)
-                                     ? VK_FORMAT_R32G32B32A32_SFLOAT
-                                     : VK_FORMAT_A8B8G8R8_UNORM_PACK32;
-            format_info.format = WillUseWidenedAstcFormat(runtime->device, info)
-                                     ? VK_FORMAT_R32G32B32A32_SFLOAT
-                                     : VK_FORMAT_A8B8G8R8_UNORM_PACK32;
+            format_info.format = VK_FORMAT_A8B8G8R8_UNORM_PACK32;
+            format_info.format = VK_FORMAT_A8B8G8R8_UNORM_PACK32;
         } else if (const auto block_view_format = BlockTexelViewFormat(info.format)) {
             format_info.format = *block_view_format;
             format_info.format = VK_FORMAT_A8B8G8R8_UNORM_PACK32;

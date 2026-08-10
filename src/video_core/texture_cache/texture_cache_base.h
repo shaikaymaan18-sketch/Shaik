@@ -566,16 +566,15 @@ private:
     u64 modification_tick = 0;
     u64 frame_tick = 0;
 
-    Common::ThreadWorker texture_decode_worker{1, "TextureDecoder"};
     // I kinda don't want ASTC CPU async to flood your threads but eh, lets FAFO
     static u32 ComputeTextureDecodeWorkerCount() {
         const u32 hw = std::thread::hardware_concurrency();
         return (std::max)(1u, hw > 2 ? hw - 1 : hw);
     }
     const u32 texture_decode_worker_count = ComputeTextureDecodeWorkerCount();
-    Common::ThreadWorker texture_decode_worker{texture_decode_worker_count, "TextureDecoder"};
-    Common::ThreadWorker texture_decode_worker{1, "TextureDecoder", {},
-                                               Common::ThreadPlacement::Efficiency};
+    Common::ThreadWorker texture_decode_worker{
+        texture_decode_worker_count, "TextureDecoder", {},Common::ThreadPlacement::Efficiency
+    };
     std::vector<std::unique_ptr<AsyncDecodeContext>> async_decodes;
 
     std::deque<PendingUnswizzle> unswizzle_queue;
