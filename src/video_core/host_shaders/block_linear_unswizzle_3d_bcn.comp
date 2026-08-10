@@ -33,7 +33,7 @@ layout(push_constant) uniform PushConstants {
 
     uint block_depth;           // Offset 48
     uint block_depth_mask;      // Offset 52
-    int _pad;                   // Offset 56
+    uint src_buffer_byte_bias;  // Offset 56
 
     ivec3 destination;          // Offset 60
 } pc;
@@ -125,6 +125,7 @@ void main() {
     offset += (block_y & pc.block_height_mask) << GOB_SIZE_SHIFT;
     offset += (pos.x >> GOB_SIZE_X_SHIFT) << pc.x_shift;
     offset += swizzle;
+    offset -= pc.src_buffer_byte_bias;
 
     uvec4 texel = ReadTexel(offset);
 

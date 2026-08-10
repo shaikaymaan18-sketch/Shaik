@@ -10,7 +10,9 @@
 #include <deque>
 #include <limits>
 #include <mutex>
+#include <optional>
 #include <span>
+#include <thread>
 #include <type_traits>
 // TODO: find out which don't require stable iters
 #include <unordered_map>
@@ -71,7 +73,20 @@ struct AsyncDecodeContext {
     std::atomic_bool complete;
 };
 
+struct AsyncCpuUnswizzleChunk {
+    std::span<const u8> swizzled_batch;
+    std::vector<u8> linear_batch;
+    u32 z_src = 0;
+    u32 z_image = 0;
+    u32 z_count = 0;
+    u32 group_z_start = 0;
+    u32 group_z_count = 0;
+    std::mutex mutex;
+    std::atomic_bool complete{false};
+    std::atomic<u32> subjobs_pending{0};
+};
 using TextureCacheGPUMap = ::Common::unordered_map<u64, std::vector<ImageId>, Common::IdentityHash<u64>>;
+
 
 class TextureCacheChannelInfo : public ChannelInfo {
 public:
@@ -133,26 +148,38 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
     using AsyncBuffer = typename P::AsyncBuffer;
     using BufferType = typename P::BufferType;
 
+    // This struct is too huge! It makes me uncomfortable
     struct PendingUnswizzle {
-        ImageId image_id;
         VideoCommon::ImageInfo info;
-        size_t current_offset = 0;
-        size_t total_size = 0;
         AsyncBuffer staging_buffer;
+        bool owns_staging_buffer = true;
+        ImageId image_id{};
+
+        size_t total_size = 0;
+        size_t current_offset = 0;
         size_t last_submitted_offset = 0;
-        size_t bytes_per_slice;
-        bool initialized = false;
-        bool was_rescaled = false;
-        bool is_sparse = false;
-        std::vector<u8> slice_has_data;
-        std::vector<std::pair<GPUVAddr, size_t>> sparse_segments;
-        size_t segment_scan_cursor = 0;
-        size_t swizzle_group_size = 0;
-        u32 slices_per_group   = 0;
-        bool is_incremental = false;
         size_t staging_base_byte_offset = 0;
-        u32 incremental_z_start = 0;
-        u32 incremental_z_count = 0;
+        size_t bytes_per_slice = 0;
+        u64 swizzled_slice_size = 0;
+
+        std::vector<std::pair<GPUVAddr, size_t>> sparse_segments;
+        std::vector<u8> slice_has_data;
+        size_t segment_scan_cursor = 0;
+        u32 active_z_start = 0;
+        u32 active_z_end = 0;
+
+        std::unique_ptr<AsyncCpuUnswizzleChunk> cpu_chunk;
+        Extent3D cpu_num_tiles{};
+        Extent3D cpu_block{};
+
+        u32 swizzle_block_depth = 0;
+        u32 cpu_stride_alignment = 0;
+        u32 cpu_bytes_per_block = 0;
+
+        bool initialized = false;
+        bool is_sparse = false;
+        bool is_cpu = false;
+        bool cpu_job_in_flight = false;
     };
 
     struct BlitImages {
@@ -442,6 +469,13 @@ private:
 
     void QueueAsyncUnswizzle(Image& image, ImageId image_id);
     void TickAsyncUnswizzle();
+    void TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image);
+    void TickAsyncUnswizzleCpu(PendingUnswizzle& task, Image& image);
+    void InitializeCpuUnswizzleTask(PendingUnswizzle& task, Image& image);
+    void StageSwizzledDataCpu(PendingUnswizzle& task, Image& image, size_t current_group_off,
+                              size_t current_group_end);
+    void DispatchCpuUnswizzleJob(PendingUnswizzle& task, Image& image, u32 z_src, u32 z_count);
+    void PollAndUploadCpuUnswizzleJob(PendingUnswizzle& task, Image& image);
 
     bool IsUnswizzleStorageFormatSupported(PixelFormat format) {
         return runtime.IsUnswizzleStorageFormatSupported(format);
@@ -476,9 +510,11 @@ private:
     u64 minimum_memory;
     u64 expected_memory;
     u64 critical_memory;
-    size_t gpu_unswizzle_maxsize = 0;
-    size_t swizzle_chunk_size = 0;
-    u32 swizzle_slices_per_batch = 0;
+
+    Settings::AsyncUnswizzleMode async_unswizzle_mode = Settings::AsyncUnswizzleMode::Off;
+    size_t async_unswizzle_maxsize = 0;
+    size_t async_unswizzle_chunk_size = 0;
+    u32 async_unswizzle_slices_per_batch = 0;
 
     struct BufferDownload {
         GPUVAddr address;
@@ -530,11 +566,24 @@ private:
     u64 modification_tick = 0;
     u64 frame_tick = 0;
 
+    Common::ThreadWorker texture_decode_worker{1, "TextureDecoder"};
+    // I kinda don't want ASTC CPU async to flood your threads but eh, lets FAFO
+    static u32 ComputeTextureDecodeWorkerCount() {
+        const u32 hw = std::thread::hardware_concurrency();
+        return (std::max)(1u, hw > 2 ? hw - 1 : hw);
+    }
+    const u32 texture_decode_worker_count = ComputeTextureDecodeWorkerCount();
+    Common::ThreadWorker texture_decode_worker{texture_decode_worker_count, "TextureDecoder"};
     Common::ThreadWorker texture_decode_worker{1, "TextureDecoder", {},
                                                Common::ThreadPlacement::Efficiency};
     std::vector<std::unique_ptr<AsyncDecodeContext>> async_decodes;
 
     std::deque<PendingUnswizzle> unswizzle_queue;
+
+    static constexpr size_t UnswizzleSharedStagingCap = 1_GiB;
+    std::optional<AsyncBuffer> unswizzle_shared_staging;
+    size_t unswizzle_shared_staging_capacity = 0;
+    bool unswizzle_shared_staging_pending_gpu_read = false;
 
     // Join caching
     boost::container::small_vector<ImageId, 4> join_overlap_ids;

@@ -157,6 +157,7 @@ ENUM(GpuClock, Normal, Boost, Overclock)
 ENUM(GpuUnswizzleSize, VerySmall, Small, Normal, Large, VeryLarge)
 ENUM(GpuUnswizzle, VeryLow, Low, Normal, Medium, High, Off)
 ENUM(GpuUnswizzleChunk, VeryLow, Low, Normal, Medium, High, Off)
+ENUM(AsyncUnswizzleMode, Off, Gpu, Cpu)
 ENUM(TemperatureUnits, Celsius, Fahrenheit)
 ENUM(ExtendedDynamicState, Disabled, EDS1, EDS2, EDS3);
 ENUM(GpuLogLevel, Off, Errors, Standard, Verbose, All)

@@ -172,8 +172,8 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent) {
               "In most cases, GPU decoding provides the best performance."));
     INSERT(Settings, accelerate_unswizzle, tr("Texture Unsiwzzle Method:"),
            tr("This option controls how generic textures should be unswizzled.\n"
-              "CPU: Use the CPU for unswizzling.\n"
-              "GPU: Use the GPU's compute shaders to unswizzling generic textures (recommended)."));
+              "CPU: Use the CPU for unswizzling (recommended).\n"
+              "GPU: Use the GPU's compute shaders to unswizzling generic textures."));
     INSERT(Settings, accelerate_astc, tr("ASTC Decoding Method:"),
            tr("This option controls how ASTC textures should be decoded.\n"
               "CPU: Use the CPU for decoding.\n"
@@ -235,9 +235,9 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent) {
     INSERT(Settings, gpu_clock, tr("GPU Clocks"),
            tr("Makes the game believe GPU work finishes faster than it does, so it stops lowering "
               "resolution and render distance to fit the Switch's clocks."));
-    INSERT(Settings, gpu_unswizzle_enabled, tr("Chunked GPU Unswizzle"),
+    /*INSERT(Settings, gpu_unswizzle_enabled, tr("Chunked GPU Unswizzle"),
            tr("Accelerates BCn 3D texture decoding using GPU compute.\n"
-              "Disable if experiencing crashes or graphical glitches."));
+              "Disable if experiencing crashes or graphical glitches."));*/
     INSERT(Settings, gpu_unswizzle_texture_size, tr("GPU Unswizzle Max Texture Size"),
            tr("Sets the maximum size (MiB) for GPU-based texture unswizzling.\n"
               "While the GPU is faster for medium and large textures, the CPU may be more "
@@ -251,6 +251,12 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent) {
            tr("Determines the number of depth slices processed in a single dispatch.\n"
               "Increasing this can improve throughput on high-end GPUs but may cause TDR or driver "
               "timeouts on weaker hardware."));
+    INSERT(Settings, async_unswizzle_mode, tr("Async Unswizzle Mode"),
+           tr("This option controls how chunked texture uploads are unswizzled.\n"
+              "Off: Disables asynchronous texture unswizzling.\n"
+              "CPU: Uses the CPU for asynchronous unswizzling.\n"
+              "GPU: Accelerates BCn 3D texture decoding using GPU compute (recommended).\n"
+              "Change to CPU or Off if VRAM is limited."));
 
     INSERT(Settings, use_vulkan_driver_pipeline_cache, tr("Use Vulkan pipeline cache"),
            tr("Enables GPU vendor-specific pipeline cache.\nThis option can improve shader loading "
@@ -685,6 +691,12 @@ std::unique_ptr<ComboboxTranslationMap> ComboboxEnumeration(QObject* parent) {
                               PAIR(GpuUnswizzleChunk, Medium, tr("Medium (256)")),
                               PAIR(GpuUnswizzleChunk, High, tr("High (512)")),
                               PAIR(GpuUnswizzleChunk, Off, tr("Off")),
+                          }});
+    translations->insert({Settings::EnumMetadata<Settings::AsyncUnswizzleMode>::Index(),
+                          {
+                              PAIR(AsyncUnswizzleMode, Off, tr("Off")),
+                              PAIR(AsyncUnswizzleMode, Cpu, tr("CPU")),
+                              PAIR(AsyncUnswizzleMode, Gpu, tr("GPU")),
                           }});
 
     translations->insert({Settings::EnumMetadata<Settings::ExtendedDynamicState>::Index(),

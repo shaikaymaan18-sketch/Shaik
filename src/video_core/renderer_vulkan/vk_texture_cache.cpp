@@ -984,13 +984,14 @@ void BlitScale(Scheduler& scheduler, VkImage src_image, VkImage dst_image, const
     }
 }
 
-[[nodiscard]] boost::container::small_vector<VkFormat, 8> BuildViewFormats(
-            const ImageInfo& info, std::span<const VkFormat> base_view_formats) {
+[[nodiscard]] boost::container::small_vector<VkFormat, 8> BuildViewFormats(const ImageInfo& info, std::span<const VkFormat> base_view_formats) {
     boost::container::small_vector<VkFormat, 8> formats(base_view_formats.begin(),
                                                          base_view_formats.end());
-    if (Settings::values.gpu_unswizzle_enabled.GetValue()) {
-        if (const auto block_view_format = BlockTexelViewFormat(info.format)) {
-            formats.push_back(*block_view_format);
+    if (Settings::values.accelerate_unswizzle.GetValue() == Settings::TexUnswizzleMode::Gpu) {
+        if (!info.is_sparse) {
+            if (const auto block_view_format = BlockTexelViewFormat(info.format)) {
+                formats.push_back(*block_view_format);
+            }
         }
     }
     return formats;
@@ -1034,16 +1035,19 @@ TextureCacheRuntime::TextureCacheRuntime(const Device& device_, Scheduler& sched
         }
     }
 
-    if (Settings::values.gpu_unswizzle_enabled.GetValue()) {
-        bl2d_unswizzle_pass.emplace(device, scheduler, descriptor_pool,
-                                   staging_buffer_pool, compute_pass_descriptor_queue);
-        bl3d_unswizzle_pass.emplace(device, scheduler, descriptor_pool,
-                                   staging_buffer_pool, compute_pass_descriptor_queue);
+    if (Settings::values.accelerate_unswizzle.GetValue() == Settings::TexUnswizzleMode::Gpu) {
         generic_2d_unswizzle_pass.emplace(device, scheduler, descriptor_pool,
                                    staging_buffer_pool, compute_pass_descriptor_queue);
         generic_3d_unswizzle_pass.emplace(device, scheduler, descriptor_pool,
                                    staging_buffer_pool, compute_pass_descriptor_queue);
         generic_linear_unswizzle_pass.emplace(device, scheduler, descriptor_pool,
+                                   staging_buffer_pool, compute_pass_descriptor_queue);
+    }
+
+    if (Settings::values.async_unswizzle_mode.GetValue() == Settings::AsyncUnswizzleMode::Gpu) {
+        bl2d_unswizzle_pass.emplace(device, scheduler, descriptor_pool,
+                                   staging_buffer_pool, compute_pass_descriptor_queue);
+        bl3d_unswizzle_pass.emplace(device, scheduler, descriptor_pool,
                                    staging_buffer_pool, compute_pass_descriptor_queue);
     }
 }
@@ -3287,17 +3291,24 @@ VkRenderPass Framebuffer::RenderPassVariant(u32 color_clear_mask, bool depth_ste
 void TextureCacheRuntime::AccelerateImageUpload(
     Image& image, const StagingBufferRef& map,
     std::span<const VideoCommon::SwizzleParameters> swizzles,
-    u32 z_src_start, u32 z_image_start) {
+    u32 z_src_start, u32 z_image_start, u32 z_count,
+    std::span<const u8> slice_has_data,
+    bool image_already_uploaded) {
 
     if (IsPixelFormatASTC(image.info.format)) {
         return astc_decoder_pass->Assemble(image, map, swizzles);
     }
 
-    if (!Settings::values.gpu_unswizzle_enabled.GetValue() || (!generic_2d_unswizzle_pass && !generic_3d_unswizzle_pass)) {
+    /*if (!Settings::values.gpu_unswizzle_enabled.GetValue() || (!generic_2d_unswizzle_pass && !generic_3d_unswizzle_pass)) {
         ASSERT(false && "GPU unswizzle is disabled for this texture");
         return;
-    }
+    }*/
 
+    if (bl3d_unswizzle_pass && IsPixelFormatBCn(image.info.format) && image.info.type == ImageType::e3D && image.info.resources.levels == 1 && image.info.resources.layers == 1) {
+        return bl3d_unswizzle_pass->Unswizzle(image, map, swizzles,
+            z_src_start, z_image_start, z_count,
+            slice_has_data, image_already_uploaded);
+    }
     if (image.info.type == ImageType::e2D && generic_2d_unswizzle_pass) {
         return generic_2d_unswizzle_pass->Unswizzle(image, map, swizzles);
     }

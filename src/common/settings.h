@@ -692,8 +692,14 @@ struct Values {
                                                   Category::RendererHacks,
                                                   Specialization::Default};
 
-    SwitchableSetting<bool> gpu_unswizzle_enabled{linkage, false, "gpu_unswizzle_enabled",
-                                                  Category::RendererHacks};
+    /*SwitchableSetting<bool> gpu_unswizzle_enabled{linkage, false, "gpu_unswizzle_enabled",
+                                                  Category::RendererHacks};*/
+
+    SwitchableSetting<AsyncUnswizzleMode> async_unswizzle_mode{linkage,
+                                                  AsyncUnswizzleMode::Off,
+                                                  "async_unswizzle_mode",
+                                                  Category::RendererHacks,
+                                                  Specialization::Default};
 
     SwitchableSetting<ExtendedDynamicState> dyna_state{linkage,
 #if defined(__ANDROID__)
