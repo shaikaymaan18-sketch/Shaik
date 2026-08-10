@@ -74,8 +74,8 @@ struct AsyncDecodeContext {
 };
 
 struct AsyncCpuUnswizzleChunk {
-    std::span<const u8> swizzled_batch;
     std::vector<u8> linear_batch;
+    std::span<const u8> swizzled_batch;
     u32 z_src = 0;
     u32 z_image = 0;
     u32 z_count = 0;

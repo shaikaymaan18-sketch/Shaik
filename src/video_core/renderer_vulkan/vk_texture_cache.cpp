@@ -2465,10 +2465,8 @@ VkImageView Image::StorageImageView(s32 level) noexcept {
             MaxwellToVK::SurfaceFormat(runtime->device, FormatType::Optimal, true, info.format);
         if (WillUseAcceleratedAstcDecode(runtime->device, info)) {
             format_info.format = VK_FORMAT_A8B8G8R8_UNORM_PACK32;
-            format_info.format = VK_FORMAT_A8B8G8R8_UNORM_PACK32;
         } else if (const auto block_view_format = BlockTexelViewFormat(info.format)) {
             format_info.format = *block_view_format;
-            format_info.format = VK_FORMAT_A8B8G8R8_UNORM_PACK32;
         }
         view = MakeStorageView(runtime->device.GetLogical(), level, *(this->*current_image),
                                format_info.format);

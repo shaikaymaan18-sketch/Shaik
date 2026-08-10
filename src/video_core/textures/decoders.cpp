@@ -18,7 +18,6 @@
 #include "video_core/textures/decoders.h"
 #if defined(ARCHITECTURE_x86_64)
 #include "video_core/textures/decoders_avx2.h"
-#include "video_core/textures/decoders_sse2.h"
 #endif
 
 namespace Tegra::Texture {
@@ -232,13 +231,9 @@ void Swizzle(std::span<u8> output, std::span<const u8> input, u32 bytes_per_pixe
             if (Common::g_cpu_caps.avx2) {
                 UnswizzleGobPermuteAVX2(output, input, bytes_per_pixel, width, height, depth,
                                         block_height, block_depth, stride_alignment);
-            } else {
-                // SSE2 comes with x64 by default but incase I'm wrong this is here
-                // Could maybe check for SSE3, SSSE3, SSE4.1 and SSE4.2 but I think they don't really add anything for this scenario
-                UnswizzleGobPermuteSSE2(output, input, bytes_per_pixel, width, height, depth,
-                                        block_height, block_depth, stride_alignment);
+                return;
             }
-            return;
+            break;
         default:
             break;
         }
