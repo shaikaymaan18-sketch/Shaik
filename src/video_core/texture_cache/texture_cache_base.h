@@ -73,18 +73,7 @@ struct AsyncDecodeContext {
     std::atomic_bool complete;
 };
 
-struct AsyncCpuUnswizzleChunk {
-    std::vector<u8> linear_batch;
-    std::span<const u8> swizzled_batch;
-    u32 z_src = 0;
-    u32 z_image = 0;
-    u32 z_count = 0;
-    u32 group_z_start = 0;
-    u32 group_z_count = 0;
-    std::mutex mutex;
-    std::atomic_bool complete{false};
-    std::atomic<u32> subjobs_pending{0};
-};
+
 using TextureCacheGPUMap = ::Common::unordered_map<u64, std::vector<ImageId>, Common::IdentityHash<u64>>;
 
 
@@ -169,7 +158,6 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
         u32 active_z_start = 0;
         u32 active_z_end = 0;
 
-        std::unique_ptr<AsyncCpuUnswizzleChunk> cpu_chunk;
         Extent3D cpu_num_tiles{};
         Extent3D cpu_block{};
 
@@ -180,7 +168,6 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
         bool initialized = false;
         bool is_sparse = false;
         bool is_cpu = false;
-        bool cpu_job_in_flight = false;
     };
 
     struct BlitImages {
@@ -472,11 +459,6 @@ private:
     void TickAsyncUnswizzle();
     void TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image);
     void TickAsyncUnswizzleCpu(PendingUnswizzle& task, Image& image);
-    void InitializeCpuUnswizzleTask(PendingUnswizzle& task, Image& image);
-    void StageSwizzledDataCpu(PendingUnswizzle& task, Image& image, size_t current_group_off,
-                              size_t current_group_end);
-    void DispatchCpuUnswizzleJob(PendingUnswizzle& task, Image& image, u32 z_src, u32 z_count);
-    void PollAndUploadCpuUnswizzleJob(PendingUnswizzle& task, Image& image);
 
     bool IsUnswizzleStorageFormatSupported(PixelFormat format) {
         return runtime.IsUnswizzleStorageFormatSupported(format);
@@ -567,15 +549,8 @@ private:
     u64 modification_tick = 0;
     u64 frame_tick = 0;
 
-    // I kinda don't want ASTC CPU async to flood your threads but eh, lets FAFO
-    static u32 ComputeTextureDecodeWorkerCount() {
-        const u32 hw = std::thread::hardware_concurrency();
-        return (std::max)(1u, hw > 2 ? hw - 1 : hw);
-    }
-    const u32 texture_decode_worker_count = ComputeTextureDecodeWorkerCount();
-    Common::ThreadWorker texture_decode_worker{
-        texture_decode_worker_count, "TextureDecoder", {},Common::ThreadPlacement::Efficiency
-    };
+    Common::ThreadWorker texture_decode_worker{1, "TextureDecoder", {},
+                                               Common::ThreadPlacement::Efficiency};
     std::vector<std::unique_ptr<AsyncDecodeContext>> async_decodes;
 
     std::deque<PendingUnswizzle> unswizzle_queue;
