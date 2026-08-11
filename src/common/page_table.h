@@ -59,7 +59,7 @@ struct PageTable {
                 , type(static_cast<u64>(type_)           & ((1ULL << 2) - 1))
                 , block(static_cast<u64>(block_)         & ((1ULL << 9) - 1))
                 , page((page_ >> 12)                     & ((1ULL << 44) - 1))
-                , block2((static_cast<u64>(block_) << 9) & ((1ULL << 8) - 1)) {}
+                , block2((static_cast<u64>(block_) >> 9) & ((1ULL << 8) - 1)) {}
             u64 marked : 1;
             u64 type   : 2;
             u64 block  : 9;
@@ -102,7 +102,7 @@ struct PageTable {
         }
 
         constexpr void MarkDebug(u64 ptr, u16 block) noexcept {
-            Store(true, PageType::RasterizerCachedMemory, block, ptr);
+            Store(true, PageType::DebugMemory, block, ptr);
         }
 
         /// Unpack a pointer from a page info raw representation
