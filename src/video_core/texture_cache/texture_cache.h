@@ -1430,6 +1430,10 @@ void TextureCache<P>::TickAsyncUnswizzle() {
     if (task.is_cpu) {
         TickAsyncUnswizzleCpu(task, image);
     } else {
+        if (!task.owns_staging_buffer && unswizzle_shared_staging_pending_gpu_read) {
+            runtime.Finish();
+            unswizzle_shared_staging_pending_gpu_read = false;
+        }
         TickAsyncUnswizzleGpu(task, image);
     }
 }
