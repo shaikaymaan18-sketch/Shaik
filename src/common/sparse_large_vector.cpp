@@ -89,6 +89,10 @@ bool CommitVectorPage(uintptr_t addr, bool write) noexcept {
 }
 #endif
 
+#ifndef MAP_NOCORE
+#define MAP_NOCORE 0
+#endif
+
 void* AllocateMemoryPages(std::size_t size) noexcept {
     if (auto page = HostPageSize; size % page != 0) {
         LOG_WARNING(HW_Memory, "Allocating unaligned large vector with size {:#x}; aligning to {} page size", size, page);
@@ -111,7 +115,7 @@ void* AllocateMemoryPages(std::size_t size) noexcept {
     }
     ASSERT_MSG(base, "Failed to reserve {:#x} sized region with error {}", size, GetLastError());
 #else
-    void* base = mmap(nullptr, size, PROT_READ, MAP_ANON | MAP_PRIVATE, -1, 0);
+    void* base = mmap(nullptr, size, PROT_READ, MAP_ANON | MAP_PRIVATE | MAP_NOCORE, -1, 0);
     if (base == MAP_FAILED)
         base = nullptr;
     ASSERT_MSG(base, "Failed to allocate {:#x} sized region with error {}", size, strerror(errno));
