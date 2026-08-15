@@ -41,10 +41,45 @@ private:
     }
 };
 
+class MNPP_SYS final : public ServiceFramework<MNPP_SYS> {
+public:
+    explicit MNPP_SYS(Core::System& system_) : ServiceFramework{system_, "mnpp:sys"} {
+        // clang-format off
+        static const FunctionInfo functions[] = {
+            {0, nullptr, "Cmd0"},
+            {10, nullptr, "Cmd10"},
+            {100, nullptr, "Cmd100"},
+            {200, nullptr, "Cmd200"},
+            {300, nullptr, "Cmd300"},
+            {400, nullptr, "Cmd400"},
+        };
+        // clang-format on
+        RegisterHandlers(functions);
+    }
+};
+
+class MNPP_WEB final : public ServiceFramework<MNPP_WEB> {
+public:
+    explicit MNPP_WEB(Core::System& system_) : ServiceFramework{system_, "mnpp:web"} {
+        // clang-format off
+        static const FunctionInfo functions[] = {
+            {0, nullptr, "Cmd0"},
+            {1, nullptr, "Cmd1"},
+            {10, nullptr, "Cmd10"},
+            {20, nullptr, "Cmd20"},
+            {100, nullptr, "Cmd100"},
+        };
+        // clang-format on
+        RegisterHandlers(functions);
+    }
+};
+
 void LoopProcess(Core::System& system) {
     auto server_manager = std::make_unique<ServerManager>(system);
 
     server_manager->RegisterNamedService("mnpp:app", std::make_shared<MNPP_APP>(system));
+    server_manager->RegisterNamedService("mnpp:sys", std::make_shared<MNPP_SYS>(system));
+    server_manager->RegisterNamedService("mnpp:web", std::make_shared<MNPP_WEB>(system));
     ServerManager::RunServer(std::move(server_manager));
 }
 

@@ -388,14 +388,6 @@ add_library(core STATIC
     hle/result.h
     hle/service/acc/acc.cpp
     hle/service/acc/acc.h
-    hle/service/acc/acc_aa.cpp
-    hle/service/acc/acc_aa.h
-    hle/service/acc/acc_su.cpp
-    hle/service/acc/acc_su.h
-    hle/service/acc/acc_u0.cpp
-    hle/service/acc/acc_u0.h
-    hle/service/acc/acc_u1.cpp
-    hle/service/acc/acc_u1.h
     hle/service/acc/async_context.cpp
     hle/service/acc/async_context.h
     hle/service/acc/errors.h
@@ -768,8 +760,8 @@ add_library(core STATIC
     hle/service/mii/types/ver3_store_data.h
     hle/service/mm/mm_u.cpp
     hle/service/mm/mm_u.h
-    hle/service/mnpp/mnpp_app.cpp
-    hle/service/mnpp/mnpp_app.h
+    hle/service/mnpp/mnpp.cpp
+    hle/service/mnpp/mnpp.h
     hle/service/ncm/ncm.cpp
     hle/service/ncm/ncm.h
     hle/service/nfc/common/amiibo_crypto.cpp
