@@ -78,13 +78,11 @@ Xbyak::RegExp EmitVAddrLookup(BlockOfCode& code, EmitContext& ctx, size_t bitsiz
 template<>
 [[maybe_unused]] Xbyak::RegExp EmitVAddrLookup<A32EmitContext>(BlockOfCode& code, A32EmitContext& ctx, size_t bitsize, Xbyak::Label& abort, Xbyak::Reg64 vaddr) {
     const Xbyak::Reg64 page = ctx.reg_alloc.ScratchGpr(code);
-    const Xbyak::Reg32 tmp = ctx.conf.absolute_offset_page_table || ctx.conf.page_table_pointer_mask != 0 ? page.cvt32() : ctx.reg_alloc.ScratchGpr(code).cvt32();
+    const Xbyak::Reg64 tmp = ctx.conf.absolute_offset_page_table || ctx.conf.page_table_pointer_mask != 0 ? page : ctx.reg_alloc.ScratchGpr(code);
 
-    EmitDetectMisalignedVAddr(code, ctx, bitsize, abort, vaddr, tmp.cvt64());
+    EmitDetectMisalignedVAddr(code, ctx, bitsize, abort, vaddr, tmp);
 
-    // TODO: This code assumes vaddr has been zext from 32-bits to 64-bits.
-
-    code.mov(tmp, vaddr.cvt32());
+    code.mov(tmp, vaddr);
     code.shr(tmp, int(page_table_const_bits));
     code.shl(tmp, int(ctx.conf.page_table_log2_stride));
     code.mov(page, qword[r14 + tmp.cvt64()]);
@@ -117,8 +115,8 @@ template<>
     if (ctx.conf.absolute_offset_page_table) {
         return page + vaddr;
     }
-    code.mov(tmp, vaddr.cvt32());
-    code.and_(tmp, static_cast<u32>(page_table_const_mask));
+    code.mov(tmp, vaddr);
+    code.and_(tmp, u32(page_table_const_mask));
     return page + tmp.cvt64();
 }
 
