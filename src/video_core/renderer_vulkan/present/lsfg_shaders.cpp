@@ -14,11 +14,11 @@ LsfgShaders::LsfgShaders(const Device& device) {
         return;
     }
 
-    const bool prefer_fp16 =
-        Settings::values.frame_gen_fp16.GetValue() && device.IsFloat16Supported();
+    const bool allow_fp16 = device.IsFloat16Supported();
+    const bool prefer_fp16 = allow_fp16 && Settings::values.frame_gen_fp16.GetValue();
 
     VideoCore::FrameGen::ShaderModules code;
-    if (VideoCore::FrameGen::LoadShaderModules(code, prefer_fp16) !=
+    if (VideoCore::FrameGen::LoadShaderModules(code, allow_fp16, prefer_fp16) !=
         VideoCore::FrameGen::LosslessStatus::Ok) {
         return;
     }

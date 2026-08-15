@@ -371,7 +371,6 @@ add_dependencies(video_core host_shaders)
 target_include_directories(video_core PRIVATE ${HOST_SHADERS_INCLUDE})
 
 target_link_libraries(video_core PRIVATE sirit::sirit)
-target_link_libraries(video_core PRIVATE dxbc)
 
 # Header-only stuff needed by all dependent targets
 target_link_libraries(video_core PUBLIC Vulkan::Headers Vulkan::UtilityHeaders GPUOpen::VulkanMemoryAllocator)
