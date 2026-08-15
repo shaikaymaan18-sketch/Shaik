@@ -68,10 +68,6 @@
     "dxbc": {
         "bundled": true,
         "hash": "196d26c07747d7aa2ced6fb1a5ae6f665e9b917de223a540038690b037c70a1eeca51c21d42aa5bec9fff7df0a6656a75ee8b4e2cb4008469f18a6812280f831",
-        "patches": [
-            "0001-disambiguate-lzcnt-for-size_t.patch",
-            "0002-add-missing-standard-includes.patch"
-        ],
         "repo": "PancakeTAS/dxbc",
         "version": "78ab59a8aaeb43cd1b0a5e91ba86722433a10b78"
     },
