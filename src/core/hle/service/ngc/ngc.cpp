@@ -29,8 +29,9 @@ public:
 private:
     void Match(HLERequestContext& ctx) {
         const auto buffer = ctx.ReadBuffer();
-        const auto text = Common::StringFromFixedZeroTerminatedBuffer(
-            reinterpret_cast<const char*>(buffer.data()), buffer.size());
+        const auto text = !buffer.empty()
+            ? Common::StringFromFixedZeroTerminatedBuffer(reinterpret_cast<const char*>(buffer.data()), buffer.size())
+            : std::string{};
 
         LOG_WARNING(Service_NGC, "(STUBBED) called, text={}", text);
 
@@ -42,8 +43,9 @@ private:
 
     void Filter(HLERequestContext& ctx) {
         const auto buffer = ctx.ReadBuffer();
-        const auto text = Common::StringFromFixedZeroTerminatedBuffer(
-            reinterpret_cast<const char*>(buffer.data()), buffer.size());
+        const auto text = !buffer.empty()
+            ? Common::StringFromFixedZeroTerminatedBuffer(reinterpret_cast<const char*>(buffer.data()), buffer.size())
+            : std::string{};
 
         LOG_WARNING(Service_NGC, "(STUBBED) called, text={}", text);
 
