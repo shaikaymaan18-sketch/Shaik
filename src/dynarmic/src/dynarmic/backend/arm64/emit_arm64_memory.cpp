@@ -255,7 +255,7 @@ void EmitDetectMisalignedVAddr(oaknut::CodeGenerator& code, EmitContext& ctx, oa
 // Trashes NZCV
 template<std::size_t bitsize>
 std::pair<oaknut::XReg, oaknut::XReg> InlinePageTableEmitVAddrLookup(oaknut::CodeGenerator& code, EmitContext& ctx, oaknut::XReg Xaddr, const SharedLabel& fallback) {
-    const std::size_t valid_page_index_bits = ctx.conf.page_table_address_space_bits - page_table_const_bits + ctx.conf.page_table_log2_stride;
+    const std::size_t valid_page_index_bits = ctx.conf.page_table_address_space_bits - page_table_const_bits;
     const std::size_t unused_top_bits = 64 - ctx.conf.page_table_address_space_bits;
 
     EmitDetectMisalignedVAddr<bitsize>(code, ctx, Xaddr, fallback);
