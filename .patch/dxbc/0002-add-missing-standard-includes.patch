@@ -8,6 +8,16 @@
  #include "dxbc_common.h"
  #include "dxbc_enums.h"
  
+--- a/include/dxbc/dxbc_compiler.h
++++ b/include/dxbc/dxbc_compiler.h
+@@ -1,6 +1,7 @@
+ #pragma once
+ 
+ #include <array>
++#include <initializer_list>
+ #include <utility>
+ #include <vector>
+ 
 --- a/include/util/util_bit.h
 +++ b/include/util/util_bit.h
 @@ -1,5 +1,8 @@
@@ -29,6 +39,16 @@
  #include <sstream>
  #include <vector>
  
+--- a/include/util/util_error.h
++++ b/include/util/util_error.h
+@@ -1,6 +1,7 @@
+ #pragma once
+ 
+ #include <string>
++#include <utility>
+ 
+ namespace dxvk {
+   
 --- a/src/dxbc/dxbc_defs.cpp
 +++ b/src/dxbc/dxbc_defs.cpp
 @@ -1,3 +1,5 @@

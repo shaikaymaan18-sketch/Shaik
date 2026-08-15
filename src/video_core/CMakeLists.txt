@@ -373,6 +373,12 @@ target_include_directories(video_core PRIVATE ${HOST_SHADERS_INCLUDE})
 target_link_libraries(video_core PRIVATE sirit::sirit)
 target_link_libraries(video_core PRIVATE dxbc)
 
+# dxbc's util_bit.h rejects AVX on Windows
+if (WIN32 AND NOT MSVC AND (ARCHITECTURE_x86 OR ARCHITECTURE_x86_64))
+    set_source_files_properties(frame_gen/lsfg_translate.cpp
+        PROPERTIES COMPILE_OPTIONS -mno-avx)
+endif()
+
 # Header-only stuff needed by all dependent targets
 target_link_libraries(video_core PUBLIC Vulkan::Headers Vulkan::UtilityHeaders GPUOpen::VulkanMemoryAllocator)
 
