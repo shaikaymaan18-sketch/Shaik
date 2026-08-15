@@ -92,15 +92,9 @@ AddDependentPackages(vulkan-headers vulkan-utility-libraries)
 # frozen
 AddJsonPackage(frozen)
 
-# DXVK's DXBC compiler
+# DXVK's DXBC compiler, used to translate the frame generation shaders
+# out of a user-supplied Lossless.dll into SPIR-V
 AddJsonPackage(dxbc)
-
-if (TARGET dxbc)
-    target_link_libraries(dxbc PUBLIC Vulkan::Headers)
-    if (WIN32 AND NOT MSVC AND (ARCHITECTURE_x86 OR ARCHITECTURE_x86_64))
-        target_compile_options(dxbc PRIVATE -mno-avx)
-    endif()
-endif()
 
 # DiscordRPC
 if (USE_DISCORD_PRESENCE)
