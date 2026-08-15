@@ -6,7 +6,7 @@
 
 #include "common/logging.h"
 #include "core/hle/service/ipc_helpers.h"
-#include "core/hle/service/mnpp/mnpp_app.h"
+#include "core/hle/service/mnpp/mnpp.h"
 #include "core/hle/service/server_manager.h"
 #include "core/hle/service/service.h"
 
@@ -17,8 +17,8 @@ public:
     explicit MNPP_APP(Core::System& system_) : ServiceFramework{system_, "mnpp:app"} {
         // clang-format off
         static const FunctionInfo functions[] = {
-            {0, &MNPP_APP::Unknown0, "unknown0"},
-            {1, &MNPP_APP::Unknown1, "unknown1"},
+            {0, &MNPP_APP::Cmd0, "Cmd0"},
+            {1, &MNPP_APP::Cmd1, "Cmd1"},
         };
         // clang-format on
 
@@ -26,14 +26,14 @@ public:
     }
 
 private:
-    void Unknown0(HLERequestContext& ctx) {
+    void Cmd0(HLERequestContext& ctx) {
         LOG_WARNING(Service_MNPP, "(STUBBED) called");
 
         IPC::ResponseBuilder rb{ctx, 2};
         rb.Push(ResultSuccess);
     }
 
-    void Unknown1(HLERequestContext& ctx) {
+    void Cmd1(HLERequestContext& ctx) {
         LOG_WARNING(Service_MNPP, "(STUBBED) called");
 
         IPC::ResponseBuilder rb{ctx, 2};
