@@ -49,6 +49,7 @@ constexpr VkExtent2D CaptureImageSize{
     .height = VideoCore::Capture::LinearHeight,
 };
 
+#ifdef HAS_LSFG
 [[nodiscard]] VkExtent2D GuestExtent(std::span<const Tegra::FramebufferConfig> framebuffers) {
     if (framebuffers.empty()) {
         return VkExtent2D{};
@@ -63,6 +64,7 @@ constexpr VkExtent2D CaptureImageSize{
         .height = static_cast<u32>(framebuffer.crop_rect.GetHeight()),
     };
 }
+#endif
 
 constexpr VkExtent3D CaptureImageExtent{
     .width = VideoCore::Capture::LinearWidth,
@@ -171,7 +173,10 @@ try
                   scheduler,
                   PresentFiltersForAppletCapture)
     , rasterizer(render_window, gpu, device_memory, device, memory_allocator, state_tracker, scheduler)
-    , frame_gen(memory_allocator, scheduler) {
+#ifdef HAS_LSFG
+    , frame_gen(memory_allocator, scheduler)
+#endif
+{
 
     if (Settings::values.renderer_force_max_clock.GetValue() && device.ShouldBoostClocks()) {
         turbo_mode.emplace(instance, dld);
@@ -208,6 +213,7 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
                                render_window.GetFramebufferLayout(), swapchain.GetImageCount(),
                                swapchain.GetImageViewFormat());
 
+#ifdef HAS_LSFG
     void(frame_gen.WantedGenerations(present_manager.MaxExtraFrames()));
 
     frame_gen.Process(device, frame, swapchain.GetImageFormat(), GuestExtent(framebuffers));
@@ -220,11 +226,14 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
         scheduler.Flush(*generated->render_ready);
         present_manager.Present(generated);
     }
+#endif
 
     scheduler.Flush(*frame->render_ready);
 
     present_manager.Present(frame);
+#ifdef HAS_LSFG
     scheduler.DispatchWork();
+#endif
 
     gpu.RendererFrameEndNotify();
     rasterizer.TickFrame();

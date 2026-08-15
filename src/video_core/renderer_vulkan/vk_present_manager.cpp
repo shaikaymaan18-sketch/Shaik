@@ -7,7 +7,9 @@
 #include "common/settings.h"
 #include "common/thread.h"
 #include "core/frontend/emu_window.h"
+#ifdef HAS_LSFG
 #include "video_core/renderer_vulkan/present/lsfg_common.h"
+#endif
 #include "video_core/renderer_vulkan/vk_present_manager.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/renderer_vulkan/vk_swapchain.h"
@@ -21,14 +23,22 @@ namespace Vulkan {
 namespace {
 
 constexpr size_t MAX_FRAMES_IN_FLIGHT = 7;
+#ifdef HAS_LSFG
 static_assert(MAX_FRAMES_IN_FLIGHT <= LSFG_MAX_TARGETS);
+#endif
 
 bool CanStoreToFrame(const vk::PhysicalDevice& physical_device, VkFormat format) {
+#ifdef HAS_LSFG
     if (!Settings::values.frame_gen.GetValue()) {
         return false;
     }
     const VkFormatProperties props{physical_device.GetFormatProperties(format)};
     return (props.optimalTilingFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) != 0;
+#else
+    void(physical_device);
+    void(format);
+    return false;
+#endif
 }
 
 bool CanBlitToSwapchain(const vk::PhysicalDevice& physical_device, VkFormat format) {
@@ -350,11 +360,15 @@ void PresentManager::SetImageCount() {
     // We cannot have more than 7 images in flight at any given time.
     // FRAMES_IN_FLIGHT is 8, and the cache TICKS_TO_DESTROY is 8.
     // Mali drivers will give us 6.
+#ifdef HAS_LSFG
     const size_t generations = Settings::FrameGenMaxGenerations();
     const size_t queued_composites = Settings::values.frame_gen_queue_target.GetValue() + 1;
     image_count =
         std::clamp<size_t>((generations + 1) * queued_composites, swapchain.GetImageCount(),
                            MAX_FRAMES_IN_FLIGHT);
+#else
+    image_count = std::min<size_t>(swapchain.GetImageCount(), MAX_FRAMES_IN_FLIGHT);
+#endif
 }
 
 void PresentManager::CopyToSwapchain(Frame* frame) {

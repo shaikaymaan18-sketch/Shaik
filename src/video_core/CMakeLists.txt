@@ -59,10 +59,6 @@ add_library(video_core STATIC
     engines/maxwell_dma.h
     engines/puller.cpp
     engines/puller.h
-    frame_gen/lossless_dll.cpp
-    frame_gen/lossless_dll.h
-    frame_gen/lsfg_translate.cpp
-    frame_gen/lsfg_translate.h
     framebuffer_config.cpp
     framebuffer_config.h
     fsr.cpp
@@ -125,28 +121,6 @@ add_library(video_core STATIC
     renderer_vulkan/present/anti_alias_pass.h
     renderer_vulkan/present/filters.cpp
     renderer_vulkan/present/filters.h
-    renderer_vulkan/present/frame_gen.cpp
-    renderer_vulkan/present/frame_gen.h
-    renderer_vulkan/present/frame_gen_pacer.cpp
-    renderer_vulkan/present/frame_gen_pacer.h
-    renderer_vulkan/present/lsfg_alpha.cpp
-    renderer_vulkan/present/lsfg_alpha.h
-    renderer_vulkan/present/lsfg_beta.cpp
-    renderer_vulkan/present/lsfg_beta.h
-    renderer_vulkan/present/lsfg_chain.cpp
-    renderer_vulkan/present/lsfg_chain.h
-    renderer_vulkan/present/lsfg_common.cpp
-    renderer_vulkan/present/lsfg_common.h
-    renderer_vulkan/present/lsfg_delta.cpp
-    renderer_vulkan/present/lsfg_delta.h
-    renderer_vulkan/present/lsfg_gamma.cpp
-    renderer_vulkan/present/lsfg_gamma.h
-    renderer_vulkan/present/lsfg_generate.cpp
-    renderer_vulkan/present/lsfg_generate.h
-    renderer_vulkan/present/lsfg_mipmaps.cpp
-    renderer_vulkan/present/lsfg_mipmaps.h
-    renderer_vulkan/present/lsfg_shaders.cpp
-    renderer_vulkan/present/lsfg_shaders.h
     renderer_vulkan/present/fsr.cpp
     renderer_vulkan/present/fsr.h
     renderer_vulkan/present/fxaa.cpp
@@ -292,6 +266,38 @@ add_library(video_core STATIC
     video_core.cpp
     video_core.h
 )
+
+if (ENABLE_LSFG)
+    target_sources(video_core PRIVATE
+        frame_gen/lossless_dll.cpp
+        frame_gen/lossless_dll.h
+        frame_gen/lsfg_translate.cpp
+        frame_gen/lsfg_translate.h
+        renderer_vulkan/present/frame_gen.cpp
+        renderer_vulkan/present/frame_gen.h
+        renderer_vulkan/present/frame_gen_pacer.cpp
+        renderer_vulkan/present/frame_gen_pacer.h
+        renderer_vulkan/present/lsfg_alpha.cpp
+        renderer_vulkan/present/lsfg_alpha.h
+        renderer_vulkan/present/lsfg_beta.cpp
+        renderer_vulkan/present/lsfg_beta.h
+        renderer_vulkan/present/lsfg_chain.cpp
+        renderer_vulkan/present/lsfg_chain.h
+        renderer_vulkan/present/lsfg_common.cpp
+        renderer_vulkan/present/lsfg_common.h
+        renderer_vulkan/present/lsfg_delta.cpp
+        renderer_vulkan/present/lsfg_delta.h
+        renderer_vulkan/present/lsfg_gamma.cpp
+        renderer_vulkan/present/lsfg_gamma.h
+        renderer_vulkan/present/lsfg_generate.cpp
+        renderer_vulkan/present/lsfg_generate.h
+        renderer_vulkan/present/lsfg_mipmaps.cpp
+        renderer_vulkan/present/lsfg_mipmaps.h
+        renderer_vulkan/present/lsfg_shaders.cpp
+        renderer_vulkan/present/lsfg_shaders.h
+    )
+    target_compile_definitions(video_core PUBLIC HAS_LSFG)
+endif()
 
 if (ENABLE_OPENGL)
     target_sources(video_core PRIVATE
