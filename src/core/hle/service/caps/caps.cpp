@@ -14,8 +14,23 @@
 #include "core/hle/service/caps/caps_u.h"
 #include "core/hle/service/server_manager.h"
 #include "core/hle/service/service.h"
+#include "frontend_common/firmware_manager.h"
 
 namespace Service::Capture {
+
+class IDecoderControlService final : public ServiceFramework<IDecoderControlService> {
+public:
+    explicit IDecoderControlService(Core::System& system_) : ServiceFramework{system_, "grc:d"} {
+        // clang-format off
+        static const FunctionInfo functions[] = {
+            {3001, nullptr, "DecodeJpeg"},
+            {4001, nullptr, "ShrinkJpeg"},
+            {4002, nullptr, "ShrinkJpegEx"},
+        };
+        // clang-format on
+        RegisterHandlers(functions);
+    }
+};
 
 void LoopProcess(Core::System& system) {
     auto server_manager = std::make_unique<ServerManager>(system);
@@ -27,6 +42,10 @@ void LoopProcess(Core::System& system) {
     server_manager->RegisterNamedService("caps:ss", std::make_shared<IScreenShotService>(system, album_manager));
     server_manager->RegisterNamedService("caps:sc", std::make_shared<IScreenShotControlService>(system));
     server_manager->RegisterNamedService("caps:su", std::make_shared<IScreenShotApplicationService>(system, album_manager));
+    // +4.0.0
+    if (FirmwareManager::GetFirmwareVersion(system).first.major >= 4) {
+        server_manager->RegisterNamedService("caps:dc", std::make_shared<IDecoderControlService>(system));
+    }
     ServerManager::RunServer(std::move(server_manager));
 }
 

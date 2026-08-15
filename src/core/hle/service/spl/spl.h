@@ -50,10 +50,4 @@ public:
     ~SPL_MANU() override;
 };
 
-class SPL_LDN final : public Module::Interface {
-public:
-    explicit SPL_LDN(Core::System& system_, std::shared_ptr<Module> module_);
-    ~SPL_LDN() override;
-};
-
 } // namespace Service::SPL

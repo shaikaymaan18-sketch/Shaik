@@ -214,7 +214,6 @@ void LoopProcess(Core::System& system) {
     server_manager->RegisterNamedService("spl:ssl", std::make_shared<SPL_SSL>(system, module));
     server_manager->RegisterNamedService("spl:es", std::make_shared<SPL_ES>(system, module));
     server_manager->RegisterNamedService("spl:manu", std::make_shared<SPL_MANU>(system, module));
-    server_manager->RegisterNamedService("spl:ldn", std::make_shared<SPL_LDN>(system, module));
     ServerManager::RunServer(std::move(server_manager));
 }
 

@@ -185,27 +185,4 @@ SPL_MANU::SPL_MANU(Core::System& system_, std::shared_ptr<Module> module_)
 
 SPL_MANU::~SPL_MANU() = default;
 
-SPL_LDN::SPL_LDN(Core::System& system_, std::shared_ptr<Module> module_)
-    : Interface(system_, std::move(module_), "spl:manu") {
-    // clang-format off
-    static const FunctionInfo functions[] = {
-        {0, nullptr, "GenerateRandomBytes"},
-        {1, nullptr, "GetConfig"},
-        {2, nullptr, "Cmd2"},
-        {3, nullptr, "Cmd3"},
-        {4, nullptr, "Cmd4"},
-        {5, nullptr, "GetConfigWithBuffer"},
-        {7000, nullptr, "GenerateNxAdvertiseKey"},
-        {7001, nullptr, "GenerateNxSessionKey"},
-        {7002, nullptr, "GenerateNxLp2pKeyIndex1"},
-        {7003, nullptr, "GenerateNxLp2pKeyIndex2"},
-        {7004, nullptr, "GenerateOunceAdvertiseKey"},
-        {7005, nullptr, "GenerateOunceSessionKey"},
-    };
-    // clang-format on
-    RegisterHandlers(functions);
-}
-
-SPL_LDN::~SPL_LDN() = default;
-
 } // namespace Service::SPL
