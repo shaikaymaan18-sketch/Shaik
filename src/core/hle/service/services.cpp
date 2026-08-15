@@ -64,6 +64,7 @@
 #include "core/hle/service/sockets/sockets.h"
 #include "core/hle/service/spl/spl_module.h"
 #include "core/hle/service/ssl/ssl.h"
+#include "core/hle/service/wlan/wlan.h"
 #include "core/hle/service/tma/tma.h"
 #include "core/hle/service/usb/usb.h"
 #include "core/hle/service/vi/vi.h"
@@ -147,6 +148,7 @@ Services::Services(std::shared_ptr<SM::ServiceManager>& sm, Core::System& system
         {"ro",         &RO::LoopProcess},
         {"spl",        &SPL::LoopProcess},
         {"ssl",        &SSL::LoopProcess},
+        {"wlan",       &WLAN::LoopProcess},
         {"tma",        &TMA::LoopProcess},
         {"usb",        &USB::LoopProcess},
         {"i2c",        &I2C::LoopProcess},
