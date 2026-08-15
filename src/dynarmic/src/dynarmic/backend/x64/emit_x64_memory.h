@@ -78,7 +78,7 @@ Xbyak::RegExp EmitVAddrLookup(BlockOfCode& code, EmitContext& ctx, size_t bitsiz
 template<>
 [[maybe_unused]] Xbyak::RegExp EmitVAddrLookup<A32EmitContext>(BlockOfCode& code, A32EmitContext& ctx, size_t bitsize, Xbyak::Label& abort, Xbyak::Reg64 vaddr) {
     const Xbyak::Reg64 page = ctx.reg_alloc.ScratchGpr(code);
-    const Xbyak::Reg32 tmp = ctx.reg_alloc.ScratchGpr(code).cvt32();
+    const Xbyak::Reg32 tmp = ctx.conf.absolute_offset_page_table || ctx.conf.page_table_pointer_mask != 0 ? page.cvt32() : ctx.reg_alloc.ScratchGpr(code).cvt32();
 
     EmitDetectMisalignedVAddr(code, ctx, bitsize, abort, vaddr, tmp.cvt64());
 
@@ -108,6 +108,11 @@ template<>
         code.mov(tmp, ctx.conf.page_table_pointer_mask);
         code.and_(page, tmp);
     }
+    if (ctx.conf.page_table_sign_extension) {
+        code.shl(page, *ctx.conf.page_table_sign_extension);
+        code.sar(page, *ctx.conf.page_table_sign_extension);
+    }
+
     code.jz(abort, code.T_NEAR);
     if (ctx.conf.absolute_offset_page_table) {
         return page + vaddr;
@@ -123,7 +128,7 @@ template<>
     const size_t unused_top_bits = 64 - ctx.conf.page_table_address_space_bits;
 
     const Xbyak::Reg64 page = ctx.reg_alloc.ScratchGpr(code);
-    const Xbyak::Reg64 tmp = ctx.reg_alloc.ScratchGpr(code);
+    const Xbyak::Reg64 tmp = ctx.conf.absolute_offset_page_table || ctx.conf.page_table_pointer_mask != 0 ? page : ctx.reg_alloc.ScratchGpr(code);
 
     EmitDetectMisalignedVAddr(code, ctx, bitsize, abort, vaddr, tmp);
 
@@ -178,6 +183,11 @@ template<>
         code.mov(tmp, ctx.conf.page_table_pointer_mask);
         code.and_(page, tmp);
     }
+    if (ctx.conf.page_table_sign_extension) {
+        code.shl(page, *ctx.conf.page_table_sign_extension);
+        code.sar(page, *ctx.conf.page_table_sign_extension);
+    }
+
     code.jz(abort, code.T_NEAR);
     if (ctx.conf.absolute_offset_page_table) {
         return page + vaddr;

@@ -45,6 +45,9 @@ struct PageTable {
     /// Masks out bits reserved for attribute tagging.
     static constexpr u64 ATTRIBUTE_MASK = ((1ULL << 44) - 1) << 12;
 
+    /// Specifies sign bit for page table entries.
+    static constexpr u64 SIGN_BIT = 45 + 12; // 44 bits of data + page offset
+
     /**
      * Atomic tuple of host pointer, page type, and block id.
      * This uses the lower bits of a given pointer to store the attributes.
