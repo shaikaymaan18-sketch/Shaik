@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // SPDX-FileCopyrightText: Copyright 2018 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -45,6 +48,12 @@ class SPL_MANU final : public Module::Interface {
 public:
     explicit SPL_MANU(Core::System& system_, std::shared_ptr<Module> module_);
     ~SPL_MANU() override;
+};
+
+class SPL_LDN final : public Module::Interface {
+public:
+    explicit SPL_LDN(Core::System& system_, std::shared_ptr<Module> module_);
+    ~SPL_LDN() override;
 };
 
 } // namespace Service::SPL

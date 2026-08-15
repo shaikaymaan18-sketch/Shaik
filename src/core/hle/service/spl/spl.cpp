@@ -25,6 +25,8 @@ SPL::SPL(Core::System& system_, std::shared_ptr<Module> module_)
     RegisterHandlers(functions);
 }
 
+SPL::~SPL() = default;
+
 SPL_MIG::SPL_MIG(Core::System& system_, std::shared_ptr<Module> module_)
     : Interface(system_, std::move(module_), "spl:mig") {
     // clang-format off
@@ -50,6 +52,8 @@ SPL_MIG::SPL_MIG(Core::System& system_, std::shared_ptr<Module> module_)
 
     RegisterHandlers(functions);
 }
+
+SPL_MIG::~SPL_MIG() = default;
 
 SPL_FS::SPL_FS(Core::System& system_, std::shared_ptr<Module> module_)
     : Interface(system_, std::move(module_), "spl:fs") {
@@ -82,6 +86,8 @@ SPL_FS::SPL_FS(Core::System& system_, std::shared_ptr<Module> module_)
     RegisterHandlers(functions);
 }
 
+SPL_FS::~SPL_FS() = default;
+
 SPL_SSL::SPL_SSL(Core::System& system_, std::shared_ptr<Module> module_)
     : Interface(system_, std::move(module_), "spl:ssl") {
     // clang-format off
@@ -110,6 +116,8 @@ SPL_SSL::SPL_SSL(Core::System& system_, std::shared_ptr<Module> module_)
 
     RegisterHandlers(functions);
 }
+
+SPL_SSL::~SPL_SSL() = default;
 
 SPL_ES::SPL_ES(Core::System& system_, std::shared_ptr<Module> module_)
     : Interface(system_, std::move(module_), "spl:es") {
@@ -145,6 +153,8 @@ SPL_ES::SPL_ES(Core::System& system_, std::shared_ptr<Module> module_)
     RegisterHandlers(functions);
 }
 
+SPL_ES::~SPL_ES() = default;
+
 SPL_MANU::SPL_MANU(Core::System& system_, std::shared_ptr<Module> module_)
     : Interface(system_, std::move(module_), "spl:manu") {
     // clang-format off
@@ -173,16 +183,29 @@ SPL_MANU::SPL_MANU(Core::System& system_, std::shared_ptr<Module> module_)
     RegisterHandlers(functions);
 }
 
-SPL::~SPL() = default;
-
-SPL_MIG::~SPL_MIG() = default;
-
-SPL_FS::~SPL_FS() = default;
-
-SPL_SSL::~SPL_SSL() = default;
-
-SPL_ES::~SPL_ES() = default;
-
 SPL_MANU::~SPL_MANU() = default;
+
+SPL_LDN::SPL_LDN(Core::System& system_, std::shared_ptr<Module> module_)
+    : Interface(system_, std::move(module_), "spl:manu") {
+    // clang-format off
+    static const FunctionInfo functions[] = {
+        {0, nullptr, "GenerateRandomBytes"},
+        {1, nullptr, "GetConfig"},
+        {2, nullptr, "Cmd2"},
+        {3, nullptr, "Cmd3"},
+        {4, nullptr, "Cmd4"},
+        {5, nullptr, "GetConfigWithBuffer"},
+        {7000, nullptr, "GenerateNxAdvertiseKey"},
+        {7001, nullptr, "GenerateNxSessionKey"},
+        {7002, nullptr, "GenerateNxLp2pKeyIndex1"},
+        {7003, nullptr, "GenerateNxLp2pKeyIndex2"},
+        {7004, nullptr, "GenerateOunceAdvertiseKey"},
+        {7005, nullptr, "GenerateOunceSessionKey"},
+    };
+    // clang-format on
+    RegisterHandlers(functions);
+}
+
+SPL_LDN::~SPL_LDN() = default;
 
 } // namespace Service::SPL

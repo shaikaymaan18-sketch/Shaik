@@ -12,8 +12,47 @@
 
 namespace Service::Sockets {
 
+class ETHC_C final : public ServiceFramework<ETHC_C> {
+public:
+    explicit ETHC_C(Core::System& system_)
+        : ServiceFramework{system_, "ethc:c"} {
+        // clang-format off
+        static const FunctionInfo functions[] = {
+            {0, nullptr, "Initialize"},
+            {1, nullptr, "Cancel"},
+            {2, nullptr, "GetResult"},
+            {3, nullptr, "GetMediaList"},
+            {4, nullptr, "SetMediaType"},
+            {5, nullptr, "GetMediaType"},
+            {6, nullptr, "GetMacAddress"},
+        };
+        // clang-format on
+        RegisterHandlers(functions);
+    }
+};
+
+class ETHC_I final : public ServiceFramework<ETHC_I> {
+public:
+    explicit ETHC_I(Core::System& system_)
+        : ServiceFramework{system_, "ethc:i"} {
+        // clang-format off
+        static const FunctionInfo functions[] = {
+            {0, nullptr, "GetReadableHandle"},
+            {1, nullptr, "Cancel"},
+            {2, nullptr, "GetResult"},
+            {3, nullptr, "GetInterfaceList"},
+            {4, nullptr, "GetInterfaceCount"},
+        };
+        // clang-format on
+        RegisterHandlers(functions);
+    }
+};
+
 void LoopProcess(Core::System& system) {
     auto server_manager = std::make_unique<ServerManager>(system);
+
+    server_manager->RegisterNamedService("ethc:c", std::make_shared<ETHC_C>(system));
+    server_manager->RegisterNamedService("ethc:i", std::make_shared<ETHC_I>(system));
 
     server_manager->RegisterNamedService("bsd:s", std::make_shared<BSD>(system, "bsd:s", false));
     server_manager->RegisterNamedService("bsd:u", std::make_shared<BSD>(system, "bsd:u", true));
