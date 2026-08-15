@@ -176,7 +176,7 @@ private:
 #if defined(_WIN32)
         CommitVectorPage(page, true);
 #elif defined(MAP_NOCORE)
-        mmap(reinterpret_cast<void*>(page), HostPageSize, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_NOCORE, -1, 0);
+        mmap(reinterpret_cast<void*>(page), HostPageSize, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
 #else
         mprotect(reinterpret_cast<void*>(page), HostPageSize, PROT_READ | PROT_WRITE);
 #endif
