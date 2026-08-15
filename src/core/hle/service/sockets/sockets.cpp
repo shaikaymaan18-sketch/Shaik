@@ -48,12 +48,24 @@ public:
     }
 };
 
+class ISfDriverServiceCreator final : public ServiceFramework<ISfDriverServiceCreator> {
+public:
+    explicit ISfDriverServiceCreator(Core::System& system_)
+        : ServiceFramework{system_, "eth:nd"} {
+        // clang-format off
+        static const FunctionInfo functions[] = {
+            {0, nullptr, "CreateDriverService"},
+        };
+        // clang-format on
+        RegisterHandlers(functions);
+    }
+};
+
 void LoopProcess(Core::System& system) {
     auto server_manager = std::make_unique<ServerManager>(system);
 
     server_manager->RegisterNamedService("ethc:c", std::make_shared<ETHC_C>(system));
     server_manager->RegisterNamedService("ethc:i", std::make_shared<ETHC_I>(system));
-
     server_manager->RegisterNamedService("bsd:s", std::make_shared<BSD>(system, "bsd:s", false));
     server_manager->RegisterNamedService("bsd:u", std::make_shared<BSD>(system, "bsd:u", true));
     server_manager->RegisterNamedService("bsd:a", std::make_shared<BSD>(system, "bsd:a", true));
@@ -64,6 +76,8 @@ void LoopProcess(Core::System& system) {
     server_manager->RegisterNamedService("nsd:u", std::make_shared<NSD>(system, "nsd:u"));
     server_manager->RegisterNamedService("sfdnsres", std::make_shared<SFDNSRES>(system));
     server_manager->RegisterNamedService("dns:priv", std::make_shared<DNS_PRIV>(system));
+    server_manager->RegisterNamedService("eth:nd", std::make_shared<ISfDriverServiceCreator>(system));
+
     server_manager->StartAdditionalHostThreads("bsdsocket", 2);
     ServerManager::RunServer(std::move(server_manager));
 }
