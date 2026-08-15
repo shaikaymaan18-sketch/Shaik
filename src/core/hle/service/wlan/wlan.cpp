@@ -3,7 +3,7 @@
 
 #include "core/core.h"
 #include "core/hle/result.h"
-#include "core/hle/service/tma/tma.h"
+#include "core/hle/service/wlan/wlan.h"
 #include "core/hle/service/ipc_helpers.h"
 #include "core/hle/service/cmif_serialization.h"
 #include "core/hle/service/cmif_types.h"
