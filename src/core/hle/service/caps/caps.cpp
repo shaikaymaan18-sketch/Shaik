@@ -18,20 +18,12 @@ void LoopProcess(Core::System& system) {
     auto server_manager = std::make_unique<ServerManager>(system);
     auto album_manager = std::make_shared<AlbumManager>(system);
 
-    server_manager->RegisterNamedService(
-        "caps:a", std::make_shared<IAlbumAccessorService>(system, album_manager));
-    server_manager->RegisterNamedService(
-        "caps:c", std::make_shared<IAlbumControlService>(system, album_manager));
-    server_manager->RegisterNamedService(
-        "caps:u", std::make_shared<IAlbumApplicationService>(system, album_manager));
-
-    server_manager->RegisterNamedService(
-        "caps:ss", std::make_shared<IScreenShotService>(system, album_manager));
-    server_manager->RegisterNamedService("caps:sc",
-                                         std::make_shared<IScreenShotControlService>(system));
-    server_manager->RegisterNamedService(
-        "caps:su", std::make_shared<IScreenShotApplicationService>(system, album_manager));
-
+    server_manager->RegisterNamedService("caps:a", std::make_shared<IAlbumAccessorService>(system, album_manager));
+    server_manager->RegisterNamedService("caps:c", std::make_shared<IAlbumControlService>(system, album_manager));
+    server_manager->RegisterNamedService("caps:u", std::make_shared<IAlbumApplicationService>(system, album_manager));
+    server_manager->RegisterNamedService("caps:ss", std::make_shared<IScreenShotService>(system, album_manager));
+    server_manager->RegisterNamedService("caps:sc", std::make_shared<IScreenShotControlService>(system));
+    server_manager->RegisterNamedService("caps:su", std::make_shared<IScreenShotApplicationService>(system, album_manager));
     ServerManager::RunServer(std::move(server_manager));
 }
 

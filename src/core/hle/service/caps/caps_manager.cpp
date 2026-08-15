@@ -263,6 +263,9 @@ Result AlbumManager::SaveScreenShot(ApplicationAlbumEntry& out_entry,
         return result;
     }
 
+    // TODO: ???
+    R_UNLESS(!image_data.empty(), ResultUnknown);
+
     const auto date = ConvertToAlbumDateTime(posix_time);
 
     return SaveImage(out_entry, image_data, title_id, date);
