@@ -35,8 +35,6 @@ bool CanStoreToFrame(const vk::PhysicalDevice& physical_device, VkFormat format)
     const VkFormatProperties props{physical_device.GetFormatProperties(format)};
     return (props.optimalTilingFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) != 0;
 #else
-    void(physical_device);
-    void(format);
     return false;
 #endif
 }
