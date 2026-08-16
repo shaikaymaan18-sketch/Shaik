@@ -28,7 +28,7 @@ Ignoring SIGSEGV when debugging in host:
 
 ## Debugging (guest code)
 
-### gdb
+### gdb (non-NCE)
 
 You must have GDB installed for aarch64 to debug the target. Install it through your package manager, e.g.:
 
@@ -68,6 +68,19 @@ Type `c` (for continue) and then if it crashes just do a `bt` (backtrace) and `l
 Expressions can be `variable_names` or `1234` (numbers) or `*var` (dereference of a pointer) or `*(1 + var)` (computed expression).
 
 For more information type `info gdb` and read [the man page](https://man7.org/linux/man-pages/man1/gdb.1.html).
+
+### Debugging NCE
+
+Eden does not support debugging NCE using GDB and will only run using LLDB. You should **not** use the GDB stub for NCE stub and instead attach LLDB to the Eden host process.
+
+Note that due to how NCE modifies thread control registers, attempting to run C++ expressions (including in host code!) has a high probability of crashing LLDB completely and should not be used.
+
+Before starting the program, LLDB should be specified ignore `SIGURG` and `SIGUSR2` as these are signals heavily used by Eden. They can be disabled with the following:
+
+- `process handle SIGUSR2 --stop false --pass true`.
+- `process handle SIGURG --stop false --pass true`.
+
+LLDB mimics GDB for many of its commands and many of the expressions in the cheatsheet above should also work on LLDB, however for more information, read [the man page](https://lldb.llvm.org/man/lldb.html).
 
 # RenderDoc (Graphic Debugging Tool)
 

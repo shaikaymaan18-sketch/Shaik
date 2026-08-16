@@ -247,6 +247,10 @@ When CMake invokes certain file syscalls - it may sometimes cause crashes or cor
 
 ## Windows
 
+### Windows 10 1709 and below
+
+All Windows versions before 1803, including the following ones, do not support Eden's fastmem JIT mode without kernel extensions and will have significant performance losses. 
+
 ### Windows 7, Windows 8 and Windows 8.1
 
 DirectX 12 is not available - simply copy and paste a random DLL and name it `d3d12.dll`.
