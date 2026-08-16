@@ -47,6 +47,7 @@ struct NativeExecutionParameters {
 
 #if defined(__APPLE__) || defined(_WIN32)
     // Are we in actual guest code?
+    // TODO: make this and is_running the same
     bool is_actually_running{};
 #endif
 

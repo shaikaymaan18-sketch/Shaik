@@ -12,7 +12,7 @@
 #define YUZU_NAKED                                          \
         _Pragma("GCC diagnostic push")                      \
         _Pragma("GCC diagnostic ignored \"-Wreturn-type\"") \
-        __attribute__((naked))
+        __attribute__((naked)) __attribute__((noipa))
 #elif defined(_MSC_VER)
 #define YUZU_NAKED __declspec(naked)
 #else
@@ -137,12 +137,12 @@ void ArmNce::ReturnToRunCodeByExceptionLevelChangeSignalHandler(int sig, void *i
 
 #if !defined(__APPLE__) && !defined(_WIN32)
     // Save old value of TPIDR_EL0, load guest one
-    u64 tpidr;
+    void* tpidr;
     asm volatile("mrs %0, TPIDR_EL0\n"
                  "msr TPIDR_EL0, %1\n"
                  : "=r"(tpidr)
                  : "r"(nep));
-    nep->tpidr_el0 = tpidr;
+    nep->native_context->host_ctx.host_tpidr_el0 = tpidr;
 #else
     nep->is_actually_running = true;
 #endif
@@ -167,7 +167,7 @@ HaltReason ArmNce::ReturnToRunCodeByTrampoline(NativeExecutionParameters* nep, u
         "ldr x2, [ x0, #%[ctx_off] ]\n"
         "add x5, x2, #%[host_ctx] \n"
 
-#if !defined(__APPLE__) && !defined(_WIN32)
+#ifdef __linux__
         // Load guest tpidr_el0
         "mrs x4, TPIDR_EL0\n"
         "msr TPIDR_EL0, x0\n"
@@ -212,6 +212,7 @@ HaltReason ArmNce::ReturnToRunCodeByTrampoline(NativeExecutionParameters* nep, u
 YUZU_NAKED_END
 
 static_assert(offsetof(HostContext, host_sp) == 0xE0); // TODO: don't use magic number
+static_assert(offsetof(HostContext, host_tpidr_el0) - 0xE0 == 8);
 
 #ifndef _WIN32
 
@@ -544,8 +545,8 @@ ArmNce::~ArmNce() = default;
 
 #ifdef _WIN32
 LONG WINAPI ArmNce::VectoredExceptionHandler(PEXCEPTION_POINTERS info) {
-    // TODO: Windows doesn't allocate a separate stack so either on the guest
-    // or current host stack, is that okay?
+    // TODO: Windows doesn't allocate a separate stack so we're either
+    // on the guest or current host stack, is that okay?
     DWORD code = info->ExceptionRecord->ExceptionCode;
 
     if (code == EXCEPTION_ACCESS_VIOLATION || code == EXCEPTION_DATATYPE_MISALIGNMENT) {
@@ -717,7 +718,6 @@ void ArmNce::SignalInterrupt(Kernel::KThread* thread) {
 void ArmNce::ClearInstructionCache() {
     // Ensure all previous memory operations complete
     asm volatile("dsb ish\n"
-                 "dsb ish\n"
                  "isb" ::: "memory");
 }
 

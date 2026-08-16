@@ -4,7 +4,7 @@ Current macOS support is still experimental and very reliant on MoltenVK develop
 
 Users of macOS may wish to use [Asahi Linux](https://wiki.gentoo.org/wiki/Project:Asahi/Guide) for the rising KosmicKrisp support.
 
-As of writing, macOS supports a partial-fastmem implementation whilst Asahi Linux supports a weaker NCE implementation based off it.
+As of writing, both macOS and Asahi Linux support fastmem support and Asahi Linux supports running with NCE
 
 ## Allowing Eden to Run on MacOS
 
