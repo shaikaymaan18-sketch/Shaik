@@ -441,14 +441,15 @@ private:
 // For managarm: see https://github.com/managarm/managarm/issues/1370
 #else // ^^^ Windows ^^^ vvv POSIX vvv
 
-#ifdef ARCHITECTURE_arm64
+#if defined(ARCHITECTURE_arm64) && (defined(MAP_FIXED_NOREPLACE) || defined(MAP_EXCL) || defined(__APPLE__))
 
 #ifndef __APPLE__
 
 #ifndef MAP_FIXED_NOREPLACE
-#define MAP_FIXED_NOREPLACE 0
+#define MAP_FIXED_NOREPLACE MAP_FIXED | MAP_EXCL
 #endif
-static void* ChooseVirtualBase(size_t virtual_size) {
+
+static void* ChooseVirtualBase(ssize_t virtual_size) {
     constexpr uintptr_t Map39BitSize = (1ULL << 39);
     constexpr uintptr_t Map36BitSize = (1ULL << 36);
 
@@ -461,6 +462,7 @@ static void* ChooseVirtualBase(size_t virtual_size) {
     const size_t upper = (Map39BitSize - virtual_size) / HugePageSize;
     const size_t range = upper - lower;
 
+    // TODO: this is really fucking stupid please rewrite this
     // Try up to 64 times to allocate memory at random addresses in the range.
     for (int i = 0; i < 64; i++) {
         // Calculate a possible location.
@@ -471,17 +473,13 @@ static void* ChooseVirtualBase(size_t virtual_size) {
             mmap(reinterpret_cast<void*>(hint_address), virtual_size, PROT_READ | PROT_WRITE,
                  MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED_NOREPLACE, -1, 0);
 
-        // If we successfully mapped, we're done.
-        if (reinterpret_cast<uintptr_t>(map_pointer) == hint_address) {
-            return map_pointer;
+        if (map_pointer == MAP_FAILED) {
+            continue;
         }
 
-#if MAP_FIXED_NOREPLACE == 0
-        // Unmap if necessary, and try again.
-        if (map_pointer != MAP_FAILED) {
-            munmap(map_pointer, virtual_size);
-        }
-#endif
+        // If we successfully mapped, we're done.
+        ASSERT(map_pointer == hint_address);
+        return map_pointer;
     }
 
     return MAP_FAILED;
