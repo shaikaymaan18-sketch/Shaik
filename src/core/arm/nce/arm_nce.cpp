@@ -121,7 +121,11 @@ HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(thread_id tid, NativeEx
         ::
 #endif
         [sig] "i"(SIGUSR2)
-        : "memory"
+        : "x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10", "x11",
+        "x12", "x13", "x14", "x15", "x16", "x17", "x18", "x29", "x30", "v0", "v1",
+        "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13",
+        "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23", "v24",
+        "v25", "v26", "v27", "v28", "v29", "v30", "v31", "cc", "memory"
         );
 }
 YUZU_NAKED_END
@@ -207,6 +211,10 @@ HaltReason ArmNce::ReturnToRunCodeByTrampoline(NativeExecutionParameters* nep, u
 #if defined(__APPLE__) || defined(_WIN32)
         ,[is_running_off] "i"(offsetof(NativeExecutionParameters, is_actually_running))
 #endif
+        : "x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10", "x11",
+        "x12", "x13", "x14", "x15", "x16", "x17", "x18", "x29", "x30", "v0", "v1",
+        "v2", "v3", "v4", "v5", "v6", "v7", "v16", "v17", "v18", "v19", "v20", "v21",
+        "v22", "v23", "v24",  "v25", "v26", "v27", "v28", "v29", "v30", "v31", "cc", "memory"
         );
 }
 YUZU_NAKED_END
@@ -234,7 +242,6 @@ void ArmNce::BreakFromRunCodeSignalHandler(int sig, void *info, void *raw_contex
 }
 
 #endif
-
 void ArmNce::GuestMemoryFaultSignalHandler(int sig, void* raw_info, void* raw_context) {
     NativeExecutionParameters* nep = GetGuestParameters();
 
@@ -717,7 +724,6 @@ void ArmNce::SignalInterrupt(Kernel::KThread* thread) {
 void ArmNce::ClearInstructionCache() {
     // Ensure all previous memory operations complete
     asm volatile("dsb ish\n"
-                 "dsb ish\n"
                  "isb" ::: "memory");
 }
 

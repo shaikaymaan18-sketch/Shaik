@@ -80,7 +80,7 @@ Before starting the program, LLDB should be specified ignore `SIGURG` and `SIGUS
 - `process handle SIGUSR2 --stop false --pass true`.
 - `process handle SIGURG --stop false --pass true`.
 
-LLDB mimics GDB for many of its commands and many of the expressions in the cheatsheet above should also work on LLDB, however for more information, read [the man page](https://lldb.llvm.org/man/lldb.html).
+LLDB mimics GDB for many of its commands and many of the expressions in the cheatsheet above should also work on LLDB, however for more information, read [the man page](https://lldb.llvm.org/man/lldb.html).yu
 
 # RenderDoc (Graphic Debugging Tool)
 
