@@ -482,7 +482,7 @@ static void* ChooseVirtualBase(ssize_t virtual_size) {
         }
 
         // If we successfully mapped, we're done.
-        ASSERT(map_pointer == hint_address);
+        ASSERT(reinterpret_cast<uintptr_t>(map_pointer) == hint_address);
         return map_pointer;
     }
 

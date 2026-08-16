@@ -102,14 +102,16 @@ HaltReason ArmNce::ReturnToRunCodeByExceptionLevelChange(thread_id tid, NativeEx
     // tid is already in x0 so we don't have to explicitly pass it
 
     asm volatile(
-        "mov x1, #%[sig]\n"  // set x1 to SIGUSR2
 #if defined(__linux__)
         "mov x9, x1\n" // move tpidr to x9 so it doesn't get clobbered
+
+        "mov x1, #%[sig]\n"  // SIGUSR2
         "mov x8, %[syscall]\n"
         "svc #0\n"
         "brk 0x0\n"
         :: [syscall] "i"(__NR_tkill),
 #elif defined(__APPLE__)
+        "mov x1, #%[sig]\n"  // SIGUSR2
         "mov x16, #328\n"
         "svc #0x80\n"
         "brk 0x0\n"
