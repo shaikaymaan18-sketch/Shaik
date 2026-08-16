@@ -773,13 +773,8 @@ Builder::Builder(QWidget* parent_, bool runtime_lock_)
 Builder::~Builder() = default;
 
 static bool IsAndroidOnly(const Settings::BasicSetting& setting) {
-    const auto id = setting.Id();
-    return id == Settings::values.frame_gen.Id() ||
-           id == Settings::values.frame_gen_multiplier.Id() ||
-           id == Settings::values.frame_gen_flow_scale.Id() ||
-           id == Settings::values.frame_gen_fp16.Id() ||
-           id == Settings::values.frame_gen_dump_flow.Id() ||
-           id == Settings::values.emulate_bgr565.Id();
+    const std::string& label = setting.GetLabel();
+    return label.starts_with("frame_gen") || label == "emulate_bgr565";
 }
 
 Widget* Builder::BuildWidget(Settings::BasicSetting* setting,

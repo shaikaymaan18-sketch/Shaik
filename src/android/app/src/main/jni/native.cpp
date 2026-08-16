@@ -1000,7 +1000,7 @@ jstring Java_org_yuzu_yuzu_1emu_NativeLibrary_getCpuSummary(JNIEnv* env, jobject
         FILE* f = std::fopen(CPUINFO_PATH, "r");
         if (!f) return Common::Android::ToJString(env, result);
 
-        char buf[512];
+        char buf[4096];
 
         if (f) {
             std::set<std::string> feature_set;
@@ -1031,7 +1031,13 @@ jstring Java_org_yuzu_yuzu_1emu_NativeLibrary_getCpuSummary(JNIEnv* env, jobject
             bool has_dotprod = feature_set.count("asimddp") || feature_set.count("dotprod");
             bool has_i8mm = feature_set.count("i8mm");
             bool has_bf16 = feature_set.count("bf16");
+            bool has_fp16 = feature_set.count("fphp") || feature_set.count("asimdhp");
             bool has_atomics = feature_set.count("atomics") || feature_set.count("lse");
+            bool has_lse2 = feature_set.count("uscat");
+            bool has_rcpc = feature_set.count("lrcpc");
+            bool has_rcpc2 = feature_set.count("ilrcpc");
+            bool has_flagm = feature_set.count("flagm");
+            bool has_flagm2 = feature_set.count("flagm2");
 
             std::string features;
             if (has_neon || has_fp) {
@@ -1039,6 +1045,7 @@ jstring Java_org_yuzu_yuzu_1emu_NativeLibrary_getCpuSummary(JNIEnv* env, jobject
                 if (has_dotprod) features += "+DP";
                 if (has_i8mm) features += "+I8MM";
                 if (has_bf16) features += "+BF16";
+                if (has_fp16) features += "+FP16";
             }
 
             if (has_sve) {
@@ -1055,6 +1062,19 @@ jstring Java_org_yuzu_yuzu_1emu_NativeLibrary_getCpuSummary(JNIEnv* env, jobject
             if (has_atomics) {
                 if (!features.empty()) features += " | ";
                 features += "LSE";
+                if (has_lse2) features += "2";
+            }
+
+            if (has_rcpc) {
+                if (!features.empty()) features += " | ";
+                features += "RCpc";
+                if (has_rcpc2) features += "2";
+            }
+
+            if (has_flagm) {
+                if (!features.empty()) features += " | ";
+                features += "FlagM";
+                if (has_flagm2) features += "2";
             }
 
             if (!features.empty()) {
