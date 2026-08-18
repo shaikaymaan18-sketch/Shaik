@@ -77,8 +77,14 @@ Eden is licensed under the GPLv3 (or any later version). Refer to the [LICENSE.t
 
 ## Special thanks
 
+Super special thanks to Cloudflare for preventing the git server from blowing up.
+
 - Yuzu
+- Ryujinx
 - Sudachi
 - Citron
+- Torzu
+- Suyu
+- Ryubing
 
 And everyone who continues or had contributed to the project! <3
