@@ -15,8 +15,9 @@
   <br>
 </h1>
 
-<h4 align="center"><b>Eden</b> is a free and opensource (FOSS) Switch 1 emulator, derived from Yuzu, Citron, and Sudachi - started by developer Camille LaVey.
-It's written in C++ with portability in mind, with builds for Windows, Linux, macOS, Android, FreeBSD and more.
+<h4 align="center"><b>Eden</b> is a free and opensource (FOSS) Switch 1 emulator started by developer Camille LaVey.
+<br>
+Written in C++, with builds for Windows, Linux, macOS, Android, FreeBSD and more.
 </h4>
 
 <p align="center">
@@ -73,3 +74,11 @@ Save us some bandwidth! We have [mirrors available](./docs/user/ThirdParty.md#mi
 ## License
 
 Eden is licensed under the GPLv3 (or any later version). Refer to the [LICENSE.txt](https://git.eden-emu.dev/eden-emu/eden/src/branch/master/LICENSE.txt) file.
+
+## Special thanks
+
+- Yuzu
+- Sudachi
+- Citron
+
+And everyone who continues or had contributed to the project! <3
