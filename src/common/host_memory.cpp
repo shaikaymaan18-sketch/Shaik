@@ -714,7 +714,6 @@ HostMemory::HostMemory(size_t backing_size_, size_t virtual_size_)
     virtual_base = nullptr;
 #else
     // Try to allocate a fastmem arena.
-    // The implementation will fail with std::bad_alloc on errors.
     impl = std::make_unique<HostMemory::Impl>(AlignUp(backing_size, PageAlignment), AlignUp(virtual_size, PageAlignment) + HugePageSize);
     if (impl->Init()) {
         backing_base = impl->backing_base;
