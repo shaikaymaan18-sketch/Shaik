@@ -78,7 +78,7 @@ Xbyak::RegExp EmitVAddrLookup(BlockOfCode& code, EmitContext& ctx, size_t bitsiz
 template<>
 [[maybe_unused]] Xbyak::RegExp EmitVAddrLookup<A32EmitContext>(BlockOfCode& code, A32EmitContext& ctx, size_t bitsize, Xbyak::Label& abort, Xbyak::Reg64 vaddr) {
     const Xbyak::Reg64 page = ctx.reg_alloc.ScratchGpr(code);
-    const Xbyak::Reg64 tmp = ctx.conf.absolute_offset_page_table || ctx.conf.page_table_pointer_mask != 0 ? page : ctx.reg_alloc.ScratchGpr(code);
+    const Xbyak::Reg64 tmp = ctx.conf.absolute_offset_page_table && ctx.conf.page_table_pointer_mask == 0 ? page : ctx.reg_alloc.ScratchGpr(code);
 
     EmitDetectMisalignedVAddr(code, ctx, bitsize, abort, vaddr, tmp);
 
@@ -102,6 +102,9 @@ template<>
     // mask away attributes
     if (ctx.conf.page_table_pointer_mask == 0) {
         code.test(page, page);
+        code.jz(abort, code.T_NEAR);
+    } else if (auto top = static_cast<s64>(ctx.conf.page_table_pointer_mask); top < INT32_MIN || top > INT32_MAX) {
+        code.and_(page, ctx.conf.page_table_pointer_mask);
     } else {
         code.mov(tmp, ctx.conf.page_table_pointer_mask);
         code.and_(page, tmp);
@@ -111,7 +114,6 @@ template<>
         code.sar(page, *ctx.conf.page_table_sign_extension);
     }
 
-    code.jz(abort, code.T_NEAR);
     if (ctx.conf.absolute_offset_page_table) {
         return page + vaddr;
     }
@@ -126,7 +128,7 @@ template<>
     const size_t unused_top_bits = 64 - ctx.conf.page_table_address_space_bits;
 
     const Xbyak::Reg64 page = ctx.reg_alloc.ScratchGpr(code);
-    const Xbyak::Reg64 tmp = ctx.conf.absolute_offset_page_table || ctx.conf.page_table_pointer_mask != 0 ? page : ctx.reg_alloc.ScratchGpr(code);
+    const Xbyak::Reg64 tmp = ctx.conf.absolute_offset_page_table && ctx.conf.page_table_pointer_mask == 0 ? page : ctx.reg_alloc.ScratchGpr(code);
 
     EmitDetectMisalignedVAddr(code, ctx, bitsize, abort, vaddr, tmp);
 
@@ -177,6 +179,9 @@ template<>
     // mask away attributes
     if (ctx.conf.page_table_pointer_mask == 0) {
         code.test(page, page);
+        code.jz(abort, code.T_NEAR);
+    } else if (auto top = static_cast<s64>(ctx.conf.page_table_pointer_mask); top < INT32_MIN || top > INT32_MAX) {
+        code.and_(page, ctx.conf.page_table_pointer_mask);
     } else {
         code.mov(tmp, ctx.conf.page_table_pointer_mask);
         code.and_(page, tmp);
@@ -186,7 +191,6 @@ template<>
         code.sar(page, *ctx.conf.page_table_sign_extension);
     }
 
-    code.jz(abort, code.T_NEAR);
     if (ctx.conf.absolute_offset_page_table) {
         return page + vaddr;
     }
