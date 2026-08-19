@@ -114,7 +114,6 @@ template <typename T>
 static void GetFuncAddress(Common::DynamicLibrary& dll, const char* name, T& pfn) {
     if (!dll.GetSymbol(name, &pfn)) {
         LOG_CRITICAL(HW_Memory, "Failed to load {}", name);
-        throw std::bad_alloc{};
     }
 }
 
@@ -789,7 +788,6 @@ HostMemory::HostMemory(size_t backing_size_, size_t virtual_size_)
     virtual_base = nullptr;
 #else
     // Try to allocate a fastmem arena.
-    // The implementation will fail with std::bad_alloc on errors.
     impl = std::make_unique<HostMemory::Impl>(AlignUp(backing_size, HostPageSize), AlignUp(virtual_size, HostPageSize) + HugePageSize);
     if (impl->Init()) {
         backing_base = impl->backing_base;
