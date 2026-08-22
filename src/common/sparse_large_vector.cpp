@@ -43,6 +43,10 @@ static LONG WINAPI FakePageFaultHandler(PEXCEPTION_POINTERS info) {
         if (auto addr_ = (exception_addr + 0x40) >> HostPageBits; addr_ != addr_shifted && region.first <= addr_ && addr_ <= region.second) {
             addr2 = addr_;
         }
+
+        if (addr != 0 || addr2 != 0) {
+            break;
+        }
     }
 
     if (addr == 0 && addr2 == 0) {
@@ -50,7 +54,7 @@ static LONG WINAPI FakePageFaultHandler(PEXCEPTION_POINTERS info) {
         return EXCEPTION_CONTINUE_SEARCH;
     }
 
-    LOG_ERROR(HW_Memory, "Accessing an unallocated region of a LargeVector at {:#x}; this shouldn't happen and is likely a Dynarmic error!", exception_addr);
+    LOG_ERROR(HW_Memory, "Accessing an unallocated region of a SparseLargeVector at {:#x}; this shouldn't happen and is likely a Dynarmic error!", exception_addr);
 
     // Commit this region
     if (addr != 0) {
@@ -89,10 +93,6 @@ bool CommitVectorPage(uintptr_t addr, bool write) noexcept {
 }
 #endif
 
-#ifndef MAP_NOCORE
-#define MAP_NOCORE 0
-#endif
-
 void* AllocateMemoryPages(std::size_t size) noexcept {
     if (auto page = HostPageSize; size % page != 0) {
         LOG_WARNING(HW_Memory, "Allocating unaligned large vector with size {:#x}; aligning to {} page size", size, page);
@@ -115,7 +115,7 @@ void* AllocateMemoryPages(std::size_t size) noexcept {
     }
     ASSERT_MSG(base, "Failed to reserve {:#x} sized region with error {}", size, GetLastError());
 #else
-    void* base = mmap(nullptr, size, PROT_READ, MAP_ANON | MAP_PRIVATE | MAP_NOCORE, -1, 0);
+    void* base = mmap(nullptr, size, PROT_READ, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (base == MAP_FAILED)
         base = nullptr;
     ASSERT_MSG(base, "Failed to allocate {:#x} sized region with error {}", size, strerror(errno));
