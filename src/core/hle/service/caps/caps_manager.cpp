@@ -248,6 +248,8 @@ Result AlbumManager::SaveScreenShot(ApplicationAlbumEntry& out_entry,
                                     AlbumReportOption report_option,
                                     const ApplicationData& app_data, std::span<const u8> image_data,
                                     u64 aruid) {
+    R_UNLESS(!image_data.empty(), ResultUnknown); //TODO: ???
+
     const u64 title_id = system.ResolveCallerProgramId(aruid);
 
     auto static_service =
@@ -264,14 +266,12 @@ Result AlbumManager::SaveScreenShot(ApplicationAlbumEntry& out_entry,
     }
 
     const auto date = ConvertToAlbumDateTime(posix_time);
-
     return SaveImage(out_entry, image_data, title_id, date);
 }
 
-Result AlbumManager::SaveEditedScreenShot(ApplicationAlbumEntry& out_entry,
-                                          const ScreenShotAttribute& attribute,
-                                          const AlbumFileId& file_id,
-                                          std::span<const u8> image_data) {
+Result AlbumManager::SaveEditedScreenShot(ApplicationAlbumEntry& out_entry, const ScreenShotAttribute& attribute, const AlbumFileId& file_id, std::span<const u8> image_data) {
+    R_UNLESS(!image_data.empty(), ResultUnknown); //TODO: ???
+
     auto static_service =
         system.ServiceManager().GetService<Service::Glue::Time::StaticService>("time:u", true);
 
@@ -286,7 +286,6 @@ Result AlbumManager::SaveEditedScreenShot(ApplicationAlbumEntry& out_entry,
     }
 
     const auto date = ConvertToAlbumDateTime(posix_time);
-
     return SaveImage(out_entry, image_data, file_id.application_id, date);
 }
 
