@@ -1033,6 +1033,13 @@ abstract class SettingsItem(
                 )
             )
             put(
+                StringInputSetting(
+                    StringSetting.LOG_FILTER,
+                    titleId = R.string.log_filter,
+                    descriptionId = R.string.log_filter_description
+                )
+            )
+            put(
                 SpinBoxSetting(
                     ShortSetting.DEBUG_KNOBS,
                     titleId = R.string.debug_knobs,

@@ -1322,6 +1322,7 @@ class SettingsFragmentPresenter(
                 add(HeaderSetting(R.string.log))
 
                 add(BooleanSetting.DEBUG_FLUSH_BY_LINE.key)
+                add(StringSetting.LOG_FILTER.key)
             }
 
             add(HeaderSetting(R.string.general))
