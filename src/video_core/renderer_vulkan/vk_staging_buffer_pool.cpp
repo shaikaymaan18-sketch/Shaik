@@ -33,7 +33,7 @@ constexpr VkDeviceSize MAX_ALIGNMENT = 256;
 // Windows ones however, can intake bigger buffers and generally do not OOM.
 // - GTX 960 on Windows will not OOM with 256mib
 // - GT 1030 on ^NIX will OOM with 256mib
-#if !defined(__FreeBSD__)
+#if defined(__FreeBSD__)
 constexpr VkDeviceSize MAX_STREAM_BUFFER_SIZE = 128_MiB;
 #else
 constexpr VkDeviceSize MAX_STREAM_BUFFER_SIZE = 256_MiB;
