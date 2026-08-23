@@ -159,13 +159,8 @@ template<>
 
     // check for marked bit, use as unmapped if marked
     if (ctx.conf.page_table_marked_bit) {
-        if (*ctx.conf.page_table_marked_bit >= 30) {
-            code.bt(page, *ctx.conf.page_table_marked_bit);
-            code.jc(abort, code.T_NEAR);
-        } else {
-            code.test(page, 1ULL << *ctx.conf.page_table_marked_bit);
-            code.jc(abort, code.T_NEAR);
-        }
+        code.bt(page, *ctx.conf.page_table_marked_bit);
+        code.jc(abort, code.T_NEAR);
     }
     // mask away attributes
     if (ctx.conf.page_table_pointer_mask == 0) {
