@@ -20,7 +20,7 @@ namespace Kernel::Svc {
 /// Used to output a message on a debug hardware unit - does nothing on a retail unit
 Result OutputDebugString(Core::System& system, u64 address, u64 len) {
     R_SUCCEED_IF(len == 0);
-    std::string msg_buffer(len);
+    std::string msg_buffer(len, 0);
     GetCurrentMemory(system.Kernel()).ReadBlock(address, msg_buffer.data(), len);
     LOG_INFO(Debug_Emulated, "{}", msg_buffer);
     R_SUCCEED();
