@@ -89,20 +89,12 @@ template<>
 
     // check for marked bit, use as unmapped if marked
 	if (ctx.conf.page_table_marked_bit) {
-	    // zero tmp
-	    code.xor_(tmp, tmp);
-	    if (*ctx.conf.page_table_marked_bit >= 30) {
-	        code.bt(page, *ctx.conf.page_table_marked_bit);
-            code.cmovc(page, tmp);
-	    } else {
-	        code.test(page, 1ULL << *ctx.conf.page_table_marked_bit);
-	        code.cmovnz(page, tmp);
-	    }
+        code.bt(page, *ctx.conf.page_table_marked_bit);
+        code.jc(abort, code.T_NEAR);
 	}
     // mask away attributes
     if (ctx.conf.page_table_pointer_mask == 0) {
         code.test(page, page);
-        code.jz(abort, code.T_NEAR);
     } else if (auto top = static_cast<s64>(ctx.conf.page_table_pointer_mask); top < INT32_MIN || top > INT32_MAX) {
         code.and_(page, ctx.conf.page_table_pointer_mask);
     } else {
@@ -114,6 +106,7 @@ template<>
         code.sar(page, *ctx.conf.page_table_sign_extension);
     }
 
+    code.jz(abort, code.T_NEAR);
     if (ctx.conf.absolute_offset_page_table) {
         return page + vaddr;
     }
@@ -166,20 +159,17 @@ template<>
 
     // check for marked bit, use as unmapped if marked
     if (ctx.conf.page_table_marked_bit) {
-        // zero tmp
-        code.xor_(tmp, tmp);
         if (*ctx.conf.page_table_marked_bit >= 30) {
             code.bt(page, *ctx.conf.page_table_marked_bit);
-            code.cmovc(page, tmp);
+            code.jc(abort, code.T_NEAR);
         } else {
             code.test(page, 1ULL << *ctx.conf.page_table_marked_bit);
-            code.cmovnz(page, tmp);
+            code.jc(abort, code.T_NEAR);
         }
     }
     // mask away attributes
     if (ctx.conf.page_table_pointer_mask == 0) {
         code.test(page, page);
-        code.jz(abort, code.T_NEAR);
     } else if (auto top = static_cast<s64>(ctx.conf.page_table_pointer_mask); top < INT32_MIN || top > INT32_MAX) {
         code.and_(page, ctx.conf.page_table_pointer_mask);
     } else {
@@ -191,6 +181,7 @@ template<>
         code.sar(page, *ctx.conf.page_table_sign_extension);
     }
 
+    code.jz(abort, code.T_NEAR);
     if (ctx.conf.absolute_offset_page_table) {
         return page + vaddr;
     }
