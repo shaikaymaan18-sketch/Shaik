@@ -115,7 +115,7 @@ void* AllocateMemoryPages(std::size_t size) noexcept {
     }
     ASSERT_MSG(base, "Failed to reserve {:#x} sized region with error {}", size, GetLastError());
 #else
-    void* base = mmap(nullptr, size, PROT_READ, MAP_ANON | MAP_PRIVATE, -1, 0);
+    void* base = mmap(nullptr, size, PROT_READ, MAP_ANON | MAP_PRIVATE | MAP_NOCORE, -1, 0);
     if (base == MAP_FAILED)
         base = nullptr;
     ASSERT_MSG(base, "Failed to allocate {:#x} sized region with error {}", size, strerror(errno));
