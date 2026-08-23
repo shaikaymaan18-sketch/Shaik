@@ -33,6 +33,9 @@ Result OutputDebugString(Core::System& system, u64 address, u64 len) {
     // Only start the thread the very first time this function is called
     if (!flusher_data.thread) {
         flusher_data.thread.emplace([](std::stop_token stop_token) {
+            std::stop_callback stop_cb(stop_token,[]{
+                flusher_data.msg_cv.notify_all();
+            });
             while (!stop_token.stop_requested()) {
                 std::unique_lock lock(flusher_data.msg_mutex);
                 flusher_data.msg_cv.wait(lock, [&stop_token] {
