@@ -93,6 +93,10 @@ bool CommitVectorPage(uintptr_t addr, bool write) noexcept {
 }
 #endif
 
+#ifndef MAP_NOCORE
+#define MAP_NOCORE 0
+#endif
+
 void* AllocateMemoryPages(std::size_t size) noexcept {
     if (auto page = HostPageSize; size % page != 0) {
         LOG_WARNING(HW_Memory, "Allocating unaligned large vector with size {:#x}; aligning to {} page size", size, page);
