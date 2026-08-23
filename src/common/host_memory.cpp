@@ -784,7 +784,7 @@ HostMemory::HostMemory(size_t backing_size_, size_t virtual_size_)
 {
 #if defined(__OPENORBIS__) || defined(__managarm__)
     LOG_WARNING(HW_Memory, "Platform doesn't support fastmem");
-    backing_base = static_cast<u8*>(malloc(backing_size));
+    backing_base = static_cast<u8*>(mmap(nullptr, backing_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
     virtual_base = nullptr;
 #else
     // Try to allocate a fastmem arena.
@@ -809,9 +809,7 @@ HostMemory::HostMemory(size_t backing_size_, size_t virtual_size_)
 }
 
 HostMemory::~HostMemory() {
-#if defined(__OPENORBIS__) || defined(__managarm__)
-    free(backing_base);
-#elif _WIN32
+#ifdef _WIN32
     if (fallback_buffer) {
         VirtualFree(backing_base, backing_size, MEM_RELEASE);
     }
