@@ -275,9 +275,7 @@ std::pair<oaknut::XReg, oaknut::XReg> InlinePageTableEmitVAddrLookup(oaknut::Cod
 
     if (ctx.conf.page_table_marked_bit) {
         // check for marked bit
-        code.TST(Xscratch0, 1ULL << *ctx.conf.page_table_marked_bit);
-        // if marked, view this page as unmapped
-        code.CSEL(Xscratch0, Xscratch0, XZR, EQ);
+        code.TBNZ(Xscratch0, *ctx.conf.page_table_marked_bit, *fallback);
     }
 
     if (ctx.conf.page_table_pointer_mask != 0) {
