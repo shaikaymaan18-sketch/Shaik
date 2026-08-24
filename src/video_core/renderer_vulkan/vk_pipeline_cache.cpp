@@ -354,7 +354,7 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
               "VkPipelineBuilder", {}, Common::ThreadPlacement::Background),
       serialization_thread(1, "VkPipelineSerialization", {},
                            Common::ThreadPlacement::Background) {
-    //const auto& float_control{device.FloatControlProperties()};
+    const auto& float_control{device.FloatControlProperties()};
     const VkDriverId driver_id{device.GetDriverID()};
     const VkShaderStageFlags subgroup_stages{device.GetSubgroupSupportedStages()};
     const auto subgroup_stage_bit{[subgroup_stages](VkShaderStageFlags flag, Shader::Stage stage) {
@@ -372,49 +372,54 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         subgroup_stage_bit(VK_SHADER_STAGE_COMPUTE_BIT, Shader::Stage::Compute)};
     profile = Shader::Profile{
         .supported_spirv = device.SupportedSpirvVersion(),
-        .unified_descriptor_binding = false,
-        .support_descriptor_aliasing = false,
-        .support_int8 = false,
+        .unified_descriptor_binding = true,
+        .support_descriptor_aliasing = device.IsDescriptorAliasingSupported(),
+        .support_int8 = device.IsInt8Supported(),
         .support_uniform_and_storage_buffer_8bit =
             device.IsUniformAndStorageBuffer8BitAccessSupported(),
         .support_storage_buffer_8bit = device.IsStorageBuffer8BitAccessSupported(),
-        .support_int16 = false,
+        .support_int16 = device.IsShaderInt16Supported(),
         .support_uniform_and_storage_buffer_16bit =
             device.IsUniformAndStorageBuffer16BitAccessSupported(),
         .support_storage_buffer_16bit = device.IsStorageBuffer16BitAccessSupported(),
         .support_int64 = device.IsShaderInt64Supported(),
-        .support_vertex_instance_id = true,
-        .support_float_controls = false,
-        .support_separate_denorm_behavior = false,
-        .support_separate_rounding_mode = false,
+        .support_vertex_instance_id = false,
+        .support_float_controls = device.IsKhrShaderFloatControlsSupported(),
+        .support_separate_denorm_behavior =
+            float_control.denormBehaviorIndependence == VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL,
+        .support_separate_rounding_mode =
+            float_control.roundingModeIndependence == VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL,
         .support_fp16_denorm_preserve = false,
-        .support_fp32_denorm_preserve = false,
+        .support_fp32_denorm_preserve = float_control.shaderDenormPreserveFloat32 != VK_FALSE,
         .support_fp16_denorm_flush = false,
-        .support_fp32_denorm_flush = false,
+        .support_fp32_denorm_flush = float_control.shaderDenormFlushToZeroFloat32 != VK_FALSE,
         .support_fp16_signed_zero_nan_preserve =
             false,
-        .support_fp32_signed_zero_nan_preserve = false,
-        .support_fp64_signed_zero_nan_preserve = false,
-        .support_explicit_workgroup_layout = false,
+        .support_fp32_signed_zero_nan_preserve =
+            float_control.shaderSignedZeroInfNanPreserveFloat32 != VK_FALSE,
+        .support_fp64_signed_zero_nan_preserve =
+            float_control.shaderSignedZeroInfNanPreserveFloat64 != VK_FALSE,
+        .support_explicit_workgroup_layout = device.IsKhrWorkgroupMemoryExplicitLayoutSupported(),
         .support_workgroup_layout_8bit_access =
             device.IsWorkgroupMemoryExplicitLayout8BitAccessSupported(),
         .support_workgroup_layout_16bit_access =
             device.IsWorkgroupMemoryExplicitLayout16BitAccessSupported(),
-        .support_vote = true,
+        .support_vote = device.IsSubgroupFeatureSupported(VK_SUBGROUP_FEATURE_VOTE_BIT),
         .supported_subgroup_stages = supported_subgroup_stages,
         .support_viewport_index_layer_non_geometry =
             device.IsExtShaderViewportIndexLayerSupported(),
         .support_viewport_mask = device.IsNvViewportArray2Supported(),
         .support_typeless_image_loads = device.IsFormatlessImageLoadSupported(),
-        .support_demote_to_helper_invocation = false,
-        .support_int64_atomics = false,
+        .support_demote_to_helper_invocation =
+            device.IsExtShaderDemoteToHelperInvocationSupported(),
+        .support_int64_atomics = device.IsExtShaderAtomicInt64Supported(),
         .support_shared_int64_atomics = device.IsSharedInt64AtomicsSupported(),
         .support_derivative_control = true,
         .support_geometry_shader_passthrough = device.IsNvGeometryShaderPassthroughSupported(),
-        .support_native_ndc = true,
+        .support_native_ndc = device.IsExtDepthClipControlSupported(),
         .support_scaled_attributes = !device.MustEmulateScaledFormats(),
         .support_multi_viewport = device.SupportsMultiViewport(),
-        .support_geometry_streams = true,
+        .support_geometry_streams = device.AreTransformFeedbackGeometryStreamsSupported(),
         .support_sampled_image_array_nonuniform_indexing =
             device.IsSampledImageArrayNonUniformIndexingSupported(),
         .support_storage_image_array_nonuniform_indexing =
@@ -426,8 +431,8 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
 
         .warp_size_potentially_larger_than_guest = device.IsWarpSizePotentiallyBiggerThanGuest(),
 
-        .lower_left_origin_mode = true,
-        .need_declared_frag_colors = true,
+        .lower_left_origin_mode = false,
+        .need_declared_frag_colors = false,
         .need_gather_subpixel_offset = driver_id == VK_DRIVER_ID_AMD_PROPRIETARY ||
                                        driver_id == VK_DRIVER_ID_AMD_OPEN_SOURCE ||
                                        driver_id == VK_DRIVER_ID_MESA_RADV ||
@@ -436,10 +441,10 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
 
         .has_broken_spirv_clamp = true,
         .has_broken_spirv_position_input = driver_id == false,
-        .has_broken_unsigned_image_offsets = true,
-        .has_broken_signed_operations = true,
-        .has_broken_fp16_float_controls = false,
-        .ignore_nan_fp_comparisons = true,
+        .has_broken_unsigned_image_offsets = false,
+        .has_broken_signed_operations = false,
+        .has_broken_fp16_float_controls = true,
+        .ignore_nan_fp_comparisons = false,
         .has_broken_spirv_subgroup_mask_vector_extract_dynamic = false,
         .has_broken_robust =
             device.IsNvidia() && device.GetNvidiaArch() <= NvidiaArchitecture::Arch_Pascal,
@@ -465,7 +470,7 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         .needs_demote_reorder = driver_id == VK_DRIVER_ID_AMD_PROPRIETARY ||
                                 driver_id == VK_DRIVER_ID_AMD_OPEN_SOURCE ||
                                 driver_id == VK_DRIVER_ID_SAMSUNG_PROPRIETARY,
-        .support_snorm_render_buffer = false,
+        .support_snorm_render_buffer = true,
         .support_viewport_index_layer = device.IsExtShaderViewportIndexLayerSupported(),
         .support_geometry_shader_passthrough = device.IsNvGeometryShaderPassthroughSupported(),
         .support_conditional_barrier = device.SupportsConditionalBarriers(),
