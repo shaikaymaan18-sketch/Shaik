@@ -97,7 +97,6 @@
 
     <!-- NVDEC Emulation -->
     <string name="nvdec_emulation">Emulace NVDEC</string>
-    <string name="nvdec_emulation_description">Určuje, jakým způsobem se zpracovává dekódování videa (NVDEC).</string>
     <string name="nvdec_emulation_none">Žádné</string>
 
     <!-- Optimize SPIRV output -->

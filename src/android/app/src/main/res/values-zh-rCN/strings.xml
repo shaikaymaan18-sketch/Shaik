@@ -106,7 +106,6 @@
 
     <!-- NVDEC Emulation -->
     <string name="nvdec_emulation">NVDEC模拟</string>
-    <string name="nvdec_emulation_description">播放过场与开场动画期间的视频解码处理方式（NVDEC）。</string>
     <string name="nvdec_emulation_none">禁用</string>
 
     <!-- Optimize SPIRV output -->
@@ -291,6 +290,22 @@
     <string name="gpu_driver_fetcher">GPU驱动获取器</string>
     <string name="gpu_driver_manager">GPU 驱动管理器</string>
     <string name="install_gpu_driver_description">安装替代的驱动程序以获得更好的性能和精度</string>
+    <string name="frame_gen">帧生成</string>
+    <string name="frame_gen_per_game_description">配置针对此游戏的帧生成设定</string>
+    <string name="frame_gen_description">设定要在使用无损缩放渲染的帧之间应用的插帧。启用后强制采用FIFO呈现模式 。</string>
+    <string name="frame_gen_multiplier">多帧生成</string>
+    <string name="frame_gen_multiplier_description">对于每个渲染帧，设定应显示的帧。数值越高，所消耗的 GPU 时间就越会成倍增多。如果设定超过显示器能力的帧数，将会降低模拟速度。</string>
+    <string name="frame_gen_multiplier_2x">2x</string>
+    <string name="frame_gen_multiplier_3x">3x</string>
+    <string name="frame_gen_multiplier_4x">4x</string>
+    <string name="frame_gen_target_rate">目标帧率</string>
+    <string name="frame_gen_target_rate_description">选取一个符合显示器实际能能力的帧率。增幅会自动调整以保持设定的帧率不变，并回调任何会导致游戏运行变慢的设定。</string>
+    <string name="frame_gen_target_rate_off">使用固定增幅</string>
+    <string name="frame_gen_target_rate_60">60 FPS</string>
+    <string name="frame_gen_target_rate_90">90 FPS</string>
+    <string name="frame_gen_target_rate_120">120 FPS</string>
+    <string name="frame_gen_target_rate_144">144 FPS</string>
+    <string name="frame_gen_target_rate_165">165 FPS</string>
     <string name="advanced_settings">高级设置</string>
     <string name="settings_description">更改模拟器设置</string>
     <string name="search_recently_played">最近游玩</string>
@@ -1080,7 +1095,6 @@
     <string name="theme_mode_follow_system">跟随系统</string>
     <string name="theme_mode_light">浅色</string>
     <string name="theme_mode_dark">深色</string>
-
 
     <!-- Black backgrounds theme -->
     <string name="use_black_backgrounds">使用黑色背景</string>

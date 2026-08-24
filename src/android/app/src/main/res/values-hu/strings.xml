@@ -62,7 +62,6 @@
     <string name="cpuopt_unsafe_host_mmu_description">Ez az optimalizáció gyorsítja a vendégprogram memória-hozzáférését. Engedélyezése esetén a vendég memóriaolvasási/írási műveletei közvetlenül a memóriában történnek, és kihasználják a gazda MMU-ját. Letiltás esetén minden memória-hozzáférés a szoftveres MMU emulációt használja.</string>
     <!-- NVDEC Emulation -->
     <string name="nvdec_emulation">NVDEC emuláció</string>
-    <string name="nvdec_emulation_description">Videódekódolás kezelése</string>
     <string name="nvdec_emulation_none">Nincs</string>
 
     <!-- Optimize SPIRV output -->

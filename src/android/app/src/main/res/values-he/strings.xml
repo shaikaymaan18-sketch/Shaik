@@ -67,7 +67,6 @@
     <string name="debug_knobs_description">לשימוש בפיתוח בלבד.</string>
     <!-- NVDEC Emulation -->
     <string name="nvdec_emulation">אמולציית NVDEC</string>
-    <string name="nvdec_emulation_description">בחר כיצד לטפל בפענוח וידאו</string>
     <string name="nvdec_emulation_none">ללא</string>
 
     <!-- Optimize SPIRV output -->

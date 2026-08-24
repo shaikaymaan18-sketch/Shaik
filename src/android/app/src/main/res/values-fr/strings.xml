@@ -104,7 +104,6 @@
 
     <!-- NVDEC Emulation -->
     <string name="nvdec_emulation">Émulation NVDEC</string>
-    <string name="nvdec_emulation_description">Sélectionnez la manière dont le décodage vidéo (NVDEC) est géré pendant les cinématiques et les intros.</string>
     <string name="nvdec_emulation_none">Aucun</string>
 
     <!-- Optimize SPIRV output -->
@@ -1003,7 +1002,6 @@
     <string name="theme_mode_follow_system">Automatique</string>
     <string name="theme_mode_light">Lumineux</string>
     <string name="theme_mode_dark">Sombre</string>
-
 
     <!-- Black backgrounds theme -->
     <string name="use_black_backgrounds">Arrière-plan noir</string>

@@ -97,7 +97,6 @@
 
     <!-- NVDEC Emulation -->
     <string name="nvdec_emulation">Emulacja NVDEC</string>
-    <string name="nvdec_emulation_description">Wybierz metodę dekodowania wideo (NVDEC).</string>
     <string name="nvdec_emulation_none">Brak</string>
 
     <!-- Optimize SPIRV output -->
@@ -934,7 +933,6 @@
     <string name="theme_mode_follow_system">Podążaj za systemowym</string>
     <string name="theme_mode_light">Jasny</string>
     <string name="theme_mode_dark">Ciemny</string>
-
 
     <!-- Black backgrounds theme -->
     <string name="use_black_backgrounds">Czarne tła</string>

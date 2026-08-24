@@ -105,7 +105,6 @@
 
     <!-- NVDEC Emulation -->
     <string name="nvdec_emulation">NVDEC-Emulation</string>
-    <string name="nvdec_emulation_description">Wähle aus, wie die Videodekodierung (NVDEC) während Zwischensequenzen und Intros gehandhabt wird.</string>
     <string name="nvdec_emulation_none">Keine</string>
 
     <!-- Optimize SPIRV output -->
@@ -990,7 +989,6 @@ Wirklich fortfahren?</string>
     <string name="theme_mode_follow_system">System folgen</string>
     <string name="theme_mode_light">Hell</string>
     <string name="theme_mode_dark">Dunkel</string>
-
 
     <!-- Black backgrounds theme -->
     <string name="use_black_backgrounds">Schwarze Hintergründe</string>
