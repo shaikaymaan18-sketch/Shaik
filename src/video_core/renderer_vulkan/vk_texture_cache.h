@@ -544,7 +544,6 @@ private:
 
         bool operator==(const VariantKey&) const noexcept = default;
 
-        /// VK_COMPONENT_SWIZZLE_IDENTITY is zero, so a default key carries no mapping.
         [[nodiscard]] bool HasSwizzle() const noexcept {
             return swizzle != std::array<VkComponentSwizzle, 4>{};
         }
@@ -559,7 +558,7 @@ private:
 
     [[nodiscard]] VariantKey MakeKey(const ImageView& image_view, bool is_depth) const noexcept;
     [[nodiscard]] VkSampler Find(const VariantKey& key) const noexcept;
-    [[nodiscard]] VkSampler Emplace(VariantKey key);
+    VkSampler Emplace(VariantKey key);
 
     CustomBorderColorBudget custom_border_color_budget;
     std::vector<Variant> variants;
