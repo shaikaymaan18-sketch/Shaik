@@ -1981,9 +1981,6 @@ void TextureCacheRuntime::TickFrame() {
         return scheduler.IsFree(pending.first);
     });
     sentenced_unswizzle_buffers.Tick();
-    std::erase_if(pending_msaa_images, [this](const auto& pending) {
-        return scheduler.IsFree(pending.first);
-    });
 }
 
 // Is this even needed? I wasn't sure if the buffer was cleared when done with,
