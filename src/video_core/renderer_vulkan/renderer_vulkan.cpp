@@ -160,12 +160,7 @@ try
                    present_manager,
                    scheduler,
                    PresentFiltersForDisplay)
-    , blit_capture(device_memory,
-                   device,
-                   memory_allocator,
-                   present_manager,
-                   scheduler,
-                   PresentFiltersForDisplay)
+    // Captures will use the same filtering as applets as well
     , blit_applet(device_memory,
                   device,
                   memory_allocator,
@@ -266,12 +261,12 @@ vk::Buffer RendererVulkan::RenderToBuffer(std::span<const Tegra::FramebufferConf
         f.image =
             CreateWrappedImage(memory_allocator, VkExtent2D{layout.width, layout.height}, format);
         f.image_view = CreateWrappedImageView(device, f.image, format);
-        f.framebuffer = blit_capture.CreateFramebuffer(device, layout, *f.image_view, format);
+        f.framebuffer = blit_applet.CreateFramebuffer(device, layout, *f.image_view, format);
         return f;
     }();
 
     auto dst_buffer = CreateWrappedBuffer(memory_allocator, buffer_size, MemoryUsage::Download);
-    blit_capture.DrawToFrame(device, rasterizer, &frame, framebuffers, layout, 1, format);
+    blit_applet.DrawToFrame(device, rasterizer, &frame, framebuffers, layout, 1, format);
 
     scheduler.RequestOutsideRenderPassOperationContext();
     scheduler.Record([&](vk::CommandBuffer cmdbuf) {

@@ -95,7 +95,6 @@ private:
     Swapchain swapchain;
     PresentManager present_manager;
     BlitScreen blit_swapchain;
-    BlitScreen blit_capture;
     BlitScreen blit_applet;
     RasterizerVulkan rasterizer;
 #ifdef HAS_LSFG
