@@ -145,11 +145,9 @@ void ProtectMemory(const void* base, size_t size, bool is_executable) {
 
 HostFeature GetHostFeatures() {
     HostFeature features = {};
-
 #ifdef DYNARMIC_ENABLE_CPU_FEATURE_DETECTION
     using Cpu = Xbyak::util::Cpu;
-    Xbyak::util::Cpu cpu_info;
-
+    Xbyak::util::Cpu cpu_info{};
     if (cpu_info.has(Cpu::tSSSE3))
         features |= HostFeature::SSSE3;
     if (cpu_info.has(Cpu::tSSE41))
@@ -196,7 +194,6 @@ HostFeature GetHostFeatures() {
         features |= HostFeature::GFNI;
     if (cpu_info.has(Cpu::tWAITPKG))
         features |= HostFeature::WAITPKG;
-
     if (cpu_info.has(Cpu::tBMI2)) {
         // BMI2 instructions such as pdep and pext have been very slow up until Zen 3.
         // Check for Zen 3 or newer by its family (0x19).
@@ -214,7 +211,6 @@ HostFeature GetHostFeatures() {
         }
     }
 #endif
-
     return features;
 }
 
@@ -233,21 +229,25 @@ bool IsUnderRosetta() {
 
 }  // anonymous namespace
 
-#ifdef DYNARMIC_ENABLE_NO_EXECUTE_SUPPORT
-static const auto default_cg_mode = Xbyak::DontSetProtectRWE;
-#else
-static const auto default_cg_mode = nullptr; //Allow RWE
-#endif
-
 BlockOfCode::BlockOfCode(RunCodeCallbacks cb, JitStateInfo jsi, size_t total_code_size, std::function<void(BlockOfCode&)> rcp)
-        : Xbyak::CodeGenerator(total_code_size, default_cg_mode, &s_allocator)
-        , cb(std::move(cb))
-        , jsi(jsi)
-        , constant_pool(*this, CONSTANT_POOL_SIZE)
-        , host_features(GetHostFeatures()) {
+    : Xbyak::CodeGenerator(total_code_size
+#ifdef DYNARMIC_ENABLE_NO_EXECUTE_SUPPORT
+        , Xbyak::DontSetProtectRWE
+#else
+        , nullptr //Allow RWE
+#endif
+        , &s_allocator)
+    , constant_pool(*this, CONSTANT_POOL_SIZE)
+    , jsi(jsi)
+    , cb(std::move(cb))
+{
     EnableWriting();
     EnsureMemoryCommitted(PRELUDE_COMMIT_SIZE);
     GenRunCode(rcp);
+}
+
+bool BlockOfCode::HasHostFeature(HostFeature feature) const noexcept {
+    return (GetHostFeatures() & feature) == feature;
 }
 
 void BlockOfCode::PreludeComplete() {
@@ -341,7 +341,7 @@ void BlockOfCode::GenRunCode(std::function<void(BlockOfCode&)> rcp) {
     mov(rbx, ABI_PARAM2); // save temporarily in non-volatile register
 
     if (cb.enable_cycle_counting) {
-        cb.GetTicksRemaining->EmitCall(*this);
+        cb.GetTicksRemaining.EmitCall(*this);
         mov(qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_to_run)], ABI_RETURN);
         mov(qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_remaining)], ABI_RETURN);
     }
@@ -388,7 +388,7 @@ void BlockOfCode::GenRunCode(std::function<void(BlockOfCode&)> rcp) {
         cmp(qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_remaining)], 0);
         jng(return_to_caller);
     }
-    cb.LookupBlock->EmitCall(*this);
+    cb.LookupBlock.EmitCall(*this);
     jmp(ABI_RETURN);
 
     align();
@@ -401,7 +401,7 @@ void BlockOfCode::GenRunCode(std::function<void(BlockOfCode&)> rcp) {
         jng(return_to_caller_mxcsr_already_exited);
     }
     SwitchMxcsrOnEntry();
-    cb.LookupBlock->EmitCall(*this);
+    cb.LookupBlock.EmitCall(*this);
     jmp(ABI_RETURN);
 
     align();
@@ -415,7 +415,7 @@ void BlockOfCode::GenRunCode(std::function<void(BlockOfCode&)> rcp) {
     L(return_to_caller_mxcsr_already_exited);
 
     if (cb.enable_cycle_counting) {
-        cb.AddTicks->EmitCall(*this, [this](RegList param) {
+        cb.AddTicks.EmitCall(*this, [this](RegList param) {
             mov(param[0], qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_to_run)]);
             sub(param[0], qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_remaining)]);
         });
@@ -455,18 +455,18 @@ void BlockOfCode::UpdateTicks() {
         return;
     }
 
-    cb.AddTicks->EmitCall(*this, [this](RegList param) {
+    cb.AddTicks.EmitCall(*this, [this](RegList param) {
         mov(param[0], qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_to_run)]);
         sub(param[0], qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_remaining)]);
     });
 
-    cb.GetTicksRemaining->EmitCall(*this);
+    cb.GetTicksRemaining.EmitCall(*this);
     mov(qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_to_run)], ABI_RETURN);
     mov(qword[rsp + ABI_SHADOW_SPACE + offsetof(StackLayout, cycles_remaining)], ABI_RETURN);
 }
 
 void BlockOfCode::LookupBlock() {
-    cb.LookupBlock->EmitCall(*this);
+    cb.LookupBlock.EmitCall(*this);
 }
 
 void BlockOfCode::LoadRequiredFlagsForCondFromRax(IR::Cond cond) {
@@ -520,7 +520,7 @@ void BlockOfCode::LoadRequiredFlagsForCondFromRax(IR::Cond cond) {
 }
 
 Xbyak::Address BlockOfCode::Const(const Xbyak::AddressFrame& frame, u64 lower, u64 upper) {
-    return constant_pool.GetConstant(frame, lower, upper);
+    return constant_pool.GetConstant(*this, frame, lower, upper);
 }
 
 CodePtr BlockOfCode::GetCodeBegin() const {
