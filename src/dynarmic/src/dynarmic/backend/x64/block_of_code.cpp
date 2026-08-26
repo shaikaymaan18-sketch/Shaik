@@ -61,73 +61,6 @@ namespace {
 constexpr size_t CONSTANT_POOL_SIZE = 2 * 1024 * 1024;
 constexpr size_t PRELUDE_COMMIT_SIZE = 16 * 1024 * 1024;
 
-class CustomXbyakAllocator : public Xbyak::Allocator {
-public:
-#ifdef _WIN32
-    uint8_t* alloc(size_t size) override {
-        void* p = VirtualAlloc(nullptr, size, MEM_RESERVE, PAGE_READWRITE);
-        if (p == nullptr) {
-            using Xbyak::Error;
-            XBYAK_THROW(Xbyak::ERR_CANT_ALLOC);
-        }
-        return static_cast<uint8_t*>(p);
-    }
-
-    void free(uint8_t* p) override {
-        VirtualFree(static_cast<void*>(p), 0, MEM_RELEASE);
-    }
-
-    bool useProtect() const override { return false; }
-#else
-    static constexpr size_t DYNARMIC_PAGE_SIZE = 4096;
-
-    // Can't subclass Xbyak::MmapAllocator because it is not a pure interface
-    // and doesn't expose its construtor
-    uint8_t* alloc(size_t size) override {
-        // Waste a page to store the size
-        size += DYNARMIC_PAGE_SIZE;
-
-        int mode = MAP_PRIVATE;
-#if defined(MAP_ANONYMOUS)
-        mode |= MAP_ANONYMOUS;
-#elif defined(MAP_ANON)
-        mode |= MAP_ANON;
-#else
-#   error "not supported"
-#endif
-#ifdef MAP_JIT
-        mode |= MAP_JIT;
-#endif
-        int prot = PROT_READ | PROT_WRITE;
-#ifdef PROT_MPROTECT
-        // https://man.netbsd.org/mprotect.2 specifies that an mprotect() that is LESS
-        // restrictive than the original mapping MUST fail
-        prot |= PROT_MPROTECT(PROT_READ) | PROT_MPROTECT(PROT_WRITE) | PROT_MPROTECT(PROT_EXEC);
-#endif
-        void* p = mmap(nullptr, size, prot, mode, -1, 0);
-        if (p == MAP_FAILED) {
-            using Xbyak::Error;
-            XBYAK_THROW(Xbyak::ERR_CANT_ALLOC);
-        }
-        std::memcpy(p, &size, sizeof(size_t));
-        return static_cast<uint8_t*>(p) + DYNARMIC_PAGE_SIZE;
-    }
-
-    void free(uint8_t* p) override {
-        size_t size;
-        std::memcpy(&size, p - DYNARMIC_PAGE_SIZE, sizeof(size_t));
-        munmap(p - DYNARMIC_PAGE_SIZE, size);
-    }
-
-#    ifdef DYNARMIC_ENABLE_NO_EXECUTE_SUPPORT
-    bool useProtect() const override { return false; }
-#    endif
-#endif
-};
-
-// This is threadsafe as Xbyak::Allocator does not contain any state; it is a pure interface.
-CustomXbyakAllocator s_allocator;
-
 #ifdef DYNARMIC_ENABLE_NO_EXECUTE_SUPPORT
 void ProtectMemory(const void* base, size_t size, bool is_executable) {
 #    ifdef _WIN32
@@ -236,7 +169,7 @@ BlockOfCode::BlockOfCode(RunCodeCallbacks cb, JitStateInfo jsi, size_t total_cod
 #else
         , nullptr //Allow RWE
 #endif
-        , &s_allocator)
+        , nullptr)
     , constant_pool(*this, CONSTANT_POOL_SIZE)
     , jsi(jsi)
     , cb(std::move(cb))

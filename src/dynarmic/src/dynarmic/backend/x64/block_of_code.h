@@ -176,10 +176,10 @@ private:
     ConstantPool constant_pool;
     JitStateInfo jsi;
     std::array<const void*, 4> return_from_run_code;
-    RunCodeCallbacks cb;
-    CodePtr code_begin = nullptr;
     RunCodeFuncType run_code = nullptr;
     RunCodeFuncType step_code = nullptr;
+    RunCodeCallbacks cb;
+    CodePtr code_begin = nullptr;
 #ifdef _WIN32
     size_t committed_size = 0;
 #endif
