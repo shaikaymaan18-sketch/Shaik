@@ -3,6 +3,9 @@
 
 // SPDX-FileCopyrightText: Copyright 2023 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include <chrono>
+#include <thread>
+#include "common/settings.h"
 
 #include "core/file_sys/errors.h"
 #include "core/hle/service/cmif_serialization.h"
@@ -30,6 +33,15 @@ Result IStorage::Read(
 
     R_UNLESS(length >= 0, FileSys::ResultInvalidSize);
     R_UNLESS(offset >= 0, FileSys::ResultInvalidOffset);
+    static thread_local std::chrono::steady_clock::time_point last_read_tick{};
+    const auto now = std::chrono::steady_clock::now();
+    const auto period = Settings::values.debug_knobs.GetValue();
+    const auto ReadInterval = std::chrono::microseconds{period};
+    if (last_read_tick != std::chrono::steady_clock::time_point{} &&
+        now - last_read_tick < ReadInterval) {
+        std::this_thread::sleep_for(ReadInterval - (now - last_read_tick));
+    }
+    last_read_tick = std::chrono::steady_clock::now();
 
     // Read the data from the Storage backend
     backend->Read(out_bytes.data(), length, offset);

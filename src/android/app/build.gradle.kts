@@ -188,7 +188,7 @@ android {
         create("mainline") {
             dimension = "version"
             isDefault = true
-            minSdk = 33
+            minSdk = 30
 
             manifestPlaceholders += mapOf("appNameBase" to "Eden")
             resValue("string", "app_name_suffixed", "Eden")
