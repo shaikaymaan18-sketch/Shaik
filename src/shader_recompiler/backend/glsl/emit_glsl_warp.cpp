@@ -205,14 +205,12 @@ void EmitShuffleButterfly(EmitContext& ctx, IR::Inst& inst, std::string_view val
 
 void EmitQuadBroadcast(EmitContext& ctx, IR::Inst& inst, std::string_view value,
                        std::string_view lane) {
-    // QuadBroadcast: read from (thread_id & ~3) | (lane & 3) within the subgroup
     const auto src_thread_id{fmt::format("(({}&~3)|({}& 3))", THREAD_ID, lane)};
     ctx.AddU32("{}=readInvocationARB({},{});", inst, value, src_thread_id);
 }
 
 void EmitQuadSwap(EmitContext& ctx, IR::Inst& inst, std::string_view value,
                   std::string_view direction) {
-    // QuadSwap: XOR thread_id with (direction+1) — maps directions 0/1/2 to XOR 1/2/3
     const auto src_thread_id{fmt::format("({}^({}+1))", THREAD_ID, direction)};
     ctx.AddU32("{}=readInvocationARB({},{});", inst, value, src_thread_id);
 }
