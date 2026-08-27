@@ -329,7 +329,7 @@ struct LogcatBackend : public Backend {
             }
         }();
         auto const df = GetDirectFormatArgs(entry);
-        __android_log_print(android_log_priority, "YuzuNative", CCB_PRINTF_FMT, df.time_seconds, df.time_fractional, df.class_name, df.level_name, entry.filename, entry.line_num, entry.function, entry.message);
+        __android_log_print(android_log_priority, "YuzuNative", "%s %s:%u:%s: %s", df.class_name, entry.filename, entry.line_num, entry.function, entry.message);
     }
     void Flush() noexcept override {}
 };
