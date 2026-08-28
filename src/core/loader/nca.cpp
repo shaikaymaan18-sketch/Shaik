@@ -37,7 +37,7 @@ static u32 CalculatePointerBufferSize(size_t heap_size) {
 
 AppLoader_NCA::AppLoader_NCA(FileSys::VirtualFile file_, u64 update_only_program_id_)
     : AppLoader(std::move(file_)),
-      nca(std::make_unique<FileSys::NCA>(file, nullptr)),
+      nca(std::make_unique<FileSys::NCA>(file, nullptr, update_only_program_id_ != 0)),
       update_only_program_id(update_only_program_id_) {}
 
 u64 AppLoader_NCA::GetProgramId() const {
