@@ -1,11 +1,11 @@
 # Dynarmic Design Documentation
 
-Dynarmic is a dynamic recompiler for the ARMv6K architecture. Future plans for dynarmic include
+Dynarmic is a dynamic recompiler for the ARMv6K architecture. Future plans for Dynarmic include
 support for other versions of the ARM architecture, having a interpreter mode, and adding support
 for other architectures.
 
 Users of this library interact with it primarily through the interface provided in
-[`src/dynarmic/interface`](../src/dynarmic/interface). Users specify how dynarmic's CPU core interacts with
+[`src/dynarmic/interface`](../src/dynarmic/interface). Users specify how Dynarmic's CPU core interacts with
 the rest of their system providing an implementation of the relevant `UserCallbacks` interface.
 Users setup the CPU state using member functions of `Jit`, then call `Jit::Execute` to start CPU
 execution. The callbacks defined on `UserCallbacks` may be called from dynamically generated code,
@@ -19,7 +19,7 @@ instructions then pass through several stages:
 
 1. Decoding (Identifying what type of instruction it is and breaking it up into fields)
 2. Translation (Generation of high-level IR from the instruction)
-3. Optimization (Eliminiation of redundant microinstructions, other speed improvements)
+3. Optimization (Elimination of redundant microinstructions, other speed improvements)
 4. Emission (Generation of host-executable code into memory)
 5. Execution (Host CPU jumps to the start of emitted code and runs it)
 
@@ -273,7 +273,7 @@ Exclusive OR (i.e.: XOR)
 
 ### Callback: {Read,Write}Memory{8,16,32,64}
 
-```c++
+```cpp
 <u8> ReadMemory8(<u32> vaddr)
 <u8> ReadMemory16(<u32> vaddr)
 <u8> ReadMemory32(<u32> vaddr)
@@ -288,7 +288,7 @@ Memory access.
 
 ### Terminal: ReturnToDispatch
 
-```c++
+```cpp
 SetTerm(IR::Term::ReturnToDispatch{})
 ```
 
@@ -297,7 +297,7 @@ The dispatcher will use the value in R15 to determine what comes next.
 
 ### Terminal: LinkBlock
 
-```c++
+```cpp
 SetTerm(IR::Term::LinkBlock{next})
 ```
 
@@ -307,7 +307,7 @@ dispatcher, which will return control to the host.
 
 ### Terminal: LinkBlockFast
 
-```c++
+```cpp
 SetTerm(IR::Term::LinkBlockFast{next})
 ```
 
@@ -316,7 +316,7 @@ This promises guarantees that must be held at runtime - i.e that the program won
 
 ### Terminal: PopRSBHint
 
-```c++
+```cpp
 SetTerm(IR::Term::PopRSBHint{})
 ```
 
@@ -328,7 +328,7 @@ this optimization or doesn't have a RSB may choose to implement this exactly as
 
 ### Terminal: If
 
-```c++
+```cpp
 SetTerm(IR::Term::If{cond, term_then, term_else})
 ```
 
@@ -366,7 +366,7 @@ Do NEVER modify `%r15`, we must make it clear that this register is "immutable" 
 
 ### `Scratch`
 
-```c++
+```cpp
 Xbyak::Reg64 ScratchGpr(HostLocList desired_locations = any_gpr);
 Xbyak::Xmm ScratchXmm(HostLocList desired_locations = any_xmm);
 ```
@@ -375,7 +375,7 @@ At runtime, allocate one of the registers in `desired_locations`. You are free t
 
 ### Pure `Use`
 
-```c++
+```cpp
 Xbyak::Reg64 UseGpr(Argument& arg);
 Xbyak::Xmm UseXmm(Argument& arg);
 OpArg UseOpArg(Argument& arg);
@@ -391,7 +391,7 @@ This register **must not** have it's value changed.
 
 ### `UseScratch`
 
-```c++
+```cpp
 Xbyak::Reg64 UseScratchGpr(Argument& arg);
 Xbyak::Xmm UseScratchXmm(Argument& arg);
 void UseScratch(Argument& arg, HostLoc host_loc);
@@ -409,7 +409,7 @@ You are free to modify the value in the register. The register is discarded at t
 
 A `Define` is the defintion of a value. This is the only time when a value may be set.
 
-```c++
+```cpp
 void DefineValue(IR::Inst* inst, const Xbyak::Reg& reg);
 ```
 
@@ -420,7 +420,7 @@ value to the specified register `reg`.
 
 Adding a `Define` to an existing value.
 
-```c++
+```cpp
 void DefineValue(IR::Inst* inst, Argument& arg);
 ```
 
@@ -458,7 +458,7 @@ One complication dynarmic has is that a compiled block is not uniquely identifia
 the PC alone, but bits in the FPSCR and CPSR are also relevant. We resolve this by
 computing a 64-bit `UniqueHash` that is guaranteed to uniquely identify a block.
 
-```c++
+```cpp
 u64 LocationDescriptor::UniqueHash() const {
     // This value MUST BE UNIQUE.
     // This calculation has to match up with EmitX64::EmitTerminalPopRSBHint
@@ -482,18 +482,18 @@ point. Each element in `rsb_location_descriptors` is a `UniqueHash` and they
 each correspond to an element in `rsb_codeptrs`. `rsb_codeptrs` contains the
 host addresses for the corresponding the compiled blocks.
 
-`RSBSize` was chosen by performance testing. Note that this is bigger than the
+`RSB_SIZE` was chosen by performance testing. Note that this is bigger than the
 size of the real RSB in hardware (which has 3 entries). Larger RSBs than 8
 showed degraded performance.
 
-```c++
+```cpp
 struct JitState {
     // ...
 
-    static constexpr size_t RSBSize = 8; // MUST be a power of 2.
+    static constexpr size_t RSB_SIZE = 8; // MUST be a power of 2.
     u32 rsb_ptr = 0;
-    std::array<u64, RSBSize> rsb_location_descriptors;
-    std::array<u64, RSBSize> rsb_codeptrs;
+    std::array<u64, RSB_SIZE> rsb_location_descriptors;
+    std::array<u64, RSB_SIZE> rsb_codeptrs;
     void ResetRSB();
 
     // ...
@@ -505,7 +505,7 @@ struct JitState {
 We insert our prediction at the insertion point iff the RSB doesn't already
 contain a prediction with the same `UniqueHash`.
 
-```c++
+```cpp
 void EmitX64::EmitPushRSB(IR::Block&, IR::Inst* inst) {
     using namespace Xbyak::util;
 
@@ -521,7 +521,7 @@ void EmitX64::EmitPushRSB(IR::Block&, IR::Inst* inst) {
 
     code->mov(index_reg, dword[code.ABI_JIT_PTR + offsetof(JitState, rsb_ptr)]);
     code->add(index_reg, 1);
-    code->and_(index_reg, u32(JitState::RSBSize - 1));
+    code->and_(index_reg, u32(JitState::RSB_SIZE - 1));
 
     code->mov(loc_desc_reg, u64(imm64));
     CodePtr patch_location = code->getCurr<CodePtr>();
@@ -530,7 +530,7 @@ void EmitX64::EmitPushRSB(IR::Block&, IR::Inst* inst) {
     code->EnsurePatchLocationSize(patch_location, 10);
 
     Xbyak::Label label;
-    for (size_t i = 0; i < JitState::RSBSize; ++i) {
+    for (size_t i = 0; i < JitState::RSB_SIZE; ++i) {
         code->cmp(loc_desc_reg, qword[code.ABI_JIT_PTR + offsetof(JitState, rsb_location_descriptors) + i * sizeof(u64)]);
         code->je(label, code->T_SHORT);
     }
@@ -544,12 +544,12 @@ void EmitX64::EmitPushRSB(IR::Block&, IR::Inst* inst) {
 
 In pseudocode:
 
-```c++
-    for (i := 0 .. RSBSize-1)
+```cpp
+    for (i := 0 .. RSB_SIZE-1)
         if (rsb_location_descriptors[i] == imm64)
         goto label;
     rsb_ptr++;
-    rsb_ptr %= RSBSize;
+    rsb_ptr %= RSB_SIZE;
     rsb_location_desciptors[rsb_ptr] = imm64; //< The UniqueHash
     rsb_codeptr[rsb_ptr] = /* codeptr corresponding to the UniqueHash */;
 label:
@@ -559,7 +559,7 @@ label:
 
 To check if a predicition is in the RSB, we linearly scan the RSB.
 
-```c++
+```cpp
 void EmitX64::EmitTerminalPopRSBHint(IR::Term::PopRSBHint, IR::LocationDescriptor initial_location) {
     using namespace Xbyak::util;
 
@@ -571,7 +571,7 @@ void EmitX64::EmitTerminalPopRSBHint(IR::Term::PopRSBHint, IR::LocationDescripto
     code->or_(rbx, rcx);
 
     code->mov(rax, u64(code->GetReturnFromRunCodeAddress()));
-    for (size_t i = 0; i < JitState::RSBSize; ++i) {
+    for (size_t i = 0; i < JitState::RSB_SIZE; ++i) {
         code->cmp(rbx, qword[code.ABI_JIT_PTR + offsetof(JitState, rsb_location_descriptors) + i * sizeof(u64)]);
         code->cmove(rax, qword[code.ABI_JIT_PTR + offsetof(JitState, rsb_codeptrs) + i * sizeof(u64)]);
     }
@@ -582,10 +582,10 @@ void EmitX64::EmitTerminalPopRSBHint(IR::Term::PopRSBHint, IR::LocationDescripto
 
 In pseudocode:
 
-```c++
+```cpp
 rbx := ComputeUniqueHash()
 rax := ReturnToDispatch
-for (i := 0 .. RSBSize-1)
+for (i := 0 .. RSB_SIZE-1)
     if (rbx == rsb_location_descriptors[i])
         rax = rsb_codeptrs[i]
 goto rax

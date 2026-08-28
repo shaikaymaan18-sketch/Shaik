@@ -44,7 +44,7 @@ Only Fedora/riscv64 has been tested, but in theory, every riscv64 distribution t
 
 ## Other
 
-Other architectures, such as SPARC, MIPS, PowerPC, Loong, and all 32-bit architectures are completely unsupported, as there is no JIT backend or emitter thereof. If you want support for it--submit patches!
+Other architectures, such as SPARC, MIPS, PowerPC, Loong, and all 32-bit architectures are completely unsupported, as there is no JIT backend or emitter thereof. If you want support for it -- submit patches!
 
 IA-64 (Itanium) support is completely unknown. Existing amd64 packages will not run on IA-64 (assuming you can even find a supported Windows/Linux distribution)
 
@@ -52,18 +52,18 @@ IA-64 (Itanium) support is completely unknown. Existing amd64 packages will not 
 
 The vast majority of Eden's testing is done on Windows, Linux, and Android. However, first-class support is also provided for:
 
-- HaikuOS
-- FreeBSD
-- OpenBSD
-- NetBSD
-- OpenIndiana (Solaris)
-- macOS
+- FreeBSD (amd64, aarch64)
+- HaikuOS (amd64)
+- OpenBSD (amd64)
+- NetBSD (amd64)
+- macOS (aarch64)
+- OpenIndiana aka. OpenSolaris (amd64)
 
 ## Linux
 
 While all modern Linux distributions are supported (Fedora >40, Ubuntu >24.04, Debian >12, Arch, Gentoo, etc.), the vast majority of testing and development for Linux is on Arch and Gentoo. Most major build system changes are tested on Gentoo first and foremost, so if builds fail on any modern distribution no matter what you do, it's likely a bug and should be reported.
 
-Intel and Nvidia GPU support is limited. AMD (RADV) drivers receive first-class testing and are known to provide the most stable Eden experience possible.
+Intel and NVIDIA GPU support is limited. AMD (RADV) drivers receive first-class testing and are known to provide the most stable Eden experience possible.
 
 Wayland is not recommended. Testing has shown significantly worse performance on most Wayland compositors compared to X11, alongside mysterious bugs and compatibility errors. For now, set `QT_QPA_PLATFORM=xcb` when running Eden, or pass `-platform xcb` to the launch arguments.
 
@@ -73,7 +73,25 @@ Windows 10 and 11 are supported. Support for Windows 8.x is unknown, and Windows
 
 In order to run Eden, you will probably need to install the [Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170).
 
-Neither AMD nor Nvidia drivers work nearly as well as Linux's RADV drivers. Compatibility is still largely the same, but performance and some hard-to-run games may suffer compared to Linux.
+Neither AMD/NVIDIA drivers work nearly as well as Linux's RADV drivers. Compatibility is still largely the same, but performance and some hard-to-run games may suffer compared to Linux.
+
+Tacit support for down to XP is provided for interested hobbyists. Read below.
+
+### Windows 7, 8, 8.1
+
+DirectX 12 is not available - simply copy and paste any DLL and name it `d3d12.dll`.
+
+Install [Qt6 compatibility libraries](github.com/ANightly/qt6windows7) specifically Qt 6.9.5.
+
+### Windows XP, Vista
+
+If you haven't already, install appropriate updates using [Legacy Update](https://legacyupdate.net/). We highly recommend to install [One-Core-API](https://github.com/shorthorn-project/One-Core-API-Binaries) as well.
+
+64-bit support is *mandatory*, there are no plans to add 32-bit support (PRs are welcome of course). While AVX2 support is recommended, it isn't a hard requirement. SSE4.1+ is recommended however, while the emulator does run well without (minimum is SSE3), non-SSE4.1 code paths are unmaintained.
+
+### Windows on ARM
+
+If you're using Snapdragon X or 8CX, use the [the Vulkan translation layer](https://apps.microsoft.com/detail/9nqpsl29bfff?hl=en-us&gl=USE) only if the stock drivers do not work. And of course always keep your system up-to-date.
 
 ## Android
 
@@ -123,13 +141,13 @@ Do note that building the GUI version with Qt versions higher than 6.7.3 will ca
 
 ## *BSD, Solaris
 
-BSD and Solaris distributions tend to lag behind Linux in terms of Vulkan and other library compatibility. For example, OpenIndiana (Solaris) does not properly package Qt, meaning the recommended method of usage is to use `eden-cli` only for now. Solaris also generally works better with OpenGL.
+BSD and Solaris distributions tend to lag behind Linux in terms of Vulkan and ports. For example, OpenIndiana (Solaris) does not properly package Qt, meaning the recommended method of usage is to use `eden-cli` for now. Solaris also generally works better with OpenGL.
 
-AMD GPU support on these platforms is limited or nonexistent.
+AMD GPU support on these platforms is limited or nonexistent, bar for OpenBSD which has a dedicated AMD GPU stack.
 
 ## HaikuOS
 
-HaikuOS supports (see below) Vulkan 1.3 and has Mesa 24.0. Because OpenGL ES is used instead of the desktop flavour of OpenGL the OpenGL backend is actually worse than the Vulkan one in terms of stability and system support. OpenGL is highly not recommended due to it being: out of tree builds of Mesa and generally unstable ones at that. Users are advised to use Vulkan whenever possible.
+HaikuOS supports (see below) Vulkan 1.3 and has Mesa 24.0. Because OpenGL ES is used instead of the desktop flavour of OpenGL the OpenGL backend is actually worse than the Vulkan one in terms of stability and system support. OpenGL is highly not recommended due to it being out of tree builds of Mesa and generally unstable ones at that. Users are advised to use Vulkan instead.
 
 - Additionally system drivers for NVIDIA and Intel iGPUs exist and provide a native Vulkan ICD with the `Xcb` interface as opposed to the native `BView`
 - In order to obtain Vulkan 1.3 support with native `BView` support; Swiftshader can be compiled from source [see this thread](https://discuss.haiku-os.org/t/swiftshader-vulkan-software-renderer-on-haiku/11526/6).
