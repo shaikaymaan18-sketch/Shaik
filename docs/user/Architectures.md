@@ -81,7 +81,7 @@ Tacit support for down to XP is provided for interested hobbyists. Read below.
 
 DirectX 12 is not available - simply copy and paste any DLL and name it `d3d12.dll`.
 
-Install [Qt6 compatibility libraries](github.com/ANightly/qt6windows7) specifically Qt 6.9.5.
+Install [Qt6 compatibility libraries](https://github.com/ANightly/qt6windows7) specifically Qt 6.9.5.
 
 ### Windows XP, Vista
 

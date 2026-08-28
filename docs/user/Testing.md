@@ -96,4 +96,4 @@ The faulty commit then, is 6th of Jan. This is called bisection https://git-scm.
 - PR's marked with **WIP** do NOT need to be tested unless explicitly asked (check the git in case)
 - Sometimes license checks may fail, hover over the build icon to see if builds did succeed, as the CI will push builds even if license checks fail.
 - All open PRs can be viewed [here](https://git.eden-emu.dev/eden-emu/eden/pulls/).
-- If site is down use one of the [mirrors](./user/ThirdParty.md#mirrors).
+- If site is down use one of the [mirrors](./ThirdParty.md#mirrors).

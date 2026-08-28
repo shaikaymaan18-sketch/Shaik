@@ -40,7 +40,7 @@ Dedicated shader recompiler to translate Maxwell assembly code to either SPIR-V,
 
 ## src/video_core/
 
-Most of the things here have their own dedicated section. In short this is basically the entire Tegra NVIDIA Maxwell GPU emulation. Additionally it includes some [extra effects](../src/video_core/host_ahders) to emulate MSAA, D24 copies or as polyfill.
+Most of the things here have their own dedicated section. In short this is basically the entire Tegra NVIDIA Maxwell GPU emulation. Additionally it includes some [extra effects](../src/video_core/host_shaders/opengl_smaa.glsl) to emulate MSAA, D24 copies or as polyfill.
 
 Available backends are: Null, Vulkan, and OpenGL.
 
