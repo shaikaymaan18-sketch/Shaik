@@ -28,10 +28,10 @@ Using the A32 frontend with the x64 backend as an example:
 * Decoding is done by [double dispatch](https://en.wikipedia.org/wiki/Visitor_pattern) in
   [`src/frontend/A32/decoder/{arm.h,thumb16.h,thumb32.h}`](../../src/dynarmic/src/dynarmic/frontend/A32/decoder/).
 * Translation is done by the visitors in [`src/dynarmic/frontend/A32/translate/translate_{arm,thumb}.cpp`](../../src/dynarmic/src/dynarmic/frontend/A32/translate/).
-  The function [`Translate`](../../src/dynarmic/src/dynarmic/frontend/A32/translate/translate.h) takes a starting memory location,
+  The function [`Translate`](../../src/dynarmic/src/dynarmic/frontend/A32/translate/a32_translate.cpp) takes a starting memory location,
   some CPU state, and memory reader callback and returns a basic block of IR.
 * The IR can be found under [`src/frontend/ir/`](../../src/dynarmic/src/dynarmic/ir/).
-* Optimizations can be found under [`src/ir_opt/`](../../src/dynarmic/src/dynarmic/ir/opt/).
+* Optimizations can be found under [`src/ir/opt_passes.cpp`](../../src/dynarmic/src/dynarmic/ir/opt_passes.cpp).
 * Emission is done by `EmitX64` which can be found in [`src/dynarmic/backend/x64/emit_x64.{h,cpp}`](../../src/dynarmic/src/dynarmic/backend/x64/).
 * Execution is performed by calling `BlockOfCode::RunCode` in [`src/dynarmic/backend/x64/block_of_code.{h,cpp}`](../../src/dynarmic/src/dynarmic/backend/x64/).
 
