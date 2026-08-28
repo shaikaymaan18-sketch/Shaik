@@ -98,4 +98,5 @@ private:
 
     // Program index for next boot
     std::atomic<s32> m_next_program_index = -1;
+    std::atomic<u64> m_next_program_id = 0;
 };

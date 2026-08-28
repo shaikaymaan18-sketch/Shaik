@@ -76,6 +76,7 @@ extern "C" {
 #include "core/frontend/applets/software_keyboard.h"
 #include "core/frontend/applets/web_browser.h"
 #include "common/android/applets/web_browser.h"
+#include "core/file_sys/common_funcs.h"
 #include "core/hle/service/am/applet_manager.h"
 #include "core/hle/service/am/frontend/applets.h"
 #include "core/hle/service/filesystem/filesystem.h"
@@ -311,11 +312,23 @@ Core::SystemResultStatus EmulationSession::InitializeEmulation(const std::string
     ConfigureFilesystemProvider(filepath);
 
     // Load the ROM.
+    const u64 previous_program_id =
+        program_index != 0 && m_next_program_id.load() >
+                                  static_cast<u64>(Service::AM::AppletProgramId::MaxProgramId)
+            ? m_next_program_id.load()
+            : 0;
+
     Service::AM::FrontendAppletParameters params{
+        .program_id = previous_program_id,
         .applet_id = static_cast<Service::AM::AppletId>(m_applet_id),
         .launch_type = frontend_initiated ? Service::AM::LaunchType::FrontendInitiated
                                           : Service::AM::LaunchType::ApplicationInitiated,
         .program_index = static_cast<s32>(program_index),
+        .previous_program_index =
+            previous_program_id != 0
+                ? static_cast<s32>(previous_program_id -
+                                   FileSys::GetBaseTitleID(previous_program_id))
+                : -1,
     };
 
     m_load_result = m_system.Load(EmulationSession::GetInstance().Window(), filepath, params);
@@ -333,6 +346,7 @@ Core::SystemResultStatus EmulationSession::InitializeEmulation(const std::string
 
     // Register an ExecuteProgram callback such that Core can execute a sub-program
     m_system.RegisterExecuteProgramCallback([&](std::size_t program_index_) {
+        m_next_program_id = m_system.GetApplicationProcessProgramID();
         m_next_program_index = program_index_;
         EmulationSession::GetInstance().HaltEmulation();
     });
