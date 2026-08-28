@@ -47,7 +47,6 @@ Use this guide when you want to set up specific controller profiles for specific
 
 - Eden Emulator set up and fully configured
 - Controller Profile Created
-    - See [*Configuring Controller Profiles*](./Controllers.md#configuring-controller-profiles) for instructions on how to do this if needed.
 
 ---
 
