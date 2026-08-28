@@ -2,7 +2,7 @@
 
 Are you just a casual user? Take a look at our [User Handbook](./user) then!
 
-If you want to register/signup as a contributor, take a gander at the [signup guide](./SIGNUP.md).
+If you want to register/signup as a contributor, take a gander at the [signup guide](https://git.eden-emu.dev/crueter/signup/src/branch/main/README.md).
 
 This contains documentation created by developers. This contains build instructions, guidelines, instructions/layouts for [cool stuff we made](./CPMUtil), and more.
 
@@ -13,10 +13,9 @@ This contains documentation created by developers. This contains build instructi
 - **[Dependencies](./Deps.md)**
 - **[Debug Guidelines](./Debug.md)**
   - **[RenderDoc](./Debug.md#renderdoc)**
-- **[CPM - CMake Package Manager](./CPMUtil)**
+- **[CPM - CMake Package Manager](./CPMUtil.md)**
 - **[Platform-Specific Caveats](./Caveats.md)**
 - **[The NVIDIA SM86 (Maxwell) GPU](./NvidiaGpu.md)**
-- **[Cross compilation](./CrossCompile.md)**
 - **[Driver Bugs](./DriverBugs.md)**
 - **[Building Older Commits](./build/OlderCommits.md)**
 - Subsystems:
