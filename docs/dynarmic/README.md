@@ -5,7 +5,7 @@ A dynamic recompiler for ARM.
 
 *Note that an adversarial guest program [can determine if it's being ran under Dynarmic](#disadvantages-of-dynarmic). Preventing this is not a goal of this project.*
 
-Cortex-A57 (32 and 64 bit) is the emulated guest target. See [ArchVersion](../../src/dynarmic/interface/A32/arch_version.h).
+Cortex-A57 (32 and 64 bit) is the emulated guest target. See [ArchVersion](../../src/dynarmic/src/dynarmic/interface/A32/arch_version.h).
 
 The only supported host architectures are x86-64, and AArch64. There are no plans to support any 32-bit architectures.
 
