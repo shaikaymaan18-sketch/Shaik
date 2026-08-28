@@ -139,6 +139,7 @@ static FileSys::VirtualFile VfsDirectoryCreateFileWrapper(const FileSys::Virtual
 #include "core/hle/service/am/frontend/applet_web_browser_types.h"
 
 #include "core/file_sys/card_image.h"
+#include "core/file_sys/common_funcs.h"
 #include "core/file_sys/romfs.h"
 #include "core/file_sys/savedata_factory.h"
 
@@ -3086,12 +3087,31 @@ void MainWindow::OnLoadComplete() {
 }
 
 void MainWindow::OnExecuteProgram(std::size_t program_index) {
+    const u64 previous_program_id = QtCommon::system->GetApplicationProcessProgramID();
+
+    const auto current_path =
+        QString::fromStdString(QtCommon::system->GetCurrentApplicationFilePath());
+
+    LOG_INFO(Frontend, "ExecuteProgram requested, program_index={} previous_program_id={:016X}",
+             program_index, previous_program_id);
+
     ShutdownGame();
 
     auto params = ApplicationAppletParameters();
     params.program_index = static_cast<s32>(program_index);
     params.launch_type = Service::AM::LaunchType::ApplicationInitiated;
-    BootGame(last_filename_booted, params);
+
+    if (previous_program_id > static_cast<u64>(Service::AM::AppletProgramId::MaxProgramId)) {
+        params.previous_program_index =
+            static_cast<s32>(previous_program_id - FileSys::GetBaseTitleID(previous_program_id));
+        params.program_id = previous_program_id;
+    }
+
+    const auto filename = current_path.isEmpty() ? last_filename_booted : current_path;
+
+    LOG_DEBUG(Frontend, "ExecuteProgram booting from path: {}", filename.toStdString());
+
+    BootGame(filename, params);
 }
 
 void MainWindow::OnExit() {

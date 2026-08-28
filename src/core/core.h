@@ -426,6 +426,7 @@ public:
     void PushGeneralChannelData(std::vector<u8>&& data);
     bool TryPopGeneralChannel(std::vector<u8>& out_data);
     [[nodiscard]] Service::Event& GetGeneralChannelEvent();
+    [[nodiscard]] const std::string& GetCurrentApplicationFilePath() const;
 
     /// Type used for the frontend to designate a callback for System to exit the application.
     using ExitCallback = std::function<void()>;

@@ -11,6 +11,7 @@ class System;
 }
 
 namespace FileSys {
+class NACP;
 class NCA;
 }
 
@@ -21,7 +22,7 @@ class AppLoader_DeconstructedRomDirectory;
 /// Loads an NCA file
 class AppLoader_NCA final : public AppLoader {
 public:
-    explicit AppLoader_NCA(FileSys::VirtualFile file_);
+    explicit AppLoader_NCA(FileSys::VirtualFile file_, u64 update_only_program_id = 0);
     ~AppLoader_NCA() override;
 
     /**
@@ -43,14 +44,20 @@ public:
 
     ResultStatus ReadRomFS(FileSys::VirtualFile& dir) override;
     ResultStatus ReadProgramId(u64& out_program_id) override;
+    ResultStatus ReadControlData(FileSys::NACP& out_control) override;
+    ResultStatus ReadTitle(std::string& out_title) override;
 
     ResultStatus ReadBanner(std::vector<u8>& buffer) override;
     ResultStatus ReadLogo(std::vector<u8>& buffer) override;
 
     ResultStatus ReadNSOModules(Modules& modules) override;
 
+    u64 GetProgramId() const;
+
 private:
     std::unique_ptr<FileSys::NCA> nca;
+    u64 update_only_program_id{};
+    std::unique_ptr<FileSys::NACP> nacp;
     std::unique_ptr<AppLoader_DeconstructedRomDirectory> directory_loader;
 };
 

@@ -295,6 +295,10 @@ struct System::Impl {
     SystemResultStatus Load(System& system, Frontend::EmuWindow& emu_window, const std::string& filepath, Service::AM::FrontendAppletParameters& params) {
         InitializeKernel(system);
 
+        if (params.applet_type == Service::AM::AppletType::Application) {
+            current_application_filepath = filepath;
+        }
+
         const auto file = GetGameFileFromPath(virtual_filesystem, filepath);
 
         // Create the application process
@@ -488,6 +492,8 @@ struct System::Impl {
 
     std::array<u64, Core::Hardware::NUM_CPU_CORES> dynarmic_ticks{};
     std::array<u8, 0x20> build_id{};
+
+    std::string current_application_filepath;
 
     /// Service manager
     std::shared_ptr<Service::SM::ServiceManager> service_manager;
@@ -927,6 +933,10 @@ void System::ExecuteProgram(std::size_t program_index) {
     } else {
         LOG_CRITICAL(Core, "execute_program_callback must be initialized by the frontend");
     }
+}
+
+const std::string& System::GetCurrentApplicationFilePath() const {
+    return impl->current_application_filepath;
 }
 
 /// @brief Gets a reference to the user channel stack.
