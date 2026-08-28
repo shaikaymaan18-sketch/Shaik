@@ -11,7 +11,7 @@ SPDX-License-Identifier: CC0-1.0
 -->
 
 <component type="desktop-application">
-  <id>org.eden_emu.eden</id>
+  <id>dev.eden_emu.eden</id>
   <metadata_license>CC0-1.0</metadata_license>
   <name>eden</name>
   <summary>Nintendo Switch emulator</summary>
@@ -35,7 +35,7 @@ SPDX-License-Identifier: CC0-1.0
   <url type="contact">https://discord.gg/HstXbPch7X</url>
   <url type="vcs-browser">https://git.eden-emu.dev</url>
   <url type="contribute">https://git.eden-emu.dev/eden-emu/eden</url>
-  <launchable type="desktop-id">org.eden_emu.eden.desktop</launchable>
+  <launchable type="desktop-id">dev.eden_emu.eden.desktop</launchable>
   <provides>
     <binary>yuzu</binary>
     <binary>yuzu-cmd</binary>
