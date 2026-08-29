@@ -570,6 +570,10 @@
     <string name="gpu_unswizzle_settings_description">Настройте параметры распаковки текстур на стороне ГПУ либо полностью отключите эту функцию. Изменение этих параметров позволяет найти баланс между производительностью и качеством загрузки текстур.</string>
     <string name="gpu_unswizzle_enable">Включить распаковку текстур (Unswizzle)</string>
     <string name="gpu_unswizzle_disabled">Отключено</string>
+    <string name="gpu_unswizzle_texture_size">Макс. размер текстуры Unswizzle</string>
+    <string name="gpu_unswizzle_texture_size_description">Задает максимальный размер (в МБ) текстур для преобразования формата (unswizzle) на ГПУ. Хотя ГПУ быстрее работает со средними и большими текстурами, ЦП может быть эффективнее для очень маленьких. Настройте это значение, чтобы найти баланс между ускорением на ГПУ и нагрузкой на ЦП.</string>
+    <string name="gpu_unswizzle_stream_size">Размер потока Unswizzle</string>
+    <string name="gpu_unswizzle_stream_size_description">Задает лимит данных на кадр для преобразования крупных текстур (unswizzle). Высокие значения ускоряют загрузку текстур ценой увеличения задержки кадра; низкие значения снижают нагрузку на ГПУ, но могут вызывать заметную постепенную подгрузку текстур.</string>
     <string name="gpu_unswizzle_chunk_size">Размер блока Unswizzle</string>
     <string name="gpu_unswizzle_chunk_size_description">Задает количество слоёв глубины, обрабатываемых за одну пачку для 3D-текстур. Увеличение этого значения улучшает пропускную способность на мощных ГПУ, но может вызывать подтормаживания или таймауты драйвера на слабом железе.</string>
     <string name="gpu_unswizzle_default_button">По умолчанию</string>

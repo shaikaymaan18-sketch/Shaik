@@ -32,17 +32,20 @@ class GpuUnswizzleSetting(
             get() {
                 return BooleanSetting.GPU_UNSWIZZLE_ENABLED.global &&
                     IntSetting.GPU_UNSWIZZLE_TEXTURE_SIZE.global &&
+                    IntSetting.GPU_UNSWIZZLE_STREAM_SIZE.global &&
                     IntSetting.GPU_UNSWIZZLE_CHUNK_SIZE.global
             }
             set(value) {
                 BooleanSetting.GPU_UNSWIZZLE_ENABLED.global = value
                 IntSetting.GPU_UNSWIZZLE_TEXTURE_SIZE.global = value
+                IntSetting.GPU_UNSWIZZLE_STREAM_SIZE.global = value
                 IntSetting.GPU_UNSWIZZLE_CHUNK_SIZE.global = value
             }
         override fun getValueAsString(needsGlobal: Boolean): String = "combined"
         override fun reset() {
             BooleanSetting.GPU_UNSWIZZLE_ENABLED.reset()
             IntSetting.GPU_UNSWIZZLE_TEXTURE_SIZE.reset()
+            IntSetting.GPU_UNSWIZZLE_STREAM_SIZE.reset()
             IntSetting.GPU_UNSWIZZLE_CHUNK_SIZE.reset()
         }
     },
@@ -69,6 +72,12 @@ class GpuUnswizzleSetting(
 
     fun setTextureSize(value: Int) =
         IntSetting.GPU_UNSWIZZLE_TEXTURE_SIZE.setInt(value)
+
+    fun getStreamSize(needsGlobal: Boolean = false): Int =
+        IntSetting.GPU_UNSWIZZLE_STREAM_SIZE.getInt(needsGlobal)
+
+    fun setStreamSize(value: Int) =
+        IntSetting.GPU_UNSWIZZLE_STREAM_SIZE.setInt(value)
 
     fun getChunkSize(needsGlobal: Boolean = false): Int =
         IntSetting.GPU_UNSWIZZLE_CHUNK_SIZE.getInt(needsGlobal)

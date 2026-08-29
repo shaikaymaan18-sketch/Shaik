@@ -641,18 +641,6 @@
         <item>5</item>
     </integer-array>
 
-    <string-array name="asyncUnswizzleModeEntries">
-        <item>@string/async_unswizzle_mode_off</item>
-        <item>@string/async_unswizzle_mode_gpu</item>
-        <item>@string/async_unswizzle_mode_cpu</item>
-    </string-array>
-
-    <integer-array name="asyncUnswizzleModeValues">
-        <item>0</item>
-        <item>1</item>
-        <item>2</item>
-    </integer-array>
-
     <string-array name="temperatureUnitEntries">
         <item>@string/temperature_celsius</item>
         <item>@string/temperature_fahrenheit</item>
