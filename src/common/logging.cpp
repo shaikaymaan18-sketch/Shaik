@@ -438,7 +438,7 @@ void FmtLogMessageImpl(Class log_class, Level log_level, const char* filename, u
             .function = function,
             .line_num = line_num,
         };
-        if (result.size <= sizeof(buffer - 1)) {
+        if (result.size <= sizeof(buffer) - 1) {
             buffer[(std::min)(result.size, sizeof(buffer) - 1)] = '\0';
             e.message = buffer;
             e.message_len = (std::min)(result.size, sizeof(buffer) - 1);
