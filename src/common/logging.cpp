@@ -447,7 +447,7 @@ void FmtLogMessageImpl(Class log_class, Level log_level, const char* filename, u
                 if (flush) backend.Flush();
             });
         } else {
-            std::string s = fmt::format(format, args);
+            std::string s = fmt::vformat(format, args);
             e.message = s.c_str();
             e.message_len = s.size();
             logging_instance->ForEachBackend([=](Backend& backend) {
