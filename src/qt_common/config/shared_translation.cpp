@@ -170,10 +170,6 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent) {
            tr("Specifies how videos should be decoded.\nIt can either use the CPU or the GPU for "
               "decoding, or perform no decoding at all (black screen on videos).\n"
               "In most cases, GPU decoding provides the best performance."));
-    INSERT(Settings, accelerate_unswizzle, tr("Texture Unswizzle Method:"),
-           tr("This option controls how generic textures should be unswizzled.\n"
-              "CPU: Use the CPU for unswizzling (recommended).\n"
-              "GPU: Use the GPU's compute shaders to unswizzling generic textures."));
     INSERT(Settings, accelerate_astc, tr("ASTC Decoding Method:"),
            tr("This option controls how ASTC textures should be decoded.\n"
               "CPU: Use the CPU for decoding.\n"
@@ -235,19 +231,7 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent) {
     INSERT(Settings, gpu_clock, tr("GPU Clocks"),
            tr("Makes the game believe GPU work finishes faster than it does, so it stops lowering "
               "resolution and render distance to fit the Switch's clocks."));
-    /*INSERT(Settings, gpu_unswizzle_enabled, tr("Chunked GPU Unswizzle"),
-           tr("Accelerates BCn 3D texture decoding using GPU compute.\n"
-              "Disable if experiencing crashes or graphical glitches."));*/
-    INSERT(Settings, gpu_unswizzle_texture_size, tr("GPU Unswizzle Max Texture Size"),
-           tr("Sets the maximum size (MiB) for GPU-based texture unswizzling.\n"
-              "While the GPU is faster for medium and large textures, the CPU may be more "
-              "efficient for very small ones.\n"
-              "Adjust this to find the balance between GPU acceleration and CPU overhead."));
-    INSERT(Settings, gpu_unswizzle_stream_size, tr("GPU Unswizzle Stream Size"),
-           tr("Sets the maximum amount of texture data (in MiB) processed per frame.\n"
-              "Higher values can reduce stutter during texture loading but may impact frame "
-              "consistency."));
-    INSERT(Settings, gpu_unswizzle_chunk_size, tr("GPU Unswizzle Chunk Size"),
+    INSERT(Settings, gpu_unswizzle_chunk_size, tr("Async Unswizzle Chunk Size"),
            tr("Determines the number of depth slices processed in a single dispatch.\n"
               "Increasing this can improve throughput on high-end GPUs but may cause TDR or driver "
               "timeouts on weaker hardware."));
@@ -396,11 +380,6 @@ std::unique_ptr<ComboboxTranslationMap> ComboboxEnumeration(QObject* parent) {
                               PAIR(SpirvOptimizeMode, Never, tr("Never")),
                               PAIR(SpirvOptimizeMode, OnLoad, tr("On Load")),
                               PAIR(SpirvOptimizeMode, Always, tr("Always")),
-                          }});
-    translations->insert({Settings::EnumMetadata<Settings::TexUnswizzleMode>::Index(),
-                          {
-                              PAIR(TexUnswizzleMode, Cpu, tr("CPU")),
-                              PAIR(TexUnswizzleMode, Gpu, tr("GPU")),
                           }});
     translations->insert({Settings::EnumMetadata<Settings::AstcDecodeMode>::Index(),
                           {

@@ -547,10 +547,6 @@
     <string name="gpu_unswizzle_settings_description">Configura los parámetros de desentrelazado de texturas basadas ​​en la GPU o desactívelos por completo. Modifique estos ajustes para equilibrar el rendimiento y la calidad de las texturas cargadas.</string>
     <string name="gpu_unswizzle_enable">Activar desentrelazado de la GPU</string>
     <string name="gpu_unswizzle_disabled">Desactivado</string>
-    <string name="gpu_unswizzle_texture_size">Tamaño máximo de textura de desentrelazado de la GPU</string>
-    <string name="gpu_unswizzle_texture_size_description">Establece el tamaño máximo (en MB) para el desentrelazado de texturas basada en GPU. Aunque la GPU es más rápida para texturas medianas y grandes, la CPU puede ser más eficiente para texturas muy pequeñas. Ajuste este valor para encontrar el equilibrio entre la aceleración de la GPU y la sobrecarga de la CPU.</string>
-    <string name="gpu_unswizzle_stream_size">Tamaño del flujo de desentrelazado de la GPU</string>
-    <string name="gpu_unswizzle_stream_size_description">Establece el límite de datos por fotograma para desentrelazar texturas grandes. Los valores altos aceleran la carga de texturas, a coste de una mayor latencia por fotograma; los valores bajos reducen la carga de la GPU, pero pueden causar parpadeos visibles en las texturas.</string>
     <string name="gpu_unswizzle_chunk_size">Tamaño del trozo de desentrelazado de la GPU</string>
     <string name="gpu_unswizzle_chunk_size_description">Determina la cantidad de cortes de profundidad procesados ​​en un solo envío de texturas 3D. Aumentar este valor puede mejorar el rendimiento en una GPU de gama alta, pero puede causar tirones y problemas en los tiempos de respuesta en hardware más modesto.</string>
     <string name="gpu_unswizzle_default_button">Por defecto</string>

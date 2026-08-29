@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <atomic>
 #include <deque>
 #include <limits>
@@ -37,6 +38,7 @@
 #include "video_core/control/channel_state_cache.h"
 #include "video_core/delayed_destruction_ring.h"
 #include "video_core/engines/fermi_2d.h"
+#include "video_core/rasterizer_interface.h"
 #include "video_core/surface.h"
 #include "video_core/texture_cache/descriptor_table.h"
 #include "video_core/texture_cache/image_base.h"
@@ -137,6 +139,15 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
     using AsyncBuffer = typename P::AsyncBuffer;
     using BufferType = typename P::BufferType;
 
+    struct AsyncCpuUnswizzleChunk {
+        std::vector<u8> linear_batch;
+        u32 z_src = 0;
+        u32 z_image = 0;
+        u32 z_count = 0;
+        u32 group_z_start = 0;
+        std::atomic<size_t> jobs_pending{0};
+    };
+
     // This struct is too huge! It makes me uncomfortable
     struct PendingUnswizzle {
         VideoCommon::ImageInfo info;
@@ -146,8 +157,7 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
 
         size_t total_size = 0;
         size_t current_offset = 0;
-        size_t last_submitted_offset = 0;
-        size_t staging_base_byte_offset = 0;
+        u32 last_submitted_slice = 0;
         size_t bytes_per_slice = 0;
         size_t current_batch_start_byte = 0;
         u64 swizzled_slice_size = 0;
@@ -158,16 +168,21 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
         u32 active_z_start = 0;
         u32 active_z_end = 0;
 
+        boost::container::small_vector<SwizzleParameters, 16> upload_swizzles;
+
+        std::unique_ptr<AsyncCpuUnswizzleChunk> cpu_chunk;
+
         Extent3D cpu_num_tiles{};
         Extent3D cpu_block{};
 
         u32 swizzle_block_depth = 0;
         u32 cpu_stride_alignment = 0;
-        u32 cpu_bytes_per_block = 0;
+        u32 bytes_per_block = 0;
 
         bool initialized = false;
         bool is_sparse = false;
         bool is_cpu = false;
+        bool cpu_job_in_flight = false;
     };
 
     struct BlitImages {
@@ -410,6 +425,9 @@ private:
     /// Delete image from the cache
     void DeleteImage(ImageId image, bool immediate_delete = false);
 
+    /// Cancel and discard any in-flight/pending async unswizzle or decode work for an image, without deleting the image itself.
+    void CancelPendingUnswizzle(ImageId image_id);
+
     /// Remove image views references from the cache
     void RemoveImageViewReferences(std::span<const ImageViewId> removed_views);
 
@@ -457,12 +475,9 @@ private:
 
     void QueueAsyncUnswizzle(Image& image, ImageId image_id);
     void TickAsyncUnswizzle();
-    void TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image);
+    void TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image, bool force_owned_staging);
     void TickAsyncUnswizzleCpu(PendingUnswizzle& task, Image& image);
-
-    bool IsUnswizzleStorageFormatSupported(PixelFormat format) {
-        return runtime.IsUnswizzleStorageFormatSupported(format);
-    }
+    void InitSparseUnswizzleTracking(PendingUnswizzle& task, Image& image);
 
     Runtime& runtime;
 
@@ -495,8 +510,6 @@ private:
     u64 critical_memory;
 
     Settings::AsyncUnswizzleMode async_unswizzle_mode = Settings::AsyncUnswizzleMode::Off;
-    size_t async_unswizzle_maxsize = 0;
-    size_t async_unswizzle_chunk_size = 0;
     u32 async_unswizzle_slices_per_batch = 0;
 
     struct BufferDownload {
@@ -553,12 +566,20 @@ private:
                                                Common::ThreadPlacement::Efficiency};
     std::vector<std::unique_ptr<AsyncDecodeContext>> async_decodes;
 
+    Common::ThreadWorker texture_unswizzle_worker{
+        (std::clamp)(static_cast<size_t>(std::thread::hardware_concurrency()) / 2, size_t{2},
+                     size_t{4}),
+        "TextureUnswizzle", {}, Common::ThreadPlacement::Background};
+
     std::deque<PendingUnswizzle> unswizzle_queue;
 
     static constexpr size_t UnswizzleSharedStagingCap = 1_GiB;
     std::optional<AsyncBuffer> unswizzle_shared_staging;
     size_t unswizzle_shared_staging_capacity = 0;
     bool unswizzle_shared_staging_pending_gpu_read = false;
+
+    static constexpr bool async_unswizzle_round_robin = true;
+    static constexpr u32 async_unswizzle_tasks_per_frame = 1;
 
     // Join caching
     boost::container::small_vector<ImageId, 4> join_overlap_ids;

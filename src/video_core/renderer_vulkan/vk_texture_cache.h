@@ -51,8 +51,6 @@ public:
                                  DescriptorPool& descriptor_pool,
                                  ComputePassDescriptorQueue& compute_pass_descriptor_queue);
 
-    bool IsUnswizzleStorageFormatSupported(PixelFormat format) const;
-
     void Finish();
 
     StagingBufferRef UploadStagingBuffer(size_t size, bool deferred = false);
@@ -100,11 +98,6 @@ public:
 
     bool CanUploadMSAA() const noexcept {
         return true;
-    }
-
-    bool CanAccelerateUnswizzle() const noexcept {
-        return Settings::values.accelerate_unswizzle.GetValue() ==
-            Settings::TexUnswizzleMode::Gpu;
     }
 
     void AccelerateImageUpload(Image&, const StagingBufferRef&,
@@ -171,10 +164,6 @@ public:
     std::optional<ASTCDecoderPass> astc_decoder_pass;
 
     std::optional<BlockLinearUnswizzle3DPass> bl3d_unswizzle_pass;
-    std::optional<BlockLinearUnswizzle2DPass> bl2d_unswizzle_pass;
-    std::optional<BlockLinearUnswizzle2DImagePass> generic_2d_unswizzle_pass;
-    std::optional<BlockLinearUnswizzle3DImagePass> generic_3d_unswizzle_pass;
-    std::optional<BlockLinearUnswizzleLinearImagePass> generic_linear_unswizzle_pass;
     const Settings::ResolutionScalingInfo& resolution;
     std::array<std::vector<VkFormat>, VideoCore::Surface::MaxPixelFormat> view_formats;
 

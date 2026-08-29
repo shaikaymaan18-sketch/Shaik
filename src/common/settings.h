@@ -64,7 +64,6 @@ SETTING(u16, false);
 SWITCHABLE(AnisotropyMode, true);
 SWITCHABLE(AntiAliasing, false);
 SWITCHABLE(AspectRatio, true);
-SWITCHABLE(TexUnswizzleMode, true);
 SWITCHABLE(AstcDecodeMode, true);
 SWITCHABLE(AstcRecompression, true);
 SWITCHABLE(AudioMode, true);
@@ -552,10 +551,6 @@ struct Values {
 #endif
                                                            "max_anisotropy",
                                                            Category::RendererAdvanced};
-    SwitchableSetting<TexUnswizzleMode, true> accelerate_unswizzle{linkage,
-                                                            TexUnswizzleMode::Cpu,
-                                                            "accelerate_unswizzle",
-                                                            Category::RendererAdvanced};
     SwitchableSetting<AstcDecodeMode, true> accelerate_astc{linkage,
                                                             AstcDecodeMode::Gpu,
                                                             "accelerate_astc",
@@ -674,26 +669,11 @@ struct Values {
     SwitchableSetting<bool> use_asynchronous_shaders{linkage, false, "use_asynchronous_shaders",
                                                      Category::RendererHacks};
 
-    SwitchableSetting<GpuUnswizzleSize> gpu_unswizzle_texture_size{linkage,
-                                                  GpuUnswizzleSize::Large,
-                                                  "gpu_unswizzle_texture_size",
-                                                  Category::RendererHacks,
-                                                  Specialization::Default};
-
-    SwitchableSetting<GpuUnswizzle> gpu_unswizzle_stream_size{linkage,
-                                                  GpuUnswizzle::Medium,
-                                                  "gpu_unswizzle_stream_size",
-                                                  Category::RendererHacks,
-                                                  Specialization::Default};
-
     SwitchableSetting<GpuUnswizzleChunk> gpu_unswizzle_chunk_size{linkage,
-                                                  GpuUnswizzleChunk::Medium,
+                                                  GpuUnswizzleChunk::VeryLow,
                                                   "gpu_unswizzle_chunk_size",
                                                   Category::RendererHacks,
                                                   Specialization::Default};
-
-    /*SwitchableSetting<bool> gpu_unswizzle_enabled{linkage, false, "gpu_unswizzle_enabled",
-                                                  Category::RendererHacks};*/
 
     SwitchableSetting<AsyncUnswizzleMode> async_unswizzle_mode{linkage,
                                                   AsyncUnswizzleMode::Off,

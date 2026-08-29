@@ -552,10 +552,6 @@ TextureCacheRuntime::TextureCacheRuntime(const Device& device_, ProgramManager& 
 
 TextureCacheRuntime::~TextureCacheRuntime() = default;
 
-bool TextureCacheRuntime::IsUnswizzleStorageFormatSupported(PixelFormat format) {
-    return false;
-}
-
 void TextureCacheRuntime::Finish() {
     glFinish();
 }

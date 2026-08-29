@@ -75,8 +75,6 @@ public:
                                  StagingBufferPool& staging_buffer_pool);
     ~TextureCacheRuntime();
 
-    bool IsUnswizzleStorageFormatSupported(PixelFormat format);
-
     void Finish();
 
     void FlushDeferredClear() {}

@@ -47,7 +47,6 @@ SETTING(u16, false);
 SWITCHABLE(AnisotropyMode, true);
 SWITCHABLE(AntiAliasing, false);
 SWITCHABLE(AspectRatio, true);
-SWITCHABLE(TexUnswizzleMode, true);
 SWITCHABLE(AstcDecodeMode, true);
 SWITCHABLE(AstcRecompression, true);
 SWITCHABLE(AudioMode, true);
