@@ -2,13 +2,13 @@
 
 ## Introduction
 
-Eden is a very complicated piece of software, and as such there are many knobs and toggles that can be configured. Most of these are invisible to normal users, however power users may be able to leverage them to their advantage.
+Eden is a very complicated piece of software, there are many knobs and toggles that can be configured. Most of these are invisible to normal users, however, power users may be able to leverage them to their advantage.
 
 This handbook primarily describes such knobs and toggles. Normal configuration options are described within the emulator itself and will not be covered in detail.
 
 ## Requirements
 
-The emulator is very demanding on hardware, and as such requires a decent mid-range computer/cellphone.
+The emulator is very demanding on hardware and requires a decent mid-range computer/cellphone.
 
 See [the requirements page](https://archive.is/sv83h) for recommended and minimum specs.
 

@@ -82,7 +82,7 @@ cmake --install build
 
 It may be tempting to specify `-t glslang`, but this will cause installation to fail. So don't.
 
-Using `--parallel` on CMake incorrectly passes `dmake ... -jn` instead of `dmake ... -j n`, this is a bug with OmniOS's CMake, and as such it's recommended to not use this option until it's fixed.
+Using `--parallel` on CMake incorrectly passes `dmake ... -jn` instead of `dmake ... -j n`, this is a bug with OmniOS's CMake, it's recommended to not use this option until it's fixed.
 
 You may also need to install `gmake` in order to properly build FFmpeg, this is provided by the `build-essential` package.
 
