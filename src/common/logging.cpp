@@ -428,21 +428,33 @@ void FmtLogMessageImpl(Class log_class, Level log_level, const char* filename, u
         auto const flush = ::Settings::values.log_flush_line.GetValue();
         char buffer[BUFSIZ];
         auto result = fmt::vformat_to_n(buffer, sizeof(buffer) - 1, format, args);
-        buffer[(std::min)(result.size, sizeof(buffer) - 1)] = '\0';
-        logging_instance->ForEachBackend([=](Backend& backend) {
-            backend.Write(Entry{
-                .message = buffer,
-                .message_len = (std::min)(result.size, sizeof(buffer) - 1),
-                .timestamp = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - logging_instance->time_origin),
-                .log_class = log_class,
-                .log_level = log_level,
-                .filename = TrimSourcePath(filename),
-                .function = function,
-                .line_num = line_num,
+        Entry e{
+            .message = nullptr,
+            .message_len = 0,
+            .timestamp = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - logging_instance->time_origin),
+            .log_class = log_class,
+            .log_level = log_level,
+            .filename = TrimSourcePath(filename),
+            .function = function,
+            .line_num = line_num,
+        };
+        if (result.size <= sizeof(buffer - 1)) {
+            buffer[(std::min)(result.size, sizeof(buffer) - 1)] = '\0';
+            e.message = buffer;
+            e.message_len = (std::min)(result.size, sizeof(buffer) - 1);
+            logging_instance->ForEachBackend([=](Backend& backend) {
+                backend.Write(e);
+                if (flush) backend.Flush();
             });
-            if (flush)
-                backend.Flush();
-        });
+        } else {
+            std::string s = fmt::format(format, args);
+            e.message = s.c_str();
+            e.message_len = s.size();
+            logging_instance->ForEachBackend([=](Backend& backend) {
+                backend.Write(e);
+                if (flush) backend.Flush();
+            });
+        }
     }
 }
 } // namespace Common::Log
