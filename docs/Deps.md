@@ -261,7 +261,7 @@ brew install molten-vk
 
 As root run:
 ```sh
-pkg install devel/cmake devel/sdl3 devel/boost-libs devel/catch2 devel/libfmt devel/nlohmann-json devel/ninja devel/nasm devel/autoconf devel/pkgconf devel/qt6-base x11-toolkits/qt6-charts devel/simpleini net/enet multimedia/ffnvcodec-headers multimedia/ffmpeg audio/opus archivers/liblz4 lang/gcc12 graphics/glslang graphics/vulkan-utility-libraries graphics/spirv-tools www/cpp-httplib vulkan-headers quazip-qt6
+pkg install devel/cmake devel/sdl3 devel/boost-libs devel/catch2 devel/libfmt devel/nlohmann-json devel/ninja devel/nasm devel/autoconf devel/pkgconf devel/qt6-base x11-toolkits/qt6-charts devel/simpleini net/enet multimedia/ffnvcodec-headers multimedia/ffmpeg audio/opus archivers/liblz4 lang/gcc12 graphics/glslang graphics/vulkan-utility-libraries graphics/spirv-tools www/cpp-httplib graphics/vulkan-utility-libraries graphics/vulkan-headers graphics/spirv-headers quazip-qt6
 ```
 
 If using FreeBSD 12 or prior, use `devel/pkg-config` instead.

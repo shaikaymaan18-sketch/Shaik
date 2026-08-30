@@ -32,6 +32,7 @@ Tools for Eden and other subprojects. When adding new scripts please use `#!/bin
 - `fuzzsettings.cpp`: Fuzz settings files.
 
 ## Android
+
 It's recommended to run these scripts after almost any Android change, as they are relatively fast and important both for APK bloat and CI.
 
 - `unused-strings.sh`: Finds unused strings in `strings.xml` files.

@@ -69,29 +69,15 @@ Wayland is not recommended. Testing has shown significantly worse performance on
 
 ## Windows
 
-Windows 10 and 11 are supported. Support for Windows 8.x is unknown, and Windows 7 support is unlikely to ever be added.
+Windows 10 and 11 are supported. Anything below is unsupported.
 
-In order to run Eden, you will probably need to install the [Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170).
+To run Eden, you'll need to install [Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170).
 
 Neither AMD/NVIDIA drivers work nearly as well as Linux's RADV drivers. Compatibility is still largely the same, but performance and some hard-to-run games may suffer compared to Linux.
 
-Tacit support for down to XP is provided for interested hobbyists. Read below.
-
-### Windows 7, 8, 8.1
-
-DirectX 12 is not available - simply copy and paste any DLL and name it `d3d12.dll`.
-
-Install [Qt6 compatibility libraries](https://github.com/crystalidea/qt6windows7) specifically Qt 6.9.5.
-
-### Windows XP, Vista
-
-If you haven't already, install appropriate updates using [Legacy Update](https://legacyupdate.net/). We highly recommend to install [One-Core-API](https://github.com/shorthorn-project/One-Core-API-Binaries) as well.
-
-64-bit support is *mandatory*, there are no plans to add 32-bit support (PRs are welcome of course). While AVX2 support is recommended, it isn't a hard requirement. SSE4.1+ is recommended however, while the emulator does run well without (minimum is SSE3), non-SSE4.1 code paths are unmaintained.
-
 ### Windows on ARM
 
-If you're using Snapdragon X or 8CX, use the [the Vulkan translation layer](https://apps.microsoft.com/detail/9nqpsl29bfff?hl=en-us&gl=USE) only if the stock drivers do not work. And of course always keep your system up-to-date.
+If you're using Snapdragon X or 8CX, install the [Vulkan translation layer](https://apps.microsoft.com/detail/9nqpsl29bfff?hl=en-us&gl=USE) only if the stock drivers don't work. And of course always keep your system up-to-date.
 
 ## Android
 

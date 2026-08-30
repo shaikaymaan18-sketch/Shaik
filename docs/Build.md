@@ -5,11 +5,14 @@
 
 This is a full-fledged guide to build Eden on all supported platforms.
 
-TL;DR
+If you already have a development environment set up:
+
 ```sh
-cmake -DCMAKE_BUILD_TYPE=Release -Bbuild -GNinja
-cmake --build build -t yuzu --parallel
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -G Ninja
+cmake --build build
 ```
+
+On Linux, macOS, and MinGW/MSYS2, make sure to read the [dependencies guide](Deps.md). On Android, read its [dedicated page](build/Android.md).
 
 ## Dependencies
 
