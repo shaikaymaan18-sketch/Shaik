@@ -337,7 +337,7 @@ private:
     std::array<HostLocInfo, SpillCount> spills;
 
     mutable std::size_t alloc_candidate_index = 0;
-    boost::container::unordered_flat_set<const IR::Inst*> defined_insts;
+    boost::unordered::unordered_flat_set<const IR::Inst*> defined_insts;
 };
 
 template<typename T>

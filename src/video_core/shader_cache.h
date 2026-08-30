@@ -149,8 +149,8 @@ private:
     mutable std::mutex lookup_mutex;
     std::mutex invalidation_mutex;
 
-    boost::container::unordered_flat_map<u64, std::unique_ptr<Entry>> lookup_cache;
-    boost::container::unordered_flat_map<u64, std::vector<Entry*>> invalidation_cache;
+    boost::unordered::unordered_flat_map<u64, std::unique_ptr<Entry>> lookup_cache;
+    boost::unordered::unordered_flat_map<u64, std::vector<Entry*>> invalidation_cache;
     std::vector<std::unique_ptr<ShaderInfo>> storage;
     std::vector<Entry*> marked_for_removal;
 };

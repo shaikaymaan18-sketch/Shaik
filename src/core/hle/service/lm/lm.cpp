@@ -332,7 +332,7 @@ private:
     };
     static_assert(sizeof(LogPacketHeader) == 0x18, "LogPacketHeader is an invalid size");
 
-    boost::container::unordered_flat_map<LogPacketHeaderEntry, std::vector<u8>> entries{};
+    boost::unordered::unordered_flat_map<LogPacketHeaderEntry, std::vector<u8>> entries{};
     LogDestination destination{LogDestination::All};
 };
 

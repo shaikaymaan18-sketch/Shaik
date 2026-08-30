@@ -114,7 +114,7 @@ private:
     };
     static_assert(sizeof(IoctlRemapEntry) == 20, "IoctlRemapEntry is incorrect size");
 
-    boost::container::unordered_flat_set<s64_le> map_buffer_offsets{};
+    boost::unordered::unordered_flat_set<s64_le> map_buffer_offsets{};
 
     struct IoctlMapBufferEx {
         MappingFlags flags{}; // bit0: fixed_offset, bit2: cacheable

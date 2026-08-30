@@ -89,7 +89,7 @@ public:
     virtual void ClearCache();
 
     /// Invalidates a selection of basic blocks.
-    void InvalidateBasicBlocks(const boost::container::unordered_flat_set<IR::LocationDescriptor>& locations);
+    void InvalidateBasicBlocks(const boost::unordered::unordered_flat_set<IR::LocationDescriptor>& locations);
 
 //protected:
     // Microinstruction emitters
@@ -132,8 +132,8 @@ public:
     // State
     BlockOfCode& code;
     ExceptionHandler exception_handler;
-    boost::container::unordered_flat_map<IR::LocationDescriptor, BlockDescriptor> block_descriptors;
-    boost::container::unordered_flat_map<IR::LocationDescriptor, PatchInformation> patch_information;
+    boost::unordered::unordered_flat_map<IR::LocationDescriptor, BlockDescriptor> block_descriptors;
+    boost::unordered::unordered_flat_map<IR::LocationDescriptor, PatchInformation> patch_information;
 
     // We need materialized protected members
     friend class A64EmitX64;

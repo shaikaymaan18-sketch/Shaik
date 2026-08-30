@@ -793,8 +793,8 @@ struct KernelCore::Impl {
 
     std::optional<KObjectNameGlobalData> object_name_global_data;
 
-    boost::container::unordered_flat_set<KAutoObject*> registered_objects;
-    boost::container::unordered_flat_set<KAutoObject*> registered_in_use_objects;
+    boost::unordered::unordered_flat_set<KAutoObject*> registered_objects;
+    boost::unordered::unordered_flat_set<KAutoObject*> registered_in_use_objects;
 
     std::mutex server_lock;
     std::vector<std::unique_ptr<Service::ServerManager>> server_managers;

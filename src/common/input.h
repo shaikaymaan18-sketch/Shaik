@@ -413,7 +413,7 @@ public:
 namespace Impl {
 
 template <typename InputDeviceType>
-using FactoryListType = boost::container::unordered_flat_map<std::string, std::shared_ptr<Factory<InputDeviceType>>>;
+using FactoryListType = boost::unordered::unordered_flat_map<std::string, std::shared_ptr<Factory<InputDeviceType>>>;
 
 template <typename InputDeviceType>
 struct FactoryList {

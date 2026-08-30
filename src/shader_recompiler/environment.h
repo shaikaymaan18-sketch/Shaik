@@ -127,9 +127,9 @@ protected:
     u32 start_address{};
     bool is_proprietary_driver{};
 public:
-    boost::container::unordered_flat_map<CbufWordKey, u32, CbufWordKeyHash> cbuf_word_cache;
-    boost::container::unordered_flat_map<HandleKey,  u32, HandleKeyHash> handle_cache;
-    boost::container::unordered_flat_map<const IR::Inst*, ConstBufferAddr> track_cache;
+    boost::unordered::unordered_flat_map<CbufWordKey, u32, CbufWordKeyHash> cbuf_word_cache;
+    boost::unordered::unordered_flat_map<HandleKey,  u32, HandleKeyHash> handle_cache;
+    boost::unordered::unordered_flat_map<const IR::Inst*, ConstBufferAddr> track_cache;
 };
 
 } // namespace Shader

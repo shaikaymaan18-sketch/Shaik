@@ -21,7 +21,7 @@
 #include "input_common/drivers/virtual_gamepad.h"
 #include "native.h"
 
-boost::container::unordered_flat_map<std::string, std::unique_ptr<AndroidConfig>> map_profiles;
+boost::unordered::unordered_flat_map<std::string, std::unique_ptr<AndroidConfig>> map_profiles;
 
 bool IsHandheldOnly() {
     const auto npad_style_set =

@@ -158,7 +158,7 @@ VkFormatFeatureFlags GetFormatFeatures(VkFormatProperties properties, FormatType
     }
 }
 
-boost::container::unordered_flat_map<VkFormat, VkFormatProperties> GetFormatProperties(vk::PhysicalDevice physical) {
+boost::unordered::unordered_flat_map<VkFormat, VkFormatProperties> GetFormatProperties(vk::PhysicalDevice physical) {
     static constexpr std::array formats{
         VK_FORMAT_A1R5G5B5_UNORM_PACK16,
         VK_FORMAT_A2B10G10R10_SINT_PACK32,
@@ -310,7 +310,7 @@ boost::container::unordered_flat_map<VkFormat, VkFormatProperties> GetFormatProp
         VK_FORMAT_EAC_R11G11_UNORM_BLOCK,
         VK_FORMAT_EAC_R11G11_SNORM_BLOCK,
     };
-    boost::container::unordered_flat_map<VkFormat, VkFormatProperties> format_properties;
+    boost::unordered::unordered_flat_map<VkFormat, VkFormatProperties> format_properties;
     for (const auto format : formats) {
         format_properties.emplace(format, physical.GetFormatProperties(format));
     }
@@ -318,7 +318,7 @@ boost::container::unordered_flat_map<VkFormat, VkFormatProperties> GetFormatProp
 }
 
 #if defined(__ANDROID__) && defined(ARCHITECTURE_arm64)
-void OverrideBcnFormats(boost::container::unordered_flat_map<VkFormat, VkFormatProperties>& format_properties) {
+void OverrideBcnFormats(boost::unordered::unordered_flat_map<VkFormat, VkFormatProperties>& format_properties) {
     // These properties are extracted from Adreno driver 512.687.0
     constexpr VkFormatFeatureFlags tiling_features{VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
                                                    VK_FORMAT_FEATURE_BLIT_SRC_BIT |
@@ -1677,7 +1677,7 @@ void Device::CollectToolingInfo() {
 std::vector<VkDeviceQueueCreateInfo> Device::GetDeviceQueueCreateInfos() const {
     static constexpr float QUEUE_PRIORITY = 1.0f;
 
-    boost::container::unordered_flat_set<u32> unique_queue_families{graphics_family, present_family};
+    boost::unordered::unordered_flat_set<u32> unique_queue_families{graphics_family, present_family};
     std::vector<VkDeviceQueueCreateInfo> queue_cis;
     queue_cis.reserve(unique_queue_families.size());
 

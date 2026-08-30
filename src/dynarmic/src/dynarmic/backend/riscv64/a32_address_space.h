@@ -75,8 +75,8 @@ private:
     CodeBlock cb;
     biscuit::Assembler as;
 
-    boost::container::unordered_flat_map<u64, CodePtr> block_entries;
-    boost::container::unordered_flat_map<u64, EmittedBlockInfo> block_infos;
+    boost::unordered::unordered_flat_map<u64, CodePtr> block_entries;
+    boost::unordered::unordered_flat_map<u64, EmittedBlockInfo> block_infos;
 
     struct PreludeInfo {
         CodePtr end_of_prelude;

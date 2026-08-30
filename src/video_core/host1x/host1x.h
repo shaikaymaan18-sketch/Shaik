@@ -119,7 +119,7 @@ private:
     }
 
     std::mutex m_mutex{};
-    boost::container::unordered_flat_map<s32, FrameDevice> m_frame_devices;
+    boost::unordered::unordered_flat_map<s32, FrameDevice> m_frame_devices;
 
     static constexpr size_t MAX_PRESENT_QUEUE = 100;
     static constexpr size_t MAX_DECODE_MAP = 200;

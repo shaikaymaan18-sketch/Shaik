@@ -301,8 +301,8 @@ private:
     bool configuring{false};
     const std::string input_engine;
     int last_callback_key = 0;
-    boost::container::unordered_flat_map<PadIdentifier, ControllerData> controller_list;
-    boost::container::unordered_flat_map<int, InputIdentifier> callback_list;
+    boost::unordered::unordered_flat_map<PadIdentifier, ControllerData> controller_list;
+    boost::unordered::unordered_flat_map<int, InputIdentifier> callback_list;
     MappingCallback mapping_callback;
 };
 

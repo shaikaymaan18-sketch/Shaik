@@ -238,8 +238,8 @@ struct MacroEngine {
         AnyCachedMacro program;
         u64 hash{};
     };
-    boost::container::unordered_flat_map<u32, CacheInfo> macro_cache;
-    boost::container::unordered_flat_map<u32, std::vector<u32>> uploaded_macro_code;
+    boost::unordered::unordered_flat_map<u32, CacheInfo> macro_cache;
+    boost::unordered::unordered_flat_map<u32, std::vector<u32>> uploaded_macro_code;
     bool is_interpreted;
 };
 

@@ -197,8 +197,8 @@ private:
         SetLegacyPathImpl(legacy_path, new_path);
     }
 
-    boost::container::unordered_flat_map<EdenPath, fs::path> eden_paths;
-    boost::container::unordered_flat_map<EmuPath, fs::path> legacy_paths;
+    boost::unordered::unordered_flat_map<EdenPath, fs::path> eden_paths;
+    boost::unordered::unordered_flat_map<EmuPath, fs::path> legacy_paths;
 };
 
 bool ValidatePath(const fs::path& path) {

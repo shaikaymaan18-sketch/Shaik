@@ -57,10 +57,10 @@ private:
         }
     };
 
-    boost::container::unordered_flat_map<AppKey, bool, AppKeyHash> app_auto_transfer_{};
-    boost::container::unordered_flat_map<Common::UUID, bool> global_auto_upload_{};
-    boost::container::unordered_flat_map<Common::UUID, bool> global_auto_download_{};
-    boost::container::unordered_flat_map<AppKey, u8, AppKeyHash> autonomy_task_status_{};
+    boost::unordered::unordered_flat_map<AppKey, bool, AppKeyHash> app_auto_transfer_{};
+    boost::unordered::unordered_flat_map<Common::UUID, bool> global_auto_upload_{};
+    boost::unordered::unordered_flat_map<Common::UUID, bool> global_auto_download_{};
+    boost::unordered::unordered_flat_map<AppKey, u8, AppKeyHash> autonomy_task_status_{};
 };
 
 } // namespace Service::OLSC

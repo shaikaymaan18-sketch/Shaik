@@ -40,8 +40,8 @@ private:
 
     mutable std::mutex lock;
     s32 last_id = 0;
-    boost::container::unordered_flat_map<s32, std::shared_ptr<android::IBinder>> binders;
-    boost::container::unordered_flat_map<s32, RefCounts> refcounts;
+    boost::unordered::unordered_flat_map<s32, std::shared_ptr<android::IBinder>> binders;
+    boost::unordered::unordered_flat_map<s32, RefCounts> refcounts;
 };
 
 } // namespace Service::Nvnflinger

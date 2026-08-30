@@ -66,7 +66,7 @@ public:
     }
 
 private:
-    boost::container::unordered_flat_map<u64, int> page_table;
+    boost::unordered::unordered_flat_map<u64, int> page_table;
     std::vector<std::tuple<DAddr, u64, int>> calls;
     size_t update_calls = 0;
 };

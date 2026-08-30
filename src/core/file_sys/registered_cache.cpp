@@ -566,7 +566,7 @@ VirtualFile RegisteredCache::GetFileAtID(NcaID id) const {
     return file;
 }
 
-static std::optional<NcaID> CheckMapForContentRecord(const boost::container::unordered_flat_map<u64, CNMT>& map, u64 title_id, ContentRecordType type) {
+static std::optional<NcaID> CheckMapForContentRecord(const boost::unordered::unordered_flat_map<u64, CNMT>& map, u64 title_id, ContentRecordType type) {
     auto cmnt_iter = map.find(title_id);
     u8 id_offset = 0;
 

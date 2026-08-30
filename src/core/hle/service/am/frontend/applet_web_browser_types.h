@@ -177,6 +177,6 @@ struct WebCommonReturnValue {
 };
 static_assert(sizeof(WebCommonReturnValue) == 0x1010, "WebCommonReturnValue has incorrect size.");
 
-using WebArgInputTLVMap = boost::container::unordered_flat_map<WebArgInputTLVType, std::vector<u8>>;
+using WebArgInputTLVMap = boost::unordered::unordered_flat_map<WebArgInputTLVType, std::vector<u8>>;
 
 } // namespace Service::AM::Frontend

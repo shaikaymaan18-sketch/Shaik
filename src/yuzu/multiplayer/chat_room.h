@@ -66,8 +66,8 @@ private:
     bool has_mod_perms = false;
     QStandardItemModel* player_list;
     std::unique_ptr<Ui::ChatRoom> ui;
-    boost::container::unordered_flat_set<std::string> block_list;
-    boost::container::unordered_flat_map<std::string, QPixmap> icon_cache;
+    boost::unordered::unordered_flat_set<std::string> block_list;
+    boost::unordered::unordered_flat_map<std::string, QPixmap> icon_cache;
 };
 
 Q_DECLARE_METATYPE(Network::ChatEntry);

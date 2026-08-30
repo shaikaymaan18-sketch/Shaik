@@ -20,7 +20,7 @@ struct RomMetadata {
     std::vector<u8> icon;
     bool isHomebrew;
 };
-static boost::container::unordered_flat_map<std::string, RomMetadata> m_rom_metadata_cache;
+static boost::unordered::unordered_flat_map<std::string, RomMetadata> m_rom_metadata_cache;
 
 static RomMetadata CacheRomMetadata(const std::string& path) {
     auto& instance = EmulationSession::GetInstance();

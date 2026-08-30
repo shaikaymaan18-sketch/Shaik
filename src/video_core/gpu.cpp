@@ -333,7 +333,7 @@ struct GPU::Impl {
     std::unique_ptr<Core::Frontend::GraphicsContext> cpu_context;
 
     Tegra::Control::Scheduler scheduler;
-    boost::container::unordered_flat_map<s32, std::shared_ptr<Tegra::Control::ChannelState>> channels;
+    boost::unordered::unordered_flat_map<s32, std::shared_ptr<Tegra::Control::ChannelState>> channels;
     Tegra::Control::ChannelState* current_channel;
     s32 bound_channel{-1};
 

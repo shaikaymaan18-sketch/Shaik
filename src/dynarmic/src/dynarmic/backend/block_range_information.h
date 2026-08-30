@@ -24,8 +24,8 @@ class BlockRangeInformation {
 public:
     void AddRange(boost::icl::discrete_interval<P> range, IR::LocationDescriptor location);
     void ClearCache();
-    boost::container::unordered_flat_set<IR::LocationDescriptor> InvalidateRanges(const boost::icl::interval_set<P>& ranges);
-    boost::icl::interval_map<P, boost::container::unordered_flat_set<IR::LocationDescriptor>> block_ranges;
+    boost::unordered::unordered_flat_set<IR::LocationDescriptor> InvalidateRanges(const boost::icl::interval_set<P>& ranges);
+    boost::icl::interval_map<P, boost::unordered::unordered_flat_set<IR::LocationDescriptor>> block_ranges;
 };
 
 }  // namespace Dynarmic::Backend

@@ -60,7 +60,7 @@ public:
 
 private:
     ExceptionHandler& exception_handler;
-    boost::container::unordered_flat_set<DoNotFastmemMarker, DoNotFastmemMarkerHash> do_not_fastmem;
+    boost::unordered::unordered_flat_set<DoNotFastmemMarker, DoNotFastmemMarkerHash> do_not_fastmem;
 };
 
 }  // namespace Dynarmic::Backend::Arm64

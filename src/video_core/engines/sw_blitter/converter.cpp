@@ -925,7 +925,7 @@ public:
 };
 
 struct ConverterFactory::ConverterFactoryImpl {
-    boost::container::unordered_flat_map<RenderTargetFormat, std::unique_ptr<Converter>> converters_cache;
+    boost::unordered::unordered_flat_map<RenderTargetFormat, std::unique_ptr<Converter>> converters_cache;
 };
 
 ConverterFactory::ConverterFactory() {

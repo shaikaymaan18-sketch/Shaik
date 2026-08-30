@@ -186,7 +186,7 @@ private:
 
     mutable std::mutex mutex;
     mutable std::mutex callback_mutex;
-    boost::container::unordered_flat_map<int, ConsoleUpdateCallback> callback_list;
+    boost::unordered::unordered_flat_map<int, ConsoleUpdateCallback> callback_list;
     int last_callback_key = 0;
 
     // Stores the current status of all console input

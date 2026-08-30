@@ -120,7 +120,7 @@ protected:
     std::array<LanStation, StationCountMax> stations;
     std::array<NodeLatestUpdate, NodeCountMax> node_changes{};
     std::array<u8, NodeCountMax> node_last_states{};
-    boost::container::unordered_flat_map<MacAddress, NetworkInfo, MACAddressHash> scan_results{};
+    boost::unordered::unordered_flat_map<MacAddress, NetworkInfo, MACAddressHash> scan_results{};
     NodeInfo node_info{};
     NetworkInfo network_info{};
     State state{State::None};

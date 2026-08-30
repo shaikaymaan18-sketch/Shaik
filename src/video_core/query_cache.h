@@ -351,7 +351,7 @@ private:
 
     mutable std::recursive_mutex mutex;
 
-    boost::container::unordered_flat_map<u64, std::vector<CachedQuery>> cached_queries;
+    boost::unordered::unordered_flat_map<u64, std::vector<CachedQuery>> cached_queries;
 
     std::array<CounterStream, VideoCore::NumQueryTypes> streams;
 

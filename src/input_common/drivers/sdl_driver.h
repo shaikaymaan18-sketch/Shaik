@@ -118,7 +118,7 @@ private:
     Common::SPSCQueue<VibrationRequest> vibration_queue;
 
     /// Map of GUID of a list of corresponding virtual Joysticks
-    boost::container::unordered_flat_map<Common::UUID, std::vector<std::shared_ptr<SDLJoystick>>> joystick_map;
+    boost::unordered::unordered_flat_map<Common::UUID, std::vector<std::shared_ptr<SDLJoystick>>> joystick_map;
     std::mutex joystick_map_mutex;
 
     bool start_thread = false;

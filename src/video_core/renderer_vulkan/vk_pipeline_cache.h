@@ -164,8 +164,8 @@ private:
     GraphicsPipelineCacheKey graphics_key{};
     GraphicsPipeline* current_pipeline{};
 
-    boost::container::unordered_flat_map<ComputePipelineCacheKey, std::unique_ptr<ComputePipeline>> compute_cache;
-    boost::container::unordered_flat_map<GraphicsPipelineCacheKey, std::unique_ptr<GraphicsPipeline>> graphics_cache;
+    boost::unordered::unordered_flat_map<ComputePipelineCacheKey, std::unique_ptr<ComputePipeline>> compute_cache;
+    boost::unordered::unordered_flat_map<GraphicsPipelineCacheKey, std::unique_ptr<GraphicsPipeline>> graphics_cache;
 
     ShaderPools main_pools;
 

@@ -258,7 +258,7 @@ private:
     std::array<Manager*, NUM_HIGH_PAGES> top_tier{};
     std::deque<std::array<Manager, MANAGER_POOL_SIZE>> manager_pool;
     std::deque<Manager*> free_managers;
-    boost::container::unordered_flat_set<u32> cached_pages;
+    boost::unordered::unordered_flat_set<u32> cached_pages;
     DeviceTracker* device_tracker = nullptr;
 };
 

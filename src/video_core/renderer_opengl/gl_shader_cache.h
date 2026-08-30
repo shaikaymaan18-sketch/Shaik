@@ -82,8 +82,8 @@ private:
     GraphicsPipeline* current_pipeline{};
 
     ShaderContext::ShaderPools main_pools;
-    boost::container::unordered_flat_map<GraphicsPipelineKey, std::unique_ptr<GraphicsPipeline>> graphics_cache;
-    boost::container::unordered_flat_map<ComputePipelineKey, std::unique_ptr<ComputePipeline>> compute_cache;
+    boost::unordered::unordered_flat_map<GraphicsPipelineKey, std::unique_ptr<GraphicsPipeline>> graphics_cache;
+    boost::unordered::unordered_flat_map<ComputePipelineKey, std::unique_ptr<ComputePipeline>> compute_cache;
 
     Shader::Profile profile;
     Shader::HostTranslateInfo host_info;

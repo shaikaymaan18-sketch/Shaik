@@ -153,7 +153,7 @@ private:
     mutable std::mutex ring_buffer_mutex;
 
     // Memory tracking
-    boost::container::unordered_flat_map<uintptr_t, MemoryAllocationEntry> memory_allocations;
+    boost::unordered::unordered_flat_map<uintptr_t, MemoryAllocationEntry> memory_allocations;
     mutable std::mutex memory_mutex;
 
     // Statistics

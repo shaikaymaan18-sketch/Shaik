@@ -100,8 +100,8 @@ private:
     void ReportUnimplementedFunction(HLERequestContext& ctx, const FunctionInfoBase* info);
 
 protected:
-    boost::container::unordered_flat_map<u32, FunctionInfoBase> handlers;
-    boost::container::unordered_flat_map<u32, FunctionInfoBase> handlers_tipc;
+    boost::unordered::unordered_flat_map<u32, FunctionInfoBase> handlers;
+    boost::unordered::unordered_flat_map<u32, FunctionInfoBase> handlers_tipc;
     /// Used to gain exclusive access to the service members, e.g. from CoreTiming thread.
     std::mutex lock_service;
     /// System context that the service operates under.

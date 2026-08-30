@@ -159,7 +159,7 @@ private:
     UtilShaders util_shaders;
     FormatConversionPass format_conversion_pass;
 
-    std::array<boost::container::unordered_flat_map<GLenum, FormatProperties>, 3> format_properties;
+    std::array<boost::unordered::unordered_flat_map<GLenum, FormatProperties>, 3> format_properties;
     bool has_broken_texture_view_formats = false;
 
     OGLTexture null_image_1d_array;

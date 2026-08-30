@@ -139,7 +139,7 @@ protected:
     NvCore::NvMap& nvmap;
     NvCore::ChannelType channel_type;
     std::array<u32, MaxSyncPoints> device_syncpoints{};
-    boost::container::unordered_flat_map<DeviceFD, NvCore::SessionId> sessions;
+    boost::unordered::unordered_flat_map<DeviceFD, NvCore::SessionId> sessions;
 };
 }; // namespace Devices
 } // namespace Service::Nvidia

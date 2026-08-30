@@ -94,7 +94,7 @@ private:
     static s64 Now();
 
     mutable std::mutex mtx;
-    boost::container::unordered_flat_map<std::string, StoredNews> items;
+    boost::unordered::unordered_flat_map<std::string, StoredNews> items;
     size_t open_counter{};
 };
 

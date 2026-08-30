@@ -1434,7 +1434,7 @@ static void VerificationPass(const IR::Block& block) {
             ASSERT(IR::AreTypesCompatible(t1, t2));
         }
     }
-    boost::container::unordered_flat_map<IR::Inst*, size_t> actual_uses;
+    boost::unordered::unordered_flat_map<IR::Inst*, size_t> actual_uses;
     for (auto const& inst : block.instructions) {
         for (size_t i = 0; i < inst.NumArgs(); i++)
             if (IR::Value const arg = inst.GetArg(i); !arg.IsImmediate())

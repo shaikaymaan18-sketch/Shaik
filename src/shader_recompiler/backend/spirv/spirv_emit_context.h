@@ -371,7 +371,7 @@ public:
     Id load_const_func_u32x4{};
 
     // Sirit::Id doesn't play nice with *::set<>
-    boost::container::unordered_flat_set<u32> non_uniform_ids;
+    boost::unordered::unordered_flat_set<u32> non_uniform_ids;
 
     bool uses_nonuniform_sampled_image{};
     bool uses_nonuniform_storage_image{};

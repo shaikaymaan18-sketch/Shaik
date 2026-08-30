@@ -637,7 +637,7 @@ private:
     ControllerMotionDevices virtual_motion_devices;
 
     mutable std::mutex callback_mutex;
-    boost::container::unordered_flat_map<int, ControllerUpdateCallback> callback_list;
+    boost::unordered::unordered_flat_map<int, ControllerUpdateCallback> callback_list;
     int last_callback_key = 0;
 
     // Stores the current status of all controller input

@@ -18,7 +18,7 @@ using Vector = Dynarmic::A64::Vector;
 
 class A64TestEnv : public Dynarmic::A64::UserCallbacks {
 public:
-    boost::container::unordered_flat_map<u64, u8> modified_memory;
+    boost::unordered::unordered_flat_map<u64, u8> modified_memory;
     std::vector<u32> code_mem;
     u64 ticks_left = 0;
     u64 code_mem_start_address = 0;

@@ -76,7 +76,7 @@ public:
 
 private:
     const Device* device{};
-    boost::container::unordered_flat_map<RenderPassKey, vk::RenderPass> cache;
+    boost::unordered::unordered_flat_map<RenderPassKey, vk::RenderPass> cache;
     std::mutex mutex;
 };
 

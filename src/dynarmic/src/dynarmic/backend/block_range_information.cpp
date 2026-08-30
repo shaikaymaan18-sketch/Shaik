@@ -18,7 +18,7 @@ namespace Dynarmic::Backend {
 
 template<typename P>
 void BlockRangeInformation<P>::AddRange(boost::icl::discrete_interval<P> range, IR::LocationDescriptor location) {
-    block_ranges.add(std::make_pair(range, boost::container::unordered_flat_set<IR::LocationDescriptor>{location}));
+    block_ranges.add(std::make_pair(range, boost::unordered::unordered_flat_set<IR::LocationDescriptor>{location}));
 }
 
 template<typename P>
@@ -27,8 +27,8 @@ void BlockRangeInformation<P>::ClearCache() {
 }
 
 template<typename P>
-boost::container::unordered_flat_set<IR::LocationDescriptor> BlockRangeInformation<P>::InvalidateRanges(const boost::icl::interval_set<P>& ranges) {
-    boost::container::unordered_flat_set<IR::LocationDescriptor> erase_locations;
+boost::unordered::unordered_flat_set<IR::LocationDescriptor> BlockRangeInformation<P>::InvalidateRanges(const boost::icl::interval_set<P>& ranges) {
+    boost::unordered::unordered_flat_set<IR::LocationDescriptor> erase_locations;
     for (auto invalidate_interval : ranges) {
         auto pair = block_ranges.equal_range(invalidate_interval);
         for (auto it = pair.first; it != pair.second; ++it)

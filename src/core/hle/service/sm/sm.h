@@ -101,8 +101,8 @@ private:
 
     /// Map of registered services, retrieved using GetServicePort.
     mutable std::mutex lock;
-    boost::container::unordered_flat_map<std::string, SessionRequestHandlerFactory> registered_services;
-    boost::container::unordered_flat_map<std::string, Kernel::KClientPort*> service_ports;
+    boost::unordered::unordered_flat_map<std::string, SessionRequestHandlerFactory> registered_services;
+    boost::unordered::unordered_flat_map<std::string, Kernel::KClientPort*> service_ports;
 
     /// Kernel context
     Kernel::KernelCore& kernel;

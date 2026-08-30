@@ -391,7 +391,7 @@ private:
                    std::optional<Node> return_label) {
         Statement* const false_stmt{pool.Create(Identity{}, IR::Condition{false}, &root_stmt)};
         Tree& root{root_stmt.children};
-        boost::container::unordered_flat_map<Flow::Block*, Node> local_labels;
+        boost::unordered::unordered_flat_map<Flow::Block*, Node> local_labels;
         local_labels.reserve(function.blocks.size());
 
         for (Flow::Block& block : function.blocks) {

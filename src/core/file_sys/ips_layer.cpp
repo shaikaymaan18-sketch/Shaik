@@ -105,7 +105,7 @@ struct IPSwitchRecord {
     size_t count;
 };
 struct IPSwitchCompiler::IPSwitchPatch {
-    boost::container::unordered_flat_map<u32, IPSwitchRecord> records;
+    boost::unordered::unordered_flat_map<u32, IPSwitchRecord> records;
     bool enabled;
 };
 

@@ -56,7 +56,7 @@ class SigHandler {
         });
     }
 
-    boost::container::unordered_flat_map<u64, CodeBlockInfo> code_block_infos;
+    boost::unordered::unordered_flat_map<u64, CodeBlockInfo> code_block_infos;
     std::shared_mutex code_block_infos_mutex;
     struct sigaction old_sa_segv;
     struct sigaction old_sa_bus;

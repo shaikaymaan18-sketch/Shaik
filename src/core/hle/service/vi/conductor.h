@@ -50,7 +50,7 @@ private:
 private:
     Core::System& m_system;
     Container& m_container;
-    boost::container::unordered_flat_map<u64, VsyncManager> m_vsync_managers;
+    boost::unordered::unordered_flat_map<u64, VsyncManager> m_vsync_managers;
     std::shared_ptr<Core::Timing::EventType> m_event;
     Common::Event m_signal;
     std::jthread m_thread;

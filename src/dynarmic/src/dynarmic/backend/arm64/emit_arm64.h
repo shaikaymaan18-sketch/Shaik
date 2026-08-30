@@ -106,8 +106,8 @@ struct EmittedBlockInfo {
     CodePtr entry_point;
     std::size_t size;
     std::vector<Relocation> relocations;
-    boost::container::unordered_flat_map<IR::LocationDescriptor, std::vector<BlockRelocation>> block_relocations;
-    boost::container::unordered_flat_map<std::ptrdiff_t, FastmemPatchInfo> fastmem_patch_info;
+    boost::unordered::unordered_flat_map<IR::LocationDescriptor, std::vector<BlockRelocation>> block_relocations;
+    boost::unordered::unordered_flat_map<std::ptrdiff_t, FastmemPatchInfo> fastmem_patch_info;
 };
 
 struct EmitConfig {

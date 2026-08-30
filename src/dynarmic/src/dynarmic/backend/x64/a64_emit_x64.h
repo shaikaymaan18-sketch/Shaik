@@ -123,11 +123,11 @@ public:
     RegAlloc reg_alloc; //reusable reg alloc
     BlockRangeInformation<u64> block_ranges;
     std::array<FastDispatchEntry, fast_dispatch_table_size> fast_dispatch_table;
-    boost::container::unordered_flat_map<u64, FastmemPatchInfo> fastmem_patch_info;
-    boost::container::unordered_flat_map<std::tuple<bool, size_t, int, int>, void (*)()> read_fallbacks;
-    boost::container::unordered_flat_map<std::tuple<bool, size_t, int, int>, void (*)()> write_fallbacks;
-    boost::container::unordered_flat_map<std::tuple<bool, size_t, int, int>, void (*)()> exclusive_write_fallbacks;
-    boost::container::unordered_flat_set<DoNotFastmemMarker> do_not_fastmem;
+    boost::unordered::unordered_flat_map<u64, FastmemPatchInfo> fastmem_patch_info;
+    boost::unordered::unordered_flat_map<std::tuple<bool, size_t, int, int>, void (*)()> read_fallbacks;
+    boost::unordered::unordered_flat_map<std::tuple<bool, size_t, int, int>, void (*)()> write_fallbacks;
+    boost::unordered::unordered_flat_map<std::tuple<bool, size_t, int, int>, void (*)()> exclusive_write_fallbacks;
+    boost::unordered::unordered_flat_set<DoNotFastmemMarker> do_not_fastmem;
     boost::container::stable_vector<Xbyak::Label> shared_labels;
     const void* terminal_handler_pop_rsb_hint = nullptr;
     const void* terminal_handler_fast_dispatch_hint = nullptr;

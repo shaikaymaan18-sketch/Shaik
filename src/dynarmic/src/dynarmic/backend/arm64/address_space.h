@@ -42,7 +42,7 @@ public:
 
     CodePtr GetOrEmit(IR::LocationDescriptor descriptor);
 
-    void InvalidateBasicBlocks(const boost::container::unordered_flat_set<IR::LocationDescriptor>& descriptors);
+    void InvalidateBasicBlocks(const boost::unordered::unordered_flat_set<IR::LocationDescriptor>& descriptors);
 
     void ClearCache();
 protected:
@@ -77,9 +77,9 @@ protected:
     // A IR::LocationDescriptor will have one current CodePtr.
     // However, there can be multiple other CodePtrs which are older, previously invalidated blocks.
     std::map<CodePtr, IR::LocationDescriptor> reverse_block_entries;
-    boost::container::unordered_flat_map<IR::LocationDescriptor, CodePtr> block_entries;
-    boost::container::unordered_flat_map<CodePtr, EmittedBlockInfo> block_infos;
-    boost::container::unordered_flat_map<IR::LocationDescriptor, boost::container::unordered_flat_set<CodePtr>> block_references;
+    boost::unordered::unordered_flat_map<IR::LocationDescriptor, CodePtr> block_entries;
+    boost::unordered::unordered_flat_map<CodePtr, EmittedBlockInfo> block_infos;
+    boost::unordered::unordered_flat_map<IR::LocationDescriptor, boost::unordered::unordered_flat_set<CodePtr>> block_references;
 
     ExceptionHandler exception_handler;
     FastmemManager fastmem_manager;

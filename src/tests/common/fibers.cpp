@@ -40,7 +40,7 @@ public:
 
 private:
     mutable std::mutex mutex;
-    boost::container::unordered_flat_map<std::thread::id, u32> ids;
+    boost::unordered::unordered_flat_map<std::thread::id, u32> ids;
 };
 
 class TestControl1 {

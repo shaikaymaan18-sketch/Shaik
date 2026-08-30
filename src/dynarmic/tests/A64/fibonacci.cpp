@@ -24,7 +24,7 @@ namespace {
 class MyEnvironment final : public A64::UserCallbacks {
 public:
     u64 ticks_left = 0;
-    boost::container::unordered_flat_map<u64, u8> memory{};
+    boost::unordered::unordered_flat_map<u64, u8> memory{};
 
     u8 MemoryRead8(u64 vaddr) override {
         return memory[vaddr];

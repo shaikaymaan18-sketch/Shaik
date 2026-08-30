@@ -119,7 +119,7 @@ private:
 
     NvCore::Container& container;
     NvCore::NvMap& file;
-    boost::container::unordered_flat_map<DeviceFD, NvCore::SessionId> sessions;
+    boost::unordered::unordered_flat_map<DeviceFD, NvCore::SessionId> sessions;
 };
 
 } // namespace Service::Nvidia::Devices

@@ -44,7 +44,7 @@ private:
         }
     };
 
-    boost::container::unordered_flat_map<ConstantT, void*, ConstantHash> constant_info;
+    boost::unordered::unordered_flat_map<ConstantT, void*, ConstantHash> constant_info;
     std::span<ConstantT> pool;
     std::size_t insertion_point;
 };

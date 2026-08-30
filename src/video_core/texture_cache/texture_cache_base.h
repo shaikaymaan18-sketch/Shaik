@@ -69,7 +69,7 @@ struct AsyncDecodeContext {
     std::atomic_bool complete;
 };
 
-using TextureCacheGPUMap = boost::container::unordered_flat_map<u64, std::vector<ImageId>, Common::IdentityHash<u64>>;
+using TextureCacheGPUMap = boost::unordered::unordered_flat_map<u64, std::vector<ImageId>, Common::IdentityHash<u64>>;
 
 class TextureCacheChannelInfo : public ChannelInfo {
 public:
@@ -87,8 +87,8 @@ public:
     std::unordered_map<TICEntry, ImageViewId> image_views;
     std::unordered_map<TSCEntry, SamplerId> samplers;
 
-    boost::container::unordered_flat_map<u32, SamplerId> sampler_ids;
-    boost::container::unordered_flat_map<u32, ImageViewId> image_view_ids;
+    boost::unordered::unordered_flat_map<u32, SamplerId> sampler_ids;
+    boost::unordered::unordered_flat_map<u32, ImageViewId> image_view_ids;
 
     TextureCacheGPUMap* gpu_page_table = nullptr;
     TextureCacheGPUMap* sparse_page_table = nullptr;
@@ -442,9 +442,9 @@ private:
     FramebufferId last_framebuffer_id{};
     u64 last_framebuffer_serial = 0;
 
-    boost::container::unordered_flat_map<RenderTargets, FramebufferId> framebuffers;
-    boost::container::unordered_flat_map<u64, std::vector<ImageMapId>, Common::IdentityHash<u64>> page_table;
-    boost::container::unordered_flat_map<ImageId, boost::container::small_vector<ImageViewId, 16>> sparse_views;
+    boost::unordered::unordered_flat_map<RenderTargets, FramebufferId> framebuffers;
+    boost::unordered::unordered_flat_map<u64, std::vector<ImageMapId>, Common::IdentityHash<u64>> page_table;
+    boost::unordered::unordered_flat_map<ImageId, boost::container::small_vector<ImageViewId, 16>> sparse_views;
 
     DAddr virtual_invalid_space{};
 
@@ -500,7 +500,7 @@ private:
     DelayedDestructionRing<ImageView, TICKS_TO_DESTROY> sentenced_image_view;
     DelayedDestructionRing<Framebuffer, TICKS_TO_DESTROY> sentenced_framebuffers;
 
-    boost::container::unordered_flat_map<GPUVAddr, ImageAllocId> image_allocs_table;
+    boost::unordered::unordered_flat_map<GPUVAddr, ImageAllocId> image_allocs_table;
 
     Common::ScratchBuffer<u8> swizzle_data_buffer;
     Common::ScratchBuffer<u8> unswizzle_data_buffer;
@@ -517,17 +517,17 @@ private:
 
     // Join caching
     boost::container::small_vector<ImageId, 4> join_overlap_ids;
-    boost::container::unordered_flat_set<ImageId> join_overlaps_found;
+    boost::unordered::unordered_flat_set<ImageId> join_overlaps_found;
     boost::container::small_vector<ImageId, 4> join_left_aliased_ids;
     boost::container::small_vector<ImageId, 4> join_right_aliased_ids;
-    boost::container::unordered_flat_set<ImageId> join_ignore_textures;
+    boost::unordered::unordered_flat_set<ImageId> join_ignore_textures;
     boost::container::small_vector<ImageId, 4> join_bad_overlap_ids;
     struct JoinCopy {
         bool is_alias;
         ImageId id;
     };
     boost::container::small_vector<JoinCopy, 4> join_copies_to_do;
-    boost::container::unordered_flat_map<ImageId, size_t> join_alias_indices;
+    boost::unordered::unordered_flat_map<ImageId, size_t> join_alias_indices;
 };
 
 } // namespace VideoCommon

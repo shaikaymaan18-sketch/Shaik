@@ -57,9 +57,9 @@ enum class InputType { None, Button, Stick, Motion, Touch };
  * Given a ParamPackage for a Device returned from `GetInputDevices`, attempt to get the default
  * mapping for the device.
  */
-using AnalogMapping = boost::container::unordered_flat_map<Settings::NativeAnalog::Values, Common::ParamPackage>;
-using ButtonMapping = boost::container::unordered_flat_map<Settings::NativeButton::Values, Common::ParamPackage>;
-using MotionMapping = boost::container::unordered_flat_map<Settings::NativeMotion::Values, Common::ParamPackage>;
+using AnalogMapping = boost::unordered::unordered_flat_map<Settings::NativeAnalog::Values, Common::ParamPackage>;
+using ButtonMapping = boost::unordered::unordered_flat_map<Settings::NativeButton::Values, Common::ParamPackage>;
+using MotionMapping = boost::unordered::unordered_flat_map<Settings::NativeMotion::Values, Common::ParamPackage>;
 
 class InputSubsystem {
 public:

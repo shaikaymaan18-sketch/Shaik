@@ -1242,7 +1242,7 @@ private:
     std::vector<size_t> valid_heap_memory;                   ///< Heaps used.
 
     /// Format properties dictionary.
-    boost::container::unordered_flat_map<VkFormat, VkFormatProperties> format_properties;
+    boost::unordered::unordered_flat_map<VkFormat, VkFormatProperties> format_properties;
 
     /// Nsight Aftermath GPU crash tracker
     std::unique_ptr<NsightAftermathTracker> nsight_aftermath_tracker;

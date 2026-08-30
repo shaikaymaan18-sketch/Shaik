@@ -80,10 +80,10 @@ protected:
     GPUVAddr program_base{};
 
     std::vector<u64> code;
-    boost::container::unordered_flat_map<u32, Shader::TextureType> texture_types;
-    boost::container::unordered_flat_map<u32, Shader::TexturePixelFormat> texture_pixel_formats;
-    boost::container::unordered_flat_map<u64, u32> cbuf_values;
-    boost::container::unordered_flat_map<u64, Shader::ReplaceConstant> cbuf_replacements;
+    boost::unordered::unordered_flat_map<u32, Shader::TextureType> texture_types;
+    boost::unordered::unordered_flat_map<u32, Shader::TexturePixelFormat> texture_pixel_formats;
+    boost::unordered::unordered_flat_map<u64, u32> cbuf_values;
+    boost::unordered::unordered_flat_map<u64, Shader::ReplaceConstant> cbuf_replacements;
 
     u32 local_memory_size{};
     u32 texture_bound{};
@@ -202,10 +202,10 @@ public:
 
 private:
     std::vector<u64> code;
-    boost::container::unordered_flat_map<u32, Shader::TextureType> texture_types;
-    boost::container::unordered_flat_map<u32, Shader::TexturePixelFormat> texture_pixel_formats;
-    boost::container::unordered_flat_map<u64, u32> cbuf_values;
-    boost::container::unordered_flat_map<u64, Shader::ReplaceConstant> cbuf_replacements;
+    boost::unordered::unordered_flat_map<u32, Shader::TextureType> texture_types;
+    boost::unordered::unordered_flat_map<u32, Shader::TexturePixelFormat> texture_pixel_formats;
+    boost::unordered::unordered_flat_map<u64, u32> cbuf_values;
+    boost::unordered::unordered_flat_map<u64, Shader::ReplaceConstant> cbuf_replacements;
     std::array<u32, 3> workgroup_size{};
     u32 local_memory_size{};
     u32 shared_memory_size{};

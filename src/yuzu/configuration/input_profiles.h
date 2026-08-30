@@ -36,5 +36,5 @@ public:
 private:
     bool ProfileExistsInMap(const std::string& profile_name) const;
 
-    boost::container::unordered_flat_map<std::string, std::unique_ptr<QtConfig>> map_profiles;
+    boost::unordered::unordered_flat_map<std::string, std::unique_ptr<QtConfig>> map_profiles;
 };

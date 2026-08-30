@@ -397,7 +397,7 @@ void EmitX64::ClearCache() {
     PerfMapClear();
 }
 
-void EmitX64::InvalidateBasicBlocks(const boost::container::unordered_flat_set<IR::LocationDescriptor>& locations) {
+void EmitX64::InvalidateBasicBlocks(const boost::unordered::unordered_flat_set<IR::LocationDescriptor>& locations) {
     code.EnableWriting();
     for (const auto& descriptor : locations) {
         if (auto const it = block_descriptors.find(descriptor); it != block_descriptors.end()) {

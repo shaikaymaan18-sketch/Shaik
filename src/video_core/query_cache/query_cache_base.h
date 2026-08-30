@@ -161,7 +161,7 @@ protected:
         }
     }
 
-    using ContentCache = boost::container::unordered_flat_map<u64, boost::container::unordered_flat_map<u32, QueryLocation>>;
+    using ContentCache = boost::unordered::unordered_flat_map<u64, boost::unordered::unordered_flat_map<u32, QueryLocation>>;
 
     void InvalidateQuery(QueryLocation location);
     bool IsQueryDirty(QueryLocation location);
@@ -169,7 +169,7 @@ protected:
     void RequestGuestHostSync();
     void UnregisterPending();
 
-    boost::container::unordered_flat_map<u64, boost::container::unordered_flat_map<u32, QueryLocation>> cached_queries;
+    boost::unordered::unordered_flat_map<u64, boost::unordered::unordered_flat_map<u32, QueryLocation>> cached_queries;
     std::mutex cache_mutex;
 
     struct QueryCacheBaseImpl;

@@ -28,7 +28,7 @@ public:
     void DeclareChannel(std::shared_ptr<ChannelState> new_channel);
 
 private:
-    boost::container::unordered_flat_map<s32, std::shared_ptr<ChannelState>> channels;
+    boost::unordered::unordered_flat_map<s32, std::shared_ptr<ChannelState>> channels;
     std::mutex scheduling_guard;
 };
 

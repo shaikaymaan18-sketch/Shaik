@@ -186,7 +186,7 @@ public:
     };
 
     std::vector<MsaaScratchImage> msaa_scratch_images;
-    boost::container::unordered_flat_map<VkImage, ResolveShadow> resolve_shadows;
+    boost::unordered::unordered_flat_map<VkImage, ResolveShadow> resolve_shadows;
     std::vector<std::pair<u64, ResolveShadow>> pending_resolve_shadows;
 };
 

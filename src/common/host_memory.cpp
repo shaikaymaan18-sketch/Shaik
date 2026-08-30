@@ -392,7 +392,7 @@ private:
 
     std::mutex placeholder_mutex;                                 ///< Mutex for placeholders
     boost::icl::separate_interval_set<size_t> placeholders;       ///< Mapped placeholders
-    boost::container::unordered_flat_map<size_t, size_t> placeholder_host_pointers; ///< Placeholder backing offset
+    boost::unordered::unordered_flat_map<size_t, size_t> placeholder_host_pointers; ///< Placeholder backing offset
 };
 
 #elif defined(__OPENORBIS__) || defined(__managarm__)

@@ -243,7 +243,7 @@ private:
     u32 index_buffer_offset = 0;
 
     u64 device_access_memory;
-    boost::container::unordered_flat_map<GPUVAddr, OGLTransformFeedback> tfb_objects;
+    boost::unordered::unordered_flat_map<GPUVAddr, OGLTransformFeedback> tfb_objects;
 };
 
 struct BufferCacheParams {
