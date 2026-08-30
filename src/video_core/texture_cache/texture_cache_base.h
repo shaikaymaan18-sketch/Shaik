@@ -471,9 +471,11 @@ private:
     void EnforceSamplerBudget();
     void TrimInactiveSamplers(size_t budget);
     std::optional<size_t> QuerySamplerBudget() const;
-    u32 GetAdaptiveBatchSize(const PendingUnswizzle& task, size_t queue_size) const;
 
     void QueueAsyncUnswizzle(Image& image, ImageId image_id);
+
+    void ProcessSparseTextures(Image &image, ImageId image_id);
+
     void TickAsyncUnswizzle();
     void TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image, bool force_owned_staging);
     void TickAsyncUnswizzleCpu(PendingUnswizzle& task, Image& image);

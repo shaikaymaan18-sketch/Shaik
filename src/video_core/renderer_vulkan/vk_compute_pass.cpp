@@ -756,6 +756,19 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
         cmdbuf.PipelineBarrier(src_stage, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, pre_barrier);
     });
 
+    compute_pass_descriptor_queue.Acquire(scheduler, 3);
+    compute_pass_descriptor_queue.AddBuffer(swizzled.buffer, sw.buffer_offset + swizzled.offset, VK_WHOLE_SIZE);
+    compute_pass_descriptor_queue.AddBuffer(*image.compute_unswizzle_buffer, 0, image.compute_unswizzle_buffer_size);
+
+    const void* descriptor_data = compute_pass_descriptor_queue.UpdateData();
+    const VkDescriptorSet set = descriptor_allocator.Commit();
+
+    scheduler.Record([this, set, descriptor_data](vk::CommandBuffer cmdbuf) {
+        device.GetLogical().UpdateDescriptorSet(set, *descriptor_template, descriptor_data);
+        cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_COMPUTE, *pipeline);
+        cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_COMPUTE, *layout, 0, set, {});
+    });
+
     for (u32 z_offset = 0; z_offset < z_count; z_offset += MAX_BATCH_SLICES) {
         const u32 current_chunk_slices = (std::min)(MAX_BATCH_SLICES, z_count - z_offset);
         const u32 current_z_src = z_src_start + z_offset;
@@ -763,17 +776,15 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
 
         bool chunk_has_data = slice_has_data.empty();
         if (!chunk_has_data) {
-            const u32 z_src_end = current_z_src + current_chunk_slices;
-            for (u32 z = current_z_src; z < z_src_end; ++z) {
-                if (z < static_cast<u32>(slice_has_data.size()) && slice_has_data[z] != 0) {
-                    chunk_has_data = true;
-                    break;
-                }
+            const size_t max_index = std::min<size_t>(current_z_src + current_chunk_slices, slice_has_data.size());
+            if (current_z_src < max_index) {
+                auto span = slice_has_data.subspan(current_z_src, max_index - current_z_src);
+                chunk_has_data = std::any_of(span.begin(), span.end(), [](u8 v) { return v != 0; });
             }
         }
 
         if (chunk_has_data) {
-            UnswizzleChunk(image, swizzled, sw, params, blocks_x, blocks_y,
+            UnswizzleChunk(image, params, blocks_x, blocks_y,
                            current_z_src, current_z_dst, current_chunk_slices,
                            src_buffer_byte_bias);
         }/* else { // If junk data appears uncomment this
@@ -806,8 +817,6 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
 
 void BlockLinearUnswizzle3DPass::UnswizzleChunk(
     Image& image,
-    const StagingBufferRef& swizzled,
-    const VideoCommon::SwizzleParameters& sw,
     const BlockLinearSwizzle3DParams& params,
     u32 blocks_x, u32 blocks_y,
     u32 z_src, u32 z_dst, u32 z_count,
@@ -837,16 +846,6 @@ void BlockLinearUnswizzle3DPass::UnswizzleChunk(
     pc.blocks_dim[1] = blocks_y;
     pc.blocks_dim[2] = z_count; // Only process the count
 
-    compute_pass_descriptor_queue.Acquire(scheduler, 3);
-    compute_pass_descriptor_queue.AddBuffer(swizzled.buffer,
-                                           sw.buffer_offset + swizzled.offset,
-                                           VK_WHOLE_SIZE);
-    compute_pass_descriptor_queue.AddBuffer(*image.compute_unswizzle_buffer, 0,
-                                           image.compute_unswizzle_buffer_size);
-
-    const void* descriptor_data = compute_pass_descriptor_queue.UpdateData();
-    const VkDescriptorSet set = descriptor_allocator.Commit();
-
     const u32 gx = Common::DivCeil(blocks_x, 8u);
     const u32 gy = Common::DivCeil(blocks_y, 8u);
     const u32 gz = Common::DivCeil(z_count, 4u);
@@ -862,8 +861,8 @@ void BlockLinearUnswizzle3DPass::UnswizzleChunk(
     const u32 image_width = image.info.size.width;
     const u32 image_height = image.info.size.height;
 
-    scheduler.Record([this, set, descriptor_data, pc, gx, gy, gz,
-                      z_dst, z_count, barrier_size,
+    scheduler.Record([this, pc, gx, gy, gz, z_dst,
+                      z_count, barrier_size,
                       out_buffer, dst_image, aspect,
                       image_width, image_height](vk::CommandBuffer cmdbuf) {
 
@@ -885,9 +884,6 @@ void BlockLinearUnswizzle3DPass::UnswizzleChunk(
         cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                                0, war_barrier);
 
-        device.GetLogical().UpdateDescriptorSet(set, *descriptor_template, descriptor_data);
-        cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_COMPUTE, *pipeline);
-        cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_COMPUTE, *layout, 0, set, {});
         cmdbuf.PushConstants(*layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
         cmdbuf.Dispatch(gx, gy, gz);
 

@@ -963,10 +963,8 @@ TextureCacheRuntime::TextureCacheRuntime(const Device& device_, Scheduler& sched
         }
     }
 
-    if (Settings::values.async_unswizzle_mode.GetValue() == Settings::AsyncUnswizzleMode::Gpu) {
-        bl3d_unswizzle_pass.emplace(device, scheduler, descriptor_pool,
-                                   staging_buffer_pool, compute_pass_descriptor_queue);
-    }
+    bl3d_unswizzle_pass.emplace(device, scheduler, descriptor_pool,
+                               staging_buffer_pool, compute_pass_descriptor_queue);
 }
 
 void TextureCacheRuntime::Finish() {

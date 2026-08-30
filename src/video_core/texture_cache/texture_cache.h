@@ -93,7 +93,7 @@ TextureCache<P>::TextureCache(Runtime& runtime_, Tegra::MaxwellDeviceMemoryManag
             default:                                   async_unswizzle_slices_per_batch = 32;
         }
     } else {
-        async_unswizzle_slices_per_batch = 0;
+        async_unswizzle_slices_per_batch = 32;
     }
 }
 
@@ -1117,15 +1117,19 @@ void TextureCache<P>::RefreshContents(Image& image, ImageId image_id) {
         return;
     }
 
-    if (async_unswizzle_mode != Settings::AsyncUnswizzleMode::Off &&
-        IsPixelFormatBCn(image.info.format) &&
+    if ( IsPixelFormatBCn(image.info.format) &&
         image.info.type == ImageType::e3D &&
         image.info.resources.levels == 1 &&
         image.info.resources.layers == 1 &&
         False(image.flags & ImageFlagBits::GpuModified) &&
         True(image.flags & ImageFlagBits::Sparse)) {
 
-        QueueAsyncUnswizzle(image, image_id);
+        if ( async_unswizzle_mode == Settings::AsyncUnswizzleMode::Off ) {
+            ProcessSparseTextures(image, image_id);
+        }
+        else {
+            QueueAsyncUnswizzle(image, image_id);
+        }
         return;
     }
 
@@ -1370,6 +1374,31 @@ void TextureCache<P>::QueueAsyncUnswizzle(Image& image, ImageId image_id) {
         .image_id = image_id,
         .is_cpu = async_unswizzle_mode == Settings::AsyncUnswizzleMode::Cpu,
     });
+}
+
+template <class P>
+void TextureCache<P>::ProcessSparseTextures(Image& image, ImageId image_id) {
+    if (True(image.flags & ImageFlagBits::IsDecoding)) {
+        return;
+    }
+
+    image.flags |= ImageFlagBits::IsDecoding;
+    image.flags |= ImageFlagBits::AcceleratedUpload;
+
+    PendingUnswizzle local_task{
+        .info = image.info,
+        .image_id = image_id,
+        .is_cpu = false,
+    };
+
+    while (True(image.flags & ImageFlagBits::IsDecoding)) {
+        if (!local_task.owns_staging_buffer && unswizzle_shared_staging_pending_gpu_read) {
+            runtime.Finish();
+            unswizzle_shared_staging_pending_gpu_read = false;
+        }
+
+        TickAsyncUnswizzleGpu(local_task, image, false);
+    }
 }
 
 template <class P>
@@ -1718,7 +1747,10 @@ void TextureCache<P>::TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image
         }
         runtime.ReleaseSparseUnswizzleBuffer(image);
         image.flags &= ~ImageFlagBits::IsDecoding;
-        unswizzle_queue.pop_front();
+
+        if (!unswizzle_queue.empty() && unswizzle_queue.front().image_id == task.image_id) {
+            unswizzle_queue.pop_front();
+        }
     }
 }
 
