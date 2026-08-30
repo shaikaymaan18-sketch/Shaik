@@ -13,7 +13,8 @@
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <vector>
 
 #include "common/address_space.h"
@@ -113,7 +114,7 @@ private:
     };
     static_assert(sizeof(IoctlRemapEntry) == 20, "IoctlRemapEntry is incorrect size");
 
-    ankerl::unordered_dense::set<s64_le> map_buffer_offsets{};
+    boost::container::unordered_flat_set<s64_le> map_buffer_offsets{};
 
     struct IoctlMapBufferEx {
         MappingFlags flags{}; // bit0: fixed_offset, bit2: cacheable

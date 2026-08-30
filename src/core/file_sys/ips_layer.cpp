@@ -8,7 +8,8 @@
 #include <utility>
 #include <span>
 #include <cctype>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include "common/hex_util.h"
 #include "common/logging.h"
@@ -104,7 +105,7 @@ struct IPSwitchRecord {
     size_t count;
 };
 struct IPSwitchCompiler::IPSwitchPatch {
-    ankerl::unordered_dense::map<u32, IPSwitchRecord> records;
+    boost::container::unordered_flat_map<u32, IPSwitchRecord> records;
     bool enabled;
 };
 

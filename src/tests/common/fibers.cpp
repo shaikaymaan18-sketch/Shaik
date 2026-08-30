@@ -11,7 +11,8 @@
 #include <mutex>
 #include <stdexcept>
 #include <thread>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <vector>
 
 #include <catch2/catch_test_macros.hpp>
@@ -39,7 +40,7 @@ public:
 
 private:
     mutable std::mutex mutex;
-    ankerl::unordered_dense::map<std::thread::id, u32> ids;
+    boost::container::unordered_flat_map<std::thread::id, u32> ids;
 };
 
 class TestControl1 {

@@ -7,7 +7,8 @@
 #pragma once
 
 #include <memory>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include "common/common_types.h"
 #include "common/polyfill_thread.h"
@@ -49,7 +50,7 @@ private:
 private:
     Core::System& m_system;
     Container& m_container;
-    ankerl::unordered_dense::map<u64, VsyncManager> m_vsync_managers;
+    boost::container::unordered_flat_map<u64, VsyncManager> m_vsync_managers;
     std::shared_ptr<Core::Timing::EventType> m_event;
     Common::Event m_signal;
     std::jthread m_thread;

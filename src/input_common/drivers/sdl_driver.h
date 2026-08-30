@@ -9,7 +9,8 @@
 #include <atomic>
 #include <mutex>
 #include <thread>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <SDL3/SDL.h>
 
@@ -117,7 +118,7 @@ private:
     Common::SPSCQueue<VibrationRequest> vibration_queue;
 
     /// Map of GUID of a list of corresponding virtual Joysticks
-    ankerl::unordered_dense::map<Common::UUID, std::vector<std::shared_ptr<SDLJoystick>>> joystick_map;
+    boost::container::unordered_flat_map<Common::UUID, std::vector<std::shared_ptr<SDLJoystick>>> joystick_map;
     std::mutex joystick_map_mutex;
 
     bool start_thread = false;

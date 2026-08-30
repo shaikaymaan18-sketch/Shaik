@@ -9,7 +9,8 @@
 
 #include <deque>
 #include <memory>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include "core/device_memory_manager.h"
 #include "core/hle/service/nvdrv/nvdata.h"

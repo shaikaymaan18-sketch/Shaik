@@ -11,7 +11,8 @@
 #include <optional>
 #include <string_view>
 #include <tuple>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <queue>
 
 #include "common/common_types.h"

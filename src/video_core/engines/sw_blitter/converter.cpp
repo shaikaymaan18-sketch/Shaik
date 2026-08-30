@@ -7,7 +7,8 @@
 #include <array>
 #include <cmath>
 #include <span>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <bit>
 #include <numeric>
 #include "common/assert.h"
@@ -924,7 +925,7 @@ public:
 };
 
 struct ConverterFactory::ConverterFactoryImpl {
-    ankerl::unordered_dense::map<RenderTargetFormat, std::unique_ptr<Converter>> converters_cache;
+    boost::container::unordered_flat_map<RenderTargetFormat, std::unique_ptr<Converter>> converters_cache;
 };
 
 ConverterFactory::ConverterFactory() {

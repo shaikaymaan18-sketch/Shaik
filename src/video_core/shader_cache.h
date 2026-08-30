@@ -10,7 +10,8 @@
 #include <memory>
 #include <mutex>
 #include <span>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <utility>
 #include <vector>
 
@@ -148,8 +149,8 @@ private:
     mutable std::mutex lookup_mutex;
     std::mutex invalidation_mutex;
 
-    ankerl::unordered_dense::map<u64, std::unique_ptr<Entry>> lookup_cache;
-    ankerl::unordered_dense::map<u64, std::vector<Entry*>> invalidation_cache;
+    boost::container::unordered_flat_map<u64, std::unique_ptr<Entry>> lookup_cache;
+    boost::container::unordered_flat_map<u64, std::vector<Entry*>> invalidation_cache;
     std::vector<std::unique_ptr<ShaderInfo>> storage;
     std::vector<Entry*> marked_for_removal;
 };

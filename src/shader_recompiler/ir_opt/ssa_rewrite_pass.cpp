@@ -19,7 +19,8 @@
 #include <deque>
 #include <map>
 #include <span>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <variant>
 #include <vector>
 

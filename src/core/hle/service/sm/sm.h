@@ -10,7 +10,8 @@
 #include <memory>
 #include <mutex>
 #include <string>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <concepts>
 
 #include "core/hle/kernel/k_port.h"
@@ -100,8 +101,8 @@ private:
 
     /// Map of registered services, retrieved using GetServicePort.
     mutable std::mutex lock;
-    ankerl::unordered_dense::map<std::string, SessionRequestHandlerFactory> registered_services;
-    ankerl::unordered_dense::map<std::string, Kernel::KClientPort*> service_ports;
+    boost::container::unordered_flat_map<std::string, SessionRequestHandlerFactory> registered_services;
+    boost::container::unordered_flat_map<std::string, Kernel::KClientPort*> service_ports;
 
     /// Kernel context
     Kernel::KernelCore& kernel;

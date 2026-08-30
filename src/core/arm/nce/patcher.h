@@ -4,7 +4,7 @@
 #pragma once
 
 #include <span>
-#include <ankerl/unordered_dense.h>
+#include <boost/container/flat_map.hpp>
 #include <vector>
 #include <oaknut/code_block.hpp>
 #include <oaknut/oaknut.hpp>
@@ -46,7 +46,7 @@ enum class PatchMode : u32 {
 
 using ModuleTextAddress = u64;
 using PatchTextAddress = u64;
-using EntryTrampolines = ankerl::unordered_dense::map<ModuleTextAddress, PatchTextAddress>;
+using EntryTrampolines = boost::container::flat_map<ModuleTextAddress, PatchTextAddress>;
 
 class Patcher {
 public:

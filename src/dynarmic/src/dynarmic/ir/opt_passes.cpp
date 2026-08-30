@@ -11,7 +11,8 @@
 #include <map>
 #include <bit>
 
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include "boost/container/small_vector.hpp"
 #include "dynarmic/frontend/A32/a32_ir_emitter.h"
 #include "dynarmic/frontend/A32/a32_location_descriptor.h"
@@ -1433,7 +1434,7 @@ static void VerificationPass(const IR::Block& block) {
             ASSERT(IR::AreTypesCompatible(t1, t2));
         }
     }
-    ankerl::unordered_dense::map<IR::Inst*, size_t> actual_uses;
+    boost::container::unordered_flat_map<IR::Inst*, size_t> actual_uses;
     for (auto const& inst : block.instructions) {
         for (size_t i = 0; i < inst.NumArgs(); i++)
             if (IR::Value const arg = inst.GetArg(i); !arg.IsImmediate())

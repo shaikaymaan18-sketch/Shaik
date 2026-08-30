@@ -12,7 +12,8 @@
 #include <optional>
 #include <span>
 #include <string>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <vector>
 
 #include "common/common_types.h"
@@ -93,7 +94,7 @@ private:
     static s64 Now();
 
     mutable std::mutex mtx;
-    ankerl::unordered_dense::map<std::string, StoredNews> items;
+    boost::container::unordered_flat_map<std::string, StoredNews> items;
     size_t open_counter{};
 };
 

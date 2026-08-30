@@ -6,7 +6,8 @@
 
 #pragma once
 
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include "common/fs/fs.h"
 #include "core/hle/result.h"
@@ -88,7 +89,7 @@ private:
     AlbumFileDateTime ConvertToAlbumDateTime(u64 posix_time) const;
 
     bool is_mounted{};
-    ankerl::unordered_dense::map<AlbumFileId, std::filesystem::path> album_files;
+    boost::container::unordered_flat_map<AlbumFileId, std::filesystem::path> album_files;
 
     Core::System& system;
 };

@@ -8,7 +8,8 @@
 
 #include <memory>
 #include <mutex>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include "common/common_types.h"
 #include "core/hle/service/nvnflinger/binder.h"
@@ -39,8 +40,8 @@ private:
 
     mutable std::mutex lock;
     s32 last_id = 0;
-    ankerl::unordered_dense::map<s32, std::shared_ptr<android::IBinder>> binders;
-    ankerl::unordered_dense::map<s32, RefCounts> refcounts;
+    boost::container::unordered_flat_map<s32, std::shared_ptr<android::IBinder>> binders;
+    boost::container::unordered_flat_map<s32, RefCounts> refcounts;
 };
 
 } // namespace Service::Nvnflinger

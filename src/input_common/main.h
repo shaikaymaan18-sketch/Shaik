@@ -8,7 +8,8 @@
 
 #include <memory>
 #include <string>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <vector>
 
 namespace Common {
@@ -56,9 +57,9 @@ enum class InputType { None, Button, Stick, Motion, Touch };
  * Given a ParamPackage for a Device returned from `GetInputDevices`, attempt to get the default
  * mapping for the device.
  */
-using AnalogMapping = ankerl::unordered_dense::map<Settings::NativeAnalog::Values, Common::ParamPackage>;
-using ButtonMapping = ankerl::unordered_dense::map<Settings::NativeButton::Values, Common::ParamPackage>;
-using MotionMapping = ankerl::unordered_dense::map<Settings::NativeMotion::Values, Common::ParamPackage>;
+using AnalogMapping = boost::container::unordered_flat_map<Settings::NativeAnalog::Values, Common::ParamPackage>;
+using ButtonMapping = boost::container::unordered_flat_map<Settings::NativeButton::Values, Common::ParamPackage>;
+using MotionMapping = boost::container::unordered_flat_map<Settings::NativeMotion::Values, Common::ParamPackage>;
 
 class InputSubsystem {
 public:

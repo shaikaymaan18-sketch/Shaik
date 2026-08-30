@@ -7,7 +7,8 @@
 #pragma once
 
 #include <memory>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <vector>
 #include "common/common_funcs.h"
 #include "common/common_types.h"
@@ -118,7 +119,7 @@ private:
 
     NvCore::Container& container;
     NvCore::NvMap& file;
-    ankerl::unordered_dense::map<DeviceFD, NvCore::SessionId> sessions;
+    boost::container::unordered_flat_map<DeviceFD, NvCore::SessionId> sessions;
 };
 
 } // namespace Service::Nvidia::Devices

@@ -10,7 +10,8 @@
 #include <QSortFilterProxyModel>
 #include <QStandardItemModel>
 #include <QVariant>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include "network/network.h"
 
 namespace Ui {
@@ -65,8 +66,8 @@ private:
     bool has_mod_perms = false;
     QStandardItemModel* player_list;
     std::unique_ptr<Ui::ChatRoom> ui;
-    ankerl::unordered_dense::set<std::string> block_list;
-    ankerl::unordered_dense::map<std::string, QPixmap> icon_cache;
+    boost::container::unordered_flat_set<std::string> block_list;
+    boost::container::unordered_flat_map<std::string, QPixmap> icon_cache;
 };
 
 Q_DECLARE_METATYPE(Network::ChatEntry);

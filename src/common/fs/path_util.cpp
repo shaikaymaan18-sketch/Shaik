@@ -7,7 +7,8 @@
 #include <algorithm>
 #include <iostream>
 #include <sstream>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include "common/assert.h"
 #include "common/fs/fs.h"
@@ -196,8 +197,8 @@ private:
         SetLegacyPathImpl(legacy_path, new_path);
     }
 
-    ankerl::unordered_dense::map<EdenPath, fs::path> eden_paths;
-    ankerl::unordered_dense::map<EmuPath, fs::path> legacy_paths;
+    boost::container::unordered_flat_map<EdenPath, fs::path> eden_paths;
+    boost::container::unordered_flat_map<EmuPath, fs::path> legacy_paths;
 };
 
 bool ValidatePath(const fs::path& path) {

@@ -6,7 +6,8 @@
 
 #pragma once
 
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <unordered_map>
 #include <variant>
 
@@ -118,7 +119,7 @@ private:
     }
 
     std::mutex m_mutex{};
-    ankerl::unordered_dense::map<s32, FrameDevice> m_frame_devices;
+    boost::container::unordered_flat_map<s32, FrameDevice> m_frame_devices;
 
     static constexpr size_t MAX_PRESENT_QUEUE = 100;
     static constexpr size_t MAX_DECODE_MAP = 200;

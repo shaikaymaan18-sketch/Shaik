@@ -7,7 +7,8 @@
 #include <algorithm>
 #include <bit>
 #include <optional>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <tuple>
 #include <limits>
 #include <boost/container/small_vector.hpp>

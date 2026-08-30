@@ -6,7 +6,8 @@
 
 #pragma once
 
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include "common/uuid.h"
 #include "core/hle/service/cmif_types.h"
@@ -56,10 +57,10 @@ private:
         }
     };
 
-    ankerl::unordered_dense::map<AppKey, bool, AppKeyHash> app_auto_transfer_{};
-    ankerl::unordered_dense::map<Common::UUID, bool> global_auto_upload_{};
-    ankerl::unordered_dense::map<Common::UUID, bool> global_auto_download_{};
-    ankerl::unordered_dense::map<AppKey, u8, AppKeyHash> autonomy_task_status_{};
+    boost::container::unordered_flat_map<AppKey, bool, AppKeyHash> app_auto_transfer_{};
+    boost::container::unordered_flat_map<Common::UUID, bool> global_auto_upload_{};
+    boost::container::unordered_flat_map<Common::UUID, bool> global_auto_download_{};
+    boost::container::unordered_flat_map<AppKey, u8, AppKeyHash> autonomy_task_status_{};
 };
 
 } // namespace Service::OLSC

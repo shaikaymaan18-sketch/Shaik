@@ -8,7 +8,8 @@
 
 #include <array>
 #include <span>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include "common/common_types.h"
 #include "video_core/buffer_cache/buffer_cache_base.h"
@@ -242,7 +243,7 @@ private:
     u32 index_buffer_offset = 0;
 
     u64 device_access_memory;
-    ankerl::unordered_dense::map<GPUVAddr, OGLTransformFeedback> tfb_objects;
+    boost::container::unordered_flat_map<GPUVAddr, OGLTransformFeedback> tfb_objects;
 };
 
 struct BufferCacheParams {

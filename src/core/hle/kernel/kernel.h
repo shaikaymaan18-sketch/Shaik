@@ -11,7 +11,8 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <vector>
 
 #include "common/polyfill_thread.h"

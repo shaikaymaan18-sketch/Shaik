@@ -7,7 +7,8 @@
 #pragma once
 
 #include <array>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <vector>
 
 #include "common/common_funcs.h"
@@ -176,6 +177,6 @@ struct WebCommonReturnValue {
 };
 static_assert(sizeof(WebCommonReturnValue) == 0x1010, "WebCommonReturnValue has incorrect size.");
 
-using WebArgInputTLVMap = ankerl::unordered_dense::map<WebArgInputTLVType, std::vector<u8>>;
+using WebArgInputTLVMap = boost::container::unordered_flat_map<WebArgInputTLVType, std::vector<u8>>;
 
 } // namespace Service::AM::Frontend

@@ -7,7 +7,8 @@
 #pragma once
 
 #include <array>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include "common/common_types.h"
 #include "shader_recompiler/program_header.h"
@@ -126,9 +127,9 @@ protected:
     u32 start_address{};
     bool is_proprietary_driver{};
 public:
-    ankerl::unordered_dense::map<CbufWordKey, u32, CbufWordKeyHash> cbuf_word_cache;
-    ankerl::unordered_dense::map<HandleKey,  u32, HandleKeyHash> handle_cache;
-    ankerl::unordered_dense::map<const IR::Inst*, ConstBufferAddr> track_cache;
+    boost::container::unordered_flat_map<CbufWordKey, u32, CbufWordKeyHash> cbuf_word_cache;
+    boost::container::unordered_flat_map<HandleKey,  u32, HandleKeyHash> handle_cache;
+    boost::container::unordered_flat_map<const IR::Inst*, ConstBufferAddr> track_cache;
 };
 
 } // namespace Shader

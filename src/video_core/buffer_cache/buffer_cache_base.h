@@ -16,7 +16,8 @@
 #include <span>
 #include <vector>
 
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <boost/container/static_vector.hpp>
 #include <boost/container/small_vector.hpp>
 

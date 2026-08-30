@@ -8,7 +8,7 @@
 #include <mutex>
 #include <sstream>
 #include <string>
-#include <ankerl/unordered_dense.h>
+#include <boost/container/flat_map.hpp>
 
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
@@ -21,12 +21,9 @@
 namespace Core::LaunchTimestampCache {
 namespace {
 
-using CacheMap = ankerl::unordered_dense::map<u64, s64>;
-using CountMap = ankerl::unordered_dense::map<u64, u64>;
-
 std::mutex g_mutex;
-CacheMap g_cache;
-CountMap g_counts;
+boost::container::flat_map<u64, s64> g_cache;
+boost::container::flat_map<u64, u64> g_counts;
 bool g_loaded = false;
 
 std::filesystem::path GetCachePath() {

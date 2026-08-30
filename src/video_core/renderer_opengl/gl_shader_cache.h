@@ -7,7 +7,8 @@
 #pragma once
 
 #include <filesystem>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include "common/common_types.h"
 #include "common/thread_worker.h"
@@ -81,8 +82,8 @@ private:
     GraphicsPipeline* current_pipeline{};
 
     ShaderContext::ShaderPools main_pools;
-    ankerl::unordered_dense::map<GraphicsPipelineKey, std::unique_ptr<GraphicsPipeline>> graphics_cache;
-    ankerl::unordered_dense::map<ComputePipelineKey, std::unique_ptr<ComputePipeline>> compute_cache;
+    boost::container::unordered_flat_map<GraphicsPipelineKey, std::unique_ptr<GraphicsPipeline>> graphics_cache;
+    boost::container::unordered_flat_map<ComputePipelineKey, std::unique_ptr<ComputePipeline>> compute_cache;
 
     Shader::Profile profile;
     Shader::HostTranslateInfo host_info;

@@ -10,7 +10,8 @@
 #include <deque>
 #include <memory>
 #include <mutex>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <utility>
 
 #include "common/assert.h"

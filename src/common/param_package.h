@@ -8,14 +8,15 @@
 
 #include <initializer_list>
 #include <string>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 namespace Common {
 
 /// A string-based key-value container supporting serializing to and deserializing from a string
 class ParamPackage {
 public:
-    using DataType = ankerl::unordered_dense::map<std::string, std::string>;
+    using DataType = boost::container::unordered_flat_map<std::string, std::string>;
 
     ParamPackage() = default;
     explicit ParamPackage(const std::string& serialized);

@@ -10,7 +10,8 @@
 #include <mutex>
 #include <optional>
 #include <span>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <utility>
 
 #include "common/assert.h"
@@ -160,7 +161,7 @@ protected:
         }
     }
 
-    using ContentCache = ankerl::unordered_dense::map<u64, ankerl::unordered_dense::map<u32, QueryLocation>>;
+    using ContentCache = boost::container::unordered_flat_map<u64, boost::container::unordered_flat_map<u32, QueryLocation>>;
 
     void InvalidateQuery(QueryLocation location);
     bool IsQueryDirty(QueryLocation location);
@@ -168,7 +169,7 @@ protected:
     void RequestGuestHostSync();
     void UnregisterPending();
 
-    ankerl::unordered_dense::map<u64, ankerl::unordered_dense::map<u32, QueryLocation>> cached_queries;
+    boost::container::unordered_flat_map<u64, boost::container::unordered_flat_map<u32, QueryLocation>> cached_queries;
     std::mutex cache_mutex;
 
     struct QueryCacheBaseImpl;

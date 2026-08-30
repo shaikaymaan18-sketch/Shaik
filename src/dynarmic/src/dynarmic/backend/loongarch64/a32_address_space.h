@@ -3,9 +3,8 @@
 
 #pragma once
 
+#include <boost/unordered/unordered_flat_map.hpp>
 #include "dynarmic/backend/loongarch64/lagoon_cpp.h"
-#include <ankerl/unordered_dense.h>
-
 #include "dynarmic/backend/loongarch64/code_block.h"
 #include "dynarmic/backend/loongarch64/emit_loongarch64.h"
 #include "dynarmic/interface/A32/config.h"
@@ -53,8 +52,8 @@ private:
     const A32::UserConfig conf;
     CodeBlock cb;
 
-    ankerl::unordered_dense::map<u64, CodePtr> block_entries;
-    ankerl::unordered_dense::map<u64, EmittedBlockInfo> block_infos;
+    boost::container::unordered_map<u64, CodePtr> block_entries;
+    boost::container::unordered_map<u64, EmittedBlockInfo> block_infos;
 
 public:
     struct PreludeInfo {

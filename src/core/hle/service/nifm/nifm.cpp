@@ -23,7 +23,8 @@
 #include <mutex>
 #include <optional>
 #include <thread>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <common/settings.h>
 
 #ifdef _WIN32

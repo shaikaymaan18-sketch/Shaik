@@ -9,7 +9,8 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <utility>
 #include <vector>
 #include "common/logging.h"
@@ -412,7 +413,7 @@ public:
 namespace Impl {
 
 template <typename InputDeviceType>
-using FactoryListType = ankerl::unordered_dense::map<std::string, std::shared_ptr<Factory<InputDeviceType>>>;
+using FactoryListType = boost::container::unordered_flat_map<std::string, std::shared_ptr<Factory<InputDeviceType>>>;
 
 template <typename InputDeviceType>
 struct FactoryList {

@@ -12,7 +12,6 @@
 #include <optional>
 #include <string>
 #include <vector>
-#include <ankerl/unordered_dense.h>
 #include <boost/container/flat_map.hpp>
 #include "common/common_types.h"
 #include "core/crypto/key_manager.h"
@@ -209,11 +208,11 @@ private:
     ContentProviderParsingFunction parser;
 
     // maps tid -> NcaID of meta
-    ankerl::unordered_dense::map<u64, NcaID> meta_id;
+    boost::container::flat_map<u64, NcaID> meta_id;
     // maps tid -> meta
-    ankerl::unordered_dense::map<u64, CNMT> meta;
+    boost::container::flat_map<u64, CNMT> meta;
     // maps tid -> meta for CNMT in yuzu_meta
-    ankerl::unordered_dense::map<u64, CNMT> yuzu_meta;
+    boost::container::flat_map<u64, CNMT> yuzu_meta;
 };
 
 enum class ContentProviderUnionSlot {
@@ -313,8 +312,8 @@ private:
     void ProcessXCI(const VirtualFile& file);
 
     std::vector<VirtualDir> load_dirs;
-    ankerl::unordered_dense::map<std::tuple<u64, ContentRecordType, TitleType>, VirtualFile> entries;
-    ankerl::unordered_dense::map<u64, u32> versions;
+    boost::container::flat_map<std::tuple<u64, ContentRecordType, TitleType>, VirtualFile> entries;
+    boost::container::flat_map<u64, u32> versions;
     std::vector<ExternalUpdateEntry> multi_version_entries;
 };
 

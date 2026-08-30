@@ -8,7 +8,8 @@
 
 #include <atomic>
 #include <memory>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <dynarmic/interface/A64/a64.h>
 #include <dynarmic/interface/code_page.h>

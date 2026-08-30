@@ -10,7 +10,8 @@
 
 #include <cstddef>
 #include <tuple>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include "dynarmic/mcl/bit.hpp"
 #include "common/common_types.h"
@@ -59,7 +60,7 @@ public:
 
 private:
     ExceptionHandler& exception_handler;
-    ankerl::unordered_dense::set<DoNotFastmemMarker, DoNotFastmemMarkerHash> do_not_fastmem;
+    boost::container::unordered_flat_set<DoNotFastmemMarker, DoNotFastmemMarkerHash> do_not_fastmem;
 };
 
 }  // namespace Dynarmic::Backend::Arm64

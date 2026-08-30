@@ -17,7 +17,8 @@
 #include <optional>
 #include <shared_mutex>
 
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <fmt/format.h>
 #include <sys/mman.h>
 
@@ -55,7 +56,7 @@ class SigHandler {
         });
     }
 
-    ankerl::unordered_dense::map<u64, CodeBlockInfo> code_block_infos;
+    boost::container::unordered_flat_map<u64, CodeBlockInfo> code_block_infos;
     std::shared_mutex code_block_infos_mutex;
     struct sigaction old_sa_segv;
     struct sigaction old_sa_bus;

@@ -11,7 +11,8 @@
 #include <set>
 #include <span>
 #include <string>
-#include <ankerl/unordered_dense.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <vector>
 
 #include "common/common_types.h"
@@ -1241,7 +1242,7 @@ private:
     std::vector<size_t> valid_heap_memory;                   ///< Heaps used.
 
     /// Format properties dictionary.
-    ankerl::unordered_dense::map<VkFormat, VkFormatProperties> format_properties;
+    boost::container::unordered_flat_map<VkFormat, VkFormatProperties> format_properties;
 
     /// Nsight Aftermath GPU crash tracker
     std::unique_ptr<NsightAftermathTracker> nsight_aftermath_tracker;
