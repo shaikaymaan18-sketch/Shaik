@@ -76,8 +76,7 @@ void ProtectMemory(const void* base, size_t size, bool is_executable) {
 }
 #endif
 
-HostFeature GetHostFeatures() {
-    HostFeature features = {};
+static const HostFeature features = []() {
 #ifdef DYNARMIC_ENABLE_CPU_FEATURE_DETECTION
     using Cpu = Xbyak::util::Cpu;
     Xbyak::util::Cpu cpu_info{};
@@ -144,6 +143,8 @@ HostFeature GetHostFeatures() {
         }
     }
 #endif
+}();
+HostFeature GetHostFeatures() {
     return features;
 }
 
