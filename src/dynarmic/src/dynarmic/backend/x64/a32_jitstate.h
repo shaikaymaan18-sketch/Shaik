@@ -39,9 +39,6 @@ struct A32JitState {
     u32 cpsr_q = 0;
     u32 cpsr_nzcv = 0;
     u32 cpsr_jaifm = 0;
-    u32 fpsr_exc = 0;
-    u32 fpsr_qc = 0;
-    u32 fpsr_nzcv = 0;
 
     alignas(16) std::array<u32, 64> ExtReg{};  // Extension registers.
 
@@ -56,6 +53,9 @@ struct A32JitState {
     u32 rsb_ptr = 0;
     std::array<u64, RSB_SIZE> rsb_location_descriptors;
     std::array<u64, RSB_SIZE> rsb_codeptrs;
+    u32 fpsr_exc = 0;
+    u32 fpsr_qc = 0;
+    u32 fpsr_nzcv = 0;
 
     u32 Cpsr() const;
     void SetCpsr(u32 cpsr);
