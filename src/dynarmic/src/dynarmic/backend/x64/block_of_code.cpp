@@ -171,9 +171,9 @@ BlockOfCode::BlockOfCode(RunCodeCallbacks cb, JitStateInfo jsi, size_t total_cod
         , nullptr //Allow RWE
 #endif
         , nullptr)
+    , constant_pool(*this, CONSTANT_POOL_SIZE)
     , jsi(jsi)
     , cb(std::move(cb))
-    , constant_pool(*this, CONSTANT_POOL_SIZE)
 {
     EnableWriting();
     EnsureMemoryCommitted(PRELUDE_COMMIT_SIZE);

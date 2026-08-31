@@ -39,7 +39,12 @@ struct A64JitState {
     u64 sp = 0;
     u64 pc = 0;
     u32 cpsr_nzcv = 0;
+    u32 fpsr_exc = 0;
+    u32 fpsr_qc = 0;
+    u32 fpcr = 0;
+
     alignas(16) std::array<u64, 64> vec{};  // Extension registers.
+
     // For internal use (See: BlockOfCode::RunCode)
     u32 guest_MXCSR = 0x00001f80;
     u32 asimd_MXCSR = 0x00009fc0;
@@ -50,9 +55,6 @@ struct A64JitState {
     u32 rsb_ptr = 0;
     std::array<u64, RSB_SIZE> rsb_location_descriptors;
     std::array<u64, RSB_SIZE> rsb_codeptrs;
-    u32 fpsr_exc = 0;
-    u32 fpsr_qc = 0;
-    u32 fpcr = 0;
 
     u32 GetPstate() const {
         return NZCV::FromX64(cpsr_nzcv);
