@@ -287,7 +287,7 @@
         "name": "sirit",
         "package": "sirit",
         "repo": "eden-emulator/sirit",
-        "version": "1.0.5"
+        "version": "v1.0.7"
     },
     "spirv-headers": {
         "hash": "d624371dd455c66a300344c89812598ffe11b5eedba555779f789e85c29dc67317741858c60e0744a1e6755cc0d2759b8659f0674f4cc31479c4cb6fc25ed23b",
