@@ -1,4 +1,12 @@
 {
+    "": {
+        "ci": true,
+        "hash": "5650fcb4712f29b74ec950d03959a205d29a792a93cf02e433eb7dac01fcda27c9ddf9f6345d2c301802a3cc7b4d76b1b4e994e9befff441a1463d4f0bb0d6c8",
+        "name": "sirit",
+        "package": "sirit",
+        "repo": "eden-emulator/sirit",
+        "version": "v1.0.6"
+    },
     "biscuit": {
         "hash": "1229f345b014f7ca544dedb4edb3311e41ba736f9aa9a67f88b5f26f3c983288c6bb6cdedcfb0b8a02c63088a37e6a0d7ba97d9c2a4d721b213916327cffe28a",
         "min_version": "0.9.1",
@@ -79,11 +87,10 @@
     },
     "ffmpeg-ci": {
         "ci": true,
-        "min_version": "4.1",
         "name": "ffmpeg",
         "package": "FFmpeg",
         "repo": "crueter-ci/FFmpeg",
-        "version": "8.0.1-c7b5f1537d"
+        "version": "9.0.1-1788120736-bf1b838f2a"
     },
     "fmt": {
         "hash": "f0da82c545b01692e9fd30fdfb613dbb8dd9716983dcd0ff19ac2a8d36f74beb5540ef38072fdecc1e34191b3682a8542ecbf3a61ef287dbba0a2679d4e023f2",
@@ -197,11 +204,10 @@
     },
     "openssl-ci": {
         "ci": true,
-        "min_version": "3.0.0",
         "name": "openssl",
         "package": "OpenSSL",
         "repo": "crueter-ci/OpenSSL",
-        "version": "4.0.0-11b7b6ea3b"
+        "version": "4.0.1-1788066753-b64f68a94e"
     },
     "openssl-cmake": {
         "bundled": true,
@@ -255,11 +261,10 @@
     },
     "sdl3-ci": {
         "ci": true,
-        "min_version": "3.2.10",
         "name": "SDL3",
         "package": "SDL3",
         "repo": "crueter-ci/SDL3",
-        "version": "3.4.8-d57c3b685c"
+        "version": "3.4.14-1788120612-147a8ee32d"
     },
     "simpleini": {
         "find_args": "MODULE",
