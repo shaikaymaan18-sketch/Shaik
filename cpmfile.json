@@ -1,11 +1,11 @@
 {
     "": {
         "ci": true,
-        "hash": "5650fcb4712f29b74ec950d03959a205d29a792a93cf02e433eb7dac01fcda27c9ddf9f6345d2c301802a3cc7b4d76b1b4e994e9befff441a1463d4f0bb0d6c8",
-        "name": "sirit",
-        "package": "sirit",
-        "repo": "eden-emulator/sirit",
-        "version": "v1.0.6"
+        "hash": "9f50d993c39529e022ad456163de91ac5934e16faf8fc348f305355fc0a643c534f87ded707e11bd03bcbc0a1760bd20852b6533a67ac0558a078385181cb184",
+        "name": "SDL3",
+        "package": "SDL3",
+        "repo": "crueter-ci/SDL3",
+        "version": "3.4.14-1788231389-147a8ee32d"
     },
     "biscuit": {
         "hash": "1229f345b014f7ca544dedb4edb3311e41ba736f9aa9a67f88b5f26f3c983288c6bb6cdedcfb0b8a02c63088a37e6a0d7ba97d9c2a4d721b213916327cffe28a",
@@ -207,7 +207,7 @@
         "name": "openssl",
         "package": "OpenSSL",
         "repo": "crueter-ci/OpenSSL",
-        "version": "4.0.1-1788066753-b64f68a94e"
+        "version": "4.0.1-1788231527-b64f68a94e"
     },
     "openssl-cmake": {
         "bundled": true,
@@ -264,7 +264,7 @@
         "name": "SDL3",
         "package": "SDL3",
         "repo": "crueter-ci/SDL3",
-        "version": "3.4.14-1788120612-147a8ee32d"
+        "version": "3.4.14-1788231389-147a8ee32d"
     },
     "simpleini": {
         "find_args": "MODULE",
