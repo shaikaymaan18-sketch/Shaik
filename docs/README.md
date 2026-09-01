@@ -2,9 +2,9 @@
 
 Are you just a casual user? Take a look at our [User Handbook](./user) then!
 
-If you want to register/signup as a contributor, take a gander at the [signup guide](https://git.eden-emu.dev/crueter/signup/src/branch/main/README.md).
+If you want to register/signup as a contributor, take a gander at [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-This contains documentation created by developers, build instructions, guidelines, instructions/layouts for [cool stuff we made](./CPMUtil), and more.
+This contains documentation created by developers, build instructions, guidelines, instructions/layouts for [cool stuff we made](./CPMUtil.md), and more.
 
 - **[General Build Instructions](./Build.md)**
 - **[CMake Options](./Options.md)**
