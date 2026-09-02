@@ -1117,15 +1117,9 @@ void TextureCache<P>::RefreshContents(Image& image, ImageId image_id) {
         return;
     }
 
-    if ( IsPixelFormatBCn(image.info.format) &&
-        image.info.type == ImageType::e3D &&
-        image.info.resources.levels == 1 &&
-        image.info.resources.layers == 1 &&
-        False(image.flags & ImageFlagBits::GpuModified) &&
-        True(image.flags & ImageFlagBits::Sparse)) {
-
+    if (True(image.flags & ImageFlagBits::SparseUpload)) {
         if ( async_unswizzle_mode == Settings::AsyncUnswizzleMode::Off ) {
-            ProcessSparseTextures(image, image_id);
+            ProcessSparseTexture(image, image_id);
         }
         else {
             QueueAsyncUnswizzle(image, image_id);
@@ -1377,7 +1371,7 @@ void TextureCache<P>::QueueAsyncUnswizzle(Image& image, ImageId image_id) {
 }
 
 template <class P>
-void TextureCache<P>::ProcessSparseTextures(Image& image, ImageId image_id) {
+void TextureCache<P>::ProcessSparseTexture(Image& image, ImageId image_id) {
     if (True(image.flags & ImageFlagBits::IsDecoding)) {
         return;
     }
@@ -1482,10 +1476,12 @@ void TextureCache<P>::InitSparseUnswizzleTracking(PendingUnswizzle& task, Image&
     task.swizzle_block_depth = sp.block_depth;
 
     const auto segs = gpu_memory->GetSubmappedRange(image.gpu_addr, image.guest_size_bytes);
-    task.sparse_segments.assign(segs.begin(), segs.end());
+    auto& sparse_segments = task.SparseSegments();
+    sparse_segments.assign(segs.begin(), segs.end());
     task.segment_scan_cursor = 0;
 
-    task.slice_has_data.assign(image.info.size.depth, 0u);
+    auto& slice_has_data = task.SliceHasData();
+    slice_has_data.assign(image.info.size.depth, 0u);
 
     if (image.info.size.depth > 1 && !image.slice_offsets.empty()) {
         const u32 depth = static_cast<u32>(image.info.size.depth);
@@ -1501,8 +1497,8 @@ void TextureCache<P>::InitSparseUnswizzleTracking(PendingUnswizzle& task, Image&
                     ? static_cast<u64>(image.slice_offsets[g_end])
                     : group_abs_start + group_byte_size;
 
-            while (seg_idx < task.sparse_segments.size()) {
-                const auto& [seg_gpu_addr, seg_size] = task.sparse_segments[seg_idx];
+            while (seg_idx < sparse_segments.size()) {
+                const auto& [seg_gpu_addr, seg_size] = sparse_segments[seg_idx];
                 const u64 seg_start = seg_gpu_addr - image.gpu_addr;
                 const u64 seg_end = seg_start + seg_size;
                 if (seg_end <= group_abs_start) {
@@ -1513,8 +1509,8 @@ void TextureCache<P>::InitSparseUnswizzleTracking(PendingUnswizzle& task, Image&
             }
 
             bool group_has_data = false;
-            for (size_t probe = seg_idx; probe < task.sparse_segments.size(); ++probe) {
-                const auto& [seg_gpu_addr, seg_size] = task.sparse_segments[probe];
+            for (size_t probe = seg_idx; probe < sparse_segments.size(); ++probe) {
+                const auto& [seg_gpu_addr, seg_size] = sparse_segments[probe];
                 const u64 seg_start = seg_gpu_addr - image.gpu_addr;
                 const u64 seg_end = seg_start + seg_size;
                 if (seg_start >= group_abs_end) break;
@@ -1526,19 +1522,19 @@ void TextureCache<P>::InitSparseUnswizzleTracking(PendingUnswizzle& task, Image&
 
             if (group_has_data) {
                 for (u32 z = g_start; z < g_end; ++z) {
-                    task.slice_has_data[z] = 1u;
+                    slice_has_data[z] = 1u;
                 }
             }
         }
     } else {
-        std::fill(task.slice_has_data.begin(), task.slice_has_data.end(), 1u);
+        std::fill(slice_has_data.begin(), slice_has_data.end(), 1u);
     }
 
     if (async_unswizzle_slices_per_batch == 0) {
         u32 first_populated = total_slices_init;
         u32 last_populated_excl = 0;
         for (u32 z = 0; z < total_slices_init; ++z) {
-            if (task.slice_has_data[z]) {
+            if (slice_has_data[z]) {
                 first_populated = (std::min)(first_populated, z);
                 last_populated_excl = z + 1;
             }
@@ -1552,6 +1548,66 @@ void TextureCache<P>::InitSparseUnswizzleTracking(PendingUnswizzle& task, Image&
             task.active_z_start = 0;
             task.active_z_end = 0;
         }
+    }
+}
+
+template <class P>
+void TextureCache<P>::ReadSparseCoalesced(PendingUnswizzle& task, Image& image, u8* staging_base,
+                                           size_t staging_base_abs_offset, size_t read_start,
+                                           size_t read_end) {
+    // This needs tuning as its just a number I pulled from out of nowhere
+    const size_t max_gap_for_batch = 4096;
+
+    const auto& sparse_segments = task.SparseSegments();
+    size_t zero_cursor = read_start;
+    while (task.segment_scan_cursor < sparse_segments.size()) {
+        const auto& [seg_gpu_addr, seg_size] = sparse_segments[task.segment_scan_cursor];
+        const size_t seg_abs_start = static_cast<size_t>(seg_gpu_addr - image.gpu_addr);
+        const size_t seg_abs_end = seg_abs_start + seg_size;
+
+        if (seg_abs_end <= read_start) { ++task.segment_scan_cursor; continue; }
+        if (seg_abs_start >= read_end) { break; }
+
+        const size_t ol_abs_start = (std::max)(seg_abs_start, read_start);
+
+        size_t batch_abs_end = (std::min)(seg_abs_end, read_end);
+        size_t batch_cursor = task.segment_scan_cursor + 1;
+
+        while (batch_cursor < sparse_segments.size()) {
+            const auto& [next_seg_addr, next_seg_size] = sparse_segments[batch_cursor];
+            const size_t next_seg_abs_start = static_cast<size_t>(next_seg_addr - image.gpu_addr);
+            const size_t next_seg_abs_end = next_seg_abs_start + next_seg_size;
+
+            if (next_seg_abs_start >= read_end) break;
+            if (next_seg_abs_end <= read_start) { ++batch_cursor; continue; }
+
+            const size_t gap = next_seg_abs_start - batch_abs_end;
+            if (gap > max_gap_for_batch) break;
+
+            batch_abs_end = (std::min)(next_seg_abs_end, read_end);
+            ++batch_cursor;
+        }
+
+        const size_t batch_size = batch_abs_end - ol_abs_start;
+        const size_t buffer_ol_rel_start = ol_abs_start - staging_base_abs_offset;
+
+        if (ol_abs_start > zero_cursor) {
+            const size_t gap_rel_start = zero_cursor - staging_base_abs_offset;
+            const size_t gap_size = ol_abs_start - zero_cursor;
+            std::memset(staging_base + gap_rel_start, 0, gap_size);
+        }
+        zero_cursor = batch_abs_end;
+
+        gpu_memory->ReadBlockUnsafe(image.gpu_addr + ol_abs_start, staging_base + buffer_ol_rel_start,
+                                    batch_size);
+
+        if (seg_abs_end > read_end) break;
+        task.segment_scan_cursor = batch_cursor;
+    }
+    if (zero_cursor < read_end) {
+        const size_t gap_rel_start = zero_cursor - staging_base_abs_offset;
+        const size_t gap_size = read_end - zero_cursor;
+        std::memset(staging_base + gap_rel_start, 0, gap_size);
     }
 }
 
@@ -1632,7 +1688,7 @@ void TextureCache<P>::TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image
             task.owns_staging_buffer = false;
         }
 
-        task.upload_swizzles = FullUploadSwizzles(task.info);
+        task.UploadSwizzles() = FullUploadSwizzles(task.info);
         task.initialized = true;
     }
 
@@ -1669,40 +1725,8 @@ void TextureCache<P>::TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image
             const size_t read_end   = read_start + copy_amount;
 
             if (task.is_sparse) {
-                size_t zero_cursor = read_start;
-                while (task.segment_scan_cursor < task.sparse_segments.size()) {
-                    const auto& [seg_gpu_addr, seg_size] =
-                        task.sparse_segments[task.segment_scan_cursor];
-                    const size_t seg_abs_start =
-                        static_cast<size_t>(seg_gpu_addr - image.gpu_addr);
-                    const size_t seg_abs_end = seg_abs_start + seg_size;
-
-                    if (seg_abs_end <= read_start) { ++task.segment_scan_cursor; continue; }
-                    if (seg_abs_start >= read_end)  { break; }
-
-                    const size_t ol_abs_start = (std::max)(seg_abs_start, read_start);
-                    const size_t ol_abs_end   = (std::min)(seg_abs_end,   read_end);
-                    const size_t ol_rel_start = ol_abs_start - task.current_batch_start_byte;
-
-                    if (ol_abs_start > zero_cursor) {
-                        const size_t gap_rel_start = zero_cursor - task.current_batch_start_byte;
-                        const size_t gap_size = ol_abs_start - zero_cursor;
-                        std::memset(staging_base + gap_rel_start, 0, gap_size);
-                    }
-                    zero_cursor = ol_abs_end;
-
-                    gpu_memory->ReadBlockUnsafe(image.gpu_addr + ol_abs_start,
-                                                staging_base + ol_rel_start,
-                                                ol_abs_end - ol_abs_start);
-
-                    if (seg_abs_end > read_end) break;
-                    ++task.segment_scan_cursor;
-                }
-                if (zero_cursor < read_end) {
-                    const size_t gap_rel_start = zero_cursor - task.current_batch_start_byte;
-                    const size_t gap_size = read_end - zero_cursor;
-                    std::memset(staging_base + gap_rel_start, 0, gap_size);
-                }
+                ReadSparseCoalesced(task, image, staging_base, task.current_batch_start_byte,
+                                    read_start, read_end);
             } else {
                 gpu_memory->ReadBlockUnsafe(image.gpu_addr + read_start,
                                             staging_base + (read_start - task.current_batch_start_byte),
@@ -1715,7 +1739,7 @@ void TextureCache<P>::TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image
     const bool is_final_batch = task.current_offset >= active_end_byte;
 
     const std::span<const u8> sparse_hint =
-        task.is_sparse ? std::span<const u8>(task.slice_has_data)
+        task.is_sparse ? std::span<const u8>(task.SliceHasData())
                        : std::span<const u8>{};
 
     if (task.current_offset >= current_group_end_byte && z_want > z_start) {
@@ -1728,7 +1752,7 @@ void TextureCache<P>::TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image
         }
 
         runtime.AccelerateImageUpload(image, task.staging_buffer,
-                                      FixSmallVectorADL(task.upload_swizzles),
+                                      FixSmallVectorADL(task.UploadSwizzles()),
                                       z_src, z_image, z_count,
                                       sparse_hint,
                                       false);
@@ -1760,8 +1784,8 @@ void TextureCache<P>::TickAsyncUnswizzleCpu(PendingUnswizzle& task, Image& image
         task.total_size = MapSizeBytes(image);
 
         const auto uploads = FullUploadSwizzles(task.info);
-        task.cpu_num_tiles = uploads[0].num_tiles;
-        task.cpu_block = uploads[0].block;
+        task.CpuNumTiles() = uploads[0].num_tiles;
+        task.CpuBlock() = uploads[0].block;
         task.cpu_stride_alignment = CalculateLevelStrideAlignment(task.info, 0);
         task.bytes_per_block = BytesPerBlock(task.info.format);
 
@@ -1889,62 +1913,7 @@ void TextureCache<P>::TickAsyncUnswizzleCpu(PendingUnswizzle& task, Image& image
         const size_t buffer_offset_start = read_start - current_group_off;
 
         if (task.is_sparse) {
-            const size_t max_gap_for_batch = 4096; // This needs tuning as its just a number I pulled from out of nowhere
-
-            size_t zero_cursor = read_start;
-
-            while (task.segment_scan_cursor < task.sparse_segments.size()) {
-                const auto& [seg_gpu_addr, seg_size] =
-                    task.sparse_segments[task.segment_scan_cursor];
-                const size_t seg_abs_start = static_cast<size_t>(seg_gpu_addr - image.gpu_addr);
-                const size_t seg_abs_end = seg_abs_start + seg_size;
-
-                if (seg_abs_end <= read_start) { ++task.segment_scan_cursor; continue; }
-                if (seg_abs_start >= read_end) { break; }
-
-                const size_t ol_abs_start = (std::max)(seg_abs_start, read_start);
-                const size_t ol_abs_end = (std::min)(seg_abs_end, read_end);
-
-                size_t batch_abs_end = ol_abs_end;
-                size_t batch_cursor = task.segment_scan_cursor + 1;
-
-                while (batch_cursor < task.sparse_segments.size()) {
-                    const auto& [next_seg_addr, next_seg_size] = task.sparse_segments[batch_cursor];
-                    const size_t next_seg_abs_start = static_cast<size_t>(next_seg_addr - image.gpu_addr);
-                    const size_t next_seg_abs_end = next_seg_abs_start + next_seg_size;
-
-                    if (next_seg_abs_start >= read_end) break;
-                    if (next_seg_abs_end <= read_start) { ++batch_cursor; continue; }
-
-                    const size_t gap = next_seg_abs_start - batch_abs_end;
-                    if (gap > max_gap_for_batch) break;
-
-                    batch_abs_end = (std::min)(next_seg_abs_end, read_end);
-                    ++batch_cursor;
-                }
-
-                const size_t batch_size = batch_abs_end - ol_abs_start;
-                const size_t buffer_ol_rel_start = ol_abs_start - current_group_off;
-
-                if (ol_abs_start > zero_cursor) {
-                    const size_t gap_rel_start = zero_cursor - current_group_off;
-                    const size_t gap_size = ol_abs_start - zero_cursor;
-                    std::memset(staging_base + gap_rel_start, 0, gap_size);
-                }
-                zero_cursor = batch_abs_end;
-
-                gpu_memory->ReadBlockUnsafe(image.gpu_addr + ol_abs_start,
-                                            staging_base + buffer_ol_rel_start,
-                                            batch_size);
-
-                if (seg_abs_end > read_end) break;
-                task.segment_scan_cursor = batch_cursor;
-            }
-            if (zero_cursor < read_end) {
-                const size_t gap_rel_start = zero_cursor - current_group_off;
-                const size_t gap_size = read_end - zero_cursor;
-                std::memset(staging_base + gap_rel_start, 0, gap_size);
-            }
+            ReadSparseCoalesced(task, image, staging_base, current_group_off, read_start, read_end);
         } else {
             gpu_memory->ReadBlockUnsafe(image.gpu_addr + read_start, staging_base + buffer_offset_start,
                                         copy_amount);
@@ -1962,10 +1931,11 @@ void TextureCache<P>::TickAsyncUnswizzleCpu(PendingUnswizzle& task, Image& image
         const u32 z_image = z_src;
 
         bool any_data = true;
-        if (task.is_sparse && !task.slice_has_data.empty()) {
+        if (task.is_sparse && !task.SliceHasData().empty()) {
             any_data = false;
+            const auto& slice_has_data = task.SliceHasData();
             for (u32 z = z_src; z < z_src + z_count_current; ++z) {
-                if (z < task.slice_has_data.size() && task.slice_has_data[z]) {
+                if (z < slice_has_data.size() && slice_has_data[z]) {
                     any_data = true;
                     break;
                 }
@@ -2026,8 +1996,12 @@ void TextureCache<P>::TickAsyncUnswizzleCpu(PendingUnswizzle& task, Image& image
             chunk->z_image = z_image;
             chunk->z_count = z_count_current;
             chunk->group_z_start = z_group_start;
-            if (chunk->linear_batch.size() < group_linear_size) {
-                chunk->linear_batch.resize(group_linear_size);
+            if (chunk->linear_staging_capacity < group_linear_size) {
+                if (chunk->linear_staging_capacity > 0) {
+                    runtime.FreeDeferredStagingBuffer(chunk->linear_staging);
+                }
+                chunk->linear_staging = runtime.UploadStagingBuffer(group_linear_size, true);
+                chunk->linear_staging_capacity = group_linear_size;
             }
 
             boost::container::small_vector<std::pair<u32, u32>, 32> subranges;
@@ -2066,12 +2040,12 @@ void TextureCache<P>::TickAsyncUnswizzleCpu(PendingUnswizzle& task, Image& image
                 const size_t sub_linear_size = static_cast<size_t>(sub_count) * task.bytes_per_slice;
 
                 const u8* const swizzled_base = swizzled_batch.data();
-                u8* const linear_base = chunk->linear_batch.data();
+                u8* const linear_base = chunk->linear_staging.mapped_span.data();
 
                 texture_unswizzle_worker.QueueWork(
                     [chunk, swizzled_base, sub_guest_off, sub_guest_size, linear_base, sub_linear_off,
                      sub_linear_size, bytes_per_block = task.bytes_per_block,
-                     num_tiles = task.cpu_num_tiles, sub_count, block = task.cpu_block,
+                     num_tiles = task.CpuNumTiles(), sub_count, block = task.CpuBlock(),
                      stride_alignment = task.cpu_stride_alignment]() mutable {
                         std::span<const u8> job_swizzled(swizzled_base + sub_guest_off, sub_guest_size);
                         std::span<u8> job_linear(linear_base + sub_linear_off, sub_linear_size);
@@ -2090,16 +2064,11 @@ void TextureCache<P>::TickAsyncUnswizzleCpu(PendingUnswizzle& task, Image& image
             const size_t offset_slices = chunk.z_src - chunk.group_z_start;
             const size_t upload_offset = offset_slices * task.bytes_per_slice;
             const size_t upload_size = static_cast<size_t>(chunk.z_count) * task.bytes_per_slice;
-
-            auto upload_staging = runtime.UploadStagingBuffer(upload_size);
-            std::memcpy(upload_staging.mapped_span.data(), chunk.linear_batch.data() + upload_offset,
-                        upload_size);
-
             const u32 aligned_width = Common::AlignUp(image.info.size.width, 4u);
             const u32 aligned_height = Common::AlignUp(image.info.size.height, 4u);
 
             const BufferImageCopy copy{
-                .buffer_offset = 0,
+                .buffer_offset = upload_offset,
                 .buffer_size = upload_size,
                 .buffer_row_length = aligned_width,
                 .buffer_image_height = aligned_height,
@@ -2113,7 +2082,7 @@ void TextureCache<P>::TickAsyncUnswizzleCpu(PendingUnswizzle& task, Image& image
                 .image_extent = {image.info.size.width, image.info.size.height, chunk.z_count},
             };
             const std::array copies{copy};
-            image.UploadMemory(upload_staging, copies);
+            image.UploadMemory(chunk.linear_staging, copies);
             runtime.InsertUploadMemoryBarrier();
 
             task.last_submitted_slice += chunk.z_count;
@@ -2128,6 +2097,10 @@ void TextureCache<P>::TickAsyncUnswizzleCpu(PendingUnswizzle& task, Image& image
     if (is_final_batch && all_submitted && !task.cpu_job_in_flight) {
         if (task.owns_staging_buffer) {
             runtime.FreeDeferredStagingBuffer(task.staging_buffer);
+        }
+        if (task.cpu_chunk && task.cpu_chunk->linear_staging_capacity > 0) {
+            runtime.FreeDeferredStagingBuffer(task.cpu_chunk->linear_staging);
+            task.cpu_chunk->linear_staging_capacity = 0;
         }
         image.flags &= ~ImageFlagBits::IsDecoding;
         unswizzle_queue.pop_front();
@@ -2973,8 +2946,14 @@ void TextureCache<P>::CancelPendingUnswizzle(ImageId image_id) {
         texture_unswizzle_worker.WaitForRequests();
     }
     for (auto& task : unswizzle_queue) {
-        if (task.image_id == image_id && task.initialized && task.owns_staging_buffer) {
-            runtime.FreeDeferredStagingBuffer(task.staging_buffer);
+        if (task.image_id == image_id && task.initialized) {
+            if (task.owns_staging_buffer) {
+                runtime.FreeDeferredStagingBuffer(task.staging_buffer);
+            }
+            if (task.cpu_chunk && task.cpu_chunk->linear_staging_capacity > 0) {
+                runtime.FreeDeferredStagingBuffer(task.cpu_chunk->linear_staging);
+                task.cpu_chunk->linear_staging_capacity = 0;
+            }
         }
     }
     std::erase_if(unswizzle_queue,
@@ -3176,6 +3155,7 @@ void TextureCache<P>::SynchronizeAliases(ImageId image_id) {
 template <class P>
 void TextureCache<P>::PrepareImage(ImageId image_id, bool is_modification, bool invalidate) {
     Image& image = slot_images[image_id];
+    runtime.SynchronizePendingGpuWrite(image);
     if (invalidate) {
         image.flags &= ~(ImageFlagBits::CpuModified | ImageFlagBits::GpuModified);
         if (False(image.flags & ImageFlagBits::Tracked)) {

@@ -140,7 +140,8 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
     using BufferType = typename P::BufferType;
 
     struct AsyncCpuUnswizzleChunk {
-        std::vector<u8> linear_batch;
+        AsyncBuffer linear_staging{};
+        size_t linear_staging_capacity = 0;
         u32 z_src = 0;
         u32 z_image = 0;
         u32 z_count = 0;
@@ -148,7 +149,14 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
         std::atomic<size_t> jobs_pending{0};
     };
 
-    // This struct is too huge! It makes me uncomfortable
+    struct SparseAndCpuUnswizzleState {
+        std::vector<std::pair<GPUVAddr, size_t>> sparse_segments;
+        std::vector<u8> slice_has_data;
+        boost::container::small_vector<SwizzleParameters, 16> upload_swizzles;
+        Extent3D cpu_num_tiles{};
+        Extent3D cpu_block{};
+    };
+
     struct PendingUnswizzle {
         VideoCommon::ImageInfo info;
         AsyncBuffer staging_buffer;
@@ -162,18 +170,15 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
         size_t current_batch_start_byte = 0;
         u64 swizzled_slice_size = 0;
 
-        std::vector<std::pair<GPUVAddr, size_t>> sparse_segments;
-        std::vector<u8> slice_has_data;
         size_t segment_scan_cursor = 0;
         u32 active_z_start = 0;
         u32 active_z_end = 0;
 
-        boost::container::small_vector<SwizzleParameters, 16> upload_swizzles;
+        // Heap allocation vs constantly moving large datatypes, which is worse!
+        std::unique_ptr<SparseAndCpuUnswizzleState> sparse_cpu_state;
 
+        // No like but needed due to needing atomic for thread safety
         std::unique_ptr<AsyncCpuUnswizzleChunk> cpu_chunk;
-
-        Extent3D cpu_num_tiles{};
-        Extent3D cpu_block{};
 
         u32 swizzle_block_depth = 0;
         u32 cpu_stride_alignment = 0;
@@ -183,6 +188,23 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
         bool is_sparse = false;
         bool is_cpu = false;
         bool cpu_job_in_flight = false;
+
+        SparseAndCpuUnswizzleState& SparseCpuState() {
+            if (!sparse_cpu_state) {
+                sparse_cpu_state = std::make_unique<SparseAndCpuUnswizzleState>();
+            }
+            return *sparse_cpu_state;
+        }
+
+        std::vector<std::pair<GPUVAddr, size_t>>& SparseSegments() {
+            return SparseCpuState().sparse_segments;
+        }
+        std::vector<u8>& SliceHasData() { return SparseCpuState().slice_has_data; }
+        boost::container::small_vector<SwizzleParameters, 16>& UploadSwizzles() {
+            return SparseCpuState().upload_swizzles;
+        }
+        Extent3D& CpuNumTiles() { return SparseCpuState().cpu_num_tiles; }
+        Extent3D& CpuBlock() { return SparseCpuState().cpu_block; }
     };
 
     struct BlitImages {
@@ -473,13 +495,14 @@ private:
     std::optional<size_t> QuerySamplerBudget() const;
 
     void QueueAsyncUnswizzle(Image& image, ImageId image_id);
-
-    void ProcessSparseTextures(Image &image, ImageId image_id);
+    void ProcessSparseTexture(Image &image, ImageId image_id);
 
     void TickAsyncUnswizzle();
     void TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image, bool force_owned_staging);
     void TickAsyncUnswizzleCpu(PendingUnswizzle& task, Image& image);
     void InitSparseUnswizzleTracking(PendingUnswizzle& task, Image& image);
+    void ReadSparseCoalesced(PendingUnswizzle& task, Image& image, u8* staging_base,
+                              size_t staging_base_abs_offset, size_t read_start, size_t read_end);
 
     Runtime& runtime;
 

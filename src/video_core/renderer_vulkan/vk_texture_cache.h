@@ -106,6 +106,8 @@ public:
                                std::span<const u8> slice_has_data = {},
                                bool image_already_uploaded = false);
 
+    void SynchronizePendingGpuWrite(Image& image);
+
     void InsertUploadMemoryBarrier() {}
 
     void TransitionImageLayout(Image& image);
@@ -389,6 +391,7 @@ private:
     VkDeviceSize compute_unswizzle_buffer_size = 0;
     bool has_compute_unswizzle_buffer = false;
     bool compute_unswizzle_buffer_is_zero = false;
+    bool has_pending_gpu_write_sync = false;
 
     void AllocateComputeUnswizzleBuffer(u32 max_slices);
 

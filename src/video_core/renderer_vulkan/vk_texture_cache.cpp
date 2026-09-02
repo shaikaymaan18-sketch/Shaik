@@ -1908,6 +1908,9 @@ Image::Image(TextureCacheRuntime& runtime_, const ImageInfo& info_, GPUVAddr gpu
         flags |= VideoCommon::ImageFlagBits::Converted;
         flags |= VideoCommon::ImageFlagBits::CostlyLoad;
     }
+    if (IsPixelFormatBCn(info.format) && info.type == ImageType::e3D && info.resources.levels == 1 && info.resources.layers == 1 && info.is_sparse) {
+        flags |= VideoCommon::ImageFlagBits::SparseUpload;
+    }
     if (runtime->device.HasDebuggingToolAttached()) {
         original_image.SetObjectNameEXT(VideoCommon::Name(*this).c_str());
     }
@@ -3188,6 +3191,31 @@ void TextureCacheRuntime::TransitionImageLayout(Image& image) {
                                    vk::PIPELINE_STAGE_GRAPHICS_COMPUTE, 0, barrier);
         });
     }
+}
+
+void TextureCacheRuntime::SynchronizePendingGpuWrite(Image& image) {
+    if (!image.has_pending_gpu_write_sync) {
+        return;
+    }
+    image.has_pending_gpu_write_sync = false;
+
+    const VkImageMemoryBarrier barrier{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+        .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+        .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = image.Handle(),
+        .subresourceRange = {image.AspectMask(), 0, 1, 0, 1},
+    };
+    scheduler.RequestOutsideRenderPassOperationContext();
+    scheduler.Record([barrier](vk::CommandBuffer cmdbuf) {
+        cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT,
+                               vk::PIPELINE_STAGE_GRAPHICS_COMPUTE, 0, barrier);
+    });
 }
 
 } // namespace Vulkan

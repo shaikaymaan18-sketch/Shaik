@@ -746,7 +746,7 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
             .srcAccessMask = src_access,
             .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
             .oldLayout = initial_prior_layout,
-            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .newLayout = VK_IMAGE_LAYOUT_GENERAL,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .image = dst_image,
@@ -793,26 +793,7 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
         }*/
     }
 
-    scheduler.Record([dst_image = image.Handle(), aspect = image.AspectMask()](vk::CommandBuffer cmdbuf) {
-        if (dst_image == VK_NULL_HANDLE) return;
-
-        const VkImageMemoryBarrier post_barrier{
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .pNext = nullptr,
-            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = dst_image,
-            .subresourceRange = {aspect, 0, 1, 0, 1},
-        };
-
-        cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT,
-                               VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                               0, post_barrier);
-    });
+    image.has_pending_gpu_write_sync = true;
 }
 
 void BlockLinearUnswizzle3DPass::UnswizzleChunk(
@@ -912,7 +893,7 @@ void BlockLinearUnswizzle3DPass::UnswizzleChunk(
             .imageExtent = {image_width, image_height, z_count},
         };
         cmdbuf.CopyBufferToImage(out_buffer, dst_image,
-                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, copy);
+                                VK_IMAGE_LAYOUT_GENERAL, copy);
     });
 }
 
@@ -976,7 +957,7 @@ void BlockLinearUnswizzle3DPass::UnswizzleZeroChunk(
             .imageExtent       = {image_width, image_height, z_count},
         };
         cmdbuf.CopyBufferToImage(out_buffer, dst_image,
-                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, copy);
+                                VK_IMAGE_LAYOUT_GENERAL, copy);
     });
 }
 
