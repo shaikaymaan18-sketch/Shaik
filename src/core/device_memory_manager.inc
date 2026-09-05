@@ -179,15 +179,6 @@ DeviceMemoryManager<Traits>::DeviceMemoryManager(const DeviceMemory& device_memo
     cached_pages = std::make_unique<CachedPages>();
 
     const size_t total_virtual = device_as_size >> Memory::YUZU_PAGEBITS;
-
-    // TODO: this is stupid, make continuity_tracker default to 0 so we can benefit from SparseLargeVector
-    auto virtual_entry = TrackedEntry {};
-    virtual_entry.compressed_physical_ptr = 0;
-    virtual_entry.continuity_tracker = 1;
-    virtual_entry.cpu_backing_address = 0;
-    for (size_t i = 0; i < total_virtual; i++) {
-        tracked_entries.Set(i, virtual_entry);
-    }
 }
 
 template <typename Traits>
@@ -302,14 +293,14 @@ void DeviceMemoryManager<Traits>::TrackContinuityImpl(DAddr address, VAddr virtu
             page_count = 1;
         }
         last_ptr = new_ptr;
-        tracked_entries.GetUnchecked(start_page_d + index).continuity_tracker = static_cast<u32>(page_count);
+        tracked_entries.GetUnchecked(start_page_d + index).continuity_tracker = static_cast<u32>(page_count) - 1;
     }
 }
 template <typename Traits>
 u8* DeviceMemoryManager<Traits>::GetSpan(const DAddr src_addr, const std::size_t size) {
     size_t page_index = src_addr >> page_bits;
     size_t subbits = src_addr & page_mask;
-    if ((static_cast<size_t>(tracked_entries[page_index].continuity_tracker) << page_bits) >= size + subbits) {
+    if ((static_cast<size_t>(tracked_entries[page_index].continuity_tracker+1) << page_bits) >= size + subbits) {
         return GetPointer<u8>(src_addr);
     }
     return nullptr;
@@ -319,7 +310,7 @@ template <typename Traits>
 const u8* DeviceMemoryManager<Traits>::GetSpan(const DAddr src_addr, const std::size_t size) const {
     size_t page_index = src_addr >> page_bits;
     size_t subbits = src_addr & page_mask;
-    if ((static_cast<size_t>(tracked_entries[page_index].continuity_tracker) << page_bits) >= size + subbits) {
+    if ((static_cast<size_t>(tracked_entries[page_index].continuity_tracker+1) << page_bits) >= size + subbits) {
         return GetPointer<u8>(src_addr);
     }
     return nullptr;
@@ -389,7 +380,7 @@ void DeviceMemoryManager<Traits>::WalkBlock(DAddr addr, std::size_t size, auto o
     std::size_t page_index = addr >> Memory::YUZU_PAGEBITS;
     std::size_t page_offset = addr & Memory::YUZU_PAGEMASK;
     while (remaining_size) {
-        const size_t next_pages = std::size_t(tracked_entries[page_index].continuity_tracker);
+        const size_t next_pages = std::size_t(tracked_entries[page_index].continuity_tracker+1);
         const std::size_t copy_amount = (std::min)((next_pages << Memory::YUZU_PAGEBITS) - page_offset, remaining_size);
         const auto current_vaddr = u64((page_index << Memory::YUZU_PAGEBITS) + page_offset);
         SCOPE_EXIT{
