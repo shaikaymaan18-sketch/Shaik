@@ -7,7 +7,7 @@ index 7e7142a..8530657 100644
 +
 +# for discord_register_osx.m
 +if (APPLE)
-+    enable_languages(OBJC)
++    enable_language(OBJC)
 +endif()
 +
  project (DiscordRPC)
