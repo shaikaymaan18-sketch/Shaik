@@ -453,7 +453,7 @@ void ArmDynarmic64::SignalInterrupt(Kernel::KThread* thread) {
 }
 
 void ArmDynarmic64::ClearInstructionCache() {
-    last_code_addr = u64(-1);
+    m_cb->last_code_addr = u64(-1);
     m_jit->ClearCache();
 }
 
