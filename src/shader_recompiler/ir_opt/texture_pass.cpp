@@ -312,10 +312,66 @@ static inline std::optional<ConstBufferAddr> TrackCached(const IR::Value& v, Env
 
 std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environment& env, const HostTranslateInfo& host_info);
 
+bool IsSameConstBufferAddr(const ConstBufferAddr& lhs, const ConstBufferAddr& rhs) {
+    return lhs.index == rhs.index && lhs.offset == rhs.offset &&
+           lhs.shift_left == rhs.shift_left && lhs.secondary_index == rhs.secondary_index &&
+           lhs.secondary_offset == rhs.secondary_offset &&
+           lhs.secondary_shift_left == rhs.secondary_shift_left && lhs.count == rhs.count &&
+           lhs.has_secondary == rhs.has_secondary && lhs.dynamic_offset == rhs.dynamic_offset;
+}
+
+std::optional<ConstBufferAddr> TrackPhi(const IR::Inst* phi, Environment& env,
+                                        const HostTranslateInfo& host_info, bool& ambiguous) {
+    std::optional<ConstBufferAddr> agreed;
+    const size_t num_args{phi->NumArgs()};
+    for (size_t index = 0; index < num_args; ++index) {
+        const IR::Value arg{phi->Arg(index).Resolve()};
+        if (arg.IsImmediate()) {
+            ambiguous = true;
+            return std::nullopt;
+        }
+        const IR::Inst* arg_inst{arg.InstRecursive()};
+        if (arg_inst == phi) {
+            continue;
+        }
+        if (arg_inst->GetOpcode() == IR::Opcode::Phi) {
+            ambiguous = true;
+            return std::nullopt;
+        }
+        const std::optional<ConstBufferAddr> operand{TrackCached(arg, env, host_info)};
+        if (!operand) {
+            ambiguous = true;
+            return std::nullopt;
+        }
+        if (!agreed) {
+            agreed = operand;
+            continue;
+        }
+        if (!IsSameConstBufferAddr(*agreed, *operand)) {
+            ambiguous = true;
+            return std::nullopt;
+        }
+    }
+    if (!agreed) {
+        ambiguous = true;
+    }
+    return agreed;
+}
+
 std::optional<ConstBufferAddr> Track(const IR::Value& value, Environment& env, const HostTranslateInfo& host_info) {
-    return IR::BreadthFirstSearch(value, [&env, &host_info](const IR::Inst* inst) {
-        return TryGetConstBuffer(inst, env, host_info);
-    });
+    bool ambiguous = false;
+    const std::optional<ConstBufferAddr> result{IR::BreadthFirstSearch(
+        value, [&env, &host_info, &ambiguous](const IR::Inst* inst)
+                   -> std::optional<ConstBufferAddr> {
+            if (inst->GetOpcode() == IR::Opcode::Phi) {
+                return TrackPhi(inst, env, host_info, ambiguous);
+            }
+            return TryGetConstBuffer(inst, env, host_info);
+        })};
+    if (ambiguous) {
+        return std::nullopt;
+    }
+    return result;
 }
 
 std::optional<u32> TryGetConstant(IR::Value& value, Environment& env) {
