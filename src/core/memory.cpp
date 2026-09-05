@@ -547,7 +547,6 @@ struct Memory::Impl {
 
             page_table.entries.ZeroRegion(base, end);
         } else {
-            static std::atomic<u32> block = 0;
             auto current_block = block.fetch_add(1, std::memory_order_relaxed);
             ASSERT(current_block <= 65535);
 
@@ -776,6 +775,7 @@ struct Memory::Impl {
 #else
     Common::HostMemory* host_buffer{};
 #endif
+    std::atomic<u32> block = 0;
 };
 
 Memory::Memory(Core::System& system_) : system{system_} {
