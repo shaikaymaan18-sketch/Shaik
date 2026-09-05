@@ -1,12 +1,4 @@
 {
-    "": {
-        "ci": true,
-        "hash": "9f50d993c39529e022ad456163de91ac5934e16faf8fc348f305355fc0a643c534f87ded707e11bd03bcbc0a1760bd20852b6533a67ac0558a078385181cb184",
-        "name": "SDL3",
-        "package": "SDL3",
-        "repo": "crueter-ci/SDL3",
-        "version": "3.4.14-1788231389-147a8ee32d"
-    },
     "biscuit": {
         "hash": "1229f345b014f7ca544dedb4edb3311e41ba736f9aa9a67f88b5f26f3c983288c6bb6cdedcfb0b8a02c63088a37e6a0d7ba97d9c2a4d721b213916327cffe28a",
         "min_version": "0.9.1",
@@ -68,10 +60,10 @@
     },
     "discord-rpc": {
         "find_args": "MODULE",
-        "hash": "ed87f16c404ad533ea1c74866e121aac2d5f204f54cd3f467a24d55246ebdeca5b89628850d6e84694da8e98e952a961cd3126631d61a7be347b3a0493347621",
+        "hash": "8a219fc6533bc223ad38024b699797f182f3140302e49f040ace946aa58f9083b86feea076d5fa91469dda6eebe078063acdf386e905d9a6d947aade31096400",
         "package": "DiscordRPC",
         "repo": "eden-emulator/discord-rpc",
-        "version": "cd5a2d7626"
+        "version": "0b5c665efe"
     },
     "enet": {
         "find_args": "MODULE",
