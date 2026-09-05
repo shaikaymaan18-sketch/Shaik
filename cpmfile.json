@@ -70,6 +70,9 @@
         "find_args": "MODULE",
         "hash": "8213c43dcb0f7d479f5861091d111ed12fbdec1e62e6d729d65a4bc181d82f48a35d5fd3cd5c291f2393ac7c9681eabc6b76609755f55376284c8a8d67e148f3",
         "package": "DiscordRPC",
+        "patches": [
+            "0001-objc.patch"
+        ],
         "repo": "eden-emulator/discord-rpc",
         "version": "0d8b2d6a37"
     },
