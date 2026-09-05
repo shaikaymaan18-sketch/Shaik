@@ -60,10 +60,10 @@
     },
     "discord-rpc": {
         "find_args": "MODULE",
-        "hash": "8a219fc6533bc223ad38024b699797f182f3140302e49f040ace946aa58f9083b86feea076d5fa91469dda6eebe078063acdf386e905d9a6d947aade31096400",
+        "hash": "4b66102e217162cc0b4d113b7871a196c6118354be46ba7818b2f2708b1c0af15deb586626fa3b89a1f42ce92c0b51a5fc16610b9a417070008a08e13c186f0d",
         "package": "DiscordRPC",
         "repo": "eden-emulator/discord-rpc",
-        "version": "0b5c665efe"
+        "version": "c91fe91f31"
     },
     "enet": {
         "find_args": "MODULE",
