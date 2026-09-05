@@ -177,8 +177,6 @@ DeviceMemoryManager<Traits>::DeviceMemoryManager(const DeviceMemory& device_memo
 {
     impl = std::make_unique<DeviceMemoryManagerAllocator<Traits>>();
     cached_pages = std::make_unique<CachedPages>();
-
-    const size_t total_virtual = device_as_size >> Memory::YUZU_PAGEBITS;
 }
 
 template <typename Traits>
