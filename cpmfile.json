@@ -68,13 +68,10 @@
     },
     "discord-rpc": {
         "find_args": "MODULE",
-        "hash": "8213c43dcb0f7d479f5861091d111ed12fbdec1e62e6d729d65a4bc181d82f48a35d5fd3cd5c291f2393ac7c9681eabc6b76609755f55376284c8a8d67e148f3",
+        "hash": "ed87f16c404ad533ea1c74866e121aac2d5f204f54cd3f467a24d55246ebdeca5b89628850d6e84694da8e98e952a961cd3126631d61a7be347b3a0493347621",
         "package": "DiscordRPC",
-        "patches": [
-            "0001-objc.patch"
-        ],
         "repo": "eden-emulator/discord-rpc",
-        "version": "0d8b2d6a37"
+        "version": "cd5a2d7626"
     },
     "enet": {
         "find_args": "MODULE",
