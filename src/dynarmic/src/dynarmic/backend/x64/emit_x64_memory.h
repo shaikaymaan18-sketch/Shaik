@@ -9,6 +9,7 @@
 #pragma once
 
 #include <bit>
+#include <utility>
 #include "dynarmic/backend/x64/xbyak.h"
 
 #include "dynarmic/backend/x64/a32_emit_x64.h"
@@ -95,7 +96,7 @@ template<>
     // mask away attributes
     if (ctx.conf.page_table_pointer_mask == 0) {
         code.test(page, page);
-    } else if (auto top = static_cast<s64>(ctx.conf.page_table_pointer_mask); top < INT32_MIN || top > INT32_MAX) {
+    } else if (std::in_range<s32>(ctx.conf.page_table_pointer_mask)) {
         code.and_(page, ctx.conf.page_table_pointer_mask);
     } else {
         code.mov(tmp, ctx.conf.page_table_pointer_mask);
@@ -165,7 +166,7 @@ template<>
     // mask away attributes
     if (ctx.conf.page_table_pointer_mask == 0) {
         code.test(page, page);
-    } else if (auto top = static_cast<s64>(ctx.conf.page_table_pointer_mask); top < INT32_MIN || top > INT32_MAX) {
+    } else if (std::in_range<s32>(ctx.conf.page_table_pointer_mask)) {
         code.and_(page, ctx.conf.page_table_pointer_mask);
     } else {
         code.mov(tmp, ctx.conf.page_table_pointer_mask);
