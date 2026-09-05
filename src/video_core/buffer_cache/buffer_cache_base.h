@@ -29,6 +29,7 @@
 #include "common/settings.h"
 #include "common/slot_vector.h"
 #include "video_core/buffer_cache/buffer_base.h"
+#include "video_core/buffer_cache/virtual_range_cache.h"
 #include "video_core/control/channel_state_cache.h"
 #include "video_core/delayed_destruction_ring.h"
 #include "video_core/dirty_flags.h"
@@ -83,6 +84,7 @@ struct Binding {
     DAddr device_addr{};
     u32 size{};
     BufferId buffer_id;
+    GPUVAddr gpu_addr{};
 };
 
 struct TextureBufferBinding : Binding {
@@ -214,6 +216,10 @@ public:
     ~BufferCache();
 
     void TickFrame();
+
+    bool BindMultiRangeStorage(const Binding& binding, bool is_written);
+
+    void UnmapGPUMemory(size_t as_id, GPUVAddr gpu_addr, size_t size);
 
     void WriteMemory(DAddr device_addr, u64 size);
 
@@ -414,7 +420,8 @@ private:
 
     void MarkWrittenBuffer(BufferId buffer_id, DAddr device_addr, u32 size);
 
-    [[nodiscard]] BufferId FindBuffer(DAddr device_addr, u32 size);
+    [[nodiscard]] BufferId FindBuffer(DAddr device_addr, u32 size,
+                                      bool sparse_compatible = false);
 
     void WaitForGpuFenceIfNeeded(Buffer& buffer);
 
@@ -422,7 +429,8 @@ private:
 
     void JoinOverlap(BufferId new_buffer_id, BufferId overlap_id, bool accumulate_stream_score);
 
-    [[nodiscard]] BufferId CreateBuffer(DAddr device_addr, u32 wanted_size);
+    [[nodiscard]] BufferId CreateBuffer(DAddr device_addr, u32 wanted_size,
+                                        bool sparse_compatible = false);
 
     void Register(BufferId buffer_id);
 
@@ -514,6 +522,7 @@ private:
     };
     Common::LeastRecentlyUsedCache<LRUItemParams> lru_cache;
     u64 frame_tick = 0;
+    VirtualRangeCache virtual_ranges;
     u64 total_used_memory = 0;
     u64 minimum_memory = 0;
     u64 critical_memory = 0;

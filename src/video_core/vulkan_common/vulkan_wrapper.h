@@ -345,6 +345,7 @@ struct DeviceDispatch : InstanceDispatch {
     PFN_vkGetQueryPoolResults vkGetQueryPoolResults{};
     PFN_vkGetSemaphoreCounterValue vkGetSemaphoreCounterValue{};
     PFN_vkMapMemory vkMapMemory{};
+    PFN_vkQueueBindSparse vkQueueBindSparse{};
     PFN_vkQueueSubmit vkQueueSubmit{};
     PFN_vkQueueSubmit2 vkQueueSubmit2{};
     PFN_vkResetFences vkResetFences{};
@@ -740,6 +741,11 @@ private:
     const DeviceDispatch* dld = nullptr;
 };
 
+struct MemoryLocation {
+    VkDeviceMemory memory{};
+    VkDeviceSize offset{};
+};
+
 class Buffer {
 public:
     explicit Buffer(VkBuffer handle_, VkDevice owner_, VmaAllocator allocator_,
@@ -811,6 +817,8 @@ public:
 
     void SetObjectNameEXT(const char* name) const;
 
+    MemoryLocation Location() const noexcept;
+
 private:
     void Release() const noexcept;
 
@@ -841,6 +849,11 @@ public:
     VkResult Submit2(Span<VkSubmitInfo2> submit_infos,
                      VkFence fence = VK_NULL_HANDLE) const noexcept {
         return dld->vkQueueSubmit2(queue, submit_infos.size(), submit_infos.data(), fence);
+    }
+
+    VkResult BindSparse(Span<VkBindSparseInfo> bind_infos,
+                        VkFence fence = VK_NULL_HANDLE) const noexcept {
+        return dld->vkQueueBindSparse(queue, bind_infos.size(), bind_infos.data(), fence);
     }
 
     VkResult Present(const VkPresentInfoKHR& present_info) const noexcept {

@@ -229,6 +229,7 @@ void Load(VkDevice device, DeviceDispatch& dld) noexcept {
     X(vkGetPipelineExecutableStatisticsKHR);
     X(vkGetSemaphoreCounterValue);
     X(vkMapMemory);
+    X(vkQueueBindSparse);
     X(vkQueueSubmit);
     X(vkQueueSubmit2);
     X(vkResetFences);
@@ -537,6 +538,18 @@ void Buffer::Invalidate() const {
 
 void Buffer::SetObjectNameEXT(const char* name) const {
     SetObjectName(dld, owner, handle, VK_OBJECT_TYPE_BUFFER, name);
+}
+
+MemoryLocation Buffer::Location() const noexcept {
+    if (!allocation) {
+        return MemoryLocation{};
+    }
+    VmaAllocationInfo info{};
+    vmaGetAllocationInfo(allocator, allocation, &info);
+    return MemoryLocation{
+        .memory = info.deviceMemory,
+        .offset = info.offset,
+    };
 }
 
 void Buffer::Release() const noexcept {

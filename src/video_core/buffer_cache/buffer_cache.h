@@ -113,6 +113,11 @@ void BufferCache<P>::TickFrame() {
 }
 
 template <class P>
+void BufferCache<P>::UnmapGPUMemory(size_t as_id, GPUVAddr gpu_addr, size_t size) {
+    virtual_ranges.Unmap(as_id, gpu_addr, size);
+}
+
+template <class P>
 void BufferCache<P>::WriteMemory(DAddr device_addr, u64 size) {
     if (memory_tracker.IsRegionGpuModified(device_addr, size)) {
         ClearDownload(device_addr, size);
@@ -999,10 +1004,55 @@ void BufferCache<P>::BindHostGraphicsUniformBuffer(size_t stage, u32 index, u32 
 }
 
 template <class P>
+bool BufferCache<P>::BindMultiRangeStorage(const Binding& binding, bool is_written) {
+    if constexpr (requires { runtime.BindMultiRangeStorageBuffer(u64{}); }) {
+        if (binding.gpu_addr == 0 || binding.size == 0) {
+            return false;
+        }
+        if (is_written && !runtime.PrefersSparseSources()) {
+            return false;
+        }
+        const VirtualSegments* segments =
+            virtual_ranges.Query(*gpu_memory, binding.gpu_addr, binding.size);
+        if (!segments || segments->size() < 2) {
+            return false;
+        }
+        const u64 key = (static_cast<u64>(gpu_memory->GetID()) << 48) ^ binding.gpu_addr;
+        const bool prefer_sparse = runtime.PrefersSparseSources();
+        runtime.ResetMultiRange();
+        for (const VirtualSegment& segment : *segments) {
+            const BufferId buffer_id =
+                FindBuffer(segment.device_addr, segment.size, prefer_sparse);
+            if (!buffer_id) {
+                return false;
+            }
+            Buffer& buffer = slot_buffers[buffer_id];
+            TouchBuffer(buffer, buffer_id);
+            if (SynchronizeBuffer(buffer, segment.device_addr, segment.size)) {
+                runtime.InvalidateMultiRange(key);
+            }
+            const u32 offset = buffer.Offset(segment.device_addr);
+            buffer.MarkUsage(offset, segment.size);
+            if (is_written) {
+                MarkWrittenBuffer(buffer_id, segment.device_addr, segment.size);
+            }
+            runtime.PushMultiRangeSource(buffer, offset, segment.size);
+        }
+        return runtime.BindMultiRangeStorageBuffer(key);
+    } else {
+        return false;
+    }
+}
+
+template <class P>
 void BufferCache<P>::BindHostGraphicsStorageBuffers(size_t stage) {
     u32 binding_index = 0;
     ForEachEnabledBit(channel_state->enabled_storage_buffers[stage], [&](u32 index) {
         const Binding& binding = channel_state->storage_buffers[stage][index];
+        const bool is_written = ((channel_state->written_storage_buffers[stage] >> index) & 1) != 0;
+        if (BindMultiRangeStorage(binding, is_written)) {
+            return;
+        }
         Buffer& buffer = slot_buffers[binding.buffer_id];
         TouchBuffer(buffer, binding.buffer_id);
         const u32 size = binding.size;
@@ -1010,7 +1060,6 @@ void BufferCache<P>::BindHostGraphicsStorageBuffers(size_t stage) {
 
         const u32 offset = buffer.Offset(binding.device_addr);
         buffer.MarkUsage(offset, size);
-        const bool is_written = ((channel_state->written_storage_buffers[stage] >> index) & 1) != 0;
 
         if (is_written) {
             MarkWrittenBuffer(binding.buffer_id, binding.device_addr, size);
@@ -1139,6 +1188,11 @@ void BufferCache<P>::BindHostComputeStorageBuffers() {
     u32 binding_index = 0;
     ForEachEnabledBit(channel_state->enabled_compute_storage_buffers, [&](u32 index) {
         const Binding& binding = channel_state->compute_storage_buffers[index];
+        const bool is_written =
+            ((channel_state->written_compute_storage_buffers >> index) & 1) != 0;
+        if (BindMultiRangeStorage(binding, is_written)) {
+            return;
+        }
         Buffer& buffer = slot_buffers[binding.buffer_id];
         TouchBuffer(buffer, binding.buffer_id);
         const u32 size = binding.size;
@@ -1146,8 +1200,6 @@ void BufferCache<P>::BindHostComputeStorageBuffers() {
 
         const u32 offset = buffer.Offset(binding.device_addr);
         buffer.MarkUsage(offset, size);
-        const bool is_written =
-            ((channel_state->written_compute_storage_buffers >> index) & 1) != 0;
 
         if (is_written) {
             MarkWrittenBuffer(binding.buffer_id, binding.device_addr, size);
@@ -1440,7 +1492,7 @@ void BufferCache<P>::MarkWrittenBuffer(BufferId buffer_id, DAddr device_addr, u3
 }
 
 template <class P>
-BufferId BufferCache<P>::FindBuffer(DAddr device_addr, u32 size) {
+BufferId BufferCache<P>::FindBuffer(DAddr device_addr, u32 size, bool sparse_compatible) {
     if (device_addr == 0) {
         return NULL_BUFFER_ID;
     }
@@ -1450,10 +1502,18 @@ BufferId BufferCache<P>::FindBuffer(DAddr device_addr, u32 size) {
         Buffer& buffer = slot_buffers[buffer_id];
         WaitForGpuFenceIfNeeded(buffer);
         if (buffer.IsInBounds(device_addr, size)) {
-            return buffer_id;
+            bool usable = true;
+            if constexpr (requires { buffer.IsSparseCompatible(); }) {
+                if (sparse_compatible && !buffer.IsSparseCompatible()) {
+                    usable = false;
+                }
+            }
+            if (usable) {
+                return buffer_id;
+            }
         }
     }
-    return CreateBuffer(device_addr, size);
+    return CreateBuffer(device_addr, size, sparse_compatible);
 }
 
 template <class P>
@@ -1575,13 +1635,15 @@ void BufferCache<P>::JoinOverlap(BufferId new_buffer_id, BufferId overlap_id,
 }
 
 template <class P>
-BufferId BufferCache<P>::CreateBuffer(DAddr device_addr, u32 wanted_size) {
+BufferId BufferCache<P>::CreateBuffer(DAddr device_addr, u32 wanted_size,
+                                      bool sparse_compatible) {
     DAddr device_addr_end = Common::AlignUp(device_addr + wanted_size, CACHING_PAGESIZE);
     device_addr = Common::AlignDown(device_addr, CACHING_PAGESIZE);
     wanted_size = static_cast<u32>(device_addr_end - device_addr);
     const OverlapResult overlap = ResolveOverlaps(device_addr, wanted_size);
     const u32 size = static_cast<u32>(overlap.end - overlap.begin);
-    const BufferId new_buffer_id = slot_buffers.insert(runtime, overlap.begin, size);
+    const BufferId new_buffer_id =
+        slot_buffers.insert(runtime, overlap.begin, size, sparse_compatible);
     auto& new_buffer = slot_buffers[new_buffer_id];
     const size_t size_bytes = new_buffer.SizeBytes();
     runtime.ClearBuffer(new_buffer, 0, size_bytes, 0);
@@ -1934,10 +1996,15 @@ Binding BufferCache<P>::StorageBufferBinding(GPUVAddr ssbo_addr, u32 cbuf_index,
     // The end address used for size calculation does not need to be aligned
     const DAddr cpu_end = Common::AlignUp(*device_addr + size, Core::DEVICE_PAGESIZE);
 
+    u32 binding_size = static_cast<u32>(cpu_end - *aligned_device_addr);
+    if (is_written) {
+        binding_size = aligned_size;
+    }
     const Binding binding{
         .device_addr = *aligned_device_addr,
-        .size = is_written ? aligned_size : static_cast<u32>(cpu_end - *aligned_device_addr),
+        .size = binding_size,
         .buffer_id = BufferId{},
+        .gpu_addr = aligned_gpu_addr,
     };
     return binding;
 }

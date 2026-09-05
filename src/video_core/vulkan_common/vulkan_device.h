@@ -317,6 +317,10 @@ public:
         return properties.driver.driverID;
     }
 
+    bool IsSparseBindingSupported() const {
+        return features.features.sparseBinding && graphics_family_sparse_binding;
+    }
+
     /// Returns true for tile-based deferred renderers.
     bool IsTiler() const {
         switch (GetDriverID()) {
@@ -1146,6 +1150,7 @@ private:
     bool owns_static_pipeline_cache{};
     u32 instance_version{};      ///< Vulkan instance version.
     u32 graphics_family{};       ///< Main graphics queue family index.
+    bool graphics_family_sparse_binding{};
     u32 present_family{};        ///< Main present queue family index.
 
     struct Extensions {
