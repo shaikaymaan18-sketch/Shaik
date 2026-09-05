@@ -57,7 +57,7 @@ struct PageTable {
     class PageEntryData {
     public:
         struct Data {
-            Data(bool marked_, PageType type_, u32 block_, u64 page_)
+            Data(bool marked_, PageType type_, u16 block_, u64 page_)
                 : marked(static_cast<u64>(marked_)       & 0b1)
                 , type(static_cast<u64>(type_)           & ((1ULL << 2) - 1))
                 , block(static_cast<u64>(block_)         & ((1ULL << 9) - 1))
@@ -96,7 +96,7 @@ struct PageTable {
         }
 
         /// Write page info atomically
-        constexpr void Store(bool marked, PageType type, u32 block, uintptr_t pointer) noexcept {
+        constexpr void Store(bool marked, PageType type, u16 block, uintptr_t pointer) noexcept {
             data_raw.store(std::bit_cast<u64>(Data{marked, type, block, pointer}));
         }
 

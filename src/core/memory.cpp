@@ -606,8 +606,8 @@ struct Memory::Impl {
                 }
             }
 
-            auto current_block = block.fetch_add(1, std::memory_order_relaxed);
-            ASSERT(current_block <= 65535);
+            auto current_block = block_count.fetch_add(1, std::memory_order_relaxed);
+            ASSERT(current_block != 65535);
 
             page_table.entries.CommitRegion(base, end);
             while (base != end) {
@@ -847,7 +847,7 @@ struct Memory::Impl {
 #else
     Common::HostMemory* host_buffer{};
 #endif
-    std::atomic<u32> block = 0;
+    std::atomic<u16> block_count = 0;
 };
 
 Memory::Memory(Core::System& system_) : system{system_} {
