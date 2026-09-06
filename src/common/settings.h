@@ -352,7 +352,7 @@ struct Values {
                                                   true};
 
     SwitchableSetting<ScalingFilter> scaling_filter{linkage,
-                                                    ScalingFilter::Bilinear,
+                                                    ScalingFilter::NearestNeighbor,
                                                     "scaling_filter",
                                                     Category::Renderer,
                                                     Specialization::Default,
@@ -387,6 +387,69 @@ struct Values {
                                                   Specialization::Default,
                                                   true,
                                                   true};
+
+    SwitchableSetting<bool> frame_gen{linkage, false, "frame_gen", Category::Renderer,
+                                      Specialization::Default, true, false};
+
+    SwitchableSetting<u32, true> frame_gen_multiplier{linkage,
+                                                      2,
+                                                      2,
+                                                      4,
+                                                      "frame_gen_multiplier",
+                                                      Category::Renderer,
+                                                      Specialization::Countable,
+                                                      true,
+                                                      false,
+                                                      &frame_gen};
+
+    SwitchableSetting<u32, true> frame_gen_target_rate{linkage,
+                                                       0,
+                                                       0,
+                                                       240,
+                                                       "frame_gen_target_rate",
+                                                       Category::Renderer,
+                                                       Specialization::Countable,
+                                                       true,
+                                                       true,
+                                                       &frame_gen};
+
+    SwitchableSetting<bool> frame_gen_flow_scale_auto{linkage,
+                                                      true,
+                                                      "frame_gen_flow_scale_auto",
+                                                      Category::Renderer,
+                                                      Specialization::Default,
+                                                      true,
+                                                      false,
+                                                      &frame_gen};
+
+    SwitchableSetting<u32, true> frame_gen_flow_scale{linkage,
+                                                      75,
+                                                      25,
+                                                      100,
+                                                      "frame_gen_flow_scale",
+                                                      Category::Renderer,
+                                                      Specialization::Countable |
+                                                          Specialization::Percentage,
+                                                      true,
+                                                      true,
+                                                      &frame_gen};
+
+    SwitchableSetting<u32, true> frame_gen_queue_target{linkage,
+                                                        1,
+                                                        0,
+                                                        2,
+                                                        "frame_gen_queue_target",
+                                                        Category::Renderer,
+                                                        Specialization::Countable,
+                                                        true,
+                                                        false,
+                                                        &frame_gen};
+
+    SwitchableSetting<bool> frame_gen_fp16{linkage,      true,  "frame_gen_fp16", Category::Renderer,
+                                           Specialization::Default, true, false, &frame_gen};
+
+    SwitchableSetting<bool> frame_gen_dump_flow{linkage, false, "frame_gen_dump_flow",
+                                                Category::Renderer};
 
     SwitchableSetting<bool> use_asynchronous_gpu_emulation{linkage,
 #ifdef __ANDROID__
@@ -569,13 +632,8 @@ struct Values {
     SwitchableSetting<bool> emulate_bgr565{linkage, false, "emulate_bgr565",
                                             Category::RendererHacks};
 
-    SwitchableSetting<bool> rescale_hack{linkage,
-#ifdef __ANDROID__
-        true,
-#else
-        false,
-#endif
-        "rescale_hack", Category::RendererHacks};
+    SwitchableSetting<bool> rescale_hack{linkage, false, "rescale_hack",
+                                         Category::RendererHacks};
     SwitchableSetting<bool> enable_gpu_buffer_readback{linkage,
                                                        false,
                                                        "enable_gpu_buffer_readback",
@@ -702,7 +760,15 @@ struct Values {
 
     // Controls
     InputSetting<std::array<PlayerInput, 10>> players;
-
+    Setting<bool> disable_wgi_xinput{
+        linkage, false, "disable_wgi_xinput", Category::Controls, Specialization::Default,
+// Only read/write disable_wgi_xinput on Windows platforms
+#ifdef _WIN32
+        true
+#else
+        false
+#endif
+    };
     Setting<bool> enable_raw_input{
         linkage, false, "enable_raw_input", Category::Controls, Specialization::Default,
 // Only read/write enable_raw_input on Windows platforms
@@ -838,7 +904,7 @@ struct Values {
                                            0,
                                            65535,
                                            "debug_knobs",
-                                           Category::Debugging,
+                                           Category::System,
                                            Specialization::Countable,
                                            true,
                                            true};
@@ -867,11 +933,21 @@ struct Values {
 
     // Per-game overrides
     bool use_squashed_iterated_blend;
+
 };
 
 extern Values values;
 
-bool getDebugKnobAt(u8 i);
+constexpr u32 MIN_FRAME_GEN_MULTIPLIER = 2;
+constexpr u32 MAX_FRAME_GEN_MULTIPLIER = 4;
+
+[[nodiscard]] u32 FrameGenMultiplier();
+
+[[nodiscard]] size_t FrameGenGenerations();
+
+[[nodiscard]] size_t FrameGenMaxGenerations();
+
+bool GetDebugKnobAt(u8 i);
 
 void UpdateGPUAccuracy();
 bool IsGPULevelHigh();

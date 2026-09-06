@@ -13,9 +13,6 @@
 - [MSYS2](#msys2)
 - [RedoxOS](#redoxos)
 - [Windows](#windows)
-  - [Windows 7, Windows 8 and Windows 8.1](#windows-7-windows-8-and-windows-81)
-  - [Windows Vista and below](#windows-vista-and-below)
-  - [Windows on ARM](#windows-on-arm)
 <!-- /TOC -->
 
 ## Arch Linux
@@ -71,7 +68,7 @@ export LIBGL_ALWAYS_SOFTWARE=1
 
 Install `developer/gcc14` on OmniOS using pkgsrc.
 
-Since so many dependencies are missing on `OmniOS`, you may wish to use `-DCPMUTIL_FORCE_BUNDLED=ON`
+Since so many dependencies are missing on `OmniOS`, you may wish to use `-DCPMUTIL_FORCE_BUNDLED=ON` and `-DYUZU_USE_BUNDLED_OPENSSL=OFF`.
 
 For OmniOS you are required to build glslang yourself:
 ```sh
@@ -86,11 +83,13 @@ cmake --install build
 
 It may be tempting to specify `-t glslang`, but this will cause installation to fail. So don't.
 
-Using `--parallel` on CMake incorrectly passes `dmake ... -jn` instead of `dmake ... -j n`, this is a bug with OmniOS's CMake, and as such it's recommended to not use this option until it's fixed.
+Using `--parallel` on CMake incorrectly passes `dmake ... -jn` instead of `dmake ... -j n`, this is a bug with OmniOS's CMake, it's recommended to not use this option until it's fixed.
 
 You may also need to install `gmake` in order to properly build FFmpeg, this is provided by the `build-essential` package.
 
-If it wasn't obvious already, you require a X11 server to properly run the emulator within OmniOS, [this guide](https://web.archive.org/web/20260424200928/https://geekblood.wordpress.com/2017/10/26/installing-x11-and-a-desktop-environment-on-omnios/) is a great starting point for that, the links to pkgsrc are outdated so follow [this exemplar](https://pkgsrc.smartos.org/install-on-illumos/) as well:
+If it wasn't obvious already, you require a X11 server to properly run the emulator within OmniOS, [this guide](https://web.archive.org/web/20260424200928/https://geekblood.wordpress.com/2017/10/26/installing-x11-and-a-desktop-environment-on-omnios/) is a great starting point for that, the links to pkgsrc are outdated so follow [this exemplar](https://pkgsrc.smartos.org/install-on-illumos/) as well.
+
+For Solaris based OSes, `${CMAKE_SYSTEM_NAME}` isn't properly set on CMake (it's set to i686 on AMD64), you may find issues when building OpenSSL from `openssl-cmake`.
 
 ## HaikuOS
 
@@ -249,7 +248,7 @@ When CMake invokes certain file syscalls - it may sometimes cause crashes or cor
 
 ### Windows 10 1709 and below
 
-All Windows versions before 1803, including the following ones, do not support Eden's fastmem JIT mode without kernel extensions and will have significant performance losses. 
+All Windows versions before 1803, including the following ones, do not support Eden's fastmem JIT mode without kernel extensions.
 
 ### Windows 7, Windows 8 and Windows 8.1
 
