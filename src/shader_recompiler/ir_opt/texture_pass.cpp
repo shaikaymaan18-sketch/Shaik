@@ -299,18 +299,30 @@ static inline bool IsTexturePixelFormatIntegerCached(Environment& env,
 }
 
 
-std::optional<ConstBufferAddr> Track(const IR::Value& value, Environment& env, const HostTranslateInfo& host_info);
-static inline std::optional<ConstBufferAddr> TrackCached(const IR::Value& v, Environment& env, const HostTranslateInfo& host_info) {
+constexpr size_t PHI_TRACK_MAX_DEPTH = 3;
+
+struct PhiTrackState {
+    boost::container::small_vector<const IR::Inst*, 8> active;
+    size_t depth{};
+};
+
+std::optional<ConstBufferAddr> Track(const IR::Value& value, Environment& env,
+                                     const HostTranslateInfo& host_info, PhiTrackState& state);
+static inline std::optional<ConstBufferAddr> TrackCached(const IR::Value& v, Environment& env,
+                                                         const HostTranslateInfo& host_info,
+                                                         PhiTrackState& state) {
     if (const IR::Inst* key = v.InstRecursive()) {
         if (auto it = env.track_cache.find(key); it != env.track_cache.end()) return it->second;
-        auto found = Track(v, env, host_info);
+        auto found = Track(v, env, host_info, state);
         if (found) env.track_cache.emplace(key, *found);
         return found;
     }
-    return Track(v, env, host_info);
+    return Track(v, env, host_info, state);
 }
 
-std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environment& env, const HostTranslateInfo& host_info);
+std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environment& env,
+                                                 const HostTranslateInfo& host_info,
+                                                 PhiTrackState& state);
 
 bool IsSameConstBufferAddr(const ConstBufferAddr& lhs, const ConstBufferAddr& rhs) {
     return lhs.index == rhs.index && lhs.offset == rhs.offset &&
@@ -319,13 +331,6 @@ bool IsSameConstBufferAddr(const ConstBufferAddr& lhs, const ConstBufferAddr& rh
            lhs.secondary_shift_left == rhs.secondary_shift_left && lhs.count == rhs.count &&
            lhs.has_secondary == rhs.has_secondary && lhs.dynamic_offset == rhs.dynamic_offset;
 }
-
-constexpr size_t PHI_TRACK_MAX_DEPTH = 4;
-
-struct PhiTrackState {
-    boost::container::small_vector<const IR::Inst*, 8> active;
-    size_t depth{};
-};
 
 std::optional<ConstBufferAddr> TrackUncached(const IR::Value& value, Environment& env,
                                              const HostTranslateInfo& host_info,
@@ -396,18 +401,19 @@ std::optional<ConstBufferAddr> TrackUncached(const IR::Value& value, Environment
             if (inst->GetOpcode() == IR::Opcode::Phi) {
                 return TrackPhi(inst, env, host_info, state, ambiguous);
             }
-            return TryGetConstBuffer(inst, env, host_info);
+            return TryGetConstBuffer(inst, env, host_info, state);
         });
 }
 
-std::optional<ConstBufferAddr> Track(const IR::Value& value, Environment& env, const HostTranslateInfo& host_info) {
+std::optional<ConstBufferAddr> Track(const IR::Value& value, Environment& env,
+                                     const HostTranslateInfo& host_info, PhiTrackState& state) {
     if (!Settings::values.enable_shader_phi_tracking.GetValue()) {
         return IR::BreadthFirstSearch(
-            value, [&env, &host_info](const IR::Inst* inst) -> std::optional<ConstBufferAddr> {
-                return TryGetConstBuffer(inst, env, host_info);
+            value, [&env, &host_info, &state](
+                       const IR::Inst* inst) -> std::optional<ConstBufferAddr> {
+                return TryGetConstBuffer(inst, env, host_info, state);
             });
     }
-    PhiTrackState state;
     bool ambiguous = false;
     const std::optional<ConstBufferAddr> result{
         TrackUncached(value, env, host_info, state, ambiguous)};
@@ -438,13 +444,15 @@ std::optional<u32> TryGetConstant(IR::Value& value, Environment& env) {
     return ReadCbufCached(env, index_number, offset_number);
 }
 
-std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environment& env, const HostTranslateInfo& host_info) {
+std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environment& env,
+                                                 const HostTranslateInfo& host_info,
+                                                 PhiTrackState& state) {
     switch (inst->GetOpcode()) {
     default:
         return std::nullopt;
     case IR::Opcode::BitwiseOr32: {
-        std::optional lhs{TrackCached(inst->Arg(0), env, host_info)};
-        std::optional rhs{TrackCached(inst->Arg(1), env, host_info)};
+        std::optional lhs{TrackCached(inst->Arg(0), env, host_info, state)};
+        std::optional rhs{TrackCached(inst->Arg(1), env, host_info, state)};
         if (!lhs || !rhs) {
             return std::nullopt;
         }
@@ -474,7 +482,7 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
         if (!shift.IsImmediate()) {
             return std::nullopt;
         }
-        std::optional lhs{TrackCached(inst->Arg(0), env, host_info)};
+        std::optional lhs{TrackCached(inst->Arg(0), env, host_info, state)};
         if (lhs) {
             lhs->shift_left = shift.U32();
         }
@@ -502,7 +510,7 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
                 return std::nullopt;
             } while (false);
         }
-        std::optional lhs{TrackCached(op1, env, host_info)};
+        std::optional lhs{TrackCached(op1, env, host_info, state)};
         if (lhs) {
             lhs->shift_left = static_cast<u32>(std::countr_zero(op2.U32()));
         }
@@ -568,7 +576,9 @@ std::optional<ConstBufferAddr> TryGetConstBuffer(const IR::Inst* inst, Environme
 TextureInst MakeInst(Environment& env, IR::Block* block, IR::Inst& inst, const HostTranslateInfo& host_info) {
     ConstBufferAddr addr;
     if (IsBindless(inst)) {
-        const std::optional<ConstBufferAddr> track_addr{TrackCached(inst.Arg(0), env, host_info)};
+        PhiTrackState state;
+        const std::optional<ConstBufferAddr> track_addr{
+            TrackCached(inst.Arg(0), env, host_info, state)};
 
         if (!track_addr) {
             throw NotImplementedException("Failed to track bindless texture constant buffer");
