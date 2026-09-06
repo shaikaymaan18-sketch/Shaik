@@ -338,7 +338,6 @@ class SettingsFragmentPresenter(
             add(BooleanSetting.ENABLE_BUFFER_HISTORY.key)
             add(BooleanSetting.ENABLE_GPU_BUFFER_READBACK.key)
             add(BooleanSetting.USE_OPTIMIZED_VERTEX_BUFFERS.key)
-            add(BooleanSetting.ENABLE_SHADER_PHI_TRACKING.key)
 
             add(HeaderSetting(R.string.hacks))
 

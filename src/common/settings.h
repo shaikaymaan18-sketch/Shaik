@@ -592,14 +592,6 @@ struct Values {
                                                   true,
                                                   true};
 
-    SwitchableSetting<bool> enable_shader_phi_tracking{linkage,
-                                                       true,
-                                                       "enable_shader_phi_tracking",
-                                                       Category::RendererAdvanced,
-                                                       Specialization::Default,
-                                                       true,
-                                                       true};
-
 #ifdef __ANDROID__
     SwitchableSetting<bool> use_optimized_vertex_buffers{linkage,
                                                  false,
