@@ -59,6 +59,8 @@ public:
 
     void Invalidate(u64 key);
 
+    void DropOwner(VkBuffer owner);
+
     void Clear();
 
 private:
@@ -74,6 +76,7 @@ private:
         VkDeviceSize size{};
         u64 geometry{};
         bool dirty{true};
+        std::vector<VkBuffer> owners;
     };
 
     [[nodiscard]] u64 HashSources(std::span<const MultiRangeSource> sources) const;

@@ -246,6 +246,12 @@ MultiRangeRef MultiRangeBufferCache::Get(u64 key, std::span<const MultiRangeSour
     entry.size = total;
     if (CanBindSparse(sources)) {
         entry.sparse_handle = CreateSparse(sources, total);
+        if (entry.sparse_handle != VK_NULL_HANDLE) {
+            entry.owners.reserve(sources.size());
+            for (const MultiRangeSource& source : sources) {
+                entry.owners.push_back(source.handle);
+            }
+        }
     }
     if (entry.sparse_handle == VK_NULL_HANDLE) {
         VkBufferUsageFlags flags = VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
@@ -293,6 +299,28 @@ void MultiRangeBufferCache::MarkGathered(u64 key) {
     const auto it = entries.find(key);
     if (it != entries.end()) {
         it->second.dirty = false;
+    }
+}
+
+void MultiRangeBufferCache::DropOwner(VkBuffer owner) {
+    if (owner == VK_NULL_HANDLE) {
+        return;
+    }
+    for (auto it = entries.begin(); it != entries.end();) {
+        Entry& entry = it->second;
+        bool owned = false;
+        for (const VkBuffer handle : entry.owners) {
+            if (handle == owner) {
+                owned = true;
+                break;
+            }
+        }
+        if (owned) {
+            DestroySparse(entry.sparse_handle);
+            it = entries.erase(it);
+        } else {
+            ++it;
+        }
     }
 }
 

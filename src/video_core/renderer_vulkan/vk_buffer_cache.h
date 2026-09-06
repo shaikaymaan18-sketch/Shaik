@@ -207,6 +207,10 @@ public:
         multi_range_buffers.Invalidate(key);
     }
 
+    void OnBufferDeleted(const Buffer& buffer) {
+        multi_range_buffers.DropOwner(buffer.Handle());
+    }
+
     void BindUniformBuffer(const Buffer& buffer, u32 offset, u32 size) {
         BindBuffer(buffer, offset, size);
     }

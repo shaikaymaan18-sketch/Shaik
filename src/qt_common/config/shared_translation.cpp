@@ -271,6 +271,8 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent) {
            tr("toggle for test on multi-range."));
     INSERT(Settings, enable_sparse_buffer_binding, tr("Sparse buffer binding"),
            tr("toggle for test on sparse buffer binding."));
+    INSERT(Settings, enable_shader_phi_tracking, tr("Shader phi tracking"),
+           tr("toggle for test on shader phi tracking."));
     INSERT(Settings, fix_bloom_effects, tr("Fix bloom effects"), tr("Removes bloom in Burnout."));
 
     INSERT(Settings, rescale_hack, tr("Enable Legacy Rescale Pass"),

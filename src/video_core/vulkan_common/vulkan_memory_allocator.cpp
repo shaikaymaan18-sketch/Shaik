@@ -305,48 +305,13 @@ vk::Buffer MemoryAllocator::CreateBuffer(const VkBufferCreateInfo &ci, MemoryUsa
         .priority = 0.f,
     };
 
-    const VkDevice logical = *device.GetLogical();
-    const auto &dld = device.GetDispatchLoader();
-
     VkBuffer handle{};
-    vk::Check(dld.vkCreateBuffer(logical, &ci, nullptr, &handle));
-
-    const VkBufferMemoryRequirementsInfo2 reqs_info{
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_REQUIREMENTS_INFO_2,
-        .pNext = nullptr,
-        .buffer = handle,
-    };
-    VkMemoryRequirements2 reqs2{
-        .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
-        .pNext = nullptr,
-        .memoryRequirements = {},
-    };
-    dld.vkGetBufferMemoryRequirements2(logical, &reqs_info, &reqs2);
-
-    VkMemoryRequirements reqs = reqs2.memoryRequirements;
-    reqs.alignment = (std::max)(reqs.alignment, min_alignment);
-    reqs.memoryTypeBits &= alloc_ci.memoryTypeBits;
-
-    VmaAllocation allocation{};
     VmaAllocationInfo alloc_info{};
-    VkResult res = vmaAllocateMemory(allocator, &reqs, &alloc_ci, &allocation, &alloc_info);
-    if (res != VK_SUCCESS) {
-        auto relaxed = alloc_ci;
-        relaxed.flags &= ~VMA_ALLOCATION_CREATE_WITHIN_BUDGET_BIT;
-        res = vmaAllocateMemory(allocator, &reqs, &relaxed, &allocation, &alloc_info);
-    }
-    if (res != VK_SUCCESS) {
-        dld.vkDestroyBuffer(logical, handle, nullptr);
-        vk::Check(res);
-    }
-    const VkResult bind_res = vmaBindBufferMemory(allocator, allocation, handle);
-    if (bind_res != VK_SUCCESS) {
-        vmaFreeMemory(allocator, allocation);
-        dld.vkDestroyBuffer(logical, handle, nullptr);
-        vk::Check(bind_res);
-    }
-
+    VmaAllocation allocation{};
     VkMemoryPropertyFlags property_flags{};
+
+    vk::Check(vmaCreateBufferWithAlignment(allocator, &ci, &alloc_ci, min_alignment, &handle,
+                                           &allocation, &alloc_info));
     vmaGetAllocationMemoryProperties(allocator, allocation, &property_flags);
 
     u8 *data = reinterpret_cast<u8 *>(alloc_info.pMappedData);
@@ -356,7 +321,8 @@ vk::Buffer MemoryAllocator::CreateBuffer(const VkBufferCreateInfo &ci, MemoryUsa
     }
     const bool is_coherent = (property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0;
 
-    return vk::Buffer(handle, logical, allocator, allocation, mapped_data, is_coherent, dld);
+    return vk::Buffer(handle, *device.GetLogical(), allocator, allocation, mapped_data, is_coherent,
+                      device.GetDispatchLoader());
 }
 
 MemoryCommit MemoryAllocator::Commit(const VkMemoryRequirements &reqs, MemoryUsage usage)

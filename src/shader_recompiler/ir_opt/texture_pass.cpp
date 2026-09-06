@@ -359,6 +359,12 @@ std::optional<ConstBufferAddr> TrackPhi(const IR::Inst* phi, Environment& env,
 }
 
 std::optional<ConstBufferAddr> Track(const IR::Value& value, Environment& env, const HostTranslateInfo& host_info) {
+    if (!Settings::values.enable_shader_phi_tracking.GetValue()) {
+        return IR::BreadthFirstSearch(
+            value, [&env, &host_info](const IR::Inst* inst) -> std::optional<ConstBufferAddr> {
+                return TryGetConstBuffer(inst, env, host_info);
+            });
+    }
     bool ambiguous = false;
     const std::optional<ConstBufferAddr> result{IR::BreadthFirstSearch(
         value, [&env, &host_info, &ambiguous](const IR::Inst* inst)

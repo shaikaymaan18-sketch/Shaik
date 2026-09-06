@@ -574,6 +574,8 @@
     <string name="enable_multi_range_storage_description">toggle for test on multi-range.</string>
     <string name="enable_sparse_buffer_binding">Sparse Buffer Binding</string>
     <string name="enable_sparse_buffer_binding_description">toggle for test on sparse buffer binding.</string>
+    <string name="enable_shader_phi_tracking">Shader Phi Tracking</string>
+    <string name="enable_shader_phi_tracking_description">toggle for test on shader phi tracking.</string>
 
     <string name="hacks">Hacks</string>
 

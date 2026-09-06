@@ -943,6 +943,13 @@ abstract class SettingsItem(
             )
             put(
                 SwitchSetting(
+                    BooleanSetting.ENABLE_SHADER_PHI_TRACKING,
+                    titleId = R.string.enable_shader_phi_tracking,
+                    descriptionId = R.string.enable_shader_phi_tracking_description
+                )
+            )
+            put(
+                SwitchSetting(
                     BooleanSetting.SYNC_MEMORY_OPERATIONS,
                     titleId = R.string.sync_memory_operations,
                     descriptionId = R.string.sync_memory_operations_description
