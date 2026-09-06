@@ -213,7 +213,8 @@ MultiRangeRef MultiRangeBufferCache::Get(const Device& device, Scheduler& schedu
     const u64 geometry = HashSources(sources);
     const u64 content = HashContent(sources);
     const auto it = entries.find(key);
-    if (it != entries.end() && it->second.geometry == geometry && it->second.size == total) {
+    if (it != entries.end() && !it->second.dead && it->second.geometry == geometry &&
+        it->second.size == total) {
         Entry& entry = it->second;
         entry.frame = frame_tick;
         entry.gpu_tick = scheduler.CurrentTick();
@@ -320,11 +321,17 @@ void MultiRangeBufferCache::DropOwner(Scheduler& scheduler, VkBuffer owner) {
                 break;
             }
         }
-        if (owned && RetireEntry(scheduler, entry)) {
-            it = entries.erase(it);
-        } else {
+        if (!owned) {
             ++it;
+            continue;
         }
+        if (RetireEntry(scheduler, entry)) {
+            it = entries.erase(it);
+            continue;
+        }
+        entry.dead = true;
+        entry.owners.clear();
+        ++it;
     }
 }
 
@@ -346,7 +353,7 @@ void MultiRangeBufferCache::TickFrame(Scheduler& scheduler) {
         Entry& entry = it->second;
         const bool expired =
             frame_tick - entry.frame > FRAMES_TO_LIVE && scheduler.IsFree(entry.gpu_tick);
-        if (expired && RetireEntry(scheduler, entry)) {
+        if ((expired || entry.dead) && RetireEntry(scheduler, entry)) {
             it = entries.erase(it);
         } else {
             ++it;

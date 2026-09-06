@@ -83,6 +83,7 @@ private:
         u64 frame{};
         u64 gpu_tick{};
         bool dirty{true};
+        bool dead{};
     };
 
     [[nodiscard]] u64 HashSources(std::span<const MultiRangeSource> sources) const;
