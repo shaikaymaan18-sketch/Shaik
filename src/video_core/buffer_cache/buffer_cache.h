@@ -1014,7 +1014,7 @@ void BufferCache<P>::ResolveMultiRangeStorage(Binding& binding, bool is_written,
         if (binding.gpu_addr == 0 || binding.size == 0) {
             return;
         }
-        if (is_written && !runtime.PrefersSparseSources()) {
+        if (is_written) {
             return;
         }
         const VirtualSegments* found =

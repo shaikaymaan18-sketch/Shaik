@@ -168,8 +168,8 @@ SparseBuffer MultiRangeBufferCache::CreateSparse(const Device& device, Scheduler
     return handle;
 }
 
-bool MultiRangeBufferCache::DestroySparse(Scheduler& scheduler, SparseBuffer&& handle) {
-    if (!handle) {
+bool MultiRangeBufferCache::RetireEntry(Scheduler& scheduler, Entry& entry) {
+    if (!entry.sparse_handle && !entry.gathered) {
         return true;
     }
     if (retired.size() == retired.capacity()) {
@@ -179,7 +179,8 @@ bool MultiRangeBufferCache::DestroySparse(Scheduler& scheduler, SparseBuffer&& h
         return false;
     }
     retired.push_back(Retired{
-        .handle = std::move(handle),
+        .handle = std::move(entry.sparse_handle),
+        .gathered = std::move(entry.gathered),
         .tick = scheduler.CurrentTick(),
     });
     return true;
@@ -189,7 +190,9 @@ void MultiRangeBufferCache::DrainRetired(Scheduler& scheduler) {
     size_t index = 0;
     while (index < retired.size()) {
         if (scheduler.IsFree(retired[index].tick)) {
-            retired[index] = std::move(retired.back());
+            if (index + 1 != retired.size()) {
+                retired[index] = std::move(retired.back());
+            }
             retired.pop_back();
         } else {
             ++index;
@@ -233,7 +236,7 @@ MultiRangeRef MultiRangeBufferCache::Get(const Device& device, Scheduler& schedu
         return ref;
     }
     if (it != entries.end()) {
-        if (!DestroySparse(scheduler, std::move(it->second.sparse_handle))) {
+        if (!RetireEntry(scheduler, it->second)) {
             return MultiRangeRef{};
         }
         entries.erase(it);
@@ -317,7 +320,7 @@ void MultiRangeBufferCache::DropOwner(Scheduler& scheduler, VkBuffer owner) {
                 break;
             }
         }
-        if (owned && DestroySparse(scheduler, std::move(entry.sparse_handle))) {
+        if (owned && RetireEntry(scheduler, entry)) {
             it = entries.erase(it);
         } else {
             ++it;
@@ -343,7 +346,7 @@ void MultiRangeBufferCache::TickFrame(Scheduler& scheduler) {
         Entry& entry = it->second;
         const bool expired =
             frame_tick - entry.frame > FRAMES_TO_LIVE && scheduler.IsFree(entry.gpu_tick);
-        if (expired && DestroySparse(scheduler, std::move(entry.sparse_handle))) {
+        if (expired && RetireEntry(scheduler, entry)) {
             it = entries.erase(it);
         } else {
             ++it;

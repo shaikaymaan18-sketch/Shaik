@@ -68,6 +68,7 @@ public:
 private:
     struct Retired {
         SparseBuffer handle;
+        vk::Buffer gathered;
         u64 tick{};
     };
 
@@ -96,7 +97,7 @@ private:
 
     [[nodiscard]] VkDeviceSize QueryBlockSize(const Device& device, u32& memory_type_bits) const;
 
-    bool DestroySparse(Scheduler& scheduler, SparseBuffer&& handle);
+    bool RetireEntry(Scheduler& scheduler, Entry& entry);
 
     void DrainRetired(Scheduler& scheduler);
 
