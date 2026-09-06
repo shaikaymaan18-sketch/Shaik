@@ -168,22 +168,28 @@ SparseBuffer MultiRangeBufferCache::CreateSparse(const Device& device, Scheduler
     return handle;
 }
 
-bool MultiRangeBufferCache::RetireEntry(Scheduler& scheduler, Entry& entry) {
+void MultiRangeBufferCache::RetireEntry(Scheduler& scheduler, Entry& entry) {
     if (!entry.sparse_handle && !entry.gathered) {
-        return true;
+        return;
     }
     if (retired.size() == retired.capacity()) {
         DrainRetired(scheduler);
     }
     if (retired.size() == retired.capacity()) {
-        return false;
+        u64 oldest = retired.front().tick;
+        for (const Retired& item : retired) {
+            if (item.tick < oldest) {
+                oldest = item.tick;
+            }
+        }
+        scheduler.Wait(oldest);
+        DrainRetired(scheduler);
     }
     retired.push_back(Retired{
         .handle = std::move(entry.sparse_handle),
         .gathered = std::move(entry.gathered),
         .tick = scheduler.CurrentTick(),
     });
-    return true;
 }
 
 void MultiRangeBufferCache::DrainRetired(Scheduler& scheduler) {
@@ -213,11 +219,8 @@ MultiRangeRef MultiRangeBufferCache::Get(const Device& device, Scheduler& schedu
     const u64 geometry = HashSources(sources);
     const u64 content = HashContent(sources);
     const auto it = entries.find(key);
-    if (it != entries.end() && !it->second.dead && it->second.geometry == geometry &&
-        it->second.size == total) {
+    if (it != entries.end() && it->second.geometry == geometry && it->second.size == total) {
         Entry& entry = it->second;
-        entry.frame = frame_tick;
-        entry.gpu_tick = scheduler.CurrentTick();
         if (entry.content != content) {
             entry.content = content;
             entry.dirty = true;
@@ -237,9 +240,7 @@ MultiRangeRef MultiRangeBufferCache::Get(const Device& device, Scheduler& schedu
         return ref;
     }
     if (it != entries.end()) {
-        if (!RetireEntry(scheduler, it->second)) {
-            return MultiRangeRef{};
-        }
+        RetireEntry(scheduler, it->second);
         entries.erase(it);
     }
 
@@ -247,8 +248,6 @@ MultiRangeRef MultiRangeBufferCache::Get(const Device& device, Scheduler& schedu
     entry.geometry = geometry;
     entry.content = content;
     entry.size = total;
-    entry.frame = frame_tick;
-    entry.gpu_tick = scheduler.CurrentTick();
     if (CanBindSparse(sources)) {
         entry.sparse_handle = CreateSparse(device, scheduler, sources, total);
         if (entry.sparse_handle) {
@@ -325,39 +324,14 @@ void MultiRangeBufferCache::DropOwner(Scheduler& scheduler, VkBuffer owner) {
             ++it;
             continue;
         }
-        if (RetireEntry(scheduler, entry)) {
-            it = entries.erase(it);
-            continue;
-        }
-        entry.dead = true;
-        entry.owners.clear();
-        ++it;
+        RetireEntry(scheduler, entry);
+        it = entries.erase(it);
     }
 }
 
 void MultiRangeBufferCache::Invalidate(u64 key) {
     if (auto const it = entries.find(key); it != entries.end()) {
         it->second.dirty = true;
-    }
-}
-
-void MultiRangeBufferCache::TickFrame(Scheduler& scheduler) {
-    ++frame_tick;
-    if (!retired.empty()) {
-        DrainRetired(scheduler);
-    }
-    if (entries.empty()) {
-        return;
-    }
-    for (auto it = entries.begin(); it != entries.end();) {
-        Entry& entry = it->second;
-        const bool expired =
-            frame_tick - entry.frame > FRAMES_TO_LIVE && scheduler.IsFree(entry.gpu_tick);
-        if ((expired || entry.dead) && RetireEntry(scheduler, entry)) {
-            it = entries.erase(it);
-        } else {
-            ++it;
-        }
     }
 }
 

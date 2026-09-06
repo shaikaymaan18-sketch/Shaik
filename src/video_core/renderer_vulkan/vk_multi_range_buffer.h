@@ -42,7 +42,6 @@ struct MultiRangeRef {
 class MultiRangeBufferCache final {
 public:
     static constexpr VkDeviceSize DEFAULT_BLOCK_SIZE = 64 * 1024;
-    static constexpr u64 FRAMES_TO_LIVE = 120;
     static constexpr size_t MAX_RETIRED = 256;
 
     explicit MultiRangeBufferCache(const Device& device);
@@ -59,8 +58,6 @@ public:
     void Invalidate(u64 key);
 
     void DropOwner(Scheduler& scheduler, VkBuffer owner);
-
-    void TickFrame(Scheduler& scheduler);
 
     VkDeviceSize block_size{DEFAULT_BLOCK_SIZE};
     bool use_sparse{};
@@ -80,10 +77,7 @@ private:
         VkDeviceSize size{};
         u64 geometry{};
         u64 content{};
-        u64 frame{};
-        u64 gpu_tick{};
         bool dirty{true};
-        bool dead{};
     };
 
     [[nodiscard]] u64 HashSources(std::span<const MultiRangeSource> sources) const;
@@ -98,13 +92,12 @@ private:
 
     [[nodiscard]] VkDeviceSize QueryBlockSize(const Device& device, u32& memory_type_bits) const;
 
-    bool RetireEntry(Scheduler& scheduler, Entry& entry);
+    void RetireEntry(Scheduler& scheduler, Entry& entry);
 
     void DrainRetired(Scheduler& scheduler);
 
     ::Common::unordered_map<u64, Entry> entries;
     boost::container::static_vector<Retired, MAX_RETIRED> retired;
-    u64 frame_tick{};
     u32 sparse_memory_type_bits{};
     VkBufferUsageFlags sparse_usage{};
 };
