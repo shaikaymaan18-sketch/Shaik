@@ -30,8 +30,6 @@ enum class BooleanSetting(override val key: String) : AbstractBooleanSetting {
     RENDERER_REACTIVE_FLUSHING("use_reactive_flushing"),
     ENABLE_BUFFER_HISTORY("enable_buffer_history"),
     USE_OPTIMIZED_VERTEX_BUFFERS("use_optimized_vertex_buffers"),
-    ENABLE_MULTI_RANGE_STORAGE("enable_multi_range_storage"),
-    ENABLE_SPARSE_BUFFER_BINDING("enable_sparse_buffer_binding"),
     ENABLE_SHADER_PHI_TRACKING("enable_shader_phi_tracking"),
     ENABLE_GPU_BUFFER_READBACK("enable_gpu_buffer_readback"),
     SYNC_MEMORY_OPERATIONS("sync_memory_operations"),

@@ -267,10 +267,6 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent) {
     INSERT(Settings, enable_buffer_history, tr("Enable buffer history"),
            tr("Enables access to previous buffer states.\nThis option may improve rendering "
               "quality and performance consistency in some games."));
-    INSERT(Settings, enable_multi_range_storage, tr("Multi-range storage buffers"),
-           tr("toggle for test on multi-range."));
-    INSERT(Settings, enable_sparse_buffer_binding, tr("Sparse buffer binding"),
-           tr("toggle for test on sparse buffer binding."));
     INSERT(Settings, enable_shader_phi_tracking, tr("Shader phi tracking"),
            tr("toggle for test on shader phi tracking."));
     INSERT(Settings, fix_bloom_effects, tr("Fix bloom effects"), tr("Removes bloom in Burnout."));

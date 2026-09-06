@@ -175,10 +175,6 @@ public:
         return multi_range_buffers.BlockSize();
     }
 
-    [[nodiscard]] bool SupportsMultiRange() const noexcept {
-        return Settings::values.enable_multi_range_storage.GetValue();
-    }
-
     [[nodiscard]] bool PrefersSparseSources() const noexcept {
         return multi_range_buffers.UsesSparse();
     }

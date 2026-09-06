@@ -320,42 +320,84 @@ bool IsSameConstBufferAddr(const ConstBufferAddr& lhs, const ConstBufferAddr& rh
            lhs.has_secondary == rhs.has_secondary && lhs.dynamic_offset == rhs.dynamic_offset;
 }
 
+constexpr size_t PHI_TRACK_MAX_DEPTH = 4;
+
+struct PhiTrackState {
+    boost::container::small_vector<const IR::Inst*, 8> active;
+    size_t depth{};
+};
+
+std::optional<ConstBufferAddr> TrackUncached(const IR::Value& value, Environment& env,
+                                             const HostTranslateInfo& host_info,
+                                             PhiTrackState& state, bool& ambiguous);
+
 std::optional<ConstBufferAddr> TrackPhi(const IR::Inst* phi, Environment& env,
-                                        const HostTranslateInfo& host_info, bool& ambiguous) {
+                                        const HostTranslateInfo& host_info, PhiTrackState& state,
+                                        bool& ambiguous) {
+    if (state.depth >= PHI_TRACK_MAX_DEPTH) {
+        ambiguous = true;
+        return std::nullopt;
+    }
+    if (std::ranges::find(state.active, phi) != state.active.end()) {
+        return std::nullopt;
+    }
+    state.active.push_back(phi);
+    ++state.depth;
+
     std::optional<ConstBufferAddr> agreed;
+    bool failed = false;
     const size_t num_args{phi->NumArgs()};
     for (size_t index = 0; index < num_args; ++index) {
         const IR::Value arg{phi->Arg(index).Resolve()};
         if (arg.IsImmediate()) {
-            ambiguous = true;
-            return std::nullopt;
+            failed = true;
+            break;
         }
         const IR::Inst* arg_inst{arg.InstRecursive()};
         if (arg_inst == phi) {
             continue;
         }
-        if (arg_inst->GetOpcode() == IR::Opcode::Phi) {
-            ambiguous = true;
-            return std::nullopt;
+        if (std::ranges::find(state.active, arg_inst) != state.active.end()) {
+            continue;
         }
-        const std::optional<ConstBufferAddr> operand{TrackCached(arg, env, host_info)};
-        if (!operand) {
-            ambiguous = true;
-            return std::nullopt;
+        bool operand_ambiguous = false;
+        const std::optional<ConstBufferAddr> operand{
+            TrackUncached(arg, env, host_info, state, operand_ambiguous)};
+        if (!operand || operand_ambiguous) {
+            failed = true;
+            break;
         }
         if (!agreed) {
             agreed = operand;
             continue;
         }
         if (!IsSameConstBufferAddr(*agreed, *operand)) {
-            ambiguous = true;
-            return std::nullopt;
+            failed = true;
+            break;
         }
     }
-    if (!agreed) {
+
+    --state.depth;
+    state.active.pop_back();
+
+    if (failed || !agreed) {
         ambiguous = true;
+        return std::nullopt;
     }
     return agreed;
+}
+
+std::optional<ConstBufferAddr> TrackUncached(const IR::Value& value, Environment& env,
+                                             const HostTranslateInfo& host_info,
+                                             PhiTrackState& state, bool& ambiguous) {
+    return IR::BreadthFirstSearch(
+        value, [&env, &host_info, &state, &ambiguous](
+                   const IR::Inst* inst) -> std::optional<ConstBufferAddr> {
+            if (inst->GetOpcode() == IR::Opcode::Phi) {
+                return TrackPhi(inst, env, host_info, state, ambiguous);
+            }
+            return TryGetConstBuffer(inst, env, host_info);
+        });
 }
 
 std::optional<ConstBufferAddr> Track(const IR::Value& value, Environment& env, const HostTranslateInfo& host_info) {
@@ -365,15 +407,10 @@ std::optional<ConstBufferAddr> Track(const IR::Value& value, Environment& env, c
                 return TryGetConstBuffer(inst, env, host_info);
             });
     }
+    PhiTrackState state;
     bool ambiguous = false;
-    const std::optional<ConstBufferAddr> result{IR::BreadthFirstSearch(
-        value, [&env, &host_info, &ambiguous](const IR::Inst* inst)
-                   -> std::optional<ConstBufferAddr> {
-            if (inst->GetOpcode() == IR::Opcode::Phi) {
-                return TrackPhi(inst, env, host_info, ambiguous);
-            }
-            return TryGetConstBuffer(inst, env, host_info);
-        })};
+    const std::optional<ConstBufferAddr> result{
+        TrackUncached(value, env, host_info, state, ambiguous)};
     if (ambiguous) {
         return std::nullopt;
     }
