@@ -562,7 +562,7 @@ bool BufferCacheRuntime::BindMultiRangeStorageBuffer(u64 key) {
                 .dst_offset = static_cast<u64>(dst_offset),
                 .size = static_cast<size_t>(source.size),
             }};
-            CopyBuffer(source.handle, ref.handle, copy, false);
+            CopyBuffer(ref.handle, source.handle, copy, false);
             dst_offset += source.size;
         }
         PostCopyBarrier();
