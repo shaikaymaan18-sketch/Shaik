@@ -592,6 +592,22 @@ struct Values {
                                                   true,
                                                   true};
 
+    SwitchableSetting<bool> enable_multi_range_storage{linkage,
+                                                       false,
+                                                       "enable_multi_range_storage",
+                                                       Category::RendererAdvanced,
+                                                       Specialization::Default,
+                                                       true,
+                                                       true};
+
+    SwitchableSetting<bool> enable_sparse_buffer_binding{linkage,
+                                                         false,
+                                                         "enable_sparse_buffer_binding",
+                                                         Category::RendererAdvanced,
+                                                         Specialization::Default,
+                                                         true,
+                                                         true};
+
 #ifdef __ANDROID__
     SwitchableSetting<bool> use_optimized_vertex_buffers{linkage,
                                                  false,

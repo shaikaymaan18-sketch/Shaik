@@ -114,7 +114,12 @@ void BufferCache<P>::TickFrame() {
 
 template <class P>
 void BufferCache<P>::UnmapGPUMemory(size_t as_id, GPUVAddr gpu_addr, size_t size) {
-    virtual_ranges.Unmap(as_id, gpu_addr, size);
+    if constexpr (requires { runtime.SupportsMultiRange(); }) {
+        if (!runtime.SupportsMultiRange()) {
+            return;
+        }
+        virtual_ranges.Unmap(as_id, gpu_addr, size);
+    }
 }
 
 template <class P>
@@ -1009,6 +1014,9 @@ void BufferCache<P>::ResolveMultiRangeStorage(Binding& binding, bool is_written,
     binding.segment_first = 0;
     binding.segment_count = 0;
     if constexpr (requires { runtime.BindMultiRangeStorageBuffer(u64{}); }) {
+        if (!runtime.SupportsMultiRange()) {
+            return;
+        }
         if (binding.gpu_addr == 0 || binding.size == 0) {
             return;
         }

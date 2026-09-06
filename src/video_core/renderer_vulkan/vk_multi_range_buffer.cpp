@@ -94,7 +94,7 @@ u64 MultiRangeBufferCache::HashSources(std::span<const MultiRangeSource> sources
 }
 
 bool MultiRangeBufferCache::CanBindSparse(std::span<const MultiRangeSource> sources) const {
-    if (!use_sparse) {
+    if (!UsesSparse()) {
         return false;
     }
     for (const MultiRangeSource& source : sources) {

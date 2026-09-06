@@ -929,6 +929,20 @@ abstract class SettingsItem(
             )
             put(
                 SwitchSetting(
+                    BooleanSetting.ENABLE_MULTI_RANGE_STORAGE,
+                    titleId = R.string.enable_multi_range_storage,
+                    descriptionId = R.string.enable_multi_range_storage_description
+                )
+            )
+            put(
+                SwitchSetting(
+                    BooleanSetting.ENABLE_SPARSE_BUFFER_BINDING,
+                    titleId = R.string.enable_sparse_buffer_binding,
+                    descriptionId = R.string.enable_sparse_buffer_binding_description
+                )
+            )
+            put(
+                SwitchSetting(
                     BooleanSetting.SYNC_MEMORY_OPERATIONS,
                     titleId = R.string.sync_memory_operations,
                     descriptionId = R.string.sync_memory_operations_description

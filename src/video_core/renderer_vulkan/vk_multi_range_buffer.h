@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "common/common_types.h"
+#include "common/settings.h"
 #include "video_core/vulkan_common/vulkan_memory_allocator.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
 
@@ -44,7 +45,7 @@ public:
     MultiRangeBufferCache& operator=(const MultiRangeBufferCache&) = delete;
 
     [[nodiscard]] bool UsesSparse() const noexcept {
-        return use_sparse;
+        return use_sparse && Settings::values.enable_sparse_buffer_binding.GetValue();
     }
 
     [[nodiscard]] VkDeviceSize BlockSize() const noexcept {
