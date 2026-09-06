@@ -85,6 +85,14 @@ struct Binding {
     u32 size{};
     BufferId buffer_id;
     GPUVAddr gpu_addr{};
+    u32 segment_first{};
+    u32 segment_count{};
+};
+
+struct MultiRangeSegment {
+    BufferId buffer_id;
+    DAddr device_addr{};
+    u32 size{};
 };
 
 struct TextureBufferBinding : Binding {
@@ -217,7 +225,11 @@ public:
 
     void TickFrame();
 
-    bool BindMultiRangeStorage(const Binding& binding, bool is_written);
+    bool BindMultiRangeStorage(const Binding& binding, bool is_written,
+                               std::span<const MultiRangeSegment> pool);
+
+    void ResolveMultiRangeStorage(Binding& binding, bool is_written,
+                                  std::vector<MultiRangeSegment>& pool);
 
     void UnmapGPUMemory(size_t as_id, GPUVAddr gpu_addr, size_t size);
 
@@ -523,6 +535,8 @@ private:
     Common::LeastRecentlyUsedCache<LRUItemParams> lru_cache;
     u64 frame_tick = 0;
     VirtualRangeCache virtual_ranges;
+    std::vector<MultiRangeSegment> graphics_segments;
+    std::vector<MultiRangeSegment> compute_segments;
     u64 total_used_memory = 0;
     u64 minimum_memory = 0;
     u64 critical_memory = 0;

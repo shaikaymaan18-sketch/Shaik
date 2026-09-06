@@ -192,6 +192,7 @@ public:
             .memory_offset = location.offset,
             .offset = offset,
             .size = size,
+            .memory_type = location.memory_type,
         });
         multi_range_total += size;
     }

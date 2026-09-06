@@ -22,6 +22,7 @@ struct MultiRangeSource {
     VkDeviceSize memory_offset{};
     VkDeviceSize offset{};
     VkDeviceSize size{};
+    u32 memory_type{};
 };
 
 struct MultiRangeRef {
@@ -81,7 +82,7 @@ private:
     [[nodiscard]] VkBuffer CreateSparse(std::span<const MultiRangeSource> sources,
                                         VkDeviceSize total);
 
-    [[nodiscard]] VkDeviceSize QueryBlockSize() const;
+    [[nodiscard]] VkDeviceSize QueryBlockSize(u32& memory_type_bits) const;
 
     void DestroySparse(VkBuffer handle);
 
@@ -92,6 +93,7 @@ private:
     Scheduler& scheduler;
     bool use_sparse{};
     VkDeviceSize block_size{DEFAULT_BLOCK_SIZE};
+    u32 sparse_memory_type_bits{};
     VkBufferUsageFlags sparse_usage{};
     std::unordered_map<u64, Entry> entries;
     std::vector<Retired> retired;

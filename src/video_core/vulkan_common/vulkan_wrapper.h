@@ -744,6 +744,7 @@ private:
 struct MemoryLocation {
     VkDeviceMemory memory{};
     VkDeviceSize offset{};
+    u32 memory_type{};
 };
 
 class Buffer {

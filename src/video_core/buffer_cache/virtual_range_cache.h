@@ -43,20 +43,31 @@ public:
         entry.gpu_addr = gpu_addr;
         entry.size = size;
         const auto ranges = memory.GetSubmappedRange(gpu_addr, size);
+        GPUVAddr expected = gpu_addr;
+        bool contiguous = true;
         for (const auto& [range_addr, range_size] : ranges) {
-            const std::optional<DAddr> device_addr = memory.GpuToCpuAddress(range_addr);
-            if (!device_addr) {
+            if (range_addr != expected || range_size == 0) {
+                contiguous = false;
                 break;
             }
-            u32 segment_size = (std::numeric_limits<u32>::max)();
-            if (range_size < static_cast<size_t>(segment_size)) {
-                segment_size = static_cast<u32>(range_size);
+            const std::optional<DAddr> device_addr = memory.GpuToCpuAddress(range_addr);
+            if (!device_addr || *device_addr == 0) {
+                contiguous = false;
+                break;
+            }
+            if (range_size > static_cast<size_t>((std::numeric_limits<u32>::max)())) {
+                contiguous = false;
+                break;
             }
             entry.segments.push_back(VirtualSegment{
                 .gpu_addr = range_addr,
                 .device_addr = *device_addr,
-                .size = segment_size,
+                .size = static_cast<u32>(range_size),
             });
+            expected += range_size;
+        }
+        if (!contiguous || expected != gpu_addr + size) {
+            entry.segments.clear();
         }
         const auto result = entries.insert_or_assign(key, std::move(entry));
         return &result.first->second.segments;

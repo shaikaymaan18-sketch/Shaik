@@ -549,6 +549,7 @@ MemoryLocation Buffer::Location() const noexcept {
     return MemoryLocation{
         .memory = info.deviceMemory,
         .offset = info.offset,
+        .memory_type = info.memoryType,
     };
 }
 

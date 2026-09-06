@@ -21,11 +21,13 @@ MultiRangeBufferCache::MultiRangeBufferCache(const Device& device_,
     if (!device.IsSparseBindingSupported()) {
         return;
     }
-    const VkDeviceSize queried = QueryBlockSize();
-    if (queried == 0) {
+    u32 memory_type_bits = 0;
+    const VkDeviceSize queried = QueryBlockSize(memory_type_bits);
+    if (queried == 0 || memory_type_bits == 0) {
         return;
     }
     block_size = queried;
+    sparse_memory_type_bits = memory_type_bits;
     use_sparse = true;
 }
 
@@ -44,7 +46,7 @@ MultiRangeBufferCache::~MultiRangeBufferCache() {
     retired.clear();
 }
 
-VkDeviceSize MultiRangeBufferCache::QueryBlockSize() const {
+VkDeviceSize MultiRangeBufferCache::QueryBlockSize(u32& memory_type_bits) const {
     const VkDevice logical = *device.GetLogical();
     const auto& dld = device.GetDispatchLoader();
     const VkBufferCreateInfo probe_ci{
@@ -73,6 +75,7 @@ VkDeviceSize MultiRangeBufferCache::QueryBlockSize() const {
     };
     dld.vkGetBufferMemoryRequirements2(logical, &reqs_info, &reqs2);
     dld.vkDestroyBuffer(logical, probe, nullptr);
+    memory_type_bits = reqs2.memoryRequirements.memoryTypeBits;
     return reqs2.memoryRequirements.alignment;
 }
 
@@ -96,6 +99,12 @@ bool MultiRangeBufferCache::CanBindSparse(std::span<const MultiRangeSource> sour
     }
     for (const MultiRangeSource& source : sources) {
         if (source.memory == VK_NULL_HANDLE) {
+            return false;
+        }
+        if (source.memory_type >= 32) {
+            return false;
+        }
+        if (((sparse_memory_type_bits >> source.memory_type) & 1) == 0) {
             return false;
         }
         const VkDeviceSize memory_offset = source.memory_offset + source.offset;
