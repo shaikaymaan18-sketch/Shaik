@@ -114,7 +114,7 @@ void BufferCache<P>::TickFrame() {
 
 template <class P>
 void BufferCache<P>::UnmapGPUMemory(size_t as_id, GPUVAddr gpu_addr, size_t size) {
-    if constexpr (requires { runtime.BindMultiRangeStorageBuffer(u64{}); }) {
+    if constexpr (requires { runtime.BindMultiRangeStorageBuffer(u64{}, bool{}); }) {
         virtual_ranges.Unmap(as_id, gpu_addr, size);
     }
 }
@@ -215,8 +215,8 @@ bool BufferCache<P>::DMACopy(GPUVAddr src_address, GPUVAddr dest_address, u64 am
     BufferId buffer_b;
     do {
         channel_state->has_deleted_buffers = false;
-        buffer_a = FindBuffer(*cpu_src_address, static_cast<u32>(amount));
-        buffer_b = FindBuffer(*cpu_dest_address, static_cast<u32>(amount));
+        buffer_a = FindBuffer(*cpu_src_address, static_cast<u32>(amount), false);
+        buffer_b = FindBuffer(*cpu_dest_address, static_cast<u32>(amount), false);
     } while (channel_state->has_deleted_buffers);
     auto& src_buffer = slot_buffers[buffer_a];
     auto& dest_buffer = slot_buffers[buffer_b];
@@ -272,7 +272,7 @@ bool BufferCache<P>::DMAClear(GPUVAddr dst_address, u64 amount, u32 value) {
     ClearDownload(*cpu_dst_address, size);
     gpu_modified_ranges.Subtract(*cpu_dst_address, size);
 
-    const BufferId buffer = FindBuffer(*cpu_dst_address, static_cast<u32>(size));
+    const BufferId buffer = FindBuffer(*cpu_dst_address, static_cast<u32>(size), false);
     Buffer& dest_buffer = slot_buffers[buffer];
     const u32 offset = dest_buffer.Offset(*cpu_dst_address);
     runtime.ClearBuffer(dest_buffer, offset, size, value);
@@ -294,7 +294,7 @@ std::pair<typename P::Buffer*, u32> BufferCache<P>::ObtainBuffer(GPUVAddr gpu_ad
 template <class P>
 std::pair<typename P::Buffer*, u32> BufferCache<P>::ObtainCPUBuffer(
     DAddr device_addr, u32 size, ObtainBufferSynchronize sync_info, ObtainBufferOperation post_op) {
-    const BufferId buffer_id = FindBuffer(device_addr, size);
+    const BufferId buffer_id = FindBuffer(device_addr, size, false);
     Buffer& buffer = slot_buffers[buffer_id];
 
     // synchronize op
@@ -1010,7 +1010,7 @@ void BufferCache<P>::ResolveMultiRangeStorage(Binding& binding, bool is_written,
                                               std::vector<MultiRangeSegment>& pool) {
     binding.segment_first = 0;
     binding.segment_count = 0;
-    if constexpr (requires { runtime.BindMultiRangeStorageBuffer(u64{}); }) {
+    if constexpr (requires { runtime.BindMultiRangeStorageBuffer(u64{}, bool{}); }) {
         if (binding.gpu_addr == 0 || binding.size == 0) {
             return;
         }
@@ -1046,7 +1046,7 @@ void BufferCache<P>::ResolveMultiRangeStorage(Binding& binding, bool is_written,
 template <class P>
 bool BufferCache<P>::BindMultiRangeStorage(const Binding& binding, bool is_written,
                                            std::span<const MultiRangeSegment> pool) {
-    if constexpr (requires { runtime.BindMultiRangeStorageBuffer(u64{}); }) {
+    if constexpr (requires { runtime.BindMultiRangeStorageBuffer(u64{}, bool{}); }) {
         if (binding.segment_count < 2) {
             return false;
         }
@@ -1069,7 +1069,7 @@ bool BufferCache<P>::BindMultiRangeStorage(const Binding& binding, bool is_writt
             }
             runtime.PushMultiRangeSource(buffer, offset, segment.size);
         }
-        return runtime.BindMultiRangeStorageBuffer(key);
+        return runtime.BindMultiRangeStorageBuffer(key, is_written);
     } else {
         return false;
     }
@@ -1319,11 +1319,11 @@ void BufferCache<P>::UpdateIndexBuffer() {
         auto inline_index_size = static_cast<u32>(draw_state.inline_index_draw_indexes.size());
         u32 buffer_size = Common::AlignUp(inline_index_size, CACHING_PAGESIZE);
         if (inline_buffer_id == NULL_BUFFER_ID) [[unlikely]] {
-            inline_buffer_id = CreateBuffer(0, buffer_size);
+            inline_buffer_id = CreateBuffer(0, buffer_size, false);
         }
         if (slot_buffers[inline_buffer_id].SizeBytes() < buffer_size) [[unlikely]] {
             slot_buffers.erase(inline_buffer_id);
-            inline_buffer_id = CreateBuffer(0, buffer_size);
+            inline_buffer_id = CreateBuffer(0, buffer_size, false);
         }
         channel_state->index_buffer = Binding{
             .device_addr = 0,
@@ -1346,7 +1346,7 @@ void BufferCache<P>::UpdateIndexBuffer() {
     channel_state->index_buffer = Binding{
         .device_addr = *device_addr,
         .size = size,
-        .buffer_id = FindBuffer(*device_addr, size),
+        .buffer_id = FindBuffer(*device_addr, size, false),
     };
 }
 
@@ -1383,7 +1383,7 @@ void BufferCache<P>::UpdateVertexBuffer(u32 index) {
     if (!gpu_memory->IsWithinGPUAddressRange(gpu_addr_end) || size >= 64_MiB) {
         size = static_cast<u32>(gpu_memory->MaxContinuousRange(gpu_addr_begin, size));
     }
-    const BufferId buffer_id = FindBuffer(*device_addr, size);
+    const BufferId buffer_id = FindBuffer(*device_addr, size, false);
     const Binding binding{
         .device_addr = *device_addr,
         .size = size,
@@ -1404,7 +1404,7 @@ void BufferCache<P>::UpdateDrawIndirect() {
         binding = Binding{
             .device_addr = *device_addr,
             .size = static_cast<u32>(size),
-            .buffer_id = FindBuffer(*device_addr, static_cast<u32>(size)),
+            .buffer_id = FindBuffer(*device_addr, static_cast<u32>(size), false),
         };
     };
     if (current_draw_indirect->include_count) {
@@ -1428,7 +1428,7 @@ void BufferCache<P>::UpdateUniformBuffers(size_t stage) {
             channel_state->dirty_uniform_buffers[stage] |= 1U << index;
         }
         // Resolve buffer
-        binding.buffer_id = FindBuffer(binding.device_addr, binding.size);
+        binding.buffer_id = FindBuffer(binding.device_addr, binding.size, false);
     });
 }
 
@@ -1437,7 +1437,7 @@ void BufferCache<P>::UpdateStorageBuffers(size_t stage) {
     ForEachEnabledBit(channel_state->enabled_storage_buffers[stage], [&](u32 index) {
         // Resolve buffer
         Binding& binding = channel_state->storage_buffers[stage][index];
-        const BufferId buffer_id = FindBuffer(binding.device_addr, binding.size);
+        const BufferId buffer_id = FindBuffer(binding.device_addr, binding.size, false);
         binding.buffer_id = buffer_id;
         const bool is_written = ((channel_state->written_storage_buffers[stage] >> index) & 1) != 0;
         ResolveMultiRangeStorage(binding, is_written, graphics_segments);
@@ -1448,7 +1448,7 @@ template <class P>
 void BufferCache<P>::UpdateTextureBuffers(size_t stage) {
     ForEachEnabledBit(channel_state->enabled_texture_buffers[stage], [&](u32 index) {
         Binding& binding = channel_state->texture_buffers[stage][index];
-        binding.buffer_id = FindBuffer(binding.device_addr, binding.size);
+        binding.buffer_id = FindBuffer(binding.device_addr, binding.size, false);
     });
 }
 
@@ -1472,7 +1472,7 @@ void BufferCache<P>::UpdateTransformFeedbackBuffer(u32 index) {
         channel_state->transform_feedback_buffers[index] = NULL_BINDING;
         return;
     }
-    const BufferId buffer_id = FindBuffer(*device_addr, size);
+    const BufferId buffer_id = FindBuffer(*device_addr, size, false);
     channel_state->transform_feedback_buffers[index] = Binding{
         .device_addr = *device_addr,
         .size = size,
@@ -1494,7 +1494,7 @@ void BufferCache<P>::UpdateComputeUniformBuffers() {
                 binding.size = cbuf.size;
             }
         }
-        binding.buffer_id = FindBuffer(binding.device_addr, binding.size);
+        binding.buffer_id = FindBuffer(binding.device_addr, binding.size, false);
     });
 }
 
@@ -1503,7 +1503,7 @@ void BufferCache<P>::UpdateComputeStorageBuffers() {
     ForEachEnabledBit(channel_state->enabled_compute_storage_buffers, [&](u32 index) {
         // Resolve buffer
         Binding& binding = channel_state->compute_storage_buffers[index];
-        binding.buffer_id = FindBuffer(binding.device_addr, binding.size);
+        binding.buffer_id = FindBuffer(binding.device_addr, binding.size, false);
         const bool is_written =
             ((channel_state->written_compute_storage_buffers >> index) & 1) != 0;
         ResolveMultiRangeStorage(binding, is_written, compute_segments);
@@ -1514,7 +1514,7 @@ template <class P>
 void BufferCache<P>::UpdateComputeTextureBuffers() {
     ForEachEnabledBit(channel_state->enabled_compute_texture_buffers, [&](u32 index) {
         Binding& binding = channel_state->compute_texture_buffers[index];
-        binding.buffer_id = FindBuffer(binding.device_addr, binding.size);
+        binding.buffer_id = FindBuffer(binding.device_addr, binding.size, false);
     });
 }
 
@@ -1845,7 +1845,7 @@ void BufferCache<P>::InlineMemoryImplementation(DAddr dest_address, size_t copy_
     ClearDownload(dest_address, copy_size);
     gpu_modified_ranges.Subtract(dest_address, copy_size);
 
-    BufferId buffer_id = FindBuffer(dest_address, static_cast<u32>(copy_size));
+    BufferId buffer_id = FindBuffer(dest_address, static_cast<u32>(copy_size), false);
     auto& buffer = slot_buffers[buffer_id];
     SynchronizeBuffer(buffer, dest_address, static_cast<u32>(copy_size));
 
@@ -2043,9 +2043,9 @@ Binding BufferCache<P>::StorageBufferBinding(GPUVAddr ssbo_addr, u32 cbuf_index,
     }
     const Binding binding{
         .device_addr = *aligned_device_addr,
+        .gpu_addr = aligned_gpu_addr,
         .size = binding_size,
         .buffer_id = BufferId{},
-        .gpu_addr = aligned_gpu_addr,
     };
     return binding;
 }

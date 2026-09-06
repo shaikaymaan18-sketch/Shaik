@@ -751,9 +751,10 @@ class Buffer {
 public:
     explicit Buffer(VkBuffer handle_, VkDevice owner_, VmaAllocator allocator_,
                     VmaAllocation allocation_, std::span<u8> mapped_, bool is_coherent_,
-                    const DeviceDispatch& dld_) noexcept
+                    MemoryLocation location_, const DeviceDispatch& dld_) noexcept
         : handle{handle_}, owner{owner_}, allocator{allocator_},
-          allocation{allocation_}, mapped{mapped_}, is_coherent{is_coherent_}, dld{&dld_} {}
+          allocation{allocation_}, mapped{mapped_}, is_coherent{is_coherent_},
+          location{location_}, dld{&dld_} {}
     Buffer() = default;
 
     Buffer(const Buffer&) = delete;
@@ -762,7 +763,7 @@ public:
     Buffer(Buffer&& rhs) noexcept
         : handle{std::exchange(rhs.handle, VkBuffer{})}, owner{rhs.owner}, allocator{rhs.allocator},
           allocation{rhs.allocation}, mapped{rhs.mapped},
-          is_coherent{rhs.is_coherent}, dld{rhs.dld} {}
+          is_coherent{rhs.is_coherent}, location{rhs.location}, dld{rhs.dld} {}
 
     Buffer& operator=(Buffer&& rhs) noexcept {
         Release();
@@ -772,6 +773,7 @@ public:
         allocation = rhs.allocation;
         mapped = rhs.mapped;
         is_coherent = rhs.is_coherent;
+        location = rhs.location;
         dld = rhs.dld;
         return *this;
     }
@@ -818,7 +820,9 @@ public:
 
     void SetObjectNameEXT(const char* name) const;
 
-    MemoryLocation Location() const noexcept;
+    MemoryLocation Location() const noexcept {
+        return location;
+    }
 
 private:
     void Release() const noexcept;
@@ -828,6 +832,7 @@ private:
     VmaAllocator allocator = nullptr;
     VmaAllocation allocation = nullptr;
     std::span<u8> mapped = {};
+    MemoryLocation location{};
     bool is_coherent = false;
     const DeviceDispatch* dld = nullptr;
 };

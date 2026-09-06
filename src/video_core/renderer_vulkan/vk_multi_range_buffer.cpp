@@ -1,7 +1,9 @@
 // SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <algorithm>
 #include <mutex>
+#include <utility>
 
 #include "video_core/renderer_vulkan/vk_multi_range_buffer.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
@@ -9,10 +11,7 @@
 
 namespace Vulkan {
 
-MultiRangeBufferCache::MultiRangeBufferCache(const Device& device_,
-                                             MemoryAllocator& memory_allocator_,
-                                             Scheduler& scheduler_)
-    : device{device_}, memory_allocator{memory_allocator_}, scheduler{scheduler_} {
+MultiRangeBufferCache::MultiRangeBufferCache(const Device& device) {
     sparse_usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
     if (device.IsBufferDeviceAddressSupported()) {
@@ -22,7 +21,7 @@ MultiRangeBufferCache::MultiRangeBufferCache(const Device& device_,
         return;
     }
     u32 memory_type_bits = 0;
-    const VkDeviceSize queried = QueryBlockSize(memory_type_bits);
+    const VkDeviceSize queried = QueryBlockSize(device, memory_type_bits);
     if (queried == 0 || memory_type_bits == 0) {
         return;
     }
@@ -31,22 +30,8 @@ MultiRangeBufferCache::MultiRangeBufferCache(const Device& device_,
     use_sparse = true;
 }
 
-MultiRangeBufferCache::~MultiRangeBufferCache() {
-    const VkDevice logical = *device.GetLogical();
-    const auto& dld = device.GetDispatchLoader();
-    for (auto& [key, entry] : entries) {
-        if (entry.sparse_handle != VK_NULL_HANDLE) {
-            dld.vkDestroyBuffer(logical, entry.sparse_handle, nullptr);
-        }
-    }
-    entries.clear();
-    for (const Retired& item : retired) {
-        dld.vkDestroyBuffer(logical, item.handle, nullptr);
-    }
-    retired.clear();
-}
-
-VkDeviceSize MultiRangeBufferCache::QueryBlockSize(u32& memory_type_bits) const {
+VkDeviceSize MultiRangeBufferCache::QueryBlockSize(const Device& device,
+                                                   u32& memory_type_bits) const {
     const VkDevice logical = *device.GetLogical();
     const auto& dld = device.GetDispatchLoader();
     const VkBufferCreateInfo probe_ci{
@@ -63,6 +48,7 @@ VkDeviceSize MultiRangeBufferCache::QueryBlockSize(u32& memory_type_bits) const 
     if (dld.vkCreateBuffer(logical, &probe_ci, nullptr, &probe) != VK_SUCCESS) {
         return 0;
     }
+    const SparseBuffer owned{probe, logical, dld};
     const VkBufferMemoryRequirementsInfo2 reqs_info{
         .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_REQUIREMENTS_INFO_2,
         .pNext = nullptr,
@@ -74,7 +60,6 @@ VkDeviceSize MultiRangeBufferCache::QueryBlockSize(u32& memory_type_bits) const 
         .memoryRequirements = {},
     };
     dld.vkGetBufferMemoryRequirements2(logical, &reqs_info, &reqs2);
-    dld.vkDestroyBuffer(logical, probe, nullptr);
     memory_type_bits = reqs2.memoryRequirements.memoryTypeBits;
     return reqs2.memoryRequirements.alignment;
 }
@@ -86,40 +71,36 @@ u64 MultiRangeBufferCache::HashSources(std::span<const MultiRangeSource> sources
         hash *= 0x100000001b3ULL;
     };
     for (const MultiRangeSource& source : sources) {
-        mix(reinterpret_cast<u64>(source.handle));
-        mix(static_cast<u64>(source.offset));
-        mix(static_cast<u64>(source.size));
+        mix(u64(source.handle));
+        mix(u64(source.offset));
+        mix(u64(source.size));
+    }
+    return hash;
+}
+
+u64 MultiRangeBufferCache::HashContent(std::span<const MultiRangeSource> sources) const {
+    u64 hash = 0xcbf29ce484222325ULL;
+    for (const MultiRangeSource& source : sources) {
+        hash ^= source.write_tick;
+        hash *= 0x100000001b3ULL;
     }
     return hash;
 }
 
 bool MultiRangeBufferCache::CanBindSparse(std::span<const MultiRangeSource> sources) const {
-    if (!UsesSparse()) {
-        return false;
-    }
-    for (const MultiRangeSource& source : sources) {
-        if (source.memory == VK_NULL_HANDLE) {
-            return false;
-        }
-        if (source.memory_type >= 32) {
-            return false;
-        }
-        if (((sparse_memory_type_bits >> source.memory_type) & 1) == 0) {
-            return false;
-        }
-        const VkDeviceSize memory_offset = source.memory_offset + source.offset;
-        if ((memory_offset % block_size) != 0) {
-            return false;
-        }
-        if ((source.size % block_size) != 0) {
-            return false;
-        }
-    }
-    return true;
+    return use_sparse &&
+           std::none_of(sources.begin(), sources.end(),
+                        [block = block_size, bits = sparse_memory_type_bits](auto const& e) {
+                            const VkDeviceSize memory_offset = e.memory_offset + e.offset;
+                            return e.memory == VK_NULL_HANDLE || e.memory_type >= 32 ||
+                                   ((bits >> e.memory_type) & 1) == 0 ||
+                                   (memory_offset % block) != 0 || (e.size % block) != 0;
+                        });
 }
 
-VkBuffer MultiRangeBufferCache::CreateSparse(std::span<const MultiRangeSource> sources,
-                                             VkDeviceSize total) {
+SparseBuffer MultiRangeBufferCache::CreateSparse(const Device& device, Scheduler& scheduler,
+                                                 std::span<const MultiRangeSource> sources,
+                                                 VkDeviceSize total) {
     const VkDevice logical = *device.GetLogical();
     const auto& dld = device.GetDispatchLoader();
     const VkBufferCreateInfo buffer_ci{
@@ -132,10 +113,11 @@ VkBuffer MultiRangeBufferCache::CreateSparse(std::span<const MultiRangeSource> s
         .queueFamilyIndexCount = 0,
         .pQueueFamilyIndices = nullptr,
     };
-    VkBuffer handle{};
-    if (dld.vkCreateBuffer(logical, &buffer_ci, nullptr, &handle) != VK_SUCCESS) {
-        return VK_NULL_HANDLE;
+    VkBuffer raw{};
+    if (dld.vkCreateBuffer(logical, &buffer_ci, nullptr, &raw) != VK_SUCCESS) {
+        return SparseBuffer{};
     }
+    SparseBuffer handle{raw, logical, dld};
     std::vector<VkSparseMemoryBind> binds;
     binds.reserve(sources.size());
     VkDeviceSize resource_offset = 0;
@@ -150,7 +132,7 @@ VkBuffer MultiRangeBufferCache::CreateSparse(std::span<const MultiRangeSource> s
         resource_offset += source.size;
     }
     const VkSparseBufferMemoryBindInfo buffer_bind{
-        .buffer = handle,
+        .buffer = raw,
         .bindCount = static_cast<u32>(binds.size()),
         .pBinds = binds.data(),
     };
@@ -180,31 +162,34 @@ VkBuffer MultiRangeBufferCache::CreateSparse(std::span<const MultiRangeSource> s
         bind_result = device.GetGraphicsQueue().BindSparse(bind_info, *fence);
     }
     if (bind_result != VK_SUCCESS) {
-        dld.vkDestroyBuffer(logical, handle, nullptr);
-        return VK_NULL_HANDLE;
+        return SparseBuffer{};
     }
     fence.Wait();
     return handle;
 }
 
-void MultiRangeBufferCache::DestroySparse(VkBuffer handle) {
-    if (handle == VK_NULL_HANDLE) {
-        return;
+bool MultiRangeBufferCache::DestroySparse(Scheduler& scheduler, SparseBuffer&& handle) {
+    if (!handle) {
+        return true;
+    }
+    if (retired.size() == retired.capacity()) {
+        DrainRetired(scheduler);
+    }
+    if (retired.size() == retired.capacity()) {
+        return false;
     }
     retired.push_back(Retired{
-        .handle = handle,
+        .handle = std::move(handle),
         .tick = scheduler.CurrentTick(),
     });
+    return true;
 }
 
-void MultiRangeBufferCache::DrainRetired() {
-    const VkDevice logical = *device.GetLogical();
-    const auto& dld = device.GetDispatchLoader();
+void MultiRangeBufferCache::DrainRetired(Scheduler& scheduler) {
     size_t index = 0;
     while (index < retired.size()) {
         if (scheduler.IsFree(retired[index].tick)) {
-            dld.vkDestroyBuffer(logical, retired[index].handle, nullptr);
-            retired[index] = retired.back();
+            retired[index] = std::move(retired.back());
             retired.pop_back();
         } else {
             ++index;
@@ -212,48 +197,64 @@ void MultiRangeBufferCache::DrainRetired() {
     }
 }
 
-MultiRangeRef MultiRangeBufferCache::Get(u64 key, std::span<const MultiRangeSource> sources,
+MultiRangeRef MultiRangeBufferCache::Get(const Device& device, Scheduler& scheduler,
+                                         MemoryAllocator& memory_allocator, u64 key,
+                                         std::span<const MultiRangeSource> sources,
                                          VkDeviceSize total) {
     if (sources.empty() || total == 0) {
         return MultiRangeRef{};
     }
     if (!retired.empty()) {
-        DrainRetired();
+        DrainRetired(scheduler);
     }
     const u64 geometry = HashSources(sources);
+    const u64 content = HashContent(sources);
     const auto it = entries.find(key);
     if (it != entries.end() && it->second.geometry == geometry && it->second.size == total) {
         Entry& entry = it->second;
+        entry.frame = frame_tick;
+        entry.gpu_tick = scheduler.CurrentTick();
+        if (entry.content != content) {
+            entry.content = content;
+            entry.dirty = true;
+        }
         MultiRangeRef ref{
-            .handle = entry.sparse_handle,
+            .handle = *entry.sparse_handle,
             .address = entry.address,
             .size = entry.size,
+            .sparse = true,
             .needs_gather = false,
         };
-        if (entry.sparse_handle == VK_NULL_HANDLE) {
+        if (!entry.sparse_handle) {
             ref.handle = *entry.gathered;
+            ref.sparse = false;
             ref.needs_gather = entry.dirty;
         }
         return ref;
     }
     if (it != entries.end()) {
-        DestroySparse(it->second.sparse_handle);
+        if (!DestroySparse(scheduler, std::move(it->second.sparse_handle))) {
+            return MultiRangeRef{};
+        }
         entries.erase(it);
     }
 
-    Entry entry;
+    Entry entry{};
     entry.geometry = geometry;
+    entry.content = content;
     entry.size = total;
+    entry.frame = frame_tick;
+    entry.gpu_tick = scheduler.CurrentTick();
     if (CanBindSparse(sources)) {
-        entry.sparse_handle = CreateSparse(sources, total);
-        if (entry.sparse_handle != VK_NULL_HANDLE) {
+        entry.sparse_handle = CreateSparse(device, scheduler, sources, total);
+        if (entry.sparse_handle) {
             entry.owners.reserve(sources.size());
             for (const MultiRangeSource& source : sources) {
                 entry.owners.push_back(source.handle);
             }
         }
     }
-    if (entry.sparse_handle == VK_NULL_HANDLE) {
+    if (!entry.sparse_handle) {
         VkBufferUsageFlags flags = VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
                                    VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
@@ -274,21 +275,23 @@ MultiRangeRef MultiRangeBufferCache::Get(u64 key, std::span<const MultiRangeSour
         entry.dirty = true;
     }
     if (device.IsBufferDeviceAddressSupported()) {
-        VkBuffer address_handle = entry.sparse_handle;
-        if (address_handle == VK_NULL_HANDLE) {
+        VkBuffer address_handle = *entry.sparse_handle;
+        if (!entry.sparse_handle) {
             address_handle = *entry.gathered;
         }
         entry.address = device.GetLogical().GetBufferDeviceAddress(address_handle);
     }
 
     MultiRangeRef ref{
-        .handle = entry.sparse_handle,
+        .handle = *entry.sparse_handle,
         .address = entry.address,
         .size = entry.size,
+        .sparse = true,
         .needs_gather = false,
     };
-    if (entry.sparse_handle == VK_NULL_HANDLE) {
+    if (!entry.sparse_handle) {
         ref.handle = *entry.gathered;
+        ref.sparse = false;
         ref.needs_gather = true;
     }
     entries.emplace(key, std::move(entry));
@@ -296,13 +299,12 @@ MultiRangeRef MultiRangeBufferCache::Get(u64 key, std::span<const MultiRangeSour
 }
 
 void MultiRangeBufferCache::MarkGathered(u64 key) {
-    const auto it = entries.find(key);
-    if (it != entries.end()) {
+    if (auto const it = entries.find(key); it != entries.end()) {
         it->second.dirty = false;
     }
 }
 
-void MultiRangeBufferCache::DropOwner(VkBuffer owner) {
+void MultiRangeBufferCache::DropOwner(Scheduler& scheduler, VkBuffer owner) {
     if (owner == VK_NULL_HANDLE) {
         return;
     }
@@ -315,8 +317,7 @@ void MultiRangeBufferCache::DropOwner(VkBuffer owner) {
                 break;
             }
         }
-        if (owned) {
-            DestroySparse(entry.sparse_handle);
+        if (owned && DestroySparse(scheduler, std::move(entry.sparse_handle))) {
             it = entries.erase(it);
         } else {
             ++it;
@@ -325,17 +326,29 @@ void MultiRangeBufferCache::DropOwner(VkBuffer owner) {
 }
 
 void MultiRangeBufferCache::Invalidate(u64 key) {
-    const auto it = entries.find(key);
-    if (it != entries.end()) {
+    if (auto const it = entries.find(key); it != entries.end()) {
         it->second.dirty = true;
     }
 }
 
-void MultiRangeBufferCache::Clear() {
-    for (auto& [key, entry] : entries) {
-        DestroySparse(entry.sparse_handle);
+void MultiRangeBufferCache::TickFrame(Scheduler& scheduler) {
+    ++frame_tick;
+    if (!retired.empty()) {
+        DrainRetired(scheduler);
     }
-    entries.clear();
+    if (entries.empty()) {
+        return;
+    }
+    for (auto it = entries.begin(); it != entries.end();) {
+        Entry& entry = it->second;
+        const bool expired =
+            frame_tick - entry.frame > FRAMES_TO_LIVE && scheduler.IsFree(entry.gpu_tick);
+        if (expired && DestroySparse(scheduler, std::move(entry.sparse_handle))) {
+            it = entries.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 } // namespace Vulkan

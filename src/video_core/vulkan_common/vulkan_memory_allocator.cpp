@@ -275,9 +275,13 @@ vk::Buffer MemoryAllocator::CreateBuffer(const VkBufferCreateInfo &ci, MemoryUsa
     const std::span<u8> mapped_data = data ? std::span<u8>{data, ci.size} : std::span<u8>{};
     const bool is_coherent = (property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0;
 
-    return vk::Buffer(handle, *device.GetLogical(), allocator, allocation, mapped_data,
-                        is_coherent,
-                        device.GetDispatchLoader());
+    const vk::MemoryLocation location{
+        .memory = alloc_info.deviceMemory,
+        .offset = alloc_info.offset,
+        .memory_type = alloc_info.memoryType,
+    };
+    return vk::Buffer(handle, *device.GetLogical(), allocator, allocation, mapped_data, is_coherent,
+                      location, device.GetDispatchLoader());
 }
 
 vk::Buffer MemoryAllocator::CreateBuffer(const VkBufferCreateInfo &ci, MemoryUsage usage,
@@ -321,8 +325,13 @@ vk::Buffer MemoryAllocator::CreateBuffer(const VkBufferCreateInfo &ci, MemoryUsa
     }
     const bool is_coherent = (property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0;
 
+    const vk::MemoryLocation location{
+        .memory = alloc_info.deviceMemory,
+        .offset = alloc_info.offset,
+        .memory_type = alloc_info.memoryType,
+    };
     return vk::Buffer(handle, *device.GetLogical(), allocator, allocation, mapped_data, is_coherent,
-                      device.GetDispatchLoader());
+                      location, device.GetDispatchLoader());
 }
 
 MemoryCommit MemoryAllocator::Commit(const VkMemoryRequirements &reqs, MemoryUsage usage)

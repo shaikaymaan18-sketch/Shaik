@@ -540,19 +540,6 @@ void Buffer::SetObjectNameEXT(const char* name) const {
     SetObjectName(dld, owner, handle, VK_OBJECT_TYPE_BUFFER, name);
 }
 
-MemoryLocation Buffer::Location() const noexcept {
-    if (!allocation) {
-        return MemoryLocation{};
-    }
-    VmaAllocationInfo info{};
-    vmaGetAllocationInfo(allocator, allocation, &info);
-    return MemoryLocation{
-        .memory = info.deviceMemory,
-        .offset = info.offset,
-        .memory_type = info.memoryType,
-    };
-}
-
 void Buffer::Release() const noexcept {
     if (handle) {
         vmaDestroyBuffer(allocator, handle, allocation);

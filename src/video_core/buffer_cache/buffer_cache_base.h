@@ -82,9 +82,9 @@ static constexpr u32 DEFAULT_SKIP_CACHE_SIZE = static_cast<u32>(4_KiB);
 
 struct Binding {
     DAddr device_addr{};
+    GPUVAddr gpu_addr{};
     u32 size{};
     BufferId buffer_id;
-    GPUVAddr gpu_addr{};
     u32 segment_first{};
     u32 segment_count{};
 };
@@ -432,8 +432,7 @@ private:
 
     void MarkWrittenBuffer(BufferId buffer_id, DAddr device_addr, u32 size);
 
-    [[nodiscard]] BufferId FindBuffer(DAddr device_addr, u32 size,
-                                      bool sparse_compatible = false);
+    [[nodiscard]] BufferId FindBuffer(DAddr device_addr, u32 size, bool sparse_compatible);
 
     void WaitForGpuFenceIfNeeded(Buffer& buffer);
 
@@ -442,7 +441,7 @@ private:
     void JoinOverlap(BufferId new_buffer_id, BufferId overlap_id, bool accumulate_stream_score);
 
     [[nodiscard]] BufferId CreateBuffer(DAddr device_addr, u32 wanted_size,
-                                        bool sparse_compatible = false);
+                                        bool sparse_compatible);
 
     void Register(BufferId buffer_id);
 
@@ -533,10 +532,10 @@ private:
         using TickType = u64;
     };
     Common::LeastRecentlyUsedCache<LRUItemParams> lru_cache;
-    u64 frame_tick = 0;
     VirtualRangeCache virtual_ranges;
     std::vector<MultiRangeSegment> graphics_segments;
     std::vector<MultiRangeSegment> compute_segments;
+    u64 frame_tick = 0;
     u64 total_used_memory = 0;
     u64 minimum_memory = 0;
     u64 critical_memory = 0;

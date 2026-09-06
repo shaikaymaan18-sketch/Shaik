@@ -357,7 +357,7 @@ BufferCacheRuntime::BufferCacheRuntime(const Device& device_, MemoryAllocator& m
       staging_pool{staging_pool_}, guest_descriptor_queue{guest_descriptor_queue_},
       quad_index_pass(device, scheduler, descriptor_pool, staging_pool,
                       compute_pass_descriptor_queue),
-      multi_range_buffers(device_, memory_allocator_, scheduler_) {
+      multi_range_buffers(device_) {
     const VkDriverIdKHR driver_id = device.GetDriverID();
     limit_dynamic_storage_buffers = driver_id == VK_DRIVER_ID_QUALCOMM_PROPRIETARY ||
                                     driver_id == VK_DRIVER_ID_ARM_PROPRIETARY;
@@ -411,6 +411,7 @@ u32 BufferCacheRuntime::GetStorageBufferAlignment() const {
 }
 
 void BufferCacheRuntime::TickFrame(Common::SlotVector<Buffer>& slot_buffers) noexcept {
+    multi_range_buffers.TickFrame(scheduler);
     for (auto it = slot_buffers.begin(); it != slot_buffers.end(); it++) {
         if (scheduler.IsFree(it->LastUsageTick())) {
             it->ResetUsageTracking();
@@ -545,12 +546,16 @@ void BufferCacheRuntime::ClearBuffer(VkBuffer dest_buffer, u32 offset, size_t si
     });
 }
 
-bool BufferCacheRuntime::BindMultiRangeStorageBuffer(u64 key) {
+bool BufferCacheRuntime::BindMultiRangeStorageBuffer(u64 key, bool is_written) {
     if (multi_range_sources.empty() || multi_range_total == 0) {
         return false;
     }
-    const MultiRangeRef ref = multi_range_buffers.Get(key, multi_range_sources, multi_range_total);
+    const MultiRangeRef ref = multi_range_buffers.Get(device, scheduler, memory_allocator, key,
+                                                     multi_range_sources, multi_range_total);
     if (ref.handle == VK_NULL_HANDLE) {
+        return false;
+    }
+    if (is_written && !ref.sparse) {
         return false;
     }
     if (ref.needs_gather) {
@@ -558,9 +563,9 @@ bool BufferCacheRuntime::BindMultiRangeStorageBuffer(u64 key) {
         VkDeviceSize dst_offset = 0;
         for (const MultiRangeSource& source : multi_range_sources) {
             const std::array<VideoCommon::BufferCopy, 1> copy{VideoCommon::BufferCopy{
-                .src_offset = static_cast<u64>(source.offset),
-                .dst_offset = static_cast<u64>(dst_offset),
-                .size = static_cast<size_t>(source.size),
+                .src_offset = u64(source.offset),
+                .dst_offset = u64(dst_offset),
+                .size = size_t(source.size),
             }};
             CopyBuffer(ref.handle, source.handle, copy, false);
             dst_offset += source.size;

@@ -35,7 +35,7 @@ class Buffer : public VideoCommon::BufferBase {
 public:
     explicit Buffer(BufferCacheRuntime&, VideoCommon::NullBufferParams null_params);
     explicit Buffer(BufferCacheRuntime& runtime, VAddr cpu_addr_, u64 size_bytes_,
-                    bool sparse_compatible_ = false);
+                    bool sparse_compatible_);
 
     [[nodiscard]] VkBufferView View(u32 offset, u32 size, VideoCore::Surface::PixelFormat format);
 
@@ -169,14 +169,14 @@ public:
     }
 
     [[nodiscard]] VkDeviceSize SparseAlignmentFor(bool sparse_compatible) const noexcept {
-        if (!sparse_compatible || !multi_range_buffers.UsesSparse()) {
+        if (!sparse_compatible || !multi_range_buffers.use_sparse) {
             return 0;
         }
-        return multi_range_buffers.BlockSize();
+        return multi_range_buffers.block_size;
     }
 
     [[nodiscard]] bool PrefersSparseSources() const noexcept {
-        return multi_range_buffers.UsesSparse();
+        return multi_range_buffers.use_sparse;
     }
 
     void ResetMultiRange() noexcept {
@@ -192,19 +192,20 @@ public:
             .memory_offset = location.offset,
             .offset = offset,
             .size = size,
+            .write_tick = buffer.getWriteTick(),
             .memory_type = location.memory_type,
         });
         multi_range_total += size;
     }
 
-    bool BindMultiRangeStorageBuffer(u64 key);
+    bool BindMultiRangeStorageBuffer(u64 key, bool is_written);
 
     void InvalidateMultiRange(u64 key) {
         multi_range_buffers.Invalidate(key);
     }
 
     void OnBufferDeleted(const Buffer& buffer) {
-        multi_range_buffers.DropOwner(buffer.Handle());
+        multi_range_buffers.DropOwner(scheduler, buffer.Handle());
     }
 
     void BindUniformBuffer(const Buffer& buffer, u32 offset, u32 size) {

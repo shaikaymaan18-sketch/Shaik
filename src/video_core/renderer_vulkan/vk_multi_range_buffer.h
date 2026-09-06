@@ -4,14 +4,19 @@
 #pragma once
 
 #include <span>
-#include <unordered_map>
 #include <vector>
 
+#include <boost/container/static_vector.hpp>
+
+#include "common/common_funcs.h"
 #include "common/common_types.h"
+#include "common/container/unordered_map.h"
 #include "video_core/vulkan_common/vulkan_memory_allocator.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
 
 namespace Vulkan {
+
+using SparseBuffer = vk::Handle<VkBuffer, VkDevice, vk::DeviceDispatch>;
 
 class Device;
 class Scheduler;
@@ -22,6 +27,7 @@ struct MultiRangeSource {
     VkDeviceSize memory_offset{};
     VkDeviceSize offset{};
     VkDeviceSize size{};
+    u64 write_tick{};
     u32 memory_type{};
 };
 
@@ -29,77 +35,76 @@ struct MultiRangeRef {
     VkBuffer handle{};
     VkDeviceAddress address{};
     VkDeviceSize size{};
+    bool sparse{};
     bool needs_gather{};
 };
 
 class MultiRangeBufferCache final {
 public:
     static constexpr VkDeviceSize DEFAULT_BLOCK_SIZE = 64 * 1024;
+    static constexpr u64 FRAMES_TO_LIVE = 120;
+    static constexpr size_t MAX_RETIRED = 256;
 
-    explicit MultiRangeBufferCache(const Device& device_, MemoryAllocator& memory_allocator_,
-                                   Scheduler& scheduler_);
-    ~MultiRangeBufferCache();
+    explicit MultiRangeBufferCache(const Device& device);
 
-    MultiRangeBufferCache(const MultiRangeBufferCache&) = delete;
-    MultiRangeBufferCache& operator=(const MultiRangeBufferCache&) = delete;
+    YUZU_NON_COPYABLE(MultiRangeBufferCache);
 
-    [[nodiscard]] bool UsesSparse() const noexcept {
-        return use_sparse;
-    }
-
-    [[nodiscard]] VkDeviceSize BlockSize() const noexcept {
-        return block_size;
-    }
-
-    [[nodiscard]] MultiRangeRef Get(u64 key, std::span<const MultiRangeSource> sources,
+    [[nodiscard]] MultiRangeRef Get(const Device& device, Scheduler& scheduler,
+                                    MemoryAllocator& memory_allocator, u64 key,
+                                    std::span<const MultiRangeSource> sources,
                                     VkDeviceSize total);
 
     void MarkGathered(u64 key);
 
     void Invalidate(u64 key);
 
-    void DropOwner(VkBuffer owner);
+    void DropOwner(Scheduler& scheduler, VkBuffer owner);
 
-    void Clear();
+    void TickFrame(Scheduler& scheduler);
+
+    VkDeviceSize block_size{DEFAULT_BLOCK_SIZE};
+    bool use_sparse{};
 
 private:
     struct Retired {
-        VkBuffer handle{};
+        SparseBuffer handle;
         u64 tick{};
     };
 
     struct Entry {
         vk::Buffer gathered;
-        VkBuffer sparse_handle{};
+        SparseBuffer sparse_handle;
+        std::vector<VkBuffer> owners;
         VkDeviceAddress address{};
         VkDeviceSize size{};
         u64 geometry{};
+        u64 content{};
+        u64 frame{};
+        u64 gpu_tick{};
         bool dirty{true};
-        std::vector<VkBuffer> owners;
     };
 
     [[nodiscard]] u64 HashSources(std::span<const MultiRangeSource> sources) const;
 
+    [[nodiscard]] u64 HashContent(std::span<const MultiRangeSource> sources) const;
+
     [[nodiscard]] bool CanBindSparse(std::span<const MultiRangeSource> sources) const;
 
-    [[nodiscard]] VkBuffer CreateSparse(std::span<const MultiRangeSource> sources,
-                                        VkDeviceSize total);
+    [[nodiscard]] SparseBuffer CreateSparse(const Device& device, Scheduler& scheduler,
+                                            std::span<const MultiRangeSource> sources,
+                                            VkDeviceSize total);
 
-    [[nodiscard]] VkDeviceSize QueryBlockSize(u32& memory_type_bits) const;
+    [[nodiscard]] VkDeviceSize QueryBlockSize(const Device& device, u32& memory_type_bits) const;
 
-    void DestroySparse(VkBuffer handle);
+    bool DestroySparse(Scheduler& scheduler, SparseBuffer&& handle);
 
-    void DrainRetired();
+    void DrainRetired(Scheduler& scheduler);
 
-    const Device& device;
-    MemoryAllocator& memory_allocator;
-    Scheduler& scheduler;
-    bool use_sparse{};
-    VkDeviceSize block_size{DEFAULT_BLOCK_SIZE};
+    ::Common::unordered_map<u64, Entry> entries;
+    boost::container::static_vector<Retired, MAX_RETIRED> retired;
+    u64 frame_tick{};
     u32 sparse_memory_type_bits{};
     VkBufferUsageFlags sparse_usage{};
-    std::unordered_map<u64, Entry> entries;
-    std::vector<Retired> retired;
 };
 
 } // namespace Vulkan

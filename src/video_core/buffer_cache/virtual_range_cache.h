@@ -7,12 +7,12 @@
 #include <limits>
 #include <mutex>
 #include <optional>
-#include <unordered_map>
 #include <vector>
 
 #include <boost/container/small_vector.hpp>
 
 #include "common/common_types.h"
+#include "common/container/unordered_map.h"
 #include "video_core/memory_manager.h"
 
 namespace VideoCommon {
@@ -27,9 +27,15 @@ using VirtualSegments = boost::container::small_vector<VirtualSegment, 8>;
 
 class VirtualRangeCache {
 public:
+    static constexpr size_t MAX_ENTRIES = 8192;
+    static constexpr size_t MAX_DEFERRED = 4096;
+
     const VirtualSegments* Query(Tegra::MemoryManager& memory, GPUVAddr gpu_addr, u32 size) {
         if (has_deferred.load(std::memory_order_acquire)) {
             ApplyDeferred();
+        }
+        if (entries.size() > MAX_ENTRIES) {
+            entries.clear();
         }
         const size_t as_id = memory.GetID();
         const u64 key = MakeKey(as_id, gpu_addr);
@@ -38,7 +44,7 @@ public:
             it->second.gpu_addr == gpu_addr && it->second.size == size) {
             return &it->second.segments;
         }
-        Entry entry;
+        Entry entry{};
         entry.as_id = as_id;
         entry.gpu_addr = gpu_addr;
         entry.size = size;
@@ -87,30 +93,26 @@ public:
                     return;
                 }
             }
-            deferred.push_back(DeferredUnmap{
-                .as_id = as_id,
-                .gpu_addr = gpu_addr,
-                .size = size,
-            });
+            if (deferred.size() >= MAX_DEFERRED) {
+                deferred.clear();
+                deferred_overflow = true;
+            } else {
+                deferred.push_back(DeferredUnmap{
+                    .as_id = as_id,
+                    .gpu_addr = gpu_addr,
+                    .size = size,
+                });
+            }
         }
         has_deferred.store(true, std::memory_order_release);
     }
 
-    void Clear() {
-        {
-            std::scoped_lock lock{deferred_mutex};
-            deferred.clear();
-        }
-        has_deferred.store(false, std::memory_order_release);
-        entries.clear();
-    }
-
 private:
     struct Entry {
+        VirtualSegments segments;
         size_t as_id{};
         GPUVAddr gpu_addr{};
         u32 size{};
-        VirtualSegments segments;
     };
 
     struct DeferredUnmap {
@@ -125,10 +127,17 @@ private:
 
     void ApplyDeferred() {
         std::vector<DeferredUnmap> pending;
+        bool overflow = false;
         {
             std::scoped_lock lock{deferred_mutex};
             has_deferred.store(false, std::memory_order_release);
             pending.swap(deferred);
+            overflow = deferred_overflow;
+            deferred_overflow = false;
+        }
+        if (overflow) {
+            entries.clear();
+            return;
         }
         if (pending.empty() || entries.empty()) {
             return;
@@ -154,10 +163,11 @@ private:
         }
     }
 
-    std::unordered_map<u64, Entry> entries;
+    ::Common::unordered_map<u64, Entry> entries;
     std::vector<DeferredUnmap> deferred;
     std::mutex deferred_mutex;
     std::atomic<bool> has_deferred{false};
+    bool deferred_overflow{};
 };
 
 } // namespace VideoCommon
