@@ -329,7 +329,6 @@ struct GPU::Impl {
 
     const bool is_async;
 
-    VideoCommon::GPUThread::ThreadManager gpu_thread;
     std::unique_ptr<Core::Frontend::GraphicsContext> cpu_context;
 
     Tegra::Control::Scheduler scheduler;
@@ -341,6 +340,10 @@ struct GPU::Impl {
     std::deque<size_t> request_swap_counters;
     std::mutex request_swap_mutex;
     u64 pending_composite_fence{};
+
+    // Destruction of thread must be done after all (non trivial)
+    // previous members has been destroyed
+    VideoCommon::GPUThread::ThreadManager gpu_thread;
 };
 
 GPU::GPU(Core::System& system, bool is_async, bool use_nvdec)
