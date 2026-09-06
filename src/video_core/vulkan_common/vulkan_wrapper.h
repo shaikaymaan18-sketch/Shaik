@@ -753,8 +753,8 @@ public:
                     VmaAllocation allocation_, std::span<u8> mapped_, bool is_coherent_,
                     MemoryLocation location_, const DeviceDispatch& dld_) noexcept
         : handle{handle_}, owner{owner_}, allocator{allocator_},
-          allocation{allocation_}, mapped{mapped_}, is_coherent{is_coherent_},
-          location{location_}, dld{&dld_} {}
+          allocation{allocation_}, mapped{mapped_}, location{location_},
+          is_coherent{is_coherent_}, dld{&dld_} {}
     Buffer() = default;
 
     Buffer(const Buffer&) = delete;
@@ -762,8 +762,8 @@ public:
 
     Buffer(Buffer&& rhs) noexcept
         : handle{std::exchange(rhs.handle, VkBuffer{})}, owner{rhs.owner}, allocator{rhs.allocator},
-          allocation{rhs.allocation}, mapped{rhs.mapped},
-          is_coherent{rhs.is_coherent}, location{rhs.location}, dld{rhs.dld} {}
+          allocation{rhs.allocation}, mapped{rhs.mapped}, location{rhs.location},
+          is_coherent{rhs.is_coherent}, dld{rhs.dld} {}
 
     Buffer& operator=(Buffer&& rhs) noexcept {
         Release();
@@ -772,8 +772,8 @@ public:
         allocator = rhs.allocator;
         allocation = rhs.allocation;
         mapped = rhs.mapped;
-        is_coherent = rhs.is_coherent;
         location = rhs.location;
+        is_coherent = rhs.is_coherent;
         dld = rhs.dld;
         return *this;
     }
