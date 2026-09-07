@@ -833,8 +833,7 @@ struct Memory::Impl {
 
     // Set of virtual mappings that are mapped into memory but have a
     // different backing address than expected due to host page size limitations.
-    // todo: ankerl sucks for this, use something else
-    ankerl::unordered_dense::map<Common::ProcessAddress, Common::PhysicalAddress> extra_mappings;
+    Common::unordered_map<Common::ProcessAddress, Common::PhysicalAddress> extra_mappings;
 
     std::array<VideoCore::RasterizerDownloadArea, Core::Hardware::NUM_CPU_CORES> rasterizer_read_areas{};
     std::array<GPUDirtyState, Core::Hardware::NUM_CPU_CORES> rasterizer_write_areas{};

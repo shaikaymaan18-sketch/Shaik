@@ -236,12 +236,10 @@ public:
         }
 
         DWORD new_flags{};
-        if (read && write && execute) {
-            new_flags = PAGE_EXECUTE_READWRITE;
+        if (read && execute) {
+            new_flags = PAGE_EXECUTE_READ;
         } else if (read && write) {
             new_flags = PAGE_READWRITE;
-        } else if (read && execute) {
-            new_flags = PAGE_EXECUTE_READ;
         } else if (read && !write) {
             new_flags = PAGE_READONLY;
         } else if (!read && !write && !execute) {

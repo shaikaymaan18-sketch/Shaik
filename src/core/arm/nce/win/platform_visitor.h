@@ -21,7 +21,7 @@ public:
     PlatformVisitor() {};
     ~PlatformVisitor() override = default;
 
-    Reg scratch;
+    Reg scratch {};
 
     template<typename... Regs>
     void ChooseScratch(Regs... args) {

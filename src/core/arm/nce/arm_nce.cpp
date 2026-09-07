@@ -716,13 +716,21 @@ void ArmNce::SignalInterrupt(Kernel::KThread* thread) {
 }
 
 void ArmNce::ClearInstructionCache() {
+#ifndef _WIN32
     // Ensure all previous memory operations complete
     asm volatile("dsb ish\n"
                  "isb" ::: "memory");
+#else
+    FlushInstructionCache(GetCurrentProcess(), nullptr, 0);
+#endif
 }
 
 void ArmNce::InvalidateCacheRange(u64 addr, std::size_t size) {
+#ifndef _WIN32
     ClearInstructionCache();
+#else
+    FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<void*>(addr), size);
+#endif
 }
 
 } // namespace Core
