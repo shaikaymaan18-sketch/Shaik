@@ -2058,7 +2058,6 @@ void TextureCache<P>::TickAsyncUnswizzleCpu(PendingUnswizzle& task, Image& image
                      stride_alignment = task.cpu_stride_alignment]() mutable {
                         std::span<const u8> job_swizzled(swizzled_base + sub_guest_off, sub_guest_size);
                         std::span<u8> job_linear(linear_base + sub_linear_off, sub_linear_size);
-                        const auto job_start = Common::SteadyClock::Now();
                         UnswizzleTexture(job_linear, job_swizzled, bytes_per_block, num_tiles.width,
                                          num_tiles.height, sub_count, block.height, block.depth,
                                          stride_alignment);
