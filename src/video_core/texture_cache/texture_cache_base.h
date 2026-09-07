@@ -7,7 +7,9 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <atomic>
+#include <chrono>
 #include <deque>
 #include <limits>
 #include <mutex>
@@ -28,6 +30,7 @@
 #include "common/hash.h"
 #include "common/literals.h"
 #include "common/lru_cache.h"
+#include "common/steady_clock.h"
 #include <ranges>
 
 #include "accelerated_swizzle.h"
@@ -129,6 +132,7 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
     static constexpr s64 DEFAULT_EXPECTED_MEMORY = 1_GiB + 125_MiB;
     static constexpr s64 DEFAULT_CRITICAL_MEMORY = 1_GiB + 625_MiB;
     static constexpr size_t GC_EMERGENCY_COUNTS = 2;
+    static constexpr size_t MAX_ASYNC_UNSWIZZLE_TASKS = 18;
 
     using Runtime = typename P::Runtime;
     using Image = typename P::Image;
@@ -149,14 +153,6 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
         std::atomic<size_t> jobs_pending{0};
     };
 
-    struct SparseAndCpuUnswizzleState {
-        std::vector<std::pair<GPUVAddr, size_t>> sparse_segments;
-        std::vector<u8> slice_has_data;
-        boost::container::small_vector<SwizzleParameters, 16> upload_swizzles;
-        Extent3D cpu_num_tiles{};
-        Extent3D cpu_block{};
-    };
-
     struct PendingUnswizzle {
         VideoCommon::ImageInfo info;
         AsyncBuffer staging_buffer;
@@ -170,15 +166,17 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
         size_t current_batch_start_byte = 0;
         u64 swizzled_slice_size = 0;
 
+        std::vector<std::pair<GPUVAddr, size_t>> sparse_segments;
+        std::vector<u8> slice_has_data;
         size_t segment_scan_cursor = 0;
         u32 active_z_start = 0;
         u32 active_z_end = 0;
 
-        // Heap allocation vs constantly moving large datatypes, which is worse!
-        std::unique_ptr<SparseAndCpuUnswizzleState> sparse_cpu_state;
+        boost::container::small_vector<SwizzleParameters, 16> upload_swizzles;
+        std::optional<size_t> cpu_chunk_slot;
 
-        // No like but needed due to needing atomic for thread safety
-        std::unique_ptr<AsyncCpuUnswizzleChunk> cpu_chunk;
+        Extent3D cpu_num_tiles{};
+        Extent3D cpu_block{};
 
         u32 swizzle_block_depth = 0;
         u32 cpu_stride_alignment = 0;
@@ -188,23 +186,6 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
         bool is_sparse = false;
         bool is_cpu = false;
         bool cpu_job_in_flight = false;
-
-        SparseAndCpuUnswizzleState& SparseCpuState() {
-            if (!sparse_cpu_state) {
-                sparse_cpu_state = std::make_unique<SparseAndCpuUnswizzleState>();
-            }
-            return *sparse_cpu_state;
-        }
-
-        std::vector<std::pair<GPUVAddr, size_t>>& SparseSegments() {
-            return SparseCpuState().sparse_segments;
-        }
-        std::vector<u8>& SliceHasData() { return SparseCpuState().slice_has_data; }
-        boost::container::small_vector<SwizzleParameters, 16>& UploadSwizzles() {
-            return SparseCpuState().upload_swizzles;
-        }
-        Extent3D& CpuNumTiles() { return SparseCpuState().cpu_num_tiles; }
-        Extent3D& CpuBlock() { return SparseCpuState().cpu_block; }
     };
 
     struct BlitImages {
@@ -504,6 +485,10 @@ private:
     void ReadSparseCoalesced(PendingUnswizzle& task, Image& image, u8* staging_base,
                               size_t staging_base_abs_offset, size_t read_start, size_t read_end);
 
+    AsyncCpuUnswizzleChunk& AcquireCpuChunk(PendingUnswizzle& task);
+    void ReleaseCpuChunk(PendingUnswizzle& task);
+    void EvictOldestUnswizzleTask();
+
     Runtime& runtime;
 
     Tegra::MaxwellDeviceMemoryManager& device_memory;
@@ -596,7 +581,10 @@ private:
                      size_t{4}),
         "TextureUnswizzle", {}, Common::ThreadPlacement::Background};
 
-    std::deque<PendingUnswizzle> unswizzle_queue;
+    boost::container::static_vector<PendingUnswizzle, MAX_ASYNC_UNSWIZZLE_TASKS> unswizzle_queue;
+
+    std::array<AsyncCpuUnswizzleChunk, MAX_ASYNC_UNSWIZZLE_TASKS> cpu_chunk_pool{};
+    std::array<bool, MAX_ASYNC_UNSWIZZLE_TASKS> cpu_chunk_slot_used{};
 
     static constexpr size_t UnswizzleSharedStagingCap = 1_GiB;
     std::optional<AsyncBuffer> unswizzle_shared_staging;
@@ -604,7 +592,7 @@ private:
     bool unswizzle_shared_staging_pending_gpu_read = false;
 
     static constexpr bool async_unswizzle_round_robin = true;
-    static constexpr u32 async_unswizzle_tasks_per_frame = 1;
+    static constexpr std::chrono::microseconds async_unswizzle_frame_budget{1000};
 
     // Join caching
     boost::container::small_vector<ImageId, 4> join_overlap_ids;
