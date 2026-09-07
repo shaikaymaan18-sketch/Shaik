@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #ifdef ARCHITECTURE_arm64
+#include "common/dynamic_library.h"
 
 // Certain functions have to be marked naked so that the compiler doesn't touch the stack
 // or implement a return (we "artificially" return later by setting PC to the LR value)
@@ -40,6 +41,8 @@
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <signal.h>
+#else
+#include "common/dynamic_library.h"
 #endif
 
 namespace Core {
@@ -544,6 +547,13 @@ ArmNce::ArmNce(System& system, bool uses_wall_clock, std::size_t core_index)
 ArmNce::~ArmNce() = default;
 
 #ifdef _WIN32
+
+using PFN_SetProcessValidCallTargets = BOOL(WINAPI*)(
+    _In_ HANDLE hProcess, _In_ PVOID VirtualAddress, _in_ SIZE_T RegionSize,
+    _In_ ULONG NumberOfOffsets, _In_ PCFG_CALL_TARGET_INFO OffsetInformation);
+
+static PFN_SetProcessValidCallTargets PFN_SetProcessValidCallTargets {};
+
 LONG WINAPI ArmNce::VectoredExceptionHandler(PEXCEPTION_POINTERS info) {
     // TODO: Windows doesn't allocate a separate stack so we're either
     // on the guest or current host stack, is that okay?
@@ -558,6 +568,17 @@ LONG WINAPI ArmNce::VectoredExceptionHandler(PEXCEPTION_POINTERS info) {
         return EXCEPTION_CONTINUE_EXECUTION;
     } else if (code == ExceptionLevelChangeSignal) {
         ReturnToRunCodeByExceptionLevelChangeSignalHandler(code, reinterpret_cast<void*>(&info->ExceptionRecord->ExceptionAddress), info->ContextRecord);
+
+        // TODO: is this the right way to do this?
+        CFG_CALL_TARGET_INFO targetInfo = {0};
+        targetInfo.Offset = 0;
+        targetInfo.Flags = CFG_CALL_TARGET_VALID;
+
+        if (!PFN_SetProcessValidCallTargets) {
+            Common::DynamicLibrary kernelbase {"Kernelbase"};
+            PFN_SetProcessValidCallTargets = kernelbase.GetSymbol("SetProcessValidCallTargets", PFN_SetProcessValidCallTargets);
+        }
+        PFN_SetProcessValidCallTargets(GetCurrentProcess(), reinterpret_cast<void*>(info->ContextRecord->Pc), 0x1000, 1, &targetInfo);
         return EXCEPTION_CONTINUE_EXECUTION;
     } else {
         // other exception? let it pass
