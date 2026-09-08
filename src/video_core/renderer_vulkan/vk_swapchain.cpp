@@ -16,6 +16,7 @@
 #include "common/logging.h"
 #include "common/settings.h"
 #include "common/settings_enums.h"
+#include "video_core/renderer_base.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/renderer_vulkan/vk_swapchain.h"
 #include "video_core/vulkan_common/vk_enum_string_helper.h"
@@ -42,13 +43,13 @@ VkSurfaceFormatKHR ChooseSwapSurfaceFormat(vk::Span<VkSurfaceFormatKHR> formats)
 }
 
 static VkPresentModeKHR ChooseSwapPresentMode(bool has_imm, bool has_mailbox,
-                                              bool has_fifo_relaxed) {
+                                              bool has_fifo_relaxed, bool frame_gen_enabled) {
     // Mailbox doesn't lock the application like FIFO (vsync)
     // FIFO present mode locks the framerate to the monitor's refresh rate
-    Settings::VSyncMode setting = [has_imm, has_mailbox]() {
+    Settings::VSyncMode setting = [has_imm, has_mailbox, frame_gen_enabled]() {
         // Choose Mailbox or Immediate if unlocked and those modes are supported
         const auto mode = Settings::values.vsync_mode.GetValue();
-        if (Settings::values.frame_gen.GetValue()) {
+        if (frame_gen_enabled) {
             return mode == Settings::VSyncMode::FifoRelaxed ? mode : Settings::VSyncMode::Fifo;
         }
         if (Settings::values.use_speed_limit.GetValue() &&
@@ -121,11 +122,13 @@ Swapchain::Swapchain(
     VkSurfaceKHR_T* surface_,
     const Device& device_,
     Scheduler& scheduler_,
+    const VideoCore::RendererSettings& renderer_settings_,
     u32 width_,
     u32 height_)
     : surface(surface_)
     , device{device_}
     , scheduler{scheduler_}
+    , renderer_settings{renderer_settings_}
 {
     Create(surface, width_, height_);
 }
@@ -263,7 +266,8 @@ void Swapchain::CreateSwapchain(const VkSurfaceCapabilitiesKHR& capabilities) {
 
     const VkCompositeAlphaFlagBitsKHR alpha_flags{ChooseAlphaFlags(capabilities)};
     surface_format = ChooseSwapSurfaceFormat(formats);
-    present_mode = ChooseSwapPresentMode(has_imm, has_mailbox, has_fifo_relaxed);
+    present_mode = ChooseSwapPresentMode(has_imm, has_mailbox, has_fifo_relaxed,
+                                         renderer_settings.GetFrameGenConfig().enabled);
 
     u32 requested_image_count{capabilities.minImageCount + 1};
     // Ensure Triple buffering if possible.
@@ -366,7 +370,9 @@ void Swapchain::Destroy() {
 }
 
 bool Swapchain::NeedsPresentModeUpdate() const {
-    const auto requested_mode = ChooseSwapPresentMode(has_imm, has_mailbox, has_fifo_relaxed);
+    const auto requested_mode = ChooseSwapPresentMode(
+        has_imm, has_mailbox, has_fifo_relaxed,
+        renderer_settings.GetFrameGenConfig().enabled);
     return present_mode != requested_mode;
 }
 

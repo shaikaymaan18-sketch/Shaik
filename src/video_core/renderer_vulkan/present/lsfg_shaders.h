@@ -14,7 +14,7 @@ class Device;
 
 class LsfgShaders {
 public:
-    explicit LsfgShaders(const Device& device);
+    explicit LsfgShaders(const Device& device, bool prefer_fp16);
 
     [[nodiscard]] bool IsValid() const {
         return valid;

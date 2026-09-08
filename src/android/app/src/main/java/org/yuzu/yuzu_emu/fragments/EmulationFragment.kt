@@ -92,6 +92,7 @@ import org.yuzu.yuzu_emu.utils.GameIconUtils
 import org.yuzu.yuzu_emu.utils.GpuDriverHelper
 import org.yuzu.yuzu_emu.utils.InputHandler
 import org.yuzu.yuzu_emu.utils.Log
+import org.yuzu.yuzu_emu.utils.LosslessScalingHelper
 import org.yuzu.yuzu_emu.utils.NativeConfig
 import org.yuzu.yuzu_emu.utils.NativeFreedrenoConfig
 import org.yuzu.yuzu_emu.utils.ViewUtils
@@ -1154,6 +1155,36 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
                 container,
                 BooleanSetting.USE_DOCKED_MODE,
             )
+
+            quickSettings.addDivider(container)
+
+            val frameGenAvailable = LosslessScalingHelper.isInstalled() &&
+                LosslessScalingHelper.isSupportedByGpu()
+            val frameGenEnabled = BooleanSetting.RENDERER_FRAME_GEN.getBoolean()
+            val usesFixedMultiplier =
+                IntSetting.RENDERER_FRAME_GEN_TARGET_RATE.getInt() == 0
+
+            quickSettings.addBooleanSetting(
+                R.string.frame_gen,
+                container,
+                BooleanSetting.RENDERER_FRAME_GEN,
+                isEnabled = frameGenAvailable
+            ) {
+                NativeLibrary.applySettings()
+                addQuickSettings()
+            }
+
+            quickSettings.addSliderSetting(
+                R.string.frame_gen_multiplier,
+                container,
+                IntSetting.RENDERER_FRAME_GEN_MULTIPLIER,
+                minValue = 2,
+                maxValue = 4,
+                units = "x",
+                isEnabled = frameGenAvailable && frameGenEnabled && usesFixedMultiplier
+            ) {
+                NativeLibrary.applySettings()
+            }
 
             quickSettings.addDivider(container)
 

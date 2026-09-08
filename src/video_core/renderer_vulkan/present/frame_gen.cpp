@@ -23,13 +23,14 @@ constexpr size_t COLOR_CHANNELS = 4;
 constexpr u64 LSFG_REQUIRED_FRAMES = 2;
 constexpr u32 LSFG_RECURRENCE_FRAMES = 2;
 
-[[nodiscard]] f32 ManualFlowScale() {
-    return static_cast<f32>(Settings::values.frame_gen_flow_scale.GetValue()) / 100.0f;
+[[nodiscard]] f32 ManualFlowScale(const VideoCore::FrameGenConfig& config) {
+    return static_cast<f32>(config.flow_scale) / 100.0f;
 }
 
-[[nodiscard]] f32 ConfiguredFlowScale(VkExtent2D guest_extent, VkExtent2D presented_extent) {
-    if (!Settings::values.frame_gen_flow_scale_auto.GetValue()) {
-        return ManualFlowScale();
+[[nodiscard]] f32 ConfiguredFlowScale(const VideoCore::FrameGenConfig& config,
+                                      VkExtent2D guest_extent, VkExtent2D presented_extent) {
+    if (!config.flow_scale_auto) {
+        return ManualFlowScale(config);
     }
     if (guest_extent.width == 0 || presented_extent.width == 0) {
         return 1.0f;
@@ -194,15 +195,61 @@ FrameGen::FrameGen(MemoryAllocator& memory_allocator_, Scheduler& scheduler_)
 
 FrameGen::~FrameGen() = default;
 
-void FrameGen::Process(const Device& device, Frame* frame, VkFormat format,
-                       VkExtent2D guest_extent) {
-    generated = false;
+void FrameGen::UpdateConfig(const VideoCore::FrameGenConfig& new_config) {
+    if (!has_config) {
+        config = new_config;
+        has_config = true;
+        return;
+    }
+    if (config == new_config) {
+        return;
+    }
 
-    if (unavailable || !Settings::values.frame_gen.GetValue()) {
+    const bool has_toggled_lsfg = config.enabled != new_config.enabled;
+    const bool precision_changed = config.fp16 != new_config.fp16;
+    const bool enabling = !config.enabled && new_config.enabled;
+    const bool must_reset_pipeline = has_toggled_lsfg || precision_changed;
+    const bool must_reload_shaders = precision_changed || enabling;
+    const bool must_reset_pacer =
+        has_toggled_lsfg || config.multiplier != new_config.multiplier ||
+        config.target_rate != new_config.target_rate;
+
+    if (must_reset_pipeline) {
         if (chain) {
             scheduler.Finish();
             chain.reset();
         }
+        if (must_reload_shaders) {
+            shaders.reset();
+        }
+
+        plan = {};
+        peak_guest_extent = {};
+        built_extent = {};
+        built_format = VK_FORMAT_UNDEFINED;
+        built_flow_scale = 0.0f;
+        frame_count = 0;
+        warm_streak = 0;
+        generated = false;
+        dumped = false;
+
+        // this will pickup the dll again once toggled
+        if (must_reload_shaders) {
+            unavailable = false;
+        }
+    }
+
+    if (must_reset_pacer) {
+        pacer.Reset();
+    }
+    config = new_config;
+}
+
+void FrameGen::Process(const Device& device, Frame* frame, VkFormat format,
+                       VkExtent2D guest_extent) {
+    generated = false;
+
+    if (unavailable || !config.enabled) {
         warm_streak = 0;
         return;
     }
@@ -213,7 +260,7 @@ void FrameGen::Process(const Device& device, Frame* frame, VkFormat format,
     }
 
     if (!shaders) {
-        shaders.emplace(device);
+        shaders.emplace(device, config.fp16);
         if (!shaders->IsValid()) {
             unavailable = true;
             return;
@@ -224,7 +271,7 @@ void FrameGen::Process(const Device& device, Frame* frame, VkFormat format,
     peak_guest_extent.height = std::max(peak_guest_extent.height, guest_extent.height);
 
     const VkExtent2D extent{.width = frame->width, .height = frame->height};
-    const f32 flow_scale = ConfiguredFlowScale(peak_guest_extent, extent);
+    const f32 flow_scale = ConfiguredFlowScale(config, peak_guest_extent, extent);
     if (!chain || built_extent.width != extent.width || built_extent.height != extent.height ||
         built_format != format || built_flow_scale != flow_scale) {
         Rebuild(device, extent, format, flow_scale);
@@ -247,7 +294,7 @@ void FrameGen::Process(const Device& device, Frame* frame, VkFormat format,
         }
     });
 
-    const bool dump_requested = generated && Settings::values.frame_gen_dump_flow.GetValue();
+    const bool dump_requested = generated && config.dump_flow;
     if (!dump_requested) {
         dumped = false;
     } else if (!dumped) {
@@ -261,7 +308,7 @@ size_t FrameGen::WantedGenerations(size_t capacity) {
         plan = {};
         return 0;
     }
-    plan = pacer.Plan(capacity);
+    plan = pacer.Plan(capacity, config);
     return plan.generations;
 }
 

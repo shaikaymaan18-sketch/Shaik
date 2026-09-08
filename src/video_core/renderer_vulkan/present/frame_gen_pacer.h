@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "common/common_types.h"
+#include "video_core/frame_gen/frame_gen_config.h"
 
 namespace Vulkan {
 
@@ -17,7 +18,7 @@ struct FrameGenPlan {
 
 class FrameGenPacer {
 public:
-    [[nodiscard]] FrameGenPlan Plan(size_t capacity);
+    [[nodiscard]] FrameGenPlan Plan(size_t capacity, const VideoCore::FrameGenConfig& config);
 
     void Reset();
 

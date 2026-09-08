@@ -5,7 +5,6 @@
 #include <cmath>
 #include <utility>
 
-#include "common/settings.h"
 #include "video_core/renderer_vulkan/present/frame_gen_pacer.h"
 
 namespace Vulkan {
@@ -46,8 +45,8 @@ constexpr auto PROBE_STEP_DELAY = std::chrono::milliseconds(250);
 
 } // Anonymous namespace
 
-FrameGenPlan FrameGenPacer::Plan(size_t capacity) {
-    const size_t ceiling = std::min(capacity, Settings::FrameGenMaxGenerations());
+FrameGenPlan FrameGenPacer::Plan(size_t capacity, const VideoCore::FrameGenConfig& config) {
+    const size_t ceiling = std::min(capacity, config.MaxGenerations());
     if (ceiling == 0) {
         Reset();
         return {};
@@ -69,7 +68,7 @@ FrameGenPlan FrameGenPacer::Plan(size_t capacity) {
         return {};
     }
 
-    const f32 target_rate = static_cast<f32>(Settings::values.frame_gen_target_rate.GetValue());
+    const f32 target_rate = static_cast<f32>(config.target_rate);
 
     if (smoothed_interval > 0.0f) {
         f32 burst_threshold = BURST_CADENCE_RATIO / smoothed_interval;
@@ -109,7 +108,7 @@ FrameGenPlan FrameGenPacer::Plan(size_t capacity) {
     }
 
     if (target_rate == 0.0f) {
-        limit = std::min(Settings::FrameGenGenerations(), ceiling);
+        limit = std::min(config.Generations(), ceiling);
         output_credit = 0.0f;
         issued_generations = limit;
         return {.generations = limit, .warm = limit > 0};

@@ -15,6 +15,10 @@ namespace Layout {
 struct FramebufferLayout;
 }
 
+namespace VideoCore {
+struct RendererSettings;
+}
+
 namespace Vulkan {
 
 class Device;
@@ -26,6 +30,7 @@ public:
         VkSurfaceKHR_T* surface,
         const Device& device,
         Scheduler& scheduler,
+        const VideoCore::RendererSettings& renderer_settings,
         u32 width,
         u32 height);
     ~Swapchain();
@@ -122,6 +127,7 @@ private:
 
     const Device& device;
     Scheduler& scheduler;
+    const VideoCore::RendererSettings& renderer_settings;
 
     vk::SwapchainKHR swapchain;
 
