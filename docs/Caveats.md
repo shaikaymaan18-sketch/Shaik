@@ -12,7 +12,6 @@
 - [NetBSD](#netbsd)
 - [MSYS2](#msys2)
 - [RedoxOS](#redoxos)
-- [Windows](#windows)
 <!-- /TOC -->
 
 ## Arch Linux
@@ -243,23 +242,3 @@ find ./*/ -name "*.dll" | while read -r dll; do deps "$dll"; done
 The package install may randomly hang at times, in which case it has to be restarted. ALWAYS do a `sudo pkg update` or the chances of it hanging will be close to 90%. If "multiple" installs fail at once, try installing 1 by 1 the packages.
 
 When CMake invokes certain file syscalls - it may sometimes cause crashes or corruptions on the (kernel?) address space - so reboot the system if there is a "hang" in CMake.
-
-## Windows
-
-### Windows 10 1709 and below
-
-All Windows versions before 1803, including the following ones, do not support Eden's fastmem JIT mode without kernel extensions.
-
-### Windows 7, Windows 8 and Windows 8.1
-
-DirectX 12 is not available - simply copy and paste a random DLL and name it `d3d12.dll`.
-
-Install [Qt6 compatibility libraries](github.com/ANightly/qt6windows7) specifically Qt 6.9.5.
-
-### Windows Vista and below
-
-No support for Windows Vista (or below) is present at the moment. Check back later.
-
-### Windows on ARM
-
-If you're using Snapdragon X or 8CX, use the [the Vulkan translation layer](https://apps.microsoft.com/detail/9nqpsl29bfff?hl=en-us&gl=USE) only if the stock drivers do not work. And of course always keep your system up-to-date.
