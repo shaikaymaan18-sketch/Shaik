@@ -69,7 +69,7 @@ Expressions can be `variable_names` or `1234` (numbers) or `*var` (dereference o
 
 For more information type `info gdb` and read [the man page](https://man7.org/linux/man-pages/man1/gdb.1.html).
 
-### Debugging NCE
+### Debugging NCE (LLDB)
 
 Eden does not support debugging NCE using GDB and will only run using LLDB. You should **not** use the GDB stub for NCE stub and instead attach LLDB to the Eden host process.
 
@@ -81,6 +81,15 @@ Before starting the program, LLDB should be specified ignore `SIGURG` and `SIGUS
 - `process handle SIGURG --stop false --pass true`.
 
 LLDB mimics GDB for many of its commands and many of the expressions in the cheatsheet above should also work on LLDB, however for more information, read [the man page](https://lldb.llvm.org/man/lldb.html).
+
+### Debugging NCE (WinDbg)
+
+On Windows on ARM64, whilst LLDB *can* be used, it is generally very slow due to it being an emulated x64 process, and it is preferred to use [WinDbg](https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/). 
+
+`.pdb` files for WinDbg can be generated with the following CMake flags on `Debug` and `RelWithDebInfo` builds.
+- `-DCMAKE_CXX_FLAGS="-gcodeview" -DCMAKE_C_FLAGS="-gcodeview" -DCMAKE_EXE_LINKER_FLAGS="-Wl,--pdb="`.
+
+Similarly to LLDB, C++ expressions and certain debug commands in WinDbg will fail to execute and should be avoided.
 
 # RenderDoc
 
