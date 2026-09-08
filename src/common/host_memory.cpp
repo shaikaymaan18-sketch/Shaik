@@ -142,7 +142,7 @@ public:
         }
 
         // Allocate backing file map
-        backing_handle = pfn_CreateFileMapping2(INVALID_HANDLE_VALUE, nullptr, FILE_MAP_WRITE | FILE_MAP_READ, PAGE_READWRITE, SEC_COMMIT, backing_size, nullptr, nullptr, 0);
+        backing_handle = pfn_CreateFileMapping2(INVALID_HANDLE_VALUE, nullptr, FILE_MAP_EXECUTE | FILE_MAP_WRITE | FILE_MAP_READ, PAGE_EXECUTE_READWRITE, SEC_COMMIT, backing_size, nullptr, nullptr, 0);
         if (!backing_handle) {
             LOG_CRITICAL(HW_Memory, "Failed to allocate {} MiB of backing memory, error {}", backing_size >> 20, GetLastError());
             return false;
@@ -155,13 +155,14 @@ public:
             return false;
         }
         // Map backing placeholder
-        void* const ret = pfn_MapViewOfFile3(backing_handle, process, backing_base, 0, backing_size, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, nullptr, 0);
+        void* const ret = pfn_MapViewOfFile3(backing_handle, process, backing_base, 0, backing_size, MEM_REPLACE_PLACEHOLDER, PAGE_EXECUTE_READWRITE, nullptr, 0);
         if (ret != backing_base) {
             Release();
             LOG_CRITICAL(HW_Memory, "Failed to map {} MiB of virtual memory, error {}", backing_size >> 20, GetLastError());
             return false;
         }
 
+#ifdef HAS_NCE
         // Allocate virtual address placeholder within a 39-bit address space
         MEM_ADDRESS_REQUIREMENTS addr_reqs {};
         addr_reqs.Alignment = HugePageSize;
@@ -180,6 +181,9 @@ public:
             virtual_base = static_cast<u8*>(pfn_VirtualAlloc2
                         (process, nullptr, virtual_size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS, nullptr, 0));
         }
+#else
+        virtual_base = static_cast<u8*>(pfn_VirtualAlloc2(process, nullptr, virtual_size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS, nullptr, 0));
+#endif
         virtual_map_base = virtual_base;
         if (!virtual_base) {
             Release();
@@ -256,6 +260,7 @@ public:
             const size_t protect_length = (std::min)(it->upper(), virtual_end) - offset;
             DWORD old_flags{};
             if (!VirtualProtect(virtual_base + offset, protect_length, new_flags, &old_flags)) {
+                __builtin_debugtrap();
                 LOG_CRITICAL(HW_Memory, "Failed to change virtual memory protect rules, error {}", GetLastError());
             }
             ++it;
@@ -797,6 +802,7 @@ HostMemory::HostMemory(size_t backing_size_, size_t virtual_size_)
             virtual_base_offset = virtual_base - impl->virtual_base;
         }
     } else {
+        __builtin_debugtrap();
         LOG_WARNING(HW_Memory, "Platform can support fastmem, but can't create it");
         fallback_buffer = true;
         backing_base = static_cast<u8*>(impl->Allocate(backing_size));

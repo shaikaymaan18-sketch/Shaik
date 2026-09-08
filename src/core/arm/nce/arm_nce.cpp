@@ -475,6 +475,8 @@ HaltReason ArmNce::RunThread(Kernel::KThread* thread) {
     thread_params->guest_stack_base = reinterpret_cast<void*>(GetInteger(
         thread->GetOwnerProcess()->GetPageTable().GetStackRegionStart() + thread->GetOwnerProcess()->GetPageTable().GetStackRegionSize()));
     thread_params->guest_stack_limit = reinterpret_cast<void*>(GetInteger(thread->GetOwnerProcess()->GetPageTable().GetStackRegionStart()));
+
+    ClearInstructionCache();
 #endif
 
     // Move non-critical operations outside the locked section
@@ -549,10 +551,10 @@ ArmNce::~ArmNce() = default;
 #ifdef _WIN32
 
 using PFN_SetProcessValidCallTargets = BOOL(WINAPI*)(
-    _In_ HANDLE hProcess, _In_ PVOID VirtualAddress, _in_ SIZE_T RegionSize,
+    _In_ HANDLE hProcess, _In_ PVOID VirtualAddress, _In_ SIZE_T RegionSize,
     _In_ ULONG NumberOfOffsets, _In_ PCFG_CALL_TARGET_INFO OffsetInformation);
 
-static PFN_SetProcessValidCallTargets PFN_SetProcessValidCallTargets {};
+static PFN_SetProcessValidCallTargets pfn_SetProcessValidCallTargets {};
 
 LONG WINAPI ArmNce::VectoredExceptionHandler(PEXCEPTION_POINTERS info) {
     // TODO: Windows doesn't allocate a separate stack so we're either
@@ -574,11 +576,12 @@ LONG WINAPI ArmNce::VectoredExceptionHandler(PEXCEPTION_POINTERS info) {
         targetInfo.Offset = 0;
         targetInfo.Flags = CFG_CALL_TARGET_VALID;
 
-        if (!PFN_SetProcessValidCallTargets) {
+        if (!pfn_SetProcessValidCallTargets) {
+            // TODO: move this to Initialize
             Common::DynamicLibrary kernelbase {"Kernelbase"};
-            PFN_SetProcessValidCallTargets = kernelbase.GetSymbol("SetProcessValidCallTargets", PFN_SetProcessValidCallTargets);
+            ASSERT(kernelbase.GetSymbol("SetProcessValidCallTargets", &pfn_SetProcessValidCallTargets));
         }
-        PFN_SetProcessValidCallTargets(GetCurrentProcess(), reinterpret_cast<void*>(info->ContextRecord->Pc), 0x1000, 1, &targetInfo);
+        pfn_SetProcessValidCallTargets(GetCurrentProcess(), reinterpret_cast<void*>(info->ContextRecord->Pc), 0x1000, 1, &targetInfo);
         return EXCEPTION_CONTINUE_EXECUTION;
     } else {
         // other exception? let it pass
