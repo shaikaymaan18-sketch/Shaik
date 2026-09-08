@@ -5,13 +5,15 @@
 #include <cmath>
 #include <string>
 
+#include <QAction>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
+#include <QFrame>
 #include <QGridLayout>
-#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMenu>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSlider>
@@ -83,16 +85,23 @@ ConfigurePostProcessing::ConfigurePostProcessing(QWidget* parent) : QDialog(pare
     auto* actions = new QHBoxLayout();
 
     auto* add_button = new QPushButton(tr("Add Effect"), this);
-    connect(add_button, &QPushButton::clicked, this, [this]() {
-        for (const auto& effect : VideoCore::GetFxCatalog()) {
-            if (!effect.Valid()) {
-                continue;
-            }
-            VideoCore::FxChain::Instance().Append(effect.file, effect.techniques.front());
-            ApplyStructuralChange();
-            return;
+    auto* add_menu = new QMenu(add_button);
+    for (const auto& effect : VideoCore::GetFxCatalog()) {
+        if (!effect.Valid()) {
+            continue;
         }
-    });
+        for (const auto& technique : effect.techniques) {
+            QAction* action = add_menu->addAction(SlotLabel(effect, technique));
+            action->setToolTip(QString::fromStdString(effect.description));
+            const std::string file = effect.file;
+            const std::string name = technique;
+            connect(action, &QAction::triggered, this, [this, file, name]() {
+                VideoCore::FxChain::Instance().Append(file, name);
+                ApplyStructuralChange();
+            });
+        }
+    }
+    add_button->setMenu(add_menu);
     actions->addWidget(add_button);
 
     actions->addStretch();
@@ -235,10 +244,20 @@ void ConfigurePostProcessing::BuildUniformWidget(QWidget* parent, QVBoxLayout* l
 }
 
 QWidget* ConfigurePostProcessing::BuildSlot(int index, const VideoCore::FxChainEntry& entry) {
-    auto* group = new QGroupBox(slots_container);
+    auto* group = new QFrame(slots_container);
+    group->setObjectName(QStringLiteral("fxSlot"));
+    group->setStyleSheet(QStringLiteral(
+        "QFrame#fxSlot { background-color: palette(alternate-base);"
+        " border: 1px solid palette(mid); border-radius: 6px; }"));
     auto* layout = new QVBoxLayout(group);
 
     auto* header = new QHBoxLayout();
+
+    auto* toggle = new QToolButton(group);
+    toggle->setArrowType(Qt::RightArrow);
+    toggle->setAutoRaise(true);
+    toggle->setCheckable(true);
+    header->addWidget(toggle);
 
     auto* combo = new QComboBox(group);
     PopulateEffectCombo(combo, entry);
@@ -292,13 +311,28 @@ QWidget* ConfigurePostProcessing::BuildSlot(int index, const VideoCore::FxChainE
 
     layout->addLayout(header);
 
+    auto* body = new QWidget(group);
+    auto* body_layout = new QVBoxLayout(body);
+    body_layout->setContentsMargins(0, 0, 0, 0);
+    body->setVisible(false);
+    layout->addWidget(body);
+
+    connect(toggle, &QToolButton::toggled, this, [toggle, body](bool open) {
+        body->setVisible(open);
+        if (open) {
+            toggle->setArrowType(Qt::DownArrow);
+        } else {
+            toggle->setArrowType(Qt::RightArrow);
+        }
+    });
+
     const VideoCore::FxEffectDesc* effect = VideoCore::FindFxEffect(entry.file);
     if (effect == nullptr) {
         auto* missing =
             new QLabel(tr("Effect '%1' was not found.").arg(QString::fromStdString(entry.file)),
                        group);
         missing->setWordWrap(true);
-        layout->addWidget(missing);
+        body_layout->addWidget(missing);
         return group;
     }
 
@@ -306,7 +340,7 @@ QWidget* ConfigurePostProcessing::BuildSlot(int index, const VideoCore::FxChainE
         auto* failed = new QLabel(
             tr("Effect failed to compile:\n%1").arg(QString::fromStdString(effect->error)), group);
         failed->setWordWrap(true);
-        layout->addWidget(failed);
+        body_layout->addWidget(failed);
         return group;
     }
 
@@ -317,10 +351,10 @@ QWidget* ConfigurePostProcessing::BuildSlot(int index, const VideoCore::FxChainE
             if (!current_category.empty()) {
                 auto* category = new QLabel(QString::fromStdString(current_category), group);
                 category->setStyleSheet(QStringLiteral("font-weight: bold;"));
-                layout->addWidget(category);
+                body_layout->addWidget(category);
             }
         }
-        BuildUniformWidget(group, layout, index, uniform);
+        BuildUniformWidget(body, body_layout, index, uniform);
     }
 
     return group;

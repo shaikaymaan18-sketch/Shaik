@@ -48,6 +48,8 @@ class SettingsFragmentPresenter(
 ) {
     private var settingsList = ArrayList<SettingsItem>()
 
+    private val expandedShaderSlots = mutableSetOf<Int>()
+
     private val context get() = YuzuApplication.appContext
 
     // Extension for altering settings list based on each setting's properties
@@ -234,15 +236,42 @@ class SettingsFragmentPresenter(
                 var summary = ""
                 if (effect != null) {
                     header = effect.label
+                    if (effect.techniques.size > 1) {
+                        header = effect.label + " \u00b7 " + entry.technique
+                    }
                     summary = effect.description
                 }
-                add(HeaderSetting(titleString = header))
+
+                val isOpen = expandedShaderSlots.contains(index)
+                var chevron = R.drawable.ic_arrow_forward
+                if (isOpen) {
+                    chevron = R.drawable.ic_dropdown_arrow
+                }
+
+                add(
+                    RunnableSetting(
+                        titleString = header,
+                        descriptionString = summary,
+                        isRunnable = true,
+                        iconId = chevron
+                    ) {
+                        if (isOpen) {
+                            expandedShaderSlots.remove(index)
+                        } else {
+                            expandedShaderSlots.add(index)
+                        }
+                        settingsViewModel.setReloadListAndNotifyDataset(true)
+                    }
+                )
+
+                if (!isOpen) {
+                    continue
+                }
 
                 add(
                     IntSingleChoiceSetting(
                         buildSlotSelector(index, entry, files, techniques),
                         titleId = R.string.post_processing_effect,
-                        descriptionString = summary,
                         choices = labels.toTypedArray(),
                         values = labels.indices.toList().toTypedArray()
                     )
@@ -262,6 +291,7 @@ class SettingsFragmentPresenter(
                         ) {
                             NativePostProcessing.move(index, -1)
                             NativePostProcessing.persist()
+                            expandedShaderSlots.clear()
                             settingsViewModel.setReloadListAndNotifyDataset(true)
                         }
                     )
@@ -274,6 +304,7 @@ class SettingsFragmentPresenter(
                         ) {
                             NativePostProcessing.move(index, 1)
                             NativePostProcessing.persist()
+                            expandedShaderSlots.clear()
                             settingsViewModel.setReloadListAndNotifyDataset(true)
                         }
                     )
@@ -295,22 +326,50 @@ class SettingsFragmentPresenter(
                     ) {
                         NativePostProcessing.remove(index)
                         NativePostProcessing.persist()
+                        expandedShaderSlots.clear()
                         settingsViewModel.setReloadListAndNotifyDataset(true)
                     }
                 )
             }
 
             add(
-                RunnableSetting(
+                IntSingleChoiceSetting(
+                    buildAddSelector(files, techniques),
                     titleId = R.string.post_processing_add,
-                    isRunnable = true
-                ) {
-                    NativePostProcessing.append(files[0], techniques[0])
-                    NativePostProcessing.persist()
-                    settingsViewModel.setReloadListAndNotifyDataset(true)
-                }
+                    choices = labels.toTypedArray(),
+                    values = labels.indices.toList().toTypedArray()
+                )
             )
         }
+    }
+
+    private fun buildAddSelector(
+        files: List<String>,
+        techniques: List<String>
+    ): AbstractIntSetting = object : AbstractIntSetting {
+        override val key = "fx_add"
+
+        override fun getInt(needsGlobal: Boolean): Int = -1
+
+        override fun setInt(value: Int) {
+            if (value < 0 || value >= files.size) {
+                return
+            }
+            NativePostProcessing.append(files[value], techniques[value])
+            NativePostProcessing.persist()
+            settingsViewModel.setReloadListAndNotifyDataset(true)
+        }
+
+        override val defaultValue = -1
+        override fun getValueAsString(needsGlobal: Boolean): String = ""
+        override fun reset() {}
+        override val isRuntimeModifiable = true
+        override val pairedSettingKey = ""
+        override val isSwitchable = false
+        override val isSaveable = true
+        override var global: Boolean
+            get() = true
+            set(_) {}
     }
 
     private fun buildSlotSelector(

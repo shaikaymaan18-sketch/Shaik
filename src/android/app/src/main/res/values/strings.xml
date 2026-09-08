@@ -302,7 +302,6 @@
     <string name="post_processing_description">ReShade FX effects applied after rendering</string>
     <string name="post_processing_per_game_description">Configure the effect chain for this game</string>
     <string name="post_processing_effect">Effect</string>
-    <string name="post_processing_none">None</string>
     <string name="post_processing_add">Add effect</string>
     <string name="post_processing_remove">Remove</string>
     <string name="post_processing_move_up">Move up</string>

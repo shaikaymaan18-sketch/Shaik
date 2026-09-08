@@ -341,17 +341,99 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
         container.addView(itemView)
     }
 
+    fun addShaderCard(
+        title: String,
+        summary: String,
+        container: ViewGroup,
+        onRemove: () -> Unit
+    ): ViewGroup {
+        val inflater = LayoutInflater.from(emulationFragment.requireContext())
+        val itemView = inflater.inflate(R.layout.item_quick_settings_shader, container, false)
+
+        val headerView = itemView.findViewById<ViewGroup>(R.id.shader_header)
+        val titleView = itemView.findViewById<TextView>(R.id.shader_title)
+        val summaryView = itemView.findViewById<TextView>(R.id.shader_summary)
+        val removeView = itemView.findViewById<android.widget.ImageView>(R.id.shader_remove)
+        val expandIcon = itemView.findViewById<android.widget.ImageView>(R.id.shader_expand)
+        val bodyView = itemView.findViewById<ViewGroup>(R.id.shader_body)
+
+        titleView.text = title
+        if (summary.isEmpty()) {
+            summaryView.visibility = View.GONE
+        } else {
+            summaryView.text = summary
+        }
+
+        var isExpanded = false
+        headerView.setOnClickListener {
+            isExpanded = !isExpanded
+            if (isExpanded) {
+                bodyView.visibility = View.VISIBLE
+                expandIcon.animate().rotation(180f).setDuration(200).start()
+            } else {
+                bodyView.visibility = View.GONE
+                expandIcon.animate().rotation(0f).setDuration(200).start()
+            }
+        }
+
+        removeView.setOnClickListener {
+            onRemove()
+        }
+
+        container.addView(itemView)
+        return bodyView
+    }
+
+    fun addEffectPicker(
+        container: ViewGroup,
+        choices: List<String>,
+        onPicked: (Int) -> Unit
+    ) {
+        val inflater = LayoutInflater.from(emulationFragment.requireContext())
+        val itemView = inflater.inflate(R.layout.item_quick_settings_add, container, false)
+
+        val button = itemView.findViewById<com.google.android.material.button.MaterialButton>(
+            R.id.add_button
+        )
+        val choiceGroup = itemView.findViewById<RadioGroup>(R.id.add_choices)
+
+        choices.forEachIndexed { index, name ->
+            val radioButton = com.google.android.material.radiobutton.MaterialRadioButton(
+                emulationFragment.requireContext()
+            )
+            radioButton.text = name
+            radioButton.id = View.generateViewId()
+            radioButton.setPadding(16, 8, 16, 8)
+            radioButton.setOnCheckedChangeListener { _, isChecked ->
+                if (isChecked) {
+                    onPicked(index)
+                }
+            }
+            choiceGroup.addView(radioButton)
+        }
+
+        var isOpen = false
+        button.setOnClickListener {
+            isOpen = !isOpen
+            if (isOpen) {
+                choiceGroup.visibility = View.VISIBLE
+            } else {
+                choiceGroup.visibility = View.GONE
+            }
+        }
+
+        container.addView(itemView)
+    }
+
     fun addPostProcessing(container: ViewGroup, onStructureChanged: () -> Unit) {
         val usable = NativePostProcessing.catalog().filter { it.valid }
         if (usable.isEmpty()) {
             return
         }
 
-        val labels = mutableListOf(
-            YuzuApplication.appContext.getString(R.string.post_processing_none)
-        )
-        val files = mutableListOf("")
-        val techniques = mutableListOf("")
+        val labels = mutableListOf<String>()
+        val files = mutableListOf<String>()
+        val techniques = mutableListOf<String>()
 
         for (effect in usable) {
             for (technique in effect.techniques) {
@@ -368,61 +450,37 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
         addDivider(container)
 
         val chain = NativePostProcessing.chain()
-        for (index in 0..chain.size) {
-            var selected = 0
-            var effect: NativePostProcessing.Effect? = null
+        chain.forEachIndexed { index, entry ->
+            val effect = usable.firstOrNull { it.file == entry.file }
 
-            if (index < chain.size) {
-                val entry = chain[index]
-                effect = usable.firstOrNull { it.file == entry.file }
-                for (i in files.indices) {
-                    if (files[i] == entry.file && techniques[i] == entry.technique) {
-                        selected = i
-                    }
+            var title = entry.file
+            var summary = ""
+            if (effect != null) {
+                title = effect.label
+                if (effect.techniques.size > 1) {
+                    title = effect.label + " \u00b7 " + entry.technique
                 }
+                summary = effect.description
             }
 
-            var title = YuzuApplication.appContext.getString(R.string.post_processing_add)
-            if (index < chain.size) {
-                title = YuzuApplication.appContext.getString(R.string.post_processing_effect)
-            }
-
-            addChoice(title, container, labels, selected) { picked ->
-                applyEffectPick(index, picked, files, techniques, chain.size)
+            val body = addShaderCard(title, summary, container) {
+                NativePostProcessing.remove(index)
+                NativePostProcessing.persist()
                 onStructureChanged()
             }
 
             if (effect != null) {
                 for (uniform in effect.uniforms) {
-                    addUniformSliders(container, index, uniform)
+                    addUniformSliders(body, index, uniform)
                 }
             }
         }
-    }
 
-    private fun applyEffectPick(
-        index: Int,
-        picked: Int,
-        files: List<String>,
-        techniques: List<String>,
-        chainSize: Int
-    ) {
-        if (index >= chainSize) {
-            if (picked > 0) {
-                NativePostProcessing.append(files[picked], techniques[picked])
-                NativePostProcessing.persist()
-            }
-            return
-        }
-
-        if (picked == 0) {
-            NativePostProcessing.remove(index)
+        addEffectPicker(container, labels) { picked ->
+            NativePostProcessing.append(files[picked], techniques[picked])
             NativePostProcessing.persist()
-            return
+            onStructureChanged()
         }
-
-        NativePostProcessing.replace(index, files[picked], techniques[picked])
-        NativePostProcessing.persist()
     }
 
     private fun addUniformSliders(
