@@ -51,7 +51,7 @@ float4 PS_Deband(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
     float3 total = float3(0.0, 0.0, 0.0);
     float3 deviation = float3(0.0, 0.0, 0.0);
 
-    for (int ring = 1; ring <= 2; ++ring)
+    [unroll] for (int ring = 1; ring <= 2; ++ring)
     {
         float angle = base + float(ring) * 2.3999632;
         float reach = Radius * float(ring) * 0.5;

@@ -54,9 +54,9 @@ float4 PS_Denoise(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
     float3 sum = float3(0.0, 0.0, 0.0);
     float3 total = float3(0.0, 0.0, 0.0);
 
-    for (int y = -2; y <= 2; ++y)
+    [unroll] for (int y = -2; y <= 2; ++y)
     {
-        for (int x = -2; x <= 2; ++x)
+        [unroll] for (int x = -2; x <= 2; ++x)
         {
             float2 offset = float2(x, y);
             float3 tap = tex2D(BackBuffer, uv + offset * texel).rgb;

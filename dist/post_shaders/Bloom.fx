@@ -44,9 +44,9 @@ float4 PS_Bloom(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
     float spread = 0.002 * gray / max(saturation, 0.25) * Radius;
 
     float3 sum = float3(0.0, 0.0, 0.0);
-    for (int x = -3; x <= 3; x += 2)
+    [unroll] for (int x = -3; x <= 3; x += 2)
     {
-        for (int y = -3; y <= 3; y += 2)
+        [unroll] for (int y = -3; y <= 3; y += 2)
         {
             float3 tap = tex2D(BackBuffer, uv + float2(x, y) * spread).rgb;
             sum += tap * Weight(tap);

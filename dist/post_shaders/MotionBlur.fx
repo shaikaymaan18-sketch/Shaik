@@ -66,7 +66,7 @@ float4 PS_MotionBlur(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
     float jitter = frac(sin(dot(pos.xy, float2(12.9898, 78.233))) * 43758.5453);
 
     float3 sum = float3(0.0, 0.0, 0.0);
-    for (int i = 0; i < TAPS; ++i)
+    [unroll] for (int i = 0; i < TAPS; ++i)
     {
         float t = (float(i) + jitter) / float(TAPS) - 0.5;
         sum += tex2D(BackBuffer, uv + velocity * t).rgb;

@@ -60,7 +60,7 @@ float4 PS_Blur(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 
     float3 sum = float3(0.0, 0.0, 0.0);
     float total = 0.0;
-    for (int i = 0; i < TAPS; ++i)
+    [unroll] for (int i = 0; i < TAPS; ++i)
     {
         float reach = sqrt((float(i) + 0.5) / float(TAPS));
         sum += tex2D(BackBuffer, uv + spoke * reach * texel * Radius).rgb * weight;
