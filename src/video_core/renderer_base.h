@@ -9,10 +9,12 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <mutex>
 
 #include "common/common_funcs.h"
 #include "common/common_types.h"
 #include "core/frontend/framebuffer_layout.h"
+#include "video_core/frame_gen/frame_gen_config.h"
 #include "video_core/gpu.h"
 #include "video_core/rasterizer_interface.h"
 
@@ -30,6 +32,20 @@ struct RendererSettings {
     std::function<void(bool)> screenshot_complete_callback;
     Layout::FramebufferLayout screenshot_framebuffer_layout;
     Service::Nvnflinger::LayerStackId screenshot_layer_stack{Service::Nvnflinger::LayerStackId::Default};
+
+    void SetFrameGenConfig(FrameGenConfig config) {
+        std::scoped_lock lock{frame_gen_mutex};
+        frame_gen_config = config;
+    }
+
+    [[nodiscard]] FrameGenConfig GetFrameGenConfig() const {
+        std::scoped_lock lock{frame_gen_mutex};
+        return frame_gen_config;
+    }
+
+private:
+    mutable std::mutex frame_gen_mutex;
+    FrameGenConfig frame_gen_config;
 };
 
 class RendererBase {

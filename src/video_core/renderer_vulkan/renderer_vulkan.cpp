@@ -145,6 +145,7 @@ try
     , swapchain(*surface,
                 device,
                 scheduler,
+                Settings(),
                render_window.GetFramebufferLayout().width,
                render_window.GetFramebufferLayout().height)
     , present_manager(instance,
@@ -152,6 +153,7 @@ try
                       device,
                       memory_allocator,
                       scheduler,
+                      Settings(),
                       swapchain,
                       surface)
     , blit_swapchain(device_memory,
@@ -206,6 +208,9 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
     }
 
     RenderScreenshot(framebuffers);
+#ifdef HAS_LSFG
+    frame_gen.UpdateConfig(Settings().GetFrameGenConfig());
+#endif
     Frame* frame = present_manager.GetRenderFrame();
 
     scheduler.RequestOutsideRenderPassOperationContext();

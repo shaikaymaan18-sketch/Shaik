@@ -7,6 +7,7 @@
 #include <thread>
 
 #include "common/logging.h"
+#include "common/settings.h"
 #include "core/frontend/emu_window.h"
 #include "core/frontend/graphics_context.h"
 #include "video_core/renderer_base.h"
@@ -22,6 +23,16 @@ RendererBase::RendererBase(Core::Frontend::EmuWindow& window_,
 RendererBase::~RendererBase() = default;
 
 void RendererBase::RefreshBaseSettings() {
+    renderer_settings.SetFrameGenConfig({
+        .enabled = Settings::values.frame_gen.GetValue(),
+        .multiplier = Settings::FrameGenMultiplier(),
+        .target_rate = Settings::values.frame_gen_target_rate.GetValue(),
+        .flow_scale_auto = Settings::values.frame_gen_flow_scale_auto.GetValue(),
+        .flow_scale = Settings::values.frame_gen_flow_scale.GetValue(),
+        .queue_target = Settings::values.frame_gen_queue_target.GetValue(),
+        .fp16 = Settings::values.frame_gen_fp16.GetValue(),
+        .dump_flow = Settings::values.frame_gen_dump_flow.GetValue(),
+    });
     UpdateCurrentFramebufferLayout();
 }
 

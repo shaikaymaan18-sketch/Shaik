@@ -114,7 +114,9 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
         name: Int,
 
         container: ViewGroup,
-        setting: BooleanSetting
+        setting: BooleanSetting,
+        isEnabled: Boolean = true,
+        onValueChanged: ((Boolean) -> Unit)? = null
     ) {
         val inflater = LayoutInflater.from(emulationFragment.requireContext())
         val itemView = inflater.inflate(R.layout.item_quick_settings_menu, container, false)
@@ -125,15 +127,21 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
 
         titleView.text = YuzuApplication.appContext.getString(name)
         switchContainer.visibility = View.VISIBLE
+        switchContainer.isEnabled = isEnabled
         switchView.isChecked = setting.getBoolean()
+        switchView.isEnabled = isEnabled
+        itemView.alpha = if (isEnabled) 1.0f else 0.5f
 
         switchView.setOnCheckedChangeListener { _, isChecked ->
             setting.setBoolean(isChecked)
             saveSettings()
+            onValueChanged?.invoke(isChecked)
         }
 
         switchContainer.setOnClickListener {
-            switchView.toggle()
+            if (switchView.isEnabled) {
+                switchView.toggle()
+            }
         }
         container.addView(itemView)
     }
@@ -177,7 +185,9 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
         setting: AbstractSetting,
         minValue: Int = 0,
         maxValue: Int = 100,
-        units: String = ""
+        units: String = "",
+        isEnabled: Boolean = true,
+        onValueChanged: ((Int) -> Unit)? = null
     ) {
         val inflater = LayoutInflater.from(emulationFragment.requireContext())
         val itemView = inflater.inflate(R.layout.item_quick_settings_menu, container, false)
@@ -190,10 +200,13 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
 
         titleView.text = YuzuApplication.appContext.getString(name)
         sliderContainer.visibility = View.VISIBLE
+        sliderContainer.isEnabled = isEnabled
 
         slider.valueFrom = minValue.toFloat()
         slider.valueTo = maxValue.toFloat()
         slider.stepSize = 1f
+        slider.isEnabled = isEnabled
+        itemView.alpha = if (isEnabled) 1.0f else 0.5f
         val currentValue = when (setting) {
             is AbstractShortSetting -> setting.getShort(needsGlobal = false).toInt()
             is AbstractIntSetting -> setting.getInt(needsGlobal = false)
@@ -204,8 +217,8 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
         val displayValue = "${slider.value.toInt()}$units"
         valueDisplay.text = displayValue
 
-        slider.addOnChangeListener { _, value, chanhed ->
-            if (chanhed) {
+        slider.addOnChangeListener { _, value, changed ->
+            if (changed) {
                 val intValue = value.toInt()
                 when (setting) {
                     is AbstractShortSetting -> setting.setShort(intValue.toShort())
@@ -213,6 +226,7 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
                 }
                 saveSettings()
                 valueDisplay.text = "$intValue$units"
+                onValueChanged?.invoke(intValue)
             }
         }
 

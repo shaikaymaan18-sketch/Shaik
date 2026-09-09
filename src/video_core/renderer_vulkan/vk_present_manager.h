@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <boost/container/deque.hpp>
@@ -18,6 +19,10 @@
 namespace Core::Frontend {
 class EmuWindow;
 } // namespace Core::Frontend
+
+namespace VideoCore {
+struct RendererSettings;
+}
 
 namespace Vulkan {
 
@@ -45,6 +50,7 @@ public:
                    const Device& device,
                    MemoryAllocator& memory_allocator,
                    Scheduler& scheduler,
+                   const VideoCore::RendererSettings& renderer_settings,
                    Swapchain& swapchain,
                    vk::SurfaceKHR& surface);
     ~PresentManager();
@@ -74,7 +80,9 @@ private:
 
     void RecreateSwapchain(Frame* frame);
 
-    void SetImageCount();
+    void UpdateSwapchainImageCount();
+
+    [[nodiscard]] size_t DesiredFrameCount() const;
 
 private:
     const vk::Instance& instance;
@@ -82,6 +90,7 @@ private:
     const Device& device;
     MemoryAllocator& memory_allocator;
     Scheduler& scheduler;
+    const VideoCore::RendererSettings& renderer_settings;
     Swapchain& swapchain;
     vk::SurfaceKHR& surface;
     vk::CommandPool cmdpool;
@@ -97,7 +106,7 @@ private:
     bool blit_supported;
     bool storage_supported;
     bool use_present_thread;
-    std::size_t image_count{};
+    std::atomic_size_t swapchain_image_count{};
 };
 
 } // namespace Vulkan

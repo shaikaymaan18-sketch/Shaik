@@ -22,6 +22,7 @@
 #include "input_common/main.h"
 #include "jni/emu_window/emu_window.h"
 #include "jni/native.h"
+#include "video_core/renderer_base.h"
 
 void EmuWindow_Android::OnSurfaceChanged(ANativeWindow* surface) {
     if (!surface) {
@@ -125,10 +126,14 @@ float EmuWindow_Android::GetFrameTimeVerifiedHint() const {
 }
 
 float EmuWindow_Android::GetPresentedFrameMultiplier() {
-    if (!Settings::values.frame_gen.GetValue()) {
-        return 1.0f;
+    if (EmulationSession::GetInstance().IsRunning()) {
+        const VideoCore::FrameGenConfig config =
+            EmulationSession::GetInstance().System().Renderer().Settings().GetFrameGenConfig();
+        return config.enabled ? static_cast<float>(config.multiplier) : 1.0f;
     }
-    return static_cast<float>(std::clamp<u32>(Settings::values.frame_gen_multiplier.GetValue(), 2, 4));
+    return Settings::values.frame_gen.GetValue()
+               ? static_cast<float>(Settings::FrameGenMultiplier())
+               : 1.0f;
 }
 
 float EmuWindow_Android::GetFrameRateHint() const {

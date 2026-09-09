@@ -7,6 +7,7 @@
 #include "common/settings.h"
 #include "common/thread.h"
 #include "core/frontend/emu_window.h"
+#include "video_core/renderer_base.h"
 #ifdef HAS_LSFG
 #include "video_core/renderer_vulkan/present/lsfg_common.h"
 #endif
@@ -29,9 +30,6 @@ static_assert(MAX_FRAMES_IN_FLIGHT <= LSFG_MAX_TARGETS);
 
 bool CanStoreToFrame(const vk::PhysicalDevice& physical_device, VkFormat format) {
 #ifdef HAS_LSFG
-    if (!Settings::values.frame_gen.GetValue()) {
-        return false;
-    }
     const VkFormatProperties props{physical_device.GetFormatProperties(format)};
     return (props.optimalTilingFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) != 0;
 #else
@@ -120,6 +118,7 @@ PresentManager::PresentManager(const vk::Instance& instance_,
                                const Device& device_,
                                MemoryAllocator& memory_allocator_,
                                Scheduler& scheduler_,
+                               const VideoCore::RendererSettings& renderer_settings_,
                                Swapchain& swapchain_,
                                vk::SurfaceKHR& surface_)
     : instance{instance_}
@@ -127,13 +126,14 @@ PresentManager::PresentManager(const vk::Instance& instance_,
     , device{device_}
     , memory_allocator{memory_allocator_}
     , scheduler{scheduler_}
+    , renderer_settings{renderer_settings_}
     , swapchain{swapchain_}
     , surface{surface_}
     , blit_supported{CanBlitToSwapchain(device.GetPhysical(), swapchain.GetImageViewFormat())}
     , storage_supported{CanStoreToFrame(device.GetPhysical(), swapchain.GetImageFormat())}
     , use_present_thread{Settings::values.async_presentation.GetValue()}
 {
-    SetImageCount();
+    UpdateSwapchainImageCount();
 
     auto& dld = device.GetLogical();
     cmdpool = dld.CreateCommandPool({
@@ -143,9 +143,14 @@ PresentManager::PresentManager(const vk::Instance& instance_,
             VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
         .queueFamilyIndex = device.GetGraphicsFamily(),
     });
-    auto cmdbuffers = cmdpool.Allocate(image_count);
+#ifdef HAS_LSFG
+    constexpr size_t frame_capacity = MAX_FRAMES_IN_FLIGHT;
+#else
+    const size_t frame_capacity = DesiredFrameCount();
+#endif
+    auto cmdbuffers = cmdpool.Allocate(frame_capacity);
 
-    frames.resize(image_count);
+    frames.resize(frame_capacity);
     for (u32 i = 0; i < frames.size(); i++) {
         Frame& frame = frames[i];
         frame.index = i;
@@ -174,7 +179,10 @@ Frame* PresentManager::GetRenderFrame() {
 
     // Wait for free presentation frames
     std::unique_lock lock{free_mutex};
-    free_cv.wait(lock, [this] { return !free_queue.empty(); });
+    free_cv.wait(lock, [this] {
+        const size_t outstanding = frames.size() - free_queue.size();
+        return !free_queue.empty() && outstanding < DesiredFrameCount();
+    });
 
     // Take the frame from the queue
     Frame* frame = free_queue.front();
@@ -202,7 +210,8 @@ void PresentManager::Present(Frame* frame) {
 }
 
 size_t PresentManager::MaxExtraFrames() const {
-    return image_count - 1;
+    const size_t frame_count = DesiredFrameCount();
+    return frame_count > 0 ? frame_count - 1 : 0;
 }
 
 void PresentManager::RecreateFrame(Frame* frame, u32 width, u32 height, VkFormat image_view_format,
@@ -351,22 +360,30 @@ void PresentManager::PresentThread(std::stop_token token) {
 
 void PresentManager::RecreateSwapchain(Frame* frame) {
     swapchain.Create(*surface, frame->width, frame->height); // Pass raw pointer
-    SetImageCount();
+    UpdateSwapchainImageCount();
 }
 
-void PresentManager::SetImageCount() {
+void PresentManager::UpdateSwapchainImageCount() {
+    swapchain_image_count.store(
+        std::min<size_t>(swapchain.GetImageCount(), MAX_FRAMES_IN_FLIGHT),
+        std::memory_order_release);
+    free_cv.notify_all();
+}
+
+size_t PresentManager::DesiredFrameCount() const {
     // We cannot have more than 7 images in flight at any given time.
     // FRAMES_IN_FLIGHT is 8, and the cache TICKS_TO_DESTROY is 8.
     // Mali drivers will give us 6.
+    const size_t minimum = swapchain_image_count.load(std::memory_order_acquire);
 #ifdef HAS_LSFG
-    const size_t generations = Settings::FrameGenMaxGenerations();
-    const size_t queued_composites = Settings::values.frame_gen_queue_target.GetValue() + 1;
-    image_count =
-        std::clamp<size_t>((generations + 1) * queued_composites, swapchain.GetImageCount(),
-                           MAX_FRAMES_IN_FLIGHT);
-#else
-    image_count = std::min<size_t>(swapchain.GetImageCount(), MAX_FRAMES_IN_FLIGHT);
+    const VideoCore::FrameGenConfig config = renderer_settings.GetFrameGenConfig();
+    if (config.enabled) {
+        const size_t queued_composites = std::clamp<size_t>(config.queue_target, 0, 2) + 1;
+        return std::clamp<size_t>((config.MaxGenerations() + 1) * queued_composites, minimum,
+                                  MAX_FRAMES_IN_FLIGHT);
+    }
 #endif
+    return minimum;
 }
 
 void PresentManager::CopyToSwapchain(Frame* frame) {

@@ -6,6 +6,7 @@
 #include <optional>
 
 #include "common/common_types.h"
+#include "video_core/frame_gen/frame_gen_config.h"
 #include "video_core/renderer_vulkan/present/frame_gen_pacer.h"
 #include "video_core/renderer_vulkan/present/lsfg_chain.h"
 #include "video_core/renderer_vulkan/present/lsfg_shaders.h"
@@ -21,6 +22,8 @@ class FrameGen {
 public:
     explicit FrameGen(MemoryAllocator& memory_allocator, Scheduler& scheduler);
     ~FrameGen();
+
+    void UpdateConfig(const VideoCore::FrameGenConfig& new_config);
 
     void Process(const Device& device, Frame* frame, VkFormat format, VkExtent2D guest_extent);
 
@@ -39,6 +42,7 @@ private:
 
     std::optional<LsfgShaders> shaders;
     std::optional<LsfgChain> chain;
+    VideoCore::FrameGenConfig config;
     FrameGenPacer pacer;
     FrameGenPlan plan{};
     VkExtent2D peak_guest_extent{};
@@ -52,6 +56,7 @@ private:
     bool generated{};
     bool unavailable{};
     bool dumped{};
+    bool has_config{};
 };
 
 } // namespace Vulkan

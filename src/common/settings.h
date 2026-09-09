@@ -389,7 +389,7 @@ struct Values {
                                                   true};
 
     SwitchableSetting<bool> frame_gen{linkage, false, "frame_gen", Category::Renderer,
-                                      Specialization::Default, true, false};
+                                      Specialization::Default, true, true};
 
     SwitchableSetting<u32, true> frame_gen_multiplier{linkage,
                                                       2,
@@ -399,7 +399,7 @@ struct Values {
                                                       Category::Renderer,
                                                       Specialization::Countable,
                                                       true,
-                                                      false,
+                                                      true,
                                                       &frame_gen};
 
     SwitchableSetting<u32, true> frame_gen_target_rate{linkage,
@@ -419,7 +419,7 @@ struct Values {
                                                       Category::Renderer,
                                                       Specialization::Default,
                                                       true,
-                                                      false,
+                                                      true,
                                                       &frame_gen};
 
     SwitchableSetting<u32, true> frame_gen_flow_scale{linkage,
@@ -442,11 +442,11 @@ struct Values {
                                                         Category::Renderer,
                                                         Specialization::Countable,
                                                         true,
-                                                        false,
+                                                        true,
                                                         &frame_gen};
 
     SwitchableSetting<bool> frame_gen_fp16{linkage,      true,  "frame_gen_fp16", Category::Renderer,
-                                           Specialization::Default, true, false, &frame_gen};
+                                           Specialization::Default, true, true, &frame_gen};
 
     SwitchableSetting<bool> frame_gen_dump_flow{linkage, false, "frame_gen_dump_flow",
                                                 Category::Renderer};
