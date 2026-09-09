@@ -53,7 +53,7 @@ float4 PS_ColorGrade(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 
 technique ColorGrade <
     ui_label = "Colour Grade";
-    ui_tooltip = "Global saturation, brightness, contrast and gamma.";
+    ui_tooltip = "The four basic colour controls in one pass: saturation, brightness, contrast and gamma. Reach for this before anything more specialised.";
 >
 {
     pass

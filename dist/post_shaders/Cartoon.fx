@@ -68,7 +68,7 @@ float4 PS_Cartoon(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 
 technique Cartoon <
     ui_label = "Cartoon";
-    ui_tooltip = "Ink outlines and flat colour bands. Faithful port of the PPSSPP shader; the outline gets heavy in dark scenes.";
+    ui_tooltip = "Ink outlines and flat colour bands. Faithful port of the PPSSPP shader; the outline gets heavy in dark scenes, so try Cartoon Soft or Cel Shading if the blacks smear.";
 >
 {
     pass

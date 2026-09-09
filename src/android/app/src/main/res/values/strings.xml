@@ -301,9 +301,14 @@
     <string name="post_processing">Post-Processing Effects</string>
     <string name="post_processing_description">ReShade FX effects applied after rendering</string>
     <string name="post_processing_per_game_description">Configure the effect chain for this game</string>
-    <string name="post_processing_effect">Effect</string>
     <string name="post_processing_add">Add effect</string>
     <string name="post_processing_remove">Remove</string>
+    <string name="post_processing_hide_effects">Remove effects</string>
+    <string name="post_processing_preset_locked">Preset active. Edit it in Post-Processing Effects before starting a game.</string>
+    <string name="post_processing_preset_modified">Preset active, with your own changes.</string>
+    <string name="post_processing_preset">Preset</string>
+    <string name="post_processing_preset_none">No preset</string>
+    <string name="post_processing_preset_reset">Reset preset values</string>
     <string name="post_processing_move_up">Move up</string>
     <string name="post_processing_move_down">Move down</string>
     <string name="post_processing_reset">Reset to defaults</string>

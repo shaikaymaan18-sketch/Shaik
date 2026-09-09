@@ -42,9 +42,38 @@ object NativePostProcessing {
 
     external fun store()
 
+    external fun getPresetsJson(): String
+
+    external fun getActivePreset(): String
+
+    external fun isPresetModified(): Boolean
+
+    external fun applyPreset(name: String): Boolean
+
+    external fun savePreset(name: String, description: String): Boolean
+
+    external fun deletePreset(name: String): Boolean
+
+    external fun clearPreset()
+
+    external fun isEnabled(): Boolean
+
+    external fun setEnabled(enabled: Boolean)
+
+    external fun getPresetDirectory(): String
+
     fun persist() {
         store()
         NativeConfig.saveGlobalConfig()
+    }
+
+    fun persistFor(perGame: Boolean) {
+        store()
+        if (perGame) {
+            NativeConfig.savePerGameConfig()
+        } else {
+            NativeConfig.saveGlobalConfig()
+        }
     }
 
 
@@ -99,6 +128,28 @@ object NativePostProcessing {
     }
 
     data class ChainEntry(val file: String, val technique: String)
+
+    data class Preset(
+        val name: String,
+        val description: String,
+        val bundled: Boolean
+    )
+
+    fun presets(): List<Preset> {
+        val out = mutableListOf<Preset>()
+        val array = JSONArray(getPresetsJson())
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            out.add(
+                Preset(
+                    name = obj.optString("name"),
+                    description = obj.optString("description"),
+                    bundled = obj.optBoolean("bundled")
+                )
+            )
+        }
+        return out
+    }
 
     fun catalog(): List<Effect> {
         val out = mutableListOf<Effect>()

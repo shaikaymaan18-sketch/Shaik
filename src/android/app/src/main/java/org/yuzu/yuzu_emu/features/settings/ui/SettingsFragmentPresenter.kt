@@ -50,6 +50,10 @@ class SettingsFragmentPresenter(
 
     private val expandedShaderSlots = mutableSetOf<Int>()
 
+    private var shaderPickerOpen = false
+
+    private var presetPickerOpen = false
+
     private val context get() = YuzuApplication.appContext
 
     // Extension for altering settings list based on each setting's properties
@@ -212,7 +216,70 @@ class SettingsFragmentPresenter(
                 return@apply
             }
 
+            val active = NativePostProcessing.getActivePreset()
+            var presetSummary = context.getString(R.string.post_processing_preset_none)
+            if (active.isNotEmpty()) {
+                presetSummary = active
+                if (NativePostProcessing.isPresetModified()) {
+                    presetSummary = context.getString(R.string.post_processing_preset_modified)
+                }
+            }
+
+            add(
+                CardSetting(
+                    titleId = R.string.post_processing_preset,
+                    descriptionString = presetSummary,
+                    expanded = presetPickerOpen
+                ) {
+                    presetPickerOpen = !presetPickerOpen
+                    settingsViewModel.setReloadListAndNotifyDataset(true)
+                }
+            )
+
+            if (presetPickerOpen) {
+                add(
+                    RunnableSetting(
+                        titleId = R.string.post_processing_preset_none,
+                        isRunnable = true
+                    ) {
+                        NativePostProcessing.clearPreset()
+                        presetPickerOpen = false
+                        settingsViewModel.setReloadListAndNotifyDataset(true)
+                    }
+                )
+                for (preset in NativePostProcessing.presets()) {
+                    add(
+                        RunnableSetting(
+                            titleString = preset.name,
+                            descriptionString = preset.description,
+                            isRunnable = true
+                        ) {
+                            NativePostProcessing.applyPreset(preset.name)
+                            NativePostProcessing.store()
+                            presetPickerOpen = false
+                            expandedShaderSlots.clear()
+                            settingsViewModel.setReloadListAndNotifyDataset(true)
+                        }
+                    )
+                }
+            }
+
+            if (active.isNotEmpty()) {
+                add(
+                    RunnableSetting(
+                        titleId = R.string.post_processing_preset_reset,
+                        isRunnable = true
+                    ) {
+                        NativePostProcessing.applyPreset(active)
+                        NativePostProcessing.store()
+                        expandedShaderSlots.clear()
+                        settingsViewModel.setReloadListAndNotifyDataset(true)
+                    }
+                )
+            }
+
             val labels = mutableListOf<String>()
+            val summaries = mutableListOf<String>()
             val files = mutableListOf<String>()
             val techniques = mutableListOf<String>()
             for (effect in usable) {
@@ -222,6 +289,7 @@ class SettingsFragmentPresenter(
                     } else {
                         labels.add(effect.label + " \u00b7 " + technique)
                     }
+                    summaries.add(effect.description)
                     files.add(effect.file)
                     techniques.add(technique)
                 }
@@ -243,17 +311,12 @@ class SettingsFragmentPresenter(
                 }
 
                 val isOpen = expandedShaderSlots.contains(index)
-                var chevron = R.drawable.ic_arrow_forward
-                if (isOpen) {
-                    chevron = R.drawable.ic_dropdown_arrow
-                }
 
                 add(
-                    RunnableSetting(
+                    CardSetting(
                         titleString = header,
                         descriptionString = summary,
-                        isRunnable = true,
-                        iconId = chevron
+                        expanded = isOpen
                     ) {
                         if (isOpen) {
                             expandedShaderSlots.remove(index)
@@ -268,15 +331,6 @@ class SettingsFragmentPresenter(
                     continue
                 }
 
-                add(
-                    IntSingleChoiceSetting(
-                        buildSlotSelector(index, entry, files, techniques),
-                        titleId = R.string.post_processing_effect,
-                        choices = labels.toTypedArray(),
-                        values = labels.indices.toList().toTypedArray()
-                    )
-                )
-
                 if (effect != null) {
                     for (uniform in effect.uniforms) {
                         addUniform(this, index, uniform)
@@ -290,7 +344,7 @@ class SettingsFragmentPresenter(
                             isRunnable = true
                         ) {
                             NativePostProcessing.move(index, -1)
-                            NativePostProcessing.persist()
+                            NativePostProcessing.store()
                             expandedShaderSlots.clear()
                             settingsViewModel.setReloadListAndNotifyDataset(true)
                         }
@@ -303,7 +357,7 @@ class SettingsFragmentPresenter(
                             isRunnable = true
                         ) {
                             NativePostProcessing.move(index, 1)
-                            NativePostProcessing.persist()
+                            NativePostProcessing.store()
                             expandedShaderSlots.clear()
                             settingsViewModel.setReloadListAndNotifyDataset(true)
                         }
@@ -315,7 +369,7 @@ class SettingsFragmentPresenter(
                         isRunnable = true
                     ) {
                         NativePostProcessing.resetValues(index)
-                        NativePostProcessing.persist()
+                        NativePostProcessing.store()
                         settingsViewModel.setReloadListAndNotifyDataset(true)
                     }
                 )
@@ -325,7 +379,7 @@ class SettingsFragmentPresenter(
                         isRunnable = true
                     ) {
                         NativePostProcessing.remove(index)
-                        NativePostProcessing.persist()
+                        NativePostProcessing.store()
                         expandedShaderSlots.clear()
                         settingsViewModel.setReloadListAndNotifyDataset(true)
                     }
@@ -333,78 +387,32 @@ class SettingsFragmentPresenter(
             }
 
             add(
-                IntSingleChoiceSetting(
-                    buildAddSelector(files, techniques),
+                CardSetting(
                     titleId = R.string.post_processing_add,
-                    choices = labels.toTypedArray(),
-                    values = labels.indices.toList().toTypedArray()
-                )
+                    expanded = shaderPickerOpen
+                ) {
+                    shaderPickerOpen = !shaderPickerOpen
+                    settingsViewModel.setReloadListAndNotifyDataset(true)
+                }
             )
-        }
-    }
 
-    private fun buildAddSelector(
-        files: List<String>,
-        techniques: List<String>
-    ): AbstractIntSetting = object : AbstractIntSetting {
-        override val key = "fx_add"
-
-        override fun getInt(needsGlobal: Boolean): Int = -1
-
-        override fun setInt(value: Int) {
-            if (value < 0 || value >= files.size) {
-                return
-            }
-            NativePostProcessing.append(files[value], techniques[value])
-            NativePostProcessing.persist()
-            settingsViewModel.setReloadListAndNotifyDataset(true)
-        }
-
-        override val defaultValue = -1
-        override fun getValueAsString(needsGlobal: Boolean): String = ""
-        override fun reset() {}
-        override val isRuntimeModifiable = true
-        override val pairedSettingKey = ""
-        override val isSwitchable = false
-        override val isSaveable = true
-        override var global: Boolean
-            get() = true
-            set(_) {}
-    }
-
-    private fun buildSlotSelector(
-        index: Int,
-        entry: NativePostProcessing.ChainEntry,
-        files: List<String>,
-        techniques: List<String>
-    ): AbstractIntSetting = object : AbstractIntSetting {
-        override val key = "fx_slot_$index"
-
-        override fun getInt(needsGlobal: Boolean): Int {
-            for (i in files.indices) {
-                if (files[i] == entry.file && techniques[i] == entry.technique) {
-                    return i
+            if (shaderPickerOpen) {
+                for (choice in labels.indices) {
+                    add(
+                        RunnableSetting(
+                            titleString = labels[choice],
+                            descriptionString = summaries[choice],
+                            isRunnable = true
+                        ) {
+                            NativePostProcessing.append(files[choice], techniques[choice])
+                            NativePostProcessing.store()
+                            shaderPickerOpen = false
+                            settingsViewModel.setReloadListAndNotifyDataset(true)
+                        }
+                    )
                 }
             }
-            return -1
         }
-
-        override fun setInt(value: Int) {
-            NativePostProcessing.replace(index, files[value], techniques[value])
-            NativePostProcessing.persist()
-            settingsViewModel.setReloadListAndNotifyDataset(true)
-        }
-
-        override val defaultValue = 0
-        override fun getValueAsString(needsGlobal: Boolean): String = getInt().toString()
-        override fun reset() {}
-        override val isRuntimeModifiable = true
-        override val pairedSettingKey = ""
-        override val isSwitchable = false
-        override val isSaveable = true
-        override var global: Boolean
-            get() = true
-            set(_) {}
     }
 
     private fun addUniform(

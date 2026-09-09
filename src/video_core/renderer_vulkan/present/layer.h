@@ -104,6 +104,7 @@ private:
 #ifdef HAS_RESHADE
     std::optional<PostProcessChain> post_process{};
     u64 post_process_generation{};
+    bool post_process_enabled{};
     VkExtent2D post_process_extent{};
 #endif
     std::vector<u64> resource_ticks{};

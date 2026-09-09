@@ -49,7 +49,7 @@ float4 PS_Natural(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 
 technique NaturalColors <
     ui_label = "Natural Colours";
-    ui_tooltip = "Warmer and more saturated look. Ported from the PPSSPP shader.";
+    ui_tooltip = "Warms the picture and lifts saturation for a less washed out look. Ported from the PPSSPP shader.";
 >
 {
     pass

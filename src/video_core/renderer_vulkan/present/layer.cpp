@@ -235,8 +235,10 @@ void Layer::SetPostProcessPass(const Device& device) {
     };
 
     const u64 generation = VideoCore::FxChain::Instance().Snapshot().generation;
+    const bool enabled = Settings::values.post_shader_enabled.GetValue();
 
-    if (post_process_generation == generation && post_process_extent.width == render_area.width &&
+    if (post_process_generation == generation && post_process_enabled == enabled &&
+        post_process_extent.width == render_area.width &&
         post_process_extent.height == render_area.height) {
         return;
     }
@@ -246,10 +248,11 @@ void Layer::SetPostProcessPass(const Device& device) {
     }
 
     post_process_generation = generation;
+    post_process_enabled = enabled;
     post_process_extent = render_area;
     post_process.reset();
 
-    if (VideoCore::FxChain::Instance().Size() == 0) {
+    if (!enabled || VideoCore::FxChain::Instance().Size() == 0) {
         return;
     }
 

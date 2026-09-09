@@ -23,6 +23,7 @@ import com.google.android.material.timepicker.TimeFormat
 import org.yuzu.yuzu_emu.R
 import org.yuzu.yuzu_emu.SettingsNavigationDirections
 import org.yuzu.yuzu_emu.databinding.ListItemSettingBinding
+import org.yuzu.yuzu_emu.databinding.ListItemSettingCardBinding
 import org.yuzu.yuzu_emu.databinding.ListItemSettingInputBinding
 import org.yuzu.yuzu_emu.databinding.ListItemSettingSwitchBinding
 import org.yuzu.yuzu_emu.databinding.ListItemSettingsHeaderBinding
@@ -104,6 +105,10 @@ class SettingsAdapter(
 
             SettingsItem.TYPE_GPU_UNSWIZZLE -> {
                 GpuUnswizzleViewHolder(ListItemSettingBinding.inflate(inflater), this)
+            }
+
+            SettingsItem.TYPE_CARD -> {
+                CardViewHolder(ListItemSettingCardBinding.inflate(inflater), this)
             }
 
             else -> {

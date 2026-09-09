@@ -204,6 +204,14 @@ void FxChain::Clear() {
     generation.fetch_add(1, std::memory_order_relaxed);
 }
 
+void FxChain::SetEntries(std::vector<FxChainEntry> next) {
+    {
+        std::scoped_lock lock{mutex};
+        entries = std::move(next);
+    }
+    generation.fetch_add(1, std::memory_order_relaxed);
+}
+
 void FxChain::SetValue(size_t index, std::string_view uniform, const std::array<f32, 4>& value) {
     std::scoped_lock lock{mutex};
     if (index >= entries.size()) {

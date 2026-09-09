@@ -10,7 +10,9 @@
 #include "common/android/android_common.h"
 #ifdef HAS_RESHADE
 #include "video_core/post_processing/fx_chain.h"
+#include "common/settings.h"
 #include "video_core/post_processing/fx_effect.h"
+#include "video_core/post_processing/fx_preset.h"
 #endif
 
 namespace {
@@ -207,6 +209,103 @@ jstring Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_getShaderDirectory(JN
                                                                               jobject obj) {
 #ifdef HAS_RESHADE
     return Common::Android::ToJString(env, VideoCore::GetFxRootDirectory().string());
+#else
+    return Common::Android::ToJString(env, "");
+#endif
+}
+
+jstring Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_getPresetsJson(JNIEnv* env,
+                                                                          jobject obj) {
+    nlohmann::json out = nlohmann::json::array();
+#ifdef HAS_RESHADE
+    VideoCore::ReloadFxPresetCatalog();
+
+    for (const auto& preset : VideoCore::GetFxPresetCatalog()) {
+        nlohmann::json entry;
+        entry["name"] = preset.name;
+        entry["description"] = preset.description;
+        entry["bundled"] = preset.bundled;
+        out.push_back(entry);
+    }
+#endif
+    return Common::Android::ToJString(env, out.dump());
+}
+
+jstring Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_getActivePreset(JNIEnv* env,
+                                                                           jobject obj) {
+#ifdef HAS_RESHADE
+    return Common::Android::ToJString(env, VideoCore::GetActiveFxPreset());
+#else
+    return Common::Android::ToJString(env, "");
+#endif
+}
+
+jboolean Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_isPresetModified(JNIEnv* env,
+                                                                             jobject obj) {
+#ifdef HAS_RESHADE
+    return static_cast<jboolean>(VideoCore::IsActiveFxPresetModified());
+#else
+    return static_cast<jboolean>(false);
+#endif
+}
+
+jboolean Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_applyPreset(JNIEnv* env, jobject obj,
+                                                                        jstring jname) {
+#ifdef HAS_RESHADE
+    return static_cast<jboolean>(
+        VideoCore::ApplyFxPreset(Common::Android::GetJString(env, jname)));
+#else
+    return static_cast<jboolean>(false);
+#endif
+}
+
+jboolean Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_savePreset(JNIEnv* env, jobject obj,
+                                                                       jstring jname,
+                                                                       jstring jdescription) {
+#ifdef HAS_RESHADE
+    return static_cast<jboolean>(
+        VideoCore::SaveFxPreset(Common::Android::GetJString(env, jname),
+                                Common::Android::GetJString(env, jdescription)));
+#else
+    return static_cast<jboolean>(false);
+#endif
+}
+
+jboolean Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_deletePreset(JNIEnv* env, jobject obj,
+                                                                         jstring jname) {
+#ifdef HAS_RESHADE
+    return static_cast<jboolean>(
+        VideoCore::DeleteFxPreset(Common::Android::GetJString(env, jname)));
+#else
+    return static_cast<jboolean>(false);
+#endif
+}
+
+void Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_clearPreset(JNIEnv* env, jobject obj) {
+#ifdef HAS_RESHADE
+    VideoCore::SetActiveFxPreset(std::string_view());
+#endif
+}
+
+jboolean Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_isEnabled(JNIEnv* env, jobject obj) {
+#ifdef HAS_RESHADE
+    return static_cast<jboolean>(Settings::values.post_shader_enabled.GetValue());
+#else
+    return static_cast<jboolean>(false);
+#endif
+}
+
+void Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_setEnabled(JNIEnv* env, jobject obj,
+                                                                   jboolean enabled) {
+#ifdef HAS_RESHADE
+    Settings::values.post_shader_enabled.SetValue(enabled != JNI_FALSE);
+#endif
+}
+
+jstring Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_getPresetDirectory(JNIEnv* env,
+                                                                              jobject obj) {
+#ifdef HAS_RESHADE
+    return Common::Android::ToJString(env, VideoCore::GetFxPresetDirectory().string());
 #else
     return Common::Android::ToJString(env, "");
 #endif

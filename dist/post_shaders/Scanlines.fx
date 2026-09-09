@@ -55,7 +55,7 @@ float4 PS_Scanlines(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 
 technique Scanlines <
     ui_label = "Scanlines";
-    ui_tooltip = "Horizontal scanlines of a CRT display.";
+    ui_tooltip = "Darkens alternating rows of pixels to imitate the horizontal scanlines of a CRT. Cheaper than the full CRT effect when you only want the lines.";
 >
 {
     pass

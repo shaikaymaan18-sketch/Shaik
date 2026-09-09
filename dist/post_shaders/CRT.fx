@@ -63,7 +63,7 @@ float4 PS_CRT(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 
 technique CRT <
     ui_label = "CRT";
-    ui_tooltip = "Curved scanlines and the phosphor mask of a CRT television.";
+    ui_tooltip = "Curved scanlines and the phosphor mask of a CRT television, for games that were drawn with that kind of screen in mind.";
 >
 {
     pass

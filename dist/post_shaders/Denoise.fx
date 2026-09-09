@@ -72,7 +72,7 @@ float4 PS_Denoise(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 
 technique Denoise <
     ui_label = "Denoise";
-    ui_tooltip = "Edge preserving blur that clears dithering and compression noise. Ported from Anime4K.";
+    ui_tooltip = "Edge preserving blur that clears dithering and compression noise while leaving outlines sharp. Ported from Anime4K.";
 >
 {
     pass

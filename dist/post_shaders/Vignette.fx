@@ -41,7 +41,7 @@ float4 PS_Vignette(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 
 technique Vignette <
     ui_label = "Vignette";
-    ui_tooltip = "Darkens the corners of the screen.";
+    ui_tooltip = "Darkens the corners of the screen to pull the eye towards the middle, the way a camera lens falls off at its edges.";
 >
 {
     pass

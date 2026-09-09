@@ -89,7 +89,7 @@ float4 PS_CartoonSoft(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Targe
 
 technique CartoonSoft <
     ui_label = "Cartoon Soft";
-    ui_tooltip = "Ink outlines and flat colour bands, with the outline held back in the shadows.";
+    ui_tooltip = "Ink outlines and flat colour bands, with the outline held back in the shadows so dark scenes do not turn into black blobs.";
 >
 {
     pass

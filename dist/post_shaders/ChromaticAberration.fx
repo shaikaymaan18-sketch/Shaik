@@ -42,7 +42,7 @@ float4 PS_ChromaticAberration(float4 pos : SV_Position, float2 uv : TEXCOORD) : 
 
 technique ChromaticAberration <
     ui_label = "Chromatic Aberration";
-    ui_tooltip = "Splits the colour channels apart towards the edges of the screen, like a cheap lens.";
+    ui_tooltip = "Splits the colour channels apart towards the edges of the screen, the way a cheap lens fails to focus every colour on the same spot.";
 >
 {
     pass

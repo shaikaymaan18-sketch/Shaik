@@ -59,7 +59,7 @@ float4 PS_Bloom(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 
 technique Bloom <
     ui_label = "Bloom";
-    ui_tooltip = "Blooms bright areas into a soft glow.";
+    ui_tooltip = "Bleeds light out of the brightest areas into a soft halo, the way a camera does when pointed at something too bright.";
 >
 {
     pass

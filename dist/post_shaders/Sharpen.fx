@@ -32,7 +32,7 @@ float4 PS_Sharpen(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 
 technique Sharpen <
     ui_label = "Sharpen";
-    ui_tooltip = "Unsharp mask that brings back edge detail lost to scaling.";
+    ui_tooltip = "Unsharp mask that brings back edge detail lost to scaling. Most useful after upscaling a low internal resolution.";
 >
 {
     pass

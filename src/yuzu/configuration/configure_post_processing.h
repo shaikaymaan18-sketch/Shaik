@@ -5,7 +5,9 @@
 
 #include <QDialog>
 
+class QCheckBox;
 class QComboBox;
+class QLabel;
 class QVBoxLayout;
 class QWidget;
 
@@ -29,7 +31,12 @@ private:
                             const VideoCore::FxUniformDesc& uniform);
     void PopulateEffectCombo(QComboBox* combo, const VideoCore::FxChainEntry& entry) const;
     void ApplyStructuralChange();
+    void PopulatePresetCombo();
+    void RefreshPresetStatus();
 
     QVBoxLayout* slots_layout{};
     QWidget* slots_container{};
+    QComboBox* preset_combo{};
+    QLabel* preset_status{};
+    QCheckBox* enabled_box{};
 };

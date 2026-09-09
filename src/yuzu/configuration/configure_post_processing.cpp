@@ -11,6 +11,7 @@
 #include <QDialogButtonBox>
 #include <QFrame>
 #include <QGridLayout>
+#include <QInputDialog>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMenu>
@@ -20,8 +21,10 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include "common/settings.h"
 #include "video_core/post_processing/fx_chain.h"
 #include "video_core/post_processing/fx_effect.h"
+#include "video_core/post_processing/fx_preset.h"
 #include "yuzu/configuration/configure_post_processing.h"
 
 namespace {
@@ -74,6 +77,75 @@ ConfigurePostProcessing::ConfigurePostProcessing(QWidget* parent) : QDialog(pare
     description->setWordWrap(true);
     root->addWidget(description);
 
+    enabled_box = new QCheckBox(tr("Enable post-processing"), this);
+    enabled_box->setChecked(Settings::values.post_shader_enabled.GetValue());
+    connect(enabled_box, &QCheckBox::toggled, this, [](bool checked) {
+        Settings::values.post_shader_enabled.SetValue(checked);
+    });
+    root->addWidget(enabled_box);
+
+    auto* preset_row = new QHBoxLayout();
+    preset_row->addWidget(new QLabel(tr("Preset:"), this));
+
+    preset_combo = new QComboBox(this);
+    preset_row->addWidget(preset_combo, 1);
+
+    auto* apply_button = new QPushButton(tr("Apply"), this);
+    connect(apply_button, &QPushButton::clicked, this, [this]() {
+        const QString name = preset_combo->currentData().toString();
+        if (name.isEmpty()) {
+            return;
+        }
+        VideoCore::ApplyFxPreset(name.toStdString());
+        ApplyStructuralChange();
+    });
+    preset_row->addWidget(apply_button);
+
+    auto* reset_button = new QPushButton(tr("Reset Values"), this);
+    reset_button->setToolTip(tr("Return every effect to the values the preset ships with."));
+    connect(reset_button, &QPushButton::clicked, this, [this]() {
+        const std::string active = VideoCore::GetActiveFxPreset();
+        if (active.empty()) {
+            return;
+        }
+        VideoCore::ApplyFxPreset(active);
+        ApplyStructuralChange();
+    });
+    preset_row->addWidget(reset_button);
+
+    auto* save_button = new QPushButton(tr("Save As..."), this);
+    connect(save_button, &QPushButton::clicked, this, [this]() {
+        bool accepted = false;
+        const QString name =
+            QInputDialog::getText(this, tr("Save Preset"), tr("Preset name:"), QLineEdit::Normal,
+                                  QString(), &accepted);
+        if (!accepted || name.trimmed().isEmpty()) {
+            return;
+        }
+        VideoCore::SaveFxPreset(name.trimmed().toStdString(), std::string());
+        PopulatePresetCombo();
+        RefreshPresetStatus();
+    });
+    preset_row->addWidget(save_button);
+
+    auto* delete_button = new QPushButton(tr("Delete"), this);
+    connect(delete_button, &QPushButton::clicked, this, [this]() {
+        const QString name = preset_combo->currentData().toString();
+        if (name.isEmpty()) {
+            return;
+        }
+        VideoCore::DeleteFxPreset(name.toStdString());
+        PopulatePresetCombo();
+        RefreshPresetStatus();
+    });
+    preset_row->addWidget(delete_button);
+
+    root->addLayout(preset_row);
+
+    preset_status = new QLabel(this);
+    preset_status->setWordWrap(true);
+    root->addWidget(preset_status);
+
     auto* scroll = new QScrollArea(this);
     scroll->setWidgetResizable(true);
     slots_container = new QWidget(scroll);
@@ -112,8 +184,12 @@ ConfigurePostProcessing::ConfigurePostProcessing(QWidget* parent) : QDialog(pare
     root->addWidget(buttons);
 
     VideoCore::ReloadFxCatalog();
+    VideoCore::ReloadFxPresetCatalog();
+    VideoCore::FxChain::Instance().LoadFromSettings();
     VideoCore::FxChain::Instance().DropUnknownEntries();
+    PopulatePresetCombo();
     RebuildRows();
+    RefreshPresetStatus();
 }
 
 ConfigurePostProcessing::~ConfigurePostProcessing() = default;
@@ -121,6 +197,47 @@ ConfigurePostProcessing::~ConfigurePostProcessing() = default;
 void ConfigurePostProcessing::ApplyStructuralChange() {
     VideoCore::FxChain::Instance().StoreToSettings();
     RebuildRows();
+    RefreshPresetStatus();
+}
+
+void ConfigurePostProcessing::PopulatePresetCombo() {
+    const QString previous = preset_combo->currentData().toString();
+    preset_combo->clear();
+
+    for (const auto& preset : VideoCore::GetFxPresetCatalog()) {
+        const QString name = QString::fromStdString(preset.name);
+        preset_combo->addItem(name, name);
+        preset_combo->setItemData(preset_combo->count() - 1,
+                                  QString::fromStdString(preset.description), Qt::ToolTipRole);
+    }
+
+    const int restored = preset_combo->findData(previous);
+    if (restored >= 0) {
+        preset_combo->setCurrentIndex(restored);
+        return;
+    }
+
+    const int active = preset_combo->findData(QString::fromStdString(VideoCore::GetActiveFxPreset()));
+    if (active >= 0) {
+        preset_combo->setCurrentIndex(active);
+    }
+}
+
+void ConfigurePostProcessing::RefreshPresetStatus() {
+    const std::string active = VideoCore::GetActiveFxPreset();
+    if (active.empty()) {
+        preset_status->setText(tr("Custom chain. Pick a preset above and press Apply to replace it."));
+        return;
+    }
+
+    if (VideoCore::IsActiveFxPresetModified()) {
+        preset_status->setText(
+            tr("Active preset: %1 (modified). Press Reset Values to go back to how it ships.")
+                .arg(QString::fromStdString(active)));
+        return;
+    }
+
+    preset_status->setText(tr("Active preset: %1").arg(QString::fromStdString(active)));
 }
 
 void ConfigurePostProcessing::PopulateEffectCombo(QComboBox* combo,

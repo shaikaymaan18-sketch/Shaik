@@ -80,7 +80,7 @@ float4 PS_Deband(float4 pos : SV_Position, float2 uv : TEXCOORD) : SV_Target
 
 technique Deband <
     ui_label = "Deband";
-    ui_tooltip = "Smooths the visible steps in gradients such as skies, then dithers whatever survives.";
+    ui_tooltip = "Smooths the visible steps in gradients such as skies, then dithers whatever survives. Worth adding whenever large flat areas show rings.";
 >
 {
     pass

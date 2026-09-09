@@ -51,6 +51,8 @@ public:
 
     void Clear();
 
+    void SetEntries(std::vector<FxChainEntry> next);
+
     void SetValue(size_t index, std::string_view uniform, const std::array<f32, 4>& value);
 
     std::array<f32, 4> GetValue(size_t index, std::string_view uniform) const;

@@ -187,7 +187,7 @@ try
     }
 
 #ifdef HAS_RESHADE
-    VideoCore::FxChain::Instance().EnsureLoadedFromSettings();
+    VideoCore::FxChain::Instance().LoadFromSettings();
 #endif
 
     Report();
