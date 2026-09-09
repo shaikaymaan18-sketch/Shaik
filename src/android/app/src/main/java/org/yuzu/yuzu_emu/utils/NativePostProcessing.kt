@@ -106,6 +106,14 @@ object NativePostProcessing {
                 return count
             }
 
+        fun describe(position: Int): String {
+            val value = min + position * step
+            if (kind == NativePostProcessing.KIND_FLOAT) {
+                return String.format("%.3f", value)
+            }
+            return Math.round(value).toString()
+        }
+
         fun defaultAt(component: Int): Float {
             if (component < defaults.size) {
                 return defaults[component]

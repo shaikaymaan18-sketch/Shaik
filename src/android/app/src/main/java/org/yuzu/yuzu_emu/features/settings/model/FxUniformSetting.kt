@@ -65,39 +65,3 @@ class FxUniformSliderSetting(
         return currentValue().roundToInt().toString()
     }
 }
-
-class FxUniformChoiceSetting(
-    index: Int,
-    uniform: NativePostProcessing.Uniform,
-    component: Int
-) : FxUniformSetting(index, uniform, component), AbstractIntSetting {
-    override val defaultValue: Any
-        get() = uniform.defaultAt(component).roundToInt()
-
-    override fun getInt(needsGlobal: Boolean): Int = currentValue().roundToInt()
-
-    override fun setInt(value: Int) = commit(value.toFloat())
-
-    override fun getValueAsString(needsGlobal: Boolean): String = getInt().toString()
-}
-
-class FxUniformBooleanSetting(
-    index: Int,
-    uniform: NativePostProcessing.Uniform,
-    component: Int
-) : FxUniformSetting(index, uniform, component), AbstractBooleanSetting {
-    override val defaultValue: Any
-        get() = uniform.defaultAt(component) != 0f
-
-    override fun getBoolean(needsGlobal: Boolean): Boolean = currentValue() != 0f
-
-    override fun setBoolean(value: Boolean) {
-        var scalar = 0f
-        if (value) {
-            scalar = 1f
-        }
-        commit(scalar)
-    }
-
-    override fun getValueAsString(needsGlobal: Boolean): String = getBoolean().toString()
-}

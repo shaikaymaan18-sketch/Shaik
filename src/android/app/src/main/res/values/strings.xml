@@ -307,7 +307,7 @@
     <string name="post_processing_close_list">Close list</string>
     <string name="post_processing_remove_all">Remove effects</string>
     <string name="post_processing_preset_locked">Preset active. Edit it in Post-Processing Effects before starting a game.</string>
-    <string name="post_processing_preset_modified">Preset active, with your own changes.</string>
+    <string name="post_processing_preset_modified">Values changed from the original preset.</string>
     <string name="post_processing_presets">Presets</string>
     <string name="post_processing_preset_new">New preset</string>
     <string name="post_processing_preset_new_description">Saves the effects you have loaded, with their current values, as a preset you can pick later.</string>

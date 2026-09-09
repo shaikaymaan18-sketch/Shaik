@@ -254,7 +254,8 @@ bool IsActiveFxPresetModified() {
         return true;
     }
 
-    return SerializeFxChain(FxChain::Instance().Entries()) != preset->chain;
+    return SerializeFxChain(FxChain::Instance().Entries()) !=
+           SerializeFxChain(ParseFxChain(preset->chain));
 }
 
 } // namespace VideoCore

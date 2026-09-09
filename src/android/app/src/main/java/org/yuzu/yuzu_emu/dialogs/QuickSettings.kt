@@ -26,6 +26,22 @@ import org.yuzu.yuzu_emu.features.settings.model.AbstractShortSetting
 import org.yuzu.yuzu_emu.features.settings.model.AbstractIntSetting
 
 class QuickSettings(val emulationFragment: EmulationFragment) {
+    private val expandedShaders = mutableSetOf<Int>()
+
+    private fun forgetShaderSlot(index: Int) {
+        val shifted = mutableSetOf<Int>()
+        for (slot in expandedShaders) {
+            if (slot < index) {
+                shifted.add(slot)
+            }
+            if (slot > index) {
+                shifted.add(slot - 1)
+            }
+        }
+        expandedShaders.clear()
+        expandedShaders.addAll(shifted)
+    }
+
     private fun saveSettings() {
         if (emulationFragment.shouldUseCustom) {
             NativeConfig.savePerGameConfig()
@@ -351,6 +367,7 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
     }
 
     fun addShaderCard(
+        index: Int,
         title: String,
         summary: String,
         container: ViewGroup,
@@ -373,13 +390,20 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
             summaryView.text = summary
         }
 
-        var isExpanded = false
+        var isExpanded = expandedShaders.contains(index)
+        if (isExpanded) {
+            bodyView.visibility = View.VISIBLE
+            expandIcon.rotation = 180f
+        }
+
         headerView.setOnClickListener {
             isExpanded = !isExpanded
             if (isExpanded) {
+                expandedShaders.add(index)
                 bodyView.visibility = View.VISIBLE
                 expandIcon.animate().rotation(180f).setDuration(200).start()
             } else {
+                expandedShaders.remove(index)
                 bodyView.visibility = View.GONE
                 expandIcon.animate().rotation(0f).setDuration(200).start()
             }
@@ -534,7 +558,7 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
                     YuzuApplication.appContext.getString(R.string.post_processing_preset_locked)
             }
             if (NativePostProcessing.isPresetModified()) {
-                summary =
+                summary = summary + "\n" +
                     YuzuApplication.appContext.getString(R.string.post_processing_preset_modified)
             }
 
@@ -574,10 +598,11 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
                 summary = effect.description
             }
 
-            val body = addShaderCard(title, summary, container) {
+            val body = addShaderCard(index, title, summary, container) {
                 emulationFragment.editPostProcessing {
                     NativePostProcessing.remove(index)
                 }
+                forgetShaderSlot(index)
                 onStructureChanged()
             }
 
@@ -596,6 +621,7 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
                 emulationFragment.editPostProcessing {
                     NativePostProcessing.clearChain()
                 }
+                expandedShaders.clear()
                 onStructureChanged()
             }
         ) { picked ->
@@ -634,7 +660,7 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
                 container,
                 steps,
                 step,
-                { position -> describeUniform(uniform, position) },
+                { position -> uniform.describe(position) },
                 { emulationFragment.persistPostProcessing() }
             ) { position ->
                 NativePostProcessing.setValue(
@@ -645,17 +671,6 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
                 )
             }
         }
-    }
-
-    private fun describeUniform(
-        uniform: NativePostProcessing.Uniform,
-        position: Int
-    ): String {
-        val value = uniform.min + position * uniform.step
-        if (uniform.kind == NativePostProcessing.KIND_FLOAT) {
-            return String.format("%.3f", value)
-        }
-        return Math.round(value).toString()
     }
 
     fun addDivider(container: ViewGroup) {

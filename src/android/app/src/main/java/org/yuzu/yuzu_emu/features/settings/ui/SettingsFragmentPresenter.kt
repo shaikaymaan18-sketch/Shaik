@@ -19,9 +19,6 @@ import org.yuzu.yuzu_emu.features.settings.model.AbstractBooleanSetting
 import org.yuzu.yuzu_emu.features.settings.model.AbstractIntSetting
 import org.yuzu.yuzu_emu.features.settings.model.BooleanSetting
 import org.yuzu.yuzu_emu.features.settings.model.FxPresetNameSetting
-import org.yuzu.yuzu_emu.features.settings.model.FxUniformBooleanSetting
-import org.yuzu.yuzu_emu.features.settings.model.FxUniformChoiceSetting
-import org.yuzu.yuzu_emu.features.settings.model.FxUniformSliderSetting
 import org.yuzu.yuzu_emu.features.settings.model.ByteSetting
 import org.yuzu.yuzu_emu.features.settings.model.IntSetting
 import org.yuzu.yuzu_emu.features.settings.model.LongSetting
@@ -366,143 +363,63 @@ class SettingsFragmentPresenter(
 
                 var header = entry.file
                 var summary = ""
+                var uniforms = emptyList<NativePostProcessing.Uniform>()
                 if (effect != null) {
                     header = effect.label
                     if (effect.techniques.size > 1) {
                         header = effect.label + " \u00b7 " + entry.technique
                     }
                     summary = effect.description
+                    uniforms = effect.uniforms
                 }
 
                 val isOpen = expandedShaderSlots.contains(index)
 
                 add(
-                    CardSetting(
+                    FxShaderCardSetting(
                         titleString = header,
                         descriptionString = summary,
-                        expanded = isOpen
-                    ) {
-                        if (isOpen) {
-                            expandedShaderSlots.remove(index)
-                        } else {
-                            expandedShaderSlots.add(index)
-                        }
-                        settingsViewModel.setReloadListAndNotifyDataset(true)
-                    }
-                )
-
-                if (!isOpen) {
-                    continue
-                }
-
-                if (effect != null) {
-                    for (uniform in effect.uniforms) {
-                        addUniform(this, index, uniform)
-                    }
-                }
-
-                if (index > 0) {
-                    add(
-                        RunnableSetting(
-                            titleId = R.string.post_processing_move_up,
-                            isRunnable = true
-                        ) {
+                        index = index,
+                        expanded = isOpen,
+                        uniforms = uniforms,
+                        canMoveUp = index > 0,
+                        canMoveDown = index < chain.size - 1,
+                        onToggle = {
+                            if (isOpen) {
+                                expandedShaderSlots.remove(index)
+                            } else {
+                                expandedShaderSlots.add(index)
+                            }
+                            settingsViewModel.setReloadListAndNotifyDataset(true)
+                        },
+                        onRemove = {
+                            NativePostProcessing.remove(index)
+                            NativePostProcessing.store()
+                            expandedShaderSlots.clear()
+                            settingsViewModel.setReloadListAndNotifyDataset(true)
+                        },
+                        onMoveUp = {
                             NativePostProcessing.move(index, -1)
                             NativePostProcessing.store()
                             expandedShaderSlots.clear()
                             settingsViewModel.setReloadListAndNotifyDataset(true)
-                        }
-                    )
-                }
-                if (index < chain.size - 1) {
-                    add(
-                        RunnableSetting(
-                            titleId = R.string.post_processing_move_down,
-                            isRunnable = true
-                        ) {
+                        },
+                        onMoveDown = {
                             NativePostProcessing.move(index, 1)
                             NativePostProcessing.store()
                             expandedShaderSlots.clear()
                             settingsViewModel.setReloadListAndNotifyDataset(true)
+                        },
+                        onReset = {
+                            NativePostProcessing.resetValues(index)
+                            NativePostProcessing.store()
+                            settingsViewModel.setReloadListAndNotifyDataset(true)
                         }
                     )
-                }
-                add(
-                    RunnableSetting(
-                        titleId = R.string.post_processing_reset,
-                        isRunnable = true
-                    ) {
-                        NativePostProcessing.resetValues(index)
-                        NativePostProcessing.store()
-                        settingsViewModel.setReloadListAndNotifyDataset(true)
-                    }
-                )
-                add(
-                    RunnableSetting(
-                        titleId = R.string.post_processing_remove,
-                        isRunnable = true
-                    ) {
-                        NativePostProcessing.remove(index)
-                        NativePostProcessing.store()
-                        expandedShaderSlots.clear()
-                        settingsViewModel.setReloadListAndNotifyDataset(true)
-                    }
                 )
             }
         }
     }
-
-    private fun addUniform(
-        sl: ArrayList<SettingsItem>,
-        index: Int,
-        uniform: NativePostProcessing.Uniform
-    ) {
-        if (uniform.uiType == NativePostProcessing.UI_CHECKBOX ||
-            uniform.kind == NativePostProcessing.KIND_BOOL
-        ) {
-            sl.add(
-                SwitchSetting(
-                    FxUniformBooleanSetting(index, uniform, 0),
-                    titleString = uniform.label,
-                    descriptionString = uniform.tooltip
-                )
-            )
-            return
-        }
-
-        if (uniform.items.isNotEmpty() &&
-            (uniform.uiType == NativePostProcessing.UI_COMBO ||
-                uniform.uiType == NativePostProcessing.UI_RADIO)
-        ) {
-            sl.add(
-                IntSingleChoiceSetting(
-                    FxUniformChoiceSetting(index, uniform, 0),
-                    titleString = uniform.label,
-                    descriptionString = uniform.tooltip,
-                    choices = uniform.items.toTypedArray(),
-                    values = uniform.items.indices.toList().toTypedArray()
-                )
-            )
-            return
-        }
-
-        for (component in 0 until uniform.components) {
-            var title = uniform.label
-            if (uniform.components > 1) {
-                title = uniform.label + " [" + component + "]"
-            }
-            sl.add(
-                SliderSetting(
-                    FxUniformSliderSetting(index, uniform, component),
-                    titleString = title,
-                    descriptionString = uniform.tooltip,
-                    min = 0,
-                    max = uniform.steps
-                )
-            )
-        }
-    }
-
 
     private fun addConfigSettings(sl: ArrayList<SettingsItem>) {
         sl.apply {
