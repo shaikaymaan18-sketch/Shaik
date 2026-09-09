@@ -98,6 +98,17 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+
+#if defined(__APPLE__)
+    // forces the cocoa platform plugin to bypass coreanimation during frame presentations
+    // this fixes a known qt 6.11.2 bug and should be remvoed later
+    setenv("QT_MTL_NO_TRANSACTION", "1", 1);
+    // force single queue metal implicit ordering before trying to vulkan
+    // required for moltenvk 1.4.x
+    setenv("MVK_CONFIG_VK_SEMAPHORE_SUPPORT_STYLE", "0", 1);
+    setenv("MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS", "1", 1);
+#endif
+
     if (StartupChecks(argv[0], &has_broken_vulkan,
                       Settings::values.perform_vulkan_check.GetValue())) {
         return 0;
