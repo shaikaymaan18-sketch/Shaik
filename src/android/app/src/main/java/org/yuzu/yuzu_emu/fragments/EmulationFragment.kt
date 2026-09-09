@@ -94,6 +94,7 @@ import org.yuzu.yuzu_emu.utils.InputHandler
 import org.yuzu.yuzu_emu.utils.Log
 import org.yuzu.yuzu_emu.utils.NativeConfig
 import org.yuzu.yuzu_emu.utils.NativeFreedrenoConfig
+import org.yuzu.yuzu_emu.utils.NativePostProcessing
 import org.yuzu.yuzu_emu.utils.ViewUtils
 import org.yuzu.yuzu_emu.utils.ViewUtils.setVisible
 import org.yuzu.yuzu_emu.utils.collect
@@ -883,6 +884,8 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
                     if (shouldUseCustom) {
                         SettingsFile.loadCustomConfig(game!!)
                     }
+                    refreshPostProcessing()
+                    addQuickSettings()
                 }
             }
 
@@ -1085,6 +1088,34 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
                 titleView.text = it.title
             }
         }
+    }
+
+    private fun withPerGameConfig(create: Boolean, action: () -> Unit) {
+        val target = game
+        var owned = false
+        if (target != null && !NativeConfig.isPerGameConfigLoaded()) {
+            if (create || SettingsFile.getCustomSettingsFile(target).exists()) {
+                SettingsFile.loadCustomConfig(target)
+                owned = true
+            }
+        }
+        action()
+        if (owned) {
+            NativeConfig.unloadPerGameConfig()
+        }
+    }
+
+    fun refreshPostProcessing() = withPerGameConfig(false) {
+        NativePostProcessing.reload()
+    }
+
+    fun persistPostProcessing() = withPerGameConfig(true) {
+        NativePostProcessing.persist()
+    }
+
+    fun editPostProcessing(action: () -> Unit) = withPerGameConfig(true) {
+        action()
+        NativePostProcessing.persist()
     }
 
     private fun addQuickSettings() {

@@ -42,6 +42,10 @@ object NativePostProcessing {
 
     external fun store()
 
+    external fun reload()
+
+    external fun clearChain()
+
     external fun getPresetsJson(): String
 
     external fun getActivePreset(): String
@@ -63,11 +67,7 @@ object NativePostProcessing {
     external fun getPresetDirectory(): String
 
     fun persist() {
-        store()
-        NativeConfig.saveGlobalConfig()
-    }
-
-    fun persistFor(perGame: Boolean) {
+        val perGame = NativeConfig.isPerGameConfigLoaded()
         store()
         if (perGame) {
             NativeConfig.savePerGameConfig()

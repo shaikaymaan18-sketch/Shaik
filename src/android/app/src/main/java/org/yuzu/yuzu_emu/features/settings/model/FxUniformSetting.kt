@@ -39,7 +39,7 @@ abstract class FxUniformSetting(
 
     protected fun commit(value: Float) {
         NativePostProcessing.setValue(index, uniform.name, component, value)
-        NativePostProcessing.persist()
+        NativePostProcessing.store()
     }
 
     override fun reset() = commit(uniform.defaultAt(component))
@@ -92,11 +92,11 @@ class FxUniformBooleanSetting(
     override fun getBoolean(needsGlobal: Boolean): Boolean = currentValue() != 0f
 
     override fun setBoolean(value: Boolean) {
+        var scalar = 0f
         if (value) {
-            commit(1f)
-            return
+            scalar = 1f
         }
-        commit(0f)
+        commit(scalar)
     }
 
     override fun getValueAsString(needsGlobal: Boolean): String = getBoolean().toString()

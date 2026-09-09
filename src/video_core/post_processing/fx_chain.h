@@ -20,6 +20,8 @@ struct FxChainEntry {
     std::string file;
     std::string technique;
     std::map<std::string, std::array<f32, 4>> values;
+
+    bool operator==(const FxChainEntry&) const = default;
 };
 
 struct FxChainSnapshot {
@@ -30,6 +32,10 @@ struct FxChainSnapshot {
 std::vector<FxChainEntry> ParseFxChain(std::string_view value);
 
 std::string SerializeFxChain(std::span<const FxChainEntry> entries);
+
+void UseGlobalFxSettings();
+
+void UsePerGameFxSettings();
 
 class FxChain {
 public:
@@ -65,8 +71,6 @@ public:
 
     void LoadFromSettings();
 
-    void EnsureLoadedFromSettings();
-
     void StoreToSettings() const;
 
     void DropUnknownEntries();
@@ -76,7 +80,6 @@ private:
 
     mutable std::mutex mutex;
     std::vector<FxChainEntry> entries;
-    bool loaded{};
     std::atomic<u64> generation{1};
 };
 

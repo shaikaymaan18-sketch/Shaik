@@ -119,6 +119,26 @@ std::string SerializeFxChain(std::span<const FxChainEntry> entries) {
     return out;
 }
 
+void UseGlobalFxSettings() {
+    Settings::values.post_shader_chain.SetGlobal(true);
+    Settings::values.post_shader_preset.SetGlobal(true);
+    Settings::values.post_shader_enabled.SetGlobal(true);
+}
+
+void UsePerGameFxSettings() {
+    const std::string chain = Settings::values.post_shader_chain.GetValue();
+    const std::string preset = Settings::values.post_shader_preset.GetValue();
+    const bool enabled = Settings::values.post_shader_enabled.GetValue();
+
+    Settings::values.post_shader_chain.SetGlobal(false);
+    Settings::values.post_shader_preset.SetGlobal(false);
+    Settings::values.post_shader_enabled.SetGlobal(false);
+
+    Settings::values.post_shader_chain.SetValue(chain);
+    Settings::values.post_shader_preset.SetValue(preset);
+    Settings::values.post_shader_enabled.SetValue(enabled);
+}
+
 FxChain& FxChain::Instance() {
     static FxChain instance;
     return instance;
@@ -260,19 +280,11 @@ void FxChain::LoadFromSettings() {
     auto parsed = ParseFxChain(Settings::values.post_shader_chain.GetValue());
 
     std::scoped_lock lock{mutex};
-    entries = std::move(parsed);
-    loaded = true;
-    generation.fetch_add(1, std::memory_order_relaxed);
-}
-
-void FxChain::EnsureLoadedFromSettings() {
-    {
-        std::scoped_lock lock{mutex};
-        if (loaded) {
-            return;
-        }
+    if (entries == parsed) {
+        return;
     }
-    LoadFromSettings();
+    entries = std::move(parsed);
+    generation.fetch_add(1, std::memory_order_relaxed);
 }
 
 void FxChain::StoreToSettings() const {

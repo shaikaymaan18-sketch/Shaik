@@ -298,6 +298,7 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
         steps: Int,
         selectedStep: Int,
         describe: (Int) -> String,
+        onCommitted: (Int) -> Unit,
         onChanged: (Int) -> Unit
     ) {
         val inflater = LayoutInflater.from(emulationFragment.requireContext())
@@ -327,14 +328,20 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
             }
         }
 
+        var pressedValue = slider.value
+
         slider.setOnTouchListener { _, event ->
             val drawer = emulationFragment.view?.findViewById<DrawerLayout>(R.id.drawer_layout)
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     drawer?.requestDisallowInterceptTouchEvent(true)
+                    pressedValue = slider.value
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     drawer?.requestDisallowInterceptTouchEvent(false)
+                    if (slider.value != pressedValue) {
+                        onCommitted(slider.value.toInt())
+                    }
                 }
             }
             false
@@ -389,6 +396,8 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
     fun addEffectPicker(
         container: ViewGroup,
         choices: List<String>,
+        hasEffects: Boolean,
+        onRemoveAll: () -> Unit,
         onPicked: (Int) -> Unit
     ) {
         val context = emulationFragment.requireContext()
@@ -398,6 +407,10 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
         val button = itemView.findViewById<com.google.android.material.button.MaterialButton>(
             R.id.add_button
         )
+        val removeButton =
+            itemView.findViewById<com.google.android.material.button.MaterialButton>(
+                R.id.remove_all_button
+            )
         val choiceGroup = itemView.findViewById<RadioGroup>(R.id.add_choices)
 
         choices.forEachIndexed { index, name ->
@@ -413,22 +426,27 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
             choiceGroup.addView(radioButton)
         }
 
-        val closedBackground = MaterialColors.getColor(
-            button,
-            com.google.android.material.R.attr.colorSecondaryContainer
-        )
-        val closedForeground = MaterialColors.getColor(
-            button,
-            com.google.android.material.R.attr.colorOnSecondaryContainer
-        )
-        val openBackground = MaterialColors.getColor(
-            button,
+        var closedLabel = R.string.post_processing_add
+        if (hasEffects) {
+            closedLabel = R.string.post_processing_open_list
+            removeButton.visibility = View.VISIBLE
+        }
+        button.setText(closedLabel)
+
+        val removeBackground = MaterialColors.getColor(
+            removeButton,
             com.google.android.material.R.attr.colorErrorContainer
         )
-        val openForeground = MaterialColors.getColor(
-            button,
+        val removeForeground = MaterialColors.getColor(
+            removeButton,
             com.google.android.material.R.attr.colorOnErrorContainer
         )
+        removeButton.backgroundTintList = ColorStateList.valueOf(removeBackground)
+        removeButton.setTextColor(removeForeground)
+        removeButton.iconTint = ColorStateList.valueOf(removeForeground)
+        removeButton.setOnClickListener {
+            onRemoveAll()
+        }
 
         val slide = context.resources.displayMetrics.density * 24.0f
 
@@ -451,11 +469,8 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
                     }
                     .start()
 
-                button.text = context.getString(R.string.post_processing_hide_effects)
+                button.setText(R.string.post_processing_close_list)
                 button.setIconResource(R.drawable.ic_clear)
-                button.backgroundTintList = ColorStateList.valueOf(openBackground)
-                button.setTextColor(openForeground)
-                button.iconTint = ColorStateList.valueOf(openForeground)
             } else {
                 choiceGroup.animate()
                     .alpha(0.0f)
@@ -466,11 +481,8 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
                     }
                     .start()
 
-                button.text = context.getString(R.string.post_processing_add)
+                button.setText(closedLabel)
                 button.setIconResource(R.drawable.ic_add)
-                button.backgroundTintList = ColorStateList.valueOf(closedBackground)
-                button.setTextColor(closedForeground)
-                button.iconTint = ColorStateList.valueOf(closedForeground)
             }
         }
 
@@ -494,8 +506,9 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
 
         switchView.isChecked = NativePostProcessing.isEnabled()
         switchView.setOnCheckedChangeListener { _, checked ->
-            NativePostProcessing.setEnabled(checked)
-            saveSettings()
+            emulationFragment.editPostProcessing {
+                NativePostProcessing.setEnabled(checked)
+            }
         }
 
         container.addView(itemView)
@@ -510,12 +523,21 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
         val preset = NativePostProcessing.getActivePreset()
         if (preset.isNotEmpty()) {
             addDivider(container)
-            var summary =
-                YuzuApplication.appContext.getString(R.string.post_processing_preset_locked)
+
+            var summary = ""
+            val described = NativePostProcessing.presets().firstOrNull { it.name == preset }
+            if (described != null) {
+                summary = described.description
+            }
+            if (summary.isEmpty()) {
+                summary =
+                    YuzuApplication.appContext.getString(R.string.post_processing_preset_locked)
+            }
             if (NativePostProcessing.isPresetModified()) {
                 summary =
                     YuzuApplication.appContext.getString(R.string.post_processing_preset_modified)
             }
+
             addPresetBand(container, preset, summary)
             return
         }
@@ -553,8 +575,9 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
             }
 
             val body = addShaderCard(title, summary, container) {
-                NativePostProcessing.remove(index)
-                NativePostProcessing.persistFor(emulationFragment.shouldUseCustom)
+                emulationFragment.editPostProcessing {
+                    NativePostProcessing.remove(index)
+                }
                 onStructureChanged()
             }
 
@@ -565,9 +588,20 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
             }
         }
 
-        addEffectPicker(container, labels) { picked ->
-            NativePostProcessing.append(files[picked], techniques[picked])
-            NativePostProcessing.persistFor(emulationFragment.shouldUseCustom)
+        addEffectPicker(
+            container,
+            labels,
+            chain.isNotEmpty(),
+            {
+                emulationFragment.editPostProcessing {
+                    NativePostProcessing.clearChain()
+                }
+                onStructureChanged()
+            }
+        ) { picked ->
+            emulationFragment.editPostProcessing {
+                NativePostProcessing.append(files[picked], techniques[picked])
+            }
             onStructureChanged()
         }
     }
@@ -600,7 +634,8 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
                 container,
                 steps,
                 step,
-                { position -> describeUniform(uniform, position) }
+                { position -> describeUniform(uniform, position) },
+                { emulationFragment.persistPostProcessing() }
             ) { position ->
                 NativePostProcessing.setValue(
                     index,
@@ -608,7 +643,6 @@ class QuickSettings(val emulationFragment: EmulationFragment) {
                     component,
                     uniform.min + position * uniform.step
                 )
-                NativePostProcessing.persistFor(emulationFragment.shouldUseCustom)
             }
         }
     }

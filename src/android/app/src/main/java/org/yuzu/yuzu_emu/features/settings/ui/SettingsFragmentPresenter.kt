@@ -18,6 +18,7 @@ import org.yuzu.yuzu_emu.features.input.model.NpadStyleIndex
 import org.yuzu.yuzu_emu.features.settings.model.AbstractBooleanSetting
 import org.yuzu.yuzu_emu.features.settings.model.AbstractIntSetting
 import org.yuzu.yuzu_emu.features.settings.model.BooleanSetting
+import org.yuzu.yuzu_emu.features.settings.model.FxPresetNameSetting
 import org.yuzu.yuzu_emu.features.settings.model.FxUniformBooleanSetting
 import org.yuzu.yuzu_emu.features.settings.model.FxUniformChoiceSetting
 import org.yuzu.yuzu_emu.features.settings.model.FxUniformSliderSetting
@@ -53,6 +54,8 @@ class SettingsFragmentPresenter(
     private var shaderPickerOpen = false
 
     private var presetPickerOpen = false
+
+    private var postProcessingSynced = false
 
     private val context get() = YuzuApplication.appContext
 
@@ -202,6 +205,11 @@ class SettingsFragmentPresenter(
     }
 
     private fun addPostProcessingSettings(sl: ArrayList<SettingsItem>) {
+        if (!postProcessingSynced) {
+            postProcessingSynced = true
+            NativePostProcessing.reload()
+        }
+
         val usable = NativePostProcessing.catalog().filter { it.valid }
 
         sl.apply {
@@ -214,68 +222,6 @@ class SettingsFragmentPresenter(
                     ) {}
                 )
                 return@apply
-            }
-
-            val active = NativePostProcessing.getActivePreset()
-            var presetSummary = context.getString(R.string.post_processing_preset_none)
-            if (active.isNotEmpty()) {
-                presetSummary = active
-                if (NativePostProcessing.isPresetModified()) {
-                    presetSummary = context.getString(R.string.post_processing_preset_modified)
-                }
-            }
-
-            add(
-                CardSetting(
-                    titleId = R.string.post_processing_preset,
-                    descriptionString = presetSummary,
-                    expanded = presetPickerOpen
-                ) {
-                    presetPickerOpen = !presetPickerOpen
-                    settingsViewModel.setReloadListAndNotifyDataset(true)
-                }
-            )
-
-            if (presetPickerOpen) {
-                add(
-                    RunnableSetting(
-                        titleId = R.string.post_processing_preset_none,
-                        isRunnable = true
-                    ) {
-                        NativePostProcessing.clearPreset()
-                        presetPickerOpen = false
-                        settingsViewModel.setReloadListAndNotifyDataset(true)
-                    }
-                )
-                for (preset in NativePostProcessing.presets()) {
-                    add(
-                        RunnableSetting(
-                            titleString = preset.name,
-                            descriptionString = preset.description,
-                            isRunnable = true
-                        ) {
-                            NativePostProcessing.applyPreset(preset.name)
-                            NativePostProcessing.store()
-                            presetPickerOpen = false
-                            expandedShaderSlots.clear()
-                            settingsViewModel.setReloadListAndNotifyDataset(true)
-                        }
-                    )
-                }
-            }
-
-            if (active.isNotEmpty()) {
-                add(
-                    RunnableSetting(
-                        titleId = R.string.post_processing_preset_reset,
-                        isRunnable = true
-                    ) {
-                        NativePostProcessing.applyPreset(active)
-                        NativePostProcessing.store()
-                        expandedShaderSlots.clear()
-                        settingsViewModel.setReloadListAndNotifyDataset(true)
-                    }
-                )
             }
 
             val labels = mutableListOf<String>()
@@ -296,6 +242,124 @@ class SettingsFragmentPresenter(
             }
 
             val chain = NativePostProcessing.chain()
+            val active = NativePostProcessing.getActivePreset()
+
+            var addLabel = R.string.post_processing_add
+            if (chain.isNotEmpty()) {
+                addLabel = R.string.post_processing_open_list
+            }
+            if (shaderPickerOpen) {
+                addLabel = R.string.post_processing_close_list
+            }
+
+            var presetLabel = context.getString(R.string.post_processing_presets)
+            if (active.isNotEmpty()) {
+                presetLabel = active
+            }
+
+            val createPreset = StringInputSetting(
+                setting = FxPresetNameSetting { name ->
+                    NativePostProcessing.savePreset(name, "")
+                    settingsViewModel.setReloadListAndNotifyDataset(true)
+                },
+                titleId = R.string.post_processing_preset_new,
+                descriptionId = R.string.post_processing_preset_new_description,
+                validator = { it != null && it.isNotBlank() && !it.contains('=') },
+                errorId = R.string.post_processing_preset_name_invalid
+            )
+
+            add(
+                FxToolbarSetting(
+                    addLabelId = addLabel,
+                    listOpen = shaderPickerOpen,
+                    presetLabel = presetLabel,
+                    hasEffects = chain.isNotEmpty(),
+                    createPreset = createPreset,
+                    onAdd = {
+                        shaderPickerOpen = !shaderPickerOpen
+                        presetPickerOpen = false
+                        settingsViewModel.setReloadListAndNotifyDataset(true)
+                    },
+                    onPresets = {
+                        presetPickerOpen = !presetPickerOpen
+                        shaderPickerOpen = false
+                        settingsViewModel.setReloadListAndNotifyDataset(true)
+                    },
+                    onRemoveAll = {
+                        NativePostProcessing.clearChain()
+                        NativePostProcessing.clearPreset()
+                        NativePostProcessing.store()
+                        expandedShaderSlots.clear()
+                        shaderPickerOpen = false
+                        settingsViewModel.setReloadListAndNotifyDataset(true)
+                    }
+                )
+            )
+
+            if (shaderPickerOpen) {
+                for (choice in labels.indices) {
+                    add(
+                        RunnableSetting(
+                            titleString = labels[choice],
+                            descriptionString = summaries[choice],
+                            isRunnable = true
+                        ) {
+                            NativePostProcessing.append(files[choice], techniques[choice])
+                            NativePostProcessing.store()
+                            shaderPickerOpen = false
+                            settingsViewModel.setReloadListAndNotifyDataset(true)
+                        }
+                    )
+                }
+            }
+
+            if (presetPickerOpen) {
+                add(
+                    FxPresetSetting(
+                        titleString = context.getString(R.string.post_processing_preset_none),
+                        onApply = {
+                            NativePostProcessing.clearPreset()
+                            presetPickerOpen = false
+                            settingsViewModel.setReloadListAndNotifyDataset(true)
+                        }
+                    )
+                )
+                for (preset in NativePostProcessing.presets()) {
+                    add(
+                        FxPresetSetting(
+                            titleString = preset.name,
+                            descriptionString = preset.description,
+                            deletable = !preset.bundled,
+                            onApply = {
+                                NativePostProcessing.applyPreset(preset.name)
+                                NativePostProcessing.store()
+                                presetPickerOpen = false
+                                expandedShaderSlots.clear()
+                                settingsViewModel.setReloadListAndNotifyDataset(true)
+                            },
+                            onDelete = {
+                                NativePostProcessing.deletePreset(preset.name)
+                                settingsViewModel.setReloadListAndNotifyDataset(true)
+                            }
+                        )
+                    )
+                }
+            }
+
+            if (active.isNotEmpty()) {
+                add(
+                    RunnableSetting(
+                        titleId = R.string.post_processing_preset_reset,
+                        isRunnable = true
+                    ) {
+                        NativePostProcessing.applyPreset(active)
+                        NativePostProcessing.store()
+                        expandedShaderSlots.clear()
+                        settingsViewModel.setReloadListAndNotifyDataset(true)
+                    }
+                )
+            }
+
             for (index in chain.indices) {
                 val entry = chain[index]
                 val effect = usable.firstOrNull { it.file == entry.file }
@@ -384,33 +448,6 @@ class SettingsFragmentPresenter(
                         settingsViewModel.setReloadListAndNotifyDataset(true)
                     }
                 )
-            }
-
-            add(
-                CardSetting(
-                    titleId = R.string.post_processing_add,
-                    expanded = shaderPickerOpen
-                ) {
-                    shaderPickerOpen = !shaderPickerOpen
-                    settingsViewModel.setReloadListAndNotifyDataset(true)
-                }
-            )
-
-            if (shaderPickerOpen) {
-                for (choice in labels.indices) {
-                    add(
-                        RunnableSetting(
-                            titleString = labels[choice],
-                            descriptionString = summaries[choice],
-                            isRunnable = true
-                        ) {
-                            NativePostProcessing.append(files[choice], techniques[choice])
-                            NativePostProcessing.store()
-                            shaderPickerOpen = false
-                            settingsViewModel.setReloadListAndNotifyDataset(true)
-                        }
-                    )
-                }
             }
         }
     }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <array>
+#include <memory>
 #include <string>
 
 #include <jni.h>
@@ -9,15 +10,29 @@
 
 #include "common/android/android_common.h"
 #ifdef HAS_RESHADE
+#include "android_config.h"
 #include "video_core/post_processing/fx_chain.h"
 #include "common/settings.h"
 #include "video_core/post_processing/fx_effect.h"
 #include "video_core/post_processing/fx_preset.h"
+
+extern std::unique_ptr<AndroidConfig> per_game_config;
 #endif
 
 namespace {
 
 #ifdef HAS_RESHADE
+bool EditingPerGame() {
+    return per_game_config != nullptr;
+}
+
+void BeginFxEdit() {
+    if (!EditingPerGame()) {
+        return;
+    }
+    VideoCore::UsePerGameFxSettings();
+}
+
 nlohmann::json SerializeUniform(const VideoCore::FxUniformDesc& uniform) {
     nlohmann::json out;
     out["name"] = uniform.name;
@@ -201,7 +216,23 @@ void Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_setValue(JNIEnv* env, jo
 
 void Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_store(JNIEnv* env, jobject obj) {
 #ifdef HAS_RESHADE
+    BeginFxEdit();
     VideoCore::FxChain::Instance().StoreToSettings();
+#endif
+}
+
+void Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_reload(JNIEnv* env, jobject obj) {
+#ifdef HAS_RESHADE
+    if (!EditingPerGame()) {
+        VideoCore::UseGlobalFxSettings();
+    }
+    VideoCore::FxChain::Instance().LoadFromSettings();
+#endif
+}
+
+void Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_clearChain(JNIEnv* env, jobject obj) {
+#ifdef HAS_RESHADE
+    VideoCore::FxChain::Instance().Clear();
 #endif
 }
 
@@ -252,6 +283,7 @@ jboolean Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_isPresetModified(JNI
 jboolean Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_applyPreset(JNIEnv* env, jobject obj,
                                                                         jstring jname) {
 #ifdef HAS_RESHADE
+    BeginFxEdit();
     return static_cast<jboolean>(
         VideoCore::ApplyFxPreset(Common::Android::GetJString(env, jname)));
 #else
@@ -263,6 +295,7 @@ jboolean Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_savePreset(JNIEnv* e
                                                                        jstring jname,
                                                                        jstring jdescription) {
 #ifdef HAS_RESHADE
+    BeginFxEdit();
     return static_cast<jboolean>(
         VideoCore::SaveFxPreset(Common::Android::GetJString(env, jname),
                                 Common::Android::GetJString(env, jdescription)));
@@ -274,6 +307,7 @@ jboolean Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_savePreset(JNIEnv* e
 jboolean Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_deletePreset(JNIEnv* env, jobject obj,
                                                                          jstring jname) {
 #ifdef HAS_RESHADE
+    BeginFxEdit();
     return static_cast<jboolean>(
         VideoCore::DeleteFxPreset(Common::Android::GetJString(env, jname)));
 #else
@@ -283,6 +317,7 @@ jboolean Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_deletePreset(JNIEnv*
 
 void Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_clearPreset(JNIEnv* env, jobject obj) {
 #ifdef HAS_RESHADE
+    BeginFxEdit();
     VideoCore::SetActiveFxPreset(std::string_view());
 #endif
 }
@@ -298,6 +333,7 @@ jboolean Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_isEnabled(JNIEnv* en
 void Java_org_yuzu_yuzu_1emu_utils_NativePostProcessing_setEnabled(JNIEnv* env, jobject obj,
                                                                    jboolean enabled) {
 #ifdef HAS_RESHADE
+    BeginFxEdit();
     Settings::values.post_shader_enabled.SetValue(enabled != JNI_FALSE);
 #endif
 }
