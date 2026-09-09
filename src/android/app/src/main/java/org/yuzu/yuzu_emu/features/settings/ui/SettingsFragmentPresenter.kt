@@ -345,10 +345,7 @@ class SettingsFragmentPresenter(
 
             if (active.isNotEmpty()) {
                 add(
-                    RunnableSetting(
-                        titleId = R.string.post_processing_preset_reset,
-                        isRunnable = true
-                    ) {
+                    FxButtonSetting(titleId = R.string.post_processing_preset_reset) {
                         NativePostProcessing.applyPreset(active)
                         NativePostProcessing.store()
                         expandedShaderSlots.clear()
@@ -382,8 +379,6 @@ class SettingsFragmentPresenter(
                         index = index,
                         expanded = isOpen,
                         uniforms = uniforms,
-                        canMoveUp = index > 0,
-                        canMoveDown = index < chain.size - 1,
                         onToggle = {
                             if (isOpen) {
                                 expandedShaderSlots.remove(index)
@@ -394,18 +389,6 @@ class SettingsFragmentPresenter(
                         },
                         onRemove = {
                             NativePostProcessing.remove(index)
-                            NativePostProcessing.store()
-                            expandedShaderSlots.clear()
-                            settingsViewModel.setReloadListAndNotifyDataset(true)
-                        },
-                        onMoveUp = {
-                            NativePostProcessing.move(index, -1)
-                            NativePostProcessing.store()
-                            expandedShaderSlots.clear()
-                            settingsViewModel.setReloadListAndNotifyDataset(true)
-                        },
-                        onMoveDown = {
-                            NativePostProcessing.move(index, 1)
                             NativePostProcessing.store()
                             expandedShaderSlots.clear()
                             settingsViewModel.setReloadListAndNotifyDataset(true)

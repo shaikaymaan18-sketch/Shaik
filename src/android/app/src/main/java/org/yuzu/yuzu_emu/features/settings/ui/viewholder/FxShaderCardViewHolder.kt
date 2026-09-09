@@ -89,12 +89,6 @@ class FxShaderCardViewHolder(
     private fun addActions(inflater: LayoutInflater) {
         val row = ItemSettingFxActionsBinding.inflate(inflater, binding.shaderBody, false)
 
-        row.fxMoveUp.isEnabled = setting.canMoveUp
-        row.fxMoveUp.setOnClickListener { setting.onMoveUp.invoke() }
-
-        row.fxMoveDown.isEnabled = setting.canMoveDown
-        row.fxMoveDown.setOnClickListener { setting.onMoveDown.invoke() }
-
         row.fxReset.setOnClickListener { setting.onReset.invoke() }
 
         binding.shaderBody.addView(row.root)

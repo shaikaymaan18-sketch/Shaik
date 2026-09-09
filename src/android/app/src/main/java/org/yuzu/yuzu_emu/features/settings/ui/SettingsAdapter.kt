@@ -23,6 +23,7 @@ import com.google.android.material.timepicker.TimeFormat
 import org.yuzu.yuzu_emu.R
 import org.yuzu.yuzu_emu.SettingsNavigationDirections
 import org.yuzu.yuzu_emu.databinding.ListItemSettingBinding
+import org.yuzu.yuzu_emu.databinding.ListItemSettingFxButtonBinding
 import org.yuzu.yuzu_emu.databinding.ListItemSettingFxPresetBinding
 import org.yuzu.yuzu_emu.databinding.ListItemSettingFxShaderBinding
 import org.yuzu.yuzu_emu.databinding.ListItemSettingFxToolbarBinding
@@ -126,6 +127,13 @@ class SettingsAdapter(
             SettingsItem.TYPE_FX_SHADER -> {
                 FxShaderCardViewHolder(
                     ListItemSettingFxShaderBinding.inflate(inflater, parent, false),
+                    this
+                )
+            }
+
+            SettingsItem.TYPE_FX_BUTTON -> {
+                FxButtonViewHolder(
+                    ListItemSettingFxButtonBinding.inflate(inflater, parent, false),
                     this
                 )
             }

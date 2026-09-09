@@ -11,12 +11,8 @@ class FxShaderCardSetting(
     val index: Int,
     val expanded: Boolean,
     val uniforms: List<NativePostProcessing.Uniform>,
-    val canMoveUp: Boolean,
-    val canMoveDown: Boolean,
     val onToggle: () -> Unit,
     val onRemove: () -> Unit,
-    val onMoveUp: () -> Unit,
-    val onMoveDown: () -> Unit,
     val onReset: () -> Unit
 ) : SettingsItem(emptySetting, 0, titleString, 0, descriptionString) {
     override val type = TYPE_FX_SHADER
