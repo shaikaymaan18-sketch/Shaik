@@ -21,7 +21,7 @@ public:
     LsfgGenerate() = default;
     LsfgGenerate(const Device& device, const LsfgShaders& shaders, LsfgResources& resources,
                  vk::DescriptorPool& descriptor_pool, LsfgImagePair& frames, LsfgImage& motion,
-                 LsfgImage& detail1, LsfgImage& detail2, size_t slots);
+                 LsfgImage& detail1, LsfgImage& detail2);
 
     void SetTarget(const Device& device, size_t slot, u32 target, VkImageView view);
 

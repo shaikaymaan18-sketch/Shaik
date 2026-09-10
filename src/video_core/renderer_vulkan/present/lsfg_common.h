@@ -30,11 +30,7 @@ constexpr size_t LSFG_HISTORY_SLOTS = 3;
 constexpr size_t LSFG_MAX_TARGETS = 7;
 constexpr size_t LSFG_MAX_GENERATIONS = 3;
 
-[[nodiscard]] constexpr size_t LsfgSlotCountFor(size_t max_generations) {
-    return max_generations * (max_generations + 1) / 2;
-}
-
-constexpr size_t LSFG_GENERATION_SLOTS = LsfgSlotCountFor(LSFG_MAX_GENERATIONS);
+constexpr size_t LSFG_GENERATION_SLOTS = LSFG_MAX_GENERATIONS * (LSFG_MAX_GENERATIONS + 1) / 2;
 
 [[nodiscard]] constexpr size_t LsfgGenerationSlot(size_t generation_count, size_t generation) {
     return (generation_count - 1) * generation_count / 2 + generation;

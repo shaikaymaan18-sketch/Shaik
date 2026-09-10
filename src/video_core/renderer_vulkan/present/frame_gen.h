@@ -34,8 +34,7 @@ public:
     void GenerateInto(const Device& device, Frame* destination, size_t generation);
 
 private:
-    void Rebuild(const Device& device, VkExtent2D extent, VkFormat format, f32 flow_scale,
-                 size_t max_generations);
+    void Rebuild(const Device& device, VkExtent2D extent, VkFormat format, f32 flow_scale);
 
     MemoryAllocator& memory_allocator;
     Scheduler& scheduler;
@@ -49,7 +48,6 @@ private:
     VkExtent2D built_extent{};
     VkFormat built_format{VK_FORMAT_UNDEFINED};
     f32 built_flow_scale{};
-    size_t built_max_generations{};
     u64 frame_count{};
     u64 last_count{};
     size_t last_generations{};

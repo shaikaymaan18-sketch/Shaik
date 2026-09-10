@@ -130,9 +130,8 @@ void FrameGen::UpdateConfig(const VideoCore::FrameGenConfig& new_config) {
     }
 
     const bool has_toggled_lsfg = config.enabled != new_config.enabled;
-    const bool generations_changed = config.MaxGenerations() != new_config.MaxGenerations();
     const bool enabling = !config.enabled && new_config.enabled;
-    const bool must_reset_pipeline = has_toggled_lsfg || generations_changed;
+    const bool must_reset_pipeline = has_toggled_lsfg;
     const bool must_reload_shaders = enabling;
     const bool must_reset_pacer =
         has_toggled_lsfg || config.multiplier != new_config.multiplier ||
@@ -152,7 +151,6 @@ void FrameGen::UpdateConfig(const VideoCore::FrameGenConfig& new_config) {
         built_extent = {};
         built_format = VK_FORMAT_UNDEFINED;
         built_flow_scale = 0.0f;
-        built_max_generations = 0;
         frame_count = 0;
         warm_streak = 0;
         generated = false;
@@ -196,11 +194,9 @@ void FrameGen::Process(const Device& device, Frame* frame, VkFormat format,
 
     const VkExtent2D extent{.width = frame->width, .height = frame->height};
     const f32 flow_scale = ConfiguredFlowScale(config, peak_guest_extent, extent);
-    const size_t max_generations = config.MaxGenerations();
     if (!chain || built_extent.width != extent.width || built_extent.height != extent.height ||
-        built_format != format || built_flow_scale != flow_scale ||
-        built_max_generations != max_generations) {
-        Rebuild(device, extent, format, flow_scale, max_generations);
+        built_format != format || built_flow_scale != flow_scale) {
+        Rebuild(device, extent, format, flow_scale);
     }
 
     const u64 count = frame_count++;
@@ -249,18 +245,15 @@ void FrameGen::GenerateInto(const Device& device, Frame* destination, size_t gen
     });
 }
 
-void FrameGen::Rebuild(const Device& device, VkExtent2D extent, VkFormat format, f32 flow_scale,
-                       size_t max_generations) {
+void FrameGen::Rebuild(const Device& device, VkExtent2D extent, VkFormat format, f32 flow_scale) {
     scheduler.Finish();
     chain.reset();
 
     built_flow_scale = flow_scale;
 
-    chain.emplace(device, memory_allocator, *shaders, extent, format, built_flow_scale,
-                  max_generations);
+    chain.emplace(device, memory_allocator, *shaders, extent, format, built_flow_scale);
     built_extent = extent;
     built_format = format;
-    built_max_generations = max_generations;
     frame_count = 0;
     warm_streak = 0;
     generated = false;

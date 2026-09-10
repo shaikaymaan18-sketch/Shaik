@@ -27,7 +27,7 @@ constexpr size_t LSFG_DELTA_INSTANCES = 3;
 class LsfgChain {
 public:
     LsfgChain(const Device& device, MemoryAllocator& memory_allocator, const LsfgShaders& shaders,
-              VkExtent2D extent, VkFormat format, f32 flow_scale, size_t max_generations);
+              VkExtent2D extent, VkFormat format, f32 flow_scale);
 
     LsfgChain(const LsfgChain&) = delete;
     LsfgChain& operator=(const LsfgChain&) = delete;
@@ -47,7 +47,6 @@ public:
     }
 
 private:
-    size_t slots{};
     LsfgResources resources;
     vk::DescriptorPool descriptor_pool;
 
