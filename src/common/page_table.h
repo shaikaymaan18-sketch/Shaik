@@ -108,9 +108,13 @@ struct PageTable {
             Store(true, PageType::DebugMemory, block, ptr);
         }
 
+        constexpr void Mark() noexcept {
+            data_raw.fetch_or(0b1);
+        }
+
         /// Unpack a pointer from a page info raw representation
         [[nodiscard]] static uintptr_t ExtractPointer(Data raw, bool ignore_marked = false) noexcept {
-            return raw.marked && !ignore_marked ? 0
+            return raw.marked && !ignore_marked && static_cast<PageType>(raw.type) != PageType::Memory ? 0
                 // shift raw.page's fake sign bit to the actual sign bit, then sign extend
                 : ((s64)(raw.page << (64 - 44))) >> (64 - 44 - 12);
         }

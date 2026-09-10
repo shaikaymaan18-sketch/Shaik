@@ -98,7 +98,10 @@ struct Memory::Impl {
                     aligned_end - aligned_base,
                     perms, separate_heap);
             } else {
-                // Default to signal handlers/fastmem impl
+                // Default to dynarmic callbacks/signal handlers
+                for (auto b = aligned_base; b < aligned_end; b += YUZU_PAGESIZE) {
+                    current_page_table->entries.GetAndFault(b >> YUZU_PAGEBITS).Mark();
+                }
                 host_buffer->Unmap(aligned_base, aligned_end - aligned_base, separate_heap);
             }
         }
