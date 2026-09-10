@@ -20,8 +20,6 @@ struct FrameGenConfig {
     bool flow_scale_auto{true};
     u32 flow_scale{75};
     u32 queue_target{1};
-    bool fp16{true};
-    bool dump_flow{};
 
     [[nodiscard]] size_t Generations() const {
         return enabled ? std::clamp(multiplier, MIN_FRAME_GEN_MULTIPLIER,
@@ -38,6 +36,16 @@ struct FrameGenConfig {
     }
 
     bool operator==(const FrameGenConfig&) const = default;
+};
+
+struct FrameGenSupport {
+    bool null_descriptor{};
+    bool shader_float16{};
+    bool storage_image_extended_formats{};
+
+    [[nodiscard]] bool IsSupported() const {
+        return null_descriptor && shader_float16 && storage_image_extended_formats;
+    }
 };
 
 } // namespace VideoCore

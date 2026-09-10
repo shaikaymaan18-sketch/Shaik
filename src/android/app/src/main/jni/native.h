@@ -39,6 +39,8 @@ public:
                              const std::string& custom_driver_name,
                              const std::string& file_redirect_dir);
 
+    std::shared_ptr<Common::DynamicLibrary> GetVulkanLibrary() const;
+
     bool IsRunning() const;
     bool IsPaused() const;
     void PauseEmulation();

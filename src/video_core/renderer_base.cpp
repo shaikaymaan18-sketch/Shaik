@@ -30,8 +30,6 @@ void RendererBase::RefreshBaseSettings() {
         .flow_scale_auto = Settings::values.frame_gen_flow_scale_auto.GetValue(),
         .flow_scale = Settings::values.frame_gen_flow_scale.GetValue(),
         .queue_target = Settings::values.frame_gen_queue_target.GetValue(),
-        .fp16 = Settings::values.frame_gen_fp16.GetValue(),
-        .dump_flow = Settings::values.frame_gen_dump_flow.GetValue(),
     });
     UpdateCurrentFramebufferLayout();
 }

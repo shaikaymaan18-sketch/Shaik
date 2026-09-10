@@ -6,15 +6,18 @@
 #include <map>
 
 #include "common/common_types.h"
+#include "video_core/frame_gen/frame_gen_config.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
 
 namespace Vulkan {
 
 class Device;
 
+[[nodiscard]] VideoCore::FrameGenSupport LsfgDeviceSupport(const Device& device);
+
 class LsfgShaders {
 public:
-    explicit LsfgShaders(const Device& device, bool prefer_fp16);
+    explicit LsfgShaders(const Device& device);
 
     [[nodiscard]] bool IsValid() const {
         return valid;

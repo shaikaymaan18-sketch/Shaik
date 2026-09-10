@@ -27,7 +27,7 @@ constexpr u32 DISPATCH_TILE_SHIFT = 3;
 LsfgGamma::LsfgGamma(const Device& device, MemoryAllocator& memory_allocator,
                      const LsfgShaders& shaders, LsfgResources& resources,
                      vk::DescriptorPool& descriptor_pool, LsfgImageHistory& inputs_,
-                     LsfgImage& flow_input_, LsfgImage* previous_)
+                     LsfgImage& flow_input_, LsfgImage* previous_, size_t slots)
     : inputs{&inputs_}, flow_input{&flow_input_}, previous{previous_} {
     using namespace VideoCore::FrameGen::PerformanceShader;
 
@@ -64,7 +64,7 @@ LsfgGamma::LsfgGamma(const Device& device, MemoryAllocator& memory_allocator,
     out_image = LsfgImage(device, memory_allocator, extent, LSFG_MOTION_FORMAT);
 
     std::vector<VkDescriptorSetLayout> layouts;
-    for (size_t slot = 0; slot < LSFG_GENERATION_SLOTS; ++slot) {
+    for (size_t slot = 0; slot < slots; ++slot) {
         for (size_t i = 0; i < LSFG_HISTORY_SLOTS; ++i) {
             layouts.push_back(passes[0].SetLayout());
         }
@@ -81,7 +81,7 @@ LsfgGamma::LsfgGamma(const Device& device, MemoryAllocator& memory_allocator,
         resources.GetSampler(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_COMPARE_OP_ALWAYS, false);
 
     size_t next = 0;
-    for (size_t slot = 0; slot < LSFG_GENERATION_SLOTS; ++slot) {
+    for (size_t slot = 0; slot < slots; ++slot) {
         Generation& pass = generations[slot];
         const VkBuffer buffer =
             resources.GetBuffer(LsfgSlotTimestamp(slot), previous == nullptr);

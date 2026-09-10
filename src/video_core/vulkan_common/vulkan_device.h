@@ -425,9 +425,9 @@ FN_MAX_LIMIT_LIST
         return features.shader_float16_int8.shaderFloat16;
     }
 
-    /// Returns true if the device can run shaders built against the Vulkan memory model.
-    bool IsVulkanMemoryModelSupported() const {
-        return features.vulkan_memory_model.vulkanMemoryModel;
+    /// Returns true if the device supports storage images with extended formats.
+    bool IsStorageImageExtendedFormatsSupported() const {
+        return features.features.shaderStorageImageExtendedFormats;
     }
 
     /// Returns true if the device supports int8 natively.

@@ -2,15 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <algorithm>
-#include <string>
-#include <vector>
 
-#include "common/fs/file.h"
-#include "common/fs/fs.h"
-#include "common/fs/path_util.h"
 #include "common/settings.h"
 #include "video_core/renderer_vulkan/present/frame_gen.h"
-#include "video_core/renderer_vulkan/present/util.h"
 #include "video_core/renderer_vulkan/vk_present_manager.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/vulkan_common/vulkan_device.h"
@@ -19,7 +13,6 @@ namespace Vulkan {
 
 namespace {
 
-constexpr size_t COLOR_CHANNELS = 4;
 constexpr u64 LSFG_REQUIRED_FRAMES = 2;
 constexpr u32 LSFG_RECURRENCE_FRAMES = 2;
 
@@ -43,75 +36,6 @@ constexpr u32 LSFG_RECURRENCE_FRAMES = 2;
     constexpr f32 FLOW_SCALE_STEPS = 20.0f;
     const f32 stepped = std::ceil(ratio * FLOW_SCALE_STEPS) / FLOW_SCALE_STEPS;
     return std::clamp(stepped, 0.25f, 1.0f);
-}
-
-bool IsBlueFirst(VkFormat format) {
-    return format == VK_FORMAT_B8G8R8A8_UNORM || format == VK_FORMAT_B8G8R8A8_SRGB;
-}
-
-VkDeviceSize BytesPerTexel(VkFormat format) {
-    switch (format) {
-    case VK_FORMAT_R8_UNORM:
-        return 1;
-    case VK_FORMAT_R16G16B16A16_SFLOAT:
-        return 8;
-    default:
-        return COLOR_CHANNELS;
-    }
-}
-
-void WritePortablePixmap(const std::filesystem::path& path, const std::string& magic,
-                         VkExtent2D extent, std::span<const u8> pixels) {
-    Common::FS::IOFile file{path, Common::FS::FileAccessMode::Write,
-                            Common::FS::FileType::BinaryFile};
-    if (!file.IsOpen()) {
-        return;
-    }
-
-    const std::string header = magic + "\n" + std::to_string(extent.width) + " " +
-                               std::to_string(extent.height) + "\n255\n";
-    if (file.Write(header) != header.size()) {
-        return;
-    }
-
-    void(file.Write(pixels));
-    void(file.Flush());
-}
-
-void WriteGrayscalePgm(const std::filesystem::path& path, VkExtent2D extent,
-                       std::span<const u8> pixels) {
-    const size_t expected = static_cast<size_t>(extent.width) * extent.height;
-    WritePortablePixmap(path, "P5", extent, pixels.subspan(0, std::min(expected, pixels.size())));
-}
-
-void WriteRaw(const std::filesystem::path& path, std::span<const u8> pixels) {
-    Common::FS::IOFile file{path, Common::FS::FileAccessMode::Write,
-                            Common::FS::FileType::BinaryFile};
-    if (!file.IsOpen()) {
-        return;
-    }
-    void(file.Write(pixels));
-    void(file.Flush());
-}
-
-void WriteColorPpm(const std::filesystem::path& path, VkExtent2D extent,
-                   std::span<const u8> pixels, bool blue_first) {
-    const size_t pixel_count = static_cast<size_t>(extent.width) * extent.height;
-    if (pixels.size() < pixel_count * COLOR_CHANNELS) {
-        return;
-    }
-
-    std::vector<u8> rgb(pixel_count * 3);
-    for (size_t i = 0; i < pixel_count; ++i) {
-        const u8 first = pixels[i * COLOR_CHANNELS];
-        const u8 green = pixels[i * COLOR_CHANNELS + 1];
-        const u8 third = pixels[i * COLOR_CHANNELS + 2];
-        rgb[i * 3] = blue_first ? third : first;
-        rgb[i * 3 + 1] = green;
-        rgb[i * 3 + 2] = blue_first ? first : third;
-    }
-
-    WritePortablePixmap(path, "P6", extent, rgb);
 }
 
 VkImageMemoryBarrier MakeTransitionBarrier(VkImage image, VkAccessFlags src_access,
@@ -206,10 +130,10 @@ void FrameGen::UpdateConfig(const VideoCore::FrameGenConfig& new_config) {
     }
 
     const bool has_toggled_lsfg = config.enabled != new_config.enabled;
-    const bool precision_changed = config.fp16 != new_config.fp16;
+    const bool generations_changed = config.MaxGenerations() != new_config.MaxGenerations();
     const bool enabling = !config.enabled && new_config.enabled;
-    const bool must_reset_pipeline = has_toggled_lsfg || precision_changed;
-    const bool must_reload_shaders = precision_changed || enabling;
+    const bool must_reset_pipeline = has_toggled_lsfg || generations_changed;
+    const bool must_reload_shaders = enabling;
     const bool must_reset_pacer =
         has_toggled_lsfg || config.multiplier != new_config.multiplier ||
         config.target_rate != new_config.target_rate;
@@ -228,10 +152,10 @@ void FrameGen::UpdateConfig(const VideoCore::FrameGenConfig& new_config) {
         built_extent = {};
         built_format = VK_FORMAT_UNDEFINED;
         built_flow_scale = 0.0f;
+        built_max_generations = 0;
         frame_count = 0;
         warm_streak = 0;
         generated = false;
-        dumped = false;
 
         // this will pickup the dll again once toggled
         if (must_reload_shaders) {
@@ -260,7 +184,7 @@ void FrameGen::Process(const Device& device, Frame* frame, VkFormat format,
     }
 
     if (!shaders) {
-        shaders.emplace(device, config.fp16);
+        shaders.emplace(device);
         if (!shaders->IsValid()) {
             unavailable = true;
             return;
@@ -272,9 +196,11 @@ void FrameGen::Process(const Device& device, Frame* frame, VkFormat format,
 
     const VkExtent2D extent{.width = frame->width, .height = frame->height};
     const f32 flow_scale = ConfiguredFlowScale(config, peak_guest_extent, extent);
+    const size_t max_generations = config.MaxGenerations();
     if (!chain || built_extent.width != extent.width || built_extent.height != extent.height ||
-        built_format != format || built_flow_scale != flow_scale) {
-        Rebuild(device, extent, format, flow_scale);
+        built_format != format || built_flow_scale != flow_scale ||
+        built_max_generations != max_generations) {
+        Rebuild(device, extent, format, flow_scale, max_generations);
     }
 
     const u64 count = frame_count++;
@@ -293,14 +219,6 @@ void FrameGen::Process(const Device& device, Frame* frame, VkFormat format,
             chain->DispatchShared(cmdbuf, count);
         }
     });
-
-    const bool dump_requested = generated && config.dump_flow;
-    if (!dump_requested) {
-        dumped = false;
-    } else if (!dumped) {
-        DumpDebugImages(count);
-        dumped = true;
-    }
 }
 
 size_t FrameGen::WantedGenerations(size_t capacity) {
@@ -331,78 +249,21 @@ void FrameGen::GenerateInto(const Device& device, Frame* destination, size_t gen
     });
 }
 
-void FrameGen::Rebuild(const Device& device, VkExtent2D extent, VkFormat format, f32 flow_scale) {
+void FrameGen::Rebuild(const Device& device, VkExtent2D extent, VkFormat format, f32 flow_scale,
+                       size_t max_generations) {
     scheduler.Finish();
     chain.reset();
 
     built_flow_scale = flow_scale;
 
-    chain.emplace(device, memory_allocator, *shaders, extent, format, built_flow_scale);
+    chain.emplace(device, memory_allocator, *shaders, extent, format, built_flow_scale,
+                  max_generations);
     built_extent = extent;
     built_format = format;
+    built_max_generations = max_generations;
     frame_count = 0;
     warm_streak = 0;
     generated = false;
-}
-
-void FrameGen::DumpDebugImages(u64 count) {
-    const std::filesystem::path directory =
-        Common::FS::GetEdenPath(Common::FS::EdenPath::LosslessDir) / "debug";
-    if (!Common::FS::CreateDirs(directory)) {
-        return;
-    }
-
-    const auto dump = [&](const std::string& name, LsfgImage& image) {
-        const VkExtent2D extent = image.Extent();
-        const VkFormat format = image.Format();
-        const VkDeviceSize texel_size = BytesPerTexel(format);
-        const VkDeviceSize size =
-            static_cast<VkDeviceSize>(extent.width) * extent.height * texel_size;
-
-        vk::Buffer buffer = CreateWrappedBuffer(memory_allocator, size, MemoryUsage::Download);
-
-        scheduler.RequestOutsideRenderPassOperationContext();
-        scheduler.Record(
-            [handle = image.Handle(), dst = *buffer, extent](vk::CommandBuffer cmdbuf) {
-                DownloadColorImage(
-                    cmdbuf, handle, dst,
-                    VkExtent3D{.width = extent.width, .height = extent.height, .depth = 1});
-            });
-        scheduler.Finish();
-
-        buffer.Invalidate();
-        const std::span<u8> mapped = buffer.Mapped();
-
-        if (format == LSFG_FLOW_FORMAT) {
-            WriteGrayscalePgm(directory / (name + ".pgm"), extent, mapped);
-        } else if (texel_size == COLOR_CHANNELS) {
-            WriteColorPpm(directory / (name + ".ppm"), extent, mapped, IsBlueFirst(format));
-        } else {
-            WriteRaw(directory / (name + "_" + std::to_string(extent.width) + "x" +
-                                  std::to_string(extent.height) + ".f16"),
-                     mapped.subspan(0, std::min<size_t>(size, mapped.size())));
-        }
-    };
-
-    dump("in0", chain->Input(0));
-    dump("in1", chain->Input(1));
-
-    for (size_t level = 0; level < LSFG_MIP_LEVELS; ++level) {
-        dump("flow_mip" + std::to_string(level), chain->FlowLevel(level));
-    }
-    for (size_t index = 0; index < 2; ++index) {
-        dump("alpha0_" + std::to_string(index), chain->AlphaOutput(0, count, index));
-        dump("alpha6_" + std::to_string(index), chain->AlphaOutput(LSFG_MIP_LEVELS - 1, count,
-                                                                  index));
-    }
-    for (size_t level = 0; level < LSFG_BETA_OUTPUTS; ++level) {
-        dump("beta_" + std::to_string(level), chain->BetaOutput(level));
-    }
-
-    dump("gamma0", chain->GammaOutput(0));
-    dump("gamma6", chain->GammaOutput(LSFG_MIP_LEVELS - 1));
-    dump("delta2_out1", chain->DeltaOutput1(LSFG_DELTA_INSTANCES - 1));
-    dump("delta2_out2", chain->DeltaOutput2(LSFG_DELTA_INSTANCES - 1));
 }
 
 } // namespace Vulkan

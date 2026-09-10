@@ -22,11 +22,12 @@ constexpr size_t FIRST_DELTA_LEVEL = 4;
 
 LsfgChain::LsfgChain(const Device& device, MemoryAllocator& memory_allocator,
                      const LsfgShaders& shaders, VkExtent2D extent, VkFormat format,
-                     f32 flow_scale)
-    : resources{device, memory_allocator, flow_scale},
+                     f32 flow_scale, size_t max_generations)
+    : slots{std::clamp(LsfgSlotCountFor(max_generations), size_t{1}, LSFG_GENERATION_SLOTS)},
+      resources{device, memory_allocator, flow_scale},
       descriptor_pool{CreateLsfgDescriptorPool(
           device, FIXED_DESCRIPTOR_SETS +
-                      DESCRIPTOR_SETS_PER_SLOT * static_cast<u32>(LSFG_GENERATION_SLOTS))} {
+                      DESCRIPTOR_SETS_PER_SLOT * static_cast<u32>(slots))} {
     for (auto& image : frames) {
         image = LsfgImage(device, memory_allocator, extent, format);
     }
@@ -48,7 +49,7 @@ LsfgChain::LsfgChain(const Device& device, MemoryAllocator& memory_allocator,
         gamma[i] = LsfgGamma(device, memory_allocator, shaders, resources, descriptor_pool,
                              alpha[level].Outputs(),
                              beta.Output(std::min(level, LSFG_BETA_OUTPUTS - 1)),
-                             i == 0 ? nullptr : &gamma[i - 1].Output());
+                             i == 0 ? nullptr : &gamma[i - 1].Output(), slots);
 
         if (i < FIRST_DELTA_LEVEL) {
             continue;
@@ -59,13 +60,13 @@ LsfgChain::LsfgChain(const Device& device, MemoryAllocator& memory_allocator,
             device, memory_allocator, shaders, resources, descriptor_pool, alpha[level].Outputs(),
             beta.Output(level), i == FIRST_DELTA_LEVEL ? nullptr : &gamma[i - 1].Output(),
             i == FIRST_DELTA_LEVEL ? nullptr : &delta[index - 1].Output1(),
-            i == FIRST_DELTA_LEVEL ? nullptr : &delta[index - 1].Output2());
+            i == FIRST_DELTA_LEVEL ? nullptr : &delta[index - 1].Output2(), slots);
     }
 
     generate = LsfgGenerate(device, shaders, resources, descriptor_pool, frames,
                             gamma[LSFG_MIP_LEVELS - 1].Output(),
                             delta[LSFG_DELTA_INSTANCES - 1].Output1(),
-                            delta[LSFG_DELTA_INSTANCES - 1].Output2());
+                            delta[LSFG_DELTA_INSTANCES - 1].Output2(), slots);
 }
 
 void LsfgChain::DispatchShared(vk::CommandBuffer cmdbuf, u64 frame_count) {

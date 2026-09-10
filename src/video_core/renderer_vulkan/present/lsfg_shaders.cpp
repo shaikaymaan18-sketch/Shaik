@@ -8,16 +8,21 @@
 
 namespace Vulkan {
 
-LsfgShaders::LsfgShaders(const Device& device, bool prefer_fp16) {
-    if (!device.IsVulkanMemoryModelSupported() || !device.HasNullDescriptor()) {
+VideoCore::FrameGenSupport LsfgDeviceSupport(const Device& device) {
+    return VideoCore::FrameGenSupport{
+        .null_descriptor = device.HasNullDescriptor(),
+        .shader_float16 = device.IsFloat16Supported(),
+        .storage_image_extended_formats = device.IsStorageImageExtendedFormatsSupported(),
+    };
+}
+
+LsfgShaders::LsfgShaders(const Device& device) {
+    if (!LsfgDeviceSupport(device).IsSupported()) {
         return;
     }
 
-    const bool allow_fp16 = device.IsFloat16Supported();
-
     VideoCore::FrameGen::ShaderModules code;
-    if (VideoCore::FrameGen::LoadShaderModules(code, allow_fp16, allow_fp16 && prefer_fp16) !=
-        VideoCore::FrameGen::LosslessStatus::Ok) {
+    if (VideoCore::FrameGen::LoadShaderModules(code) != VideoCore::FrameGen::LosslessStatus::Ok) {
         return;
     }
 

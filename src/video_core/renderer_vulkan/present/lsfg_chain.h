@@ -27,7 +27,7 @@ constexpr size_t LSFG_DELTA_INSTANCES = 3;
 class LsfgChain {
 public:
     LsfgChain(const Device& device, MemoryAllocator& memory_allocator, const LsfgShaders& shaders,
-              VkExtent2D extent, VkFormat format, f32 flow_scale);
+              VkExtent2D extent, VkFormat format, f32 flow_scale, size_t max_generations);
 
     LsfgChain(const LsfgChain&) = delete;
     LsfgChain& operator=(const LsfgChain&) = delete;
@@ -46,31 +46,8 @@ public:
         return frames[frame_count % frames.size()];
     }
 
-    [[nodiscard]] LsfgImage& FlowLevel(size_t level) {
-        return mipmaps.Output(level);
-    }
-
-    [[nodiscard]] LsfgImage& AlphaOutput(size_t level, u64 frame_count, size_t index) {
-        return alpha[level].Outputs()[frame_count % LSFG_HISTORY_SLOTS][index];
-    }
-
-    [[nodiscard]] LsfgImage& BetaOutput(size_t level) {
-        return beta.Output(level);
-    }
-
-    [[nodiscard]] LsfgImage& GammaOutput(size_t index) {
-        return gamma[index].Output();
-    }
-
-    [[nodiscard]] LsfgImage& DeltaOutput1(size_t index) {
-        return delta[index].Output1();
-    }
-
-    [[nodiscard]] LsfgImage& DeltaOutput2(size_t index) {
-        return delta[index].Output2();
-    }
-
 private:
+    size_t slots{};
     LsfgResources resources;
     vk::DescriptorPool descriptor_pool;
 

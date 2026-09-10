@@ -93,6 +93,9 @@ extern "C" {
 #include "input_common/drivers/virtual_amiibo.h"
 #include "jni/native.h"
 #include "video_core/frame_gen/lossless_dll.h"
+#ifdef HAS_LSFG
+#include "video_core/renderer_vulkan/present/lsfg_shaders.h"
+#endif
 #include "video_core/renderer_base.h"
 #include "video_core/renderer_vulkan/renderer_vulkan.h"
 #include "video_core/capture.h"
@@ -189,6 +192,10 @@ void EmulationSession::InitializeGpuDriver(const std::string& hook_lib_dir,
 
     m_vulkan_library = std::make_shared<Common::DynamicLibrary>(handle);
 #endif
+}
+
+std::shared_ptr<Common::DynamicLibrary> EmulationSession::GetVulkanLibrary() const {
+    return m_vulkan_library;
 }
 
 bool EmulationSession::IsRunning() const {
@@ -1168,32 +1175,24 @@ VkPhysicalDeviceProperties GetVulkanDeviceProperties() {
     return physical_device.GetProperties();
 }
 
-bool GetVulkanMemoryModelSupport() {
-    Common::DynamicLibrary library;
-    if (!library.Open("libvulkan.so")) {
-        return false;
+bool GetFrameGenerationSupport() {
+#ifdef HAS_LSFG
+    std::shared_ptr<Common::DynamicLibrary> library =
+        EmulationSession::GetInstance().GetVulkanLibrary();
+    if (!library || !library->IsOpen()) {
+        library = std::make_shared<Common::DynamicLibrary>();
+        if (!library->Open("libvulkan.so")) {
+            return false;
+        }
     }
 
     Vulkan::vk::InstanceDispatch dld;
-    const auto instance = Vulkan::CreateInstance(library, dld, VK_API_VERSION_1_1);
-    const auto physical_devices = instance.EnumeratePhysicalDevices();
-    if (physical_devices.empty()) {
-        return false;
-    }
-
-    const Vulkan::vk::PhysicalDevice physical_device(physical_devices[0], dld);
-
-    VkPhysicalDeviceVulkanMemoryModelFeatures memory_model{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES,
-        .pNext = nullptr,
-    };
-    VkPhysicalDeviceFeatures2 features{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .pNext = &memory_model,
-    };
-    physical_device.GetFeatures2(features);
-
-    return memory_model.vulkanMemoryModel == VK_TRUE;
+    const auto instance = Vulkan::CreateInstance(*library, dld, VK_API_VERSION_1_1);
+    const Vulkan::Device device = Vulkan::CreateDevice(instance, dld, VK_NULL_HANDLE);
+    return Vulkan::LsfgDeviceSupport(device).IsSupported();
+#else
+    return false;
+#endif
 }
 } // namespace
 
@@ -1272,7 +1271,7 @@ jstring Java_org_yuzu_yuzu_1emu_NativeLibrary_getVulkanApiVersion(JNIEnv* env, j
 
 jboolean Java_org_yuzu_yuzu_1emu_NativeLibrary_supportsFrameGeneration(JNIEnv* env, jobject jobj) {
     try {
-        return static_cast<jboolean>(GetVulkanMemoryModelSupport());
+        return static_cast<jboolean>(GetFrameGenerationSupport());
     } catch (...) {
         return static_cast<jboolean>(false);
     }

@@ -49,7 +49,7 @@ VkImageMemoryBarrier MakeTargetBarrier(VkImage image, VkAccessFlags src_access,
 LsfgGenerate::LsfgGenerate(const Device& device, const LsfgShaders& shaders,
                            LsfgResources& resources, vk::DescriptorPool& descriptor_pool,
                            LsfgImagePair& frames_, LsfgImage& motion_, LsfgImage& detail1_,
-                           LsfgImage& detail2_)
+                           LsfgImage& detail2_, size_t slots)
     : frames{&frames_}, motion{&motion_}, detail1{&detail1_}, detail2{&detail2_} {
     using namespace VideoCore::FrameGen::PerformanceShader;
 
@@ -63,12 +63,12 @@ LsfgGenerate::LsfgGenerate(const Device& device, const LsfgShaders& shaders,
     edge_sampler =
         resources.GetSampler(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_COMPARE_OP_ALWAYS, false);
 
-    const std::vector<VkDescriptorSetLayout> layouts(
-        LSFG_GENERATION_SLOTS * LSFG_MAX_TARGETS * 2, pass.SetLayout());
+    const std::vector<VkDescriptorSetLayout> layouts(slots * LSFG_MAX_TARGETS * 2,
+                                                     pass.SetLayout());
     owned_sets = CreateWrappedDescriptorSets(descriptor_pool, layouts);
 
     size_t next = 0;
-    for (size_t slot = 0; slot < LSFG_GENERATION_SLOTS; ++slot) {
+    for (size_t slot = 0; slot < slots; ++slot) {
         Generation& target = generations[slot];
         target.buffer = resources.GetBuffer(LsfgSlotTimestamp(slot));
 

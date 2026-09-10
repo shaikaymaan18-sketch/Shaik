@@ -114,7 +114,6 @@ class SettingsFragmentPresenter(
             ) {
                 add(IntSetting.RENDERER_FRAME_GEN_FLOW_SCALE.key)
             }
-            add(BooleanSetting.RENDERER_FRAME_GEN_FP16.key)
         }
     }
 
@@ -1339,7 +1338,6 @@ class SettingsFragmentPresenter(
                 add(BooleanSetting.DUMP_GUEST_SHADERS.key)
                 add(BooleanSetting.GPU_LOG_SHADER_DUMPS.key)
                 add(BooleanSetting.DUMP_MACROS.key)
-                add(BooleanSetting.RENDERER_FRAME_GEN_DUMP_FLOW.key)
                 add(BooleanSetting.GPU_LOG_MEMORY_TRACKING.key)
                 add(BooleanSetting.GPU_LOG_DRIVER_DEBUG.key)
                 add(IntSetting.GPU_LOG_RING_BUFFER_SIZE.key)
