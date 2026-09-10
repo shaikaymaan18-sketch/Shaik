@@ -63,7 +63,7 @@ struct PageTable {
                 , block(static_cast<u64>(block_)         & ((1ULL << 9) - 1))
                 , page((page_ >> 12)                     & ((1ULL << 45) - 1))
                 , block2((static_cast<u64>(block_) >> 9) & ((1ULL << 7) - 1)) {}
-            u64 marked : 1;
+            u64 marked : 1;  // if true, JIT will not access this memory and fallback to callbacks
             u64 type   : 2;
             u64 block  : 9;
             u64 page   : 45; // 44 bits of actual data (64 - page offset (12) - reserved (8)) + a sign bit
@@ -101,6 +101,8 @@ struct PageTable {
         }
 
         constexpr void MarkRasterizerCached() noexcept {
+            // Data.marked = true;
+            // Data.type = PageType::RasterizerCached;
             data_raw.fetch_or(0b111);
         }
 
@@ -109,6 +111,7 @@ struct PageTable {
         }
 
         constexpr void Mark() noexcept {
+            // Data.marked = true;
             data_raw.fetch_or(0b1);
         }
 
