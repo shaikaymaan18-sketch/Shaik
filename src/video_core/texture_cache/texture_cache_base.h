@@ -156,32 +156,30 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
     struct PendingUnswizzle {
         VideoCommon::ImageInfo info;
         AsyncBuffer staging_buffer;
-        bool owns_staging_buffer = true;
-        ImageId image_id{};
-
-        size_t total_size = 0;
-        size_t current_offset = 0;
-        u32 last_submitted_slice = 0;
-        size_t bytes_per_slice = 0;
-        size_t current_batch_start_byte = 0;
-        u64 swizzled_slice_size = 0;
-
         std::vector<std::pair<GPUVAddr, size_t>> sparse_segments;
         std::vector<u8> slice_has_data;
-        size_t segment_scan_cursor = 0;
-        u32 active_z_start = 0;
-        u32 active_z_end = 0;
-
         boost::container::small_vector<SwizzleParameters, 16> upload_swizzles;
         std::optional<size_t> cpu_chunk_slot;
 
+        size_t total_size = 0;
+        size_t current_offset = 0;
+        size_t bytes_per_slice = 0;
+        size_t current_batch_start_byte = 0;
+        u64 swizzled_slice_size = 0;
+        size_t segment_scan_cursor = 0;
+
         Extent3D cpu_num_tiles{};
         Extent3D cpu_block{};
+        ImageId image_id{};
 
+        u32 last_submitted_slice = 0;
+        u32 active_z_start = 0;
+        u32 active_z_end = 0;
         u32 swizzle_block_depth = 0;
         u32 cpu_stride_alignment = 0;
         u32 bytes_per_block = 0;
 
+        bool owns_staging_buffer = true;
         bool initialized = false;
         bool is_sparse = false;
         bool is_cpu = false;
@@ -470,10 +468,6 @@ private:
 
     void QueueAsyncDecode(Image& image, ImageId image_id);
     void TickAsyncDecode();
-
-    void EnforceSamplerBudget();
-    void TrimInactiveSamplers(size_t budget);
-    std::optional<size_t> QuerySamplerBudget() const;
 
     void QueueAsyncUnswizzle(Image& image, ImageId image_id);
     void ProcessSparseTexture(Image &image, ImageId image_id);

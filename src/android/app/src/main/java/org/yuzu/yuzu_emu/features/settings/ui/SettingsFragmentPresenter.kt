@@ -562,7 +562,8 @@ class SettingsFragmentPresenter(
             add(IntSetting.ANDROID_PIPELINE_WORKERS.key)
             add(BooleanSetting.RENDERER_ASYNCHRONOUS_GPU_EMULATION.key)
             add(BooleanSetting.RENDERER_ASYNC_PRESENTATION.key)
-            add(SettingsItem.GPU_UNSWIZZLE_COMBINED)
+            add(IntSetting.GPU_UNSWIZZLE_CHUNK_SIZE.key)
+            add(IntSetting.ASYNC_UNSWIZZLE_MODE.key)
 
             add(HeaderSetting(R.string.extensions))
 

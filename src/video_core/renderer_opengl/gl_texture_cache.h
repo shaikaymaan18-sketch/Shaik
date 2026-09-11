@@ -104,10 +104,6 @@ public:
         return true;
     }
 
-    bool CanAccelerateUnswizzle() const noexcept {
-        return false;
-    }
-
     void CopyImage(Image& dst, Image& src, std::span<const VideoCommon::ImageCopy> copies);
 
     void CopyImageMSAA(Image& dst, Image& src, std::span<const VideoCommon::ImageCopy> copies);
