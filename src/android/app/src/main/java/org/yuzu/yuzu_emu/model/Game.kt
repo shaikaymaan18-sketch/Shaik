@@ -37,7 +37,7 @@ class Game(
 
     val settingsName: String
         get() {
-            val programIdLong = programId.toLong()
+            val programIdLong = programId.toLongOrNull() ?: 0L
             return if (programIdLong == 0L) {
                 FileUtil.getFilename(Uri.parse(path))
             } else {
@@ -47,7 +47,7 @@ class Game(
 
     val programIdHex: String
         get() {
-            val programIdLong = programId.toLong()
+            val programIdLong = programId.toLongOrNull() ?: 0L
             return if (programIdLong == 0L) {
                 "0"
             } else {
