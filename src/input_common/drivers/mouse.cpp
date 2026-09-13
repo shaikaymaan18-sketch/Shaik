@@ -164,6 +164,8 @@ void Mouse::Move(int x, int y, int center_x, int center_y) {
 void Mouse::NotifyChanged() {
     auto const timestamp = Common::SteadyClock::Now();
     if (button_pressed || has_moved) {
+        UpdateStickInput(timestamp);
+        UpdateMotionInput(timestamp);
         has_moved = false;
     } else {
         // neutral due to no movement or press
@@ -183,8 +185,6 @@ void Mouse::NotifyChanged() {
             .delta_timestamp = u64(std::chrono::duration_cast<std::chrono::microseconds>(timestamp - last_notify_timestamp).count()),
         });
     }
-    UpdateStickInput(timestamp);
-    UpdateMotionInput(timestamp);
     last_notify_timestamp = timestamp;
 }
 
