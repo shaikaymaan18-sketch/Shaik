@@ -1143,7 +1143,7 @@ void TextureCache<P>::UploadImageContents(Image& image, StagingBuffer& staging) 
         gpu_memory->ReadBlock(gpu_addr, mapped_span.data(), mapped_span.size_bytes(),
                               VideoCommon::CacheType::NoTextureCache);
         const auto uploads = FullUploadSwizzles(image.info);
-        runtime.AccelerateImageUpload(image, staging, FixSmallVectorADL(uploads), 0, 0, 0);
+        runtime.AccelerateImageUpload(image, staging, FixSmallVectorADL(uploads), 0, 0, 0, {}, false);
         return;
     }
 
@@ -1384,6 +1384,13 @@ void TextureCache<P>::EvictOldestUnswizzleTask() {
     Image& image = slot_images[task_image_id];
     CancelPendingUnswizzle(task_image_id);
     image.flags &= ~ImageFlagBits::IsDecoding;
+
+    if (False(image.flags & ImageFlagBits::CpuModified)) {
+        image.flags |= ImageFlagBits::CpuModified;
+        if (True(image.flags & ImageFlagBits::Tracked)) {
+            UntrackImage(image, task_image_id);
+        }
+    }
 }
 
 template <class P>
@@ -1402,12 +1409,7 @@ void TextureCache<P>::ProcessSparseTexture(Image& image, ImageId image_id) {
     };
 
     while (True(image.flags & ImageFlagBits::IsDecoding)) {
-        if (!local_task.owns_staging_buffer && unswizzle_shared_staging_pending_gpu_read) {
-            runtime.Finish();
-            unswizzle_shared_staging_pending_gpu_read = false;
-        }
-
-        TickAsyncUnswizzleGpu(local_task, image, false);
+        TickAsyncUnswizzleGpu(local_task, image);
     }
 }
 
@@ -1452,21 +1454,14 @@ void TextureCache<P>::TickAsyncUnswizzle() {
         if (task.is_cpu) {
             TickAsyncUnswizzleCpu(task, image);
         } else {
-            const bool force_owned_staging = async_unswizzle_round_robin;
-            if (!force_owned_staging && !task.owns_staging_buffer &&
-                unswizzle_shared_staging_pending_gpu_read) {
-                runtime.Finish();
-                unswizzle_shared_staging_pending_gpu_read = false;
-            }
-            TickAsyncUnswizzleGpu(task, image, force_owned_staging);
+            TickAsyncUnswizzleGpu(task, image);
         }
 
-        if (async_unswizzle_round_robin && !unswizzle_queue.empty() &&
-            unswizzle_queue.front().image_id == task_image_id) {
+        if (!unswizzle_queue.empty() && unswizzle_queue.front().image_id == task_image_id) {
             std::rotate(unswizzle_queue.begin(), unswizzle_queue.begin() + 1,
                         unswizzle_queue.end());
         }
-    } while (async_unswizzle_round_robin && !unswizzle_queue.empty() &&
+    } while (!unswizzle_queue.empty() &&
              Common::SteadyClock::Now() < frame_deadline);
 }
 
@@ -1621,8 +1616,7 @@ void TextureCache<P>::ReadSparseCoalesced(PendingUnswizzle& task, Image& image, 
 }
 
 template <class P>
-void TextureCache<P>::TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image,
-                                             bool force_owned_staging) {
+void TextureCache<P>::TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image) {
     if (!task.initialized) {
         task.total_size = MapSizeBytes(image);
         task.bytes_per_block = BytesPerBlock(task.info.format);
@@ -1670,36 +1664,9 @@ void TextureCache<P>::TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image
         }
 
         const size_t needed = (std::max)(max_batch_size, size_t{1});
-        {
-            if (force_owned_staging || needed > UnswizzleSharedStagingCap) {
-                task.staging_buffer = runtime.UploadStagingBuffer(needed, true);
-                task.owns_staging_buffer = true;
-            } else {
-                if (unswizzle_shared_staging_pending_gpu_read) {
-                    runtime.Finish();
-                    unswizzle_shared_staging_pending_gpu_read = false;
-                }
+        task.staging_buffer = runtime.UploadStagingBuffer(needed, true);
 
-                if (!unswizzle_shared_staging.has_value() ||
-                    unswizzle_shared_staging_capacity < needed) {
-                    if (unswizzle_shared_staging.has_value()) {
-                        runtime.FreeDeferredStagingBuffer(*unswizzle_shared_staging);
-                    }
-                    const size_t grown = (std::min)(
-                        UnswizzleSharedStagingCap,
-                        (std::max)(needed, unswizzle_shared_staging_capacity +
-                                                unswizzle_shared_staging_capacity / 4));
-                    unswizzle_shared_staging = runtime.UploadStagingBuffer(grown, true);
-                    unswizzle_shared_staging_capacity = grown;
-                    }
-                task.staging_buffer = *unswizzle_shared_staging;
-                task.staging_buffer.mapped_span =
-                    task.staging_buffer.mapped_span.subspan(0, needed);
-                task.owns_staging_buffer = false;
-            }
-        }
-
-        task.upload_swizzles = FullUploadSwizzles(task.info);
+        task.upload_swizzles = FixSmallVectorADL(FullUploadSwizzles(task.info));
         task.initialized = true;
     }
 
@@ -1757,16 +1724,14 @@ void TextureCache<P>::TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image
         const u32 z_count = z_want - z_start;
         const u32 z_src   = z_start;
         const u32 z_image = z_src; // + 0 for full tasks
-
-        if (!task.owns_staging_buffer) {
-            unswizzle_shared_staging_pending_gpu_read = true;
-        }
+        const bool image_already_uploaded = task.already_uploaded;
 
         runtime.AccelerateImageUpload(image, task.staging_buffer,
-                                      FixSmallVectorADL(task.upload_swizzles),
+                                      task.upload_swizzles,
                                       z_src, z_image, z_count,
                                       sparse_hint,
-                                      false);
+                                      image_already_uploaded);
+        task.already_uploaded = true;
 
         task.last_submitted_slice = z_want;
         task.current_batch_start_byte = current_group_end_byte;
@@ -1777,9 +1742,7 @@ void TextureCache<P>::TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image
                                (is_final_batch && task.last_submitted_slice >= task.active_z_end);
 
     if (is_final_batch && all_submitted) {
-        if (task.owns_staging_buffer) {
-            runtime.FreeDeferredStagingBuffer(task.staging_buffer);
-        }
+        runtime.FreeDeferredStagingBuffer(task.staging_buffer);
         runtime.ReleaseSparseUnswizzleBuffer(image);
         image.flags &= ~ImageFlagBits::IsDecoding;
 
@@ -1854,32 +1817,8 @@ void TextureCache<P>::TickAsyncUnswizzleCpu(PendingUnswizzle& task, Image& image
             task.last_submitted_slice = task.active_z_start;
         }
 
-        // Possible memory leak here but if UnswizzleSharedStagingCap does its job we should be okay
         const size_t needed = (std::max)(max_batch_size, size_t{1});
-        const bool force_owned_staging = async_unswizzle_round_robin;
-        {
-            if (force_owned_staging || needed > UnswizzleSharedStagingCap) {
-                task.staging_buffer = runtime.UploadStagingBuffer(needed, true);
-                task.owns_staging_buffer = true;
-            } else {
-                if (!unswizzle_shared_staging.has_value() ||
-                    unswizzle_shared_staging_capacity < needed) {
-                    if (unswizzle_shared_staging.has_value()) {
-                        runtime.FreeDeferredStagingBuffer(*unswizzle_shared_staging);
-                    }
-                    const size_t grown = (std::min)(
-                        UnswizzleSharedStagingCap,
-                        (std::max)(needed, unswizzle_shared_staging_capacity +
-                                                unswizzle_shared_staging_capacity / 4));
-                    unswizzle_shared_staging = runtime.UploadStagingBuffer(grown, true);
-                    unswizzle_shared_staging_capacity = grown;
-                }
-                task.staging_buffer = *unswizzle_shared_staging;
-                task.staging_buffer.mapped_span =
-                    task.staging_buffer.mapped_span.subspan(0, needed);
-                task.owns_staging_buffer = false;
-            }
-        }
+        task.staging_buffer = runtime.UploadStagingBuffer(needed, true);
 
         task.initialized = true;
     }
@@ -2104,9 +2043,7 @@ void TextureCache<P>::TickAsyncUnswizzleCpu(PendingUnswizzle& task, Image& image
     const bool all_submitted = slices_submitted >= effective_end;
 
     if (is_final_batch && all_submitted && !task.cpu_job_in_flight) {
-        if (task.owns_staging_buffer) {
-            runtime.FreeDeferredStagingBuffer(task.staging_buffer);
-        }
+        runtime.FreeDeferredStagingBuffer(task.staging_buffer);
         ReleaseCpuChunk(task);
         image.flags &= ~ImageFlagBits::IsDecoding;
         unswizzle_queue.erase(unswizzle_queue.begin());
@@ -2983,9 +2920,7 @@ void TextureCache<P>::CancelPendingUnswizzle(ImageId image_id) {
     }
     for (auto& task : unswizzle_queue) {
         if (task.image_id == image_id && task.initialized) {
-            if (task.owns_staging_buffer) {
-                runtime.FreeDeferredStagingBuffer(task.staging_buffer);
-            }
+            runtime.FreeDeferredStagingBuffer(task.staging_buffer);
             ReleaseCpuChunk(task);
         }
     }

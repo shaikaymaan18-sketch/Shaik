@@ -158,7 +158,7 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
         AsyncBuffer staging_buffer;
         std::vector<std::pair<GPUVAddr, size_t>> sparse_segments;
         std::vector<u8> slice_has_data;
-        boost::container::small_vector<SwizzleParameters, 16> upload_swizzles;
+        std::vector<SwizzleParameters> upload_swizzles;
         std::optional<size_t> cpu_chunk_slot;
 
         size_t total_size = 0;
@@ -179,11 +179,11 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
         u32 cpu_stride_alignment = 0;
         u32 bytes_per_block = 0;
 
-        bool owns_staging_buffer = true;
         bool initialized = false;
         bool is_sparse = false;
         bool is_cpu = false;
         bool cpu_job_in_flight = false;
+        bool already_uploaded = false;
     };
 
     struct BlitImages {
@@ -473,7 +473,7 @@ private:
     void ProcessSparseTexture(Image &image, ImageId image_id);
 
     void TickAsyncUnswizzle();
-    void TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image, bool force_owned_staging);
+    void TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image);
     void TickAsyncUnswizzleCpu(PendingUnswizzle& task, Image& image);
     void InitSparseUnswizzleTracking(PendingUnswizzle& task, Image& image);
     void ReadSparseCoalesced(PendingUnswizzle& task, Image& image, u8* staging_base,
@@ -579,13 +579,6 @@ private:
 
     std::array<AsyncCpuUnswizzleChunk, MAX_ASYNC_UNSWIZZLE_TASKS> cpu_chunk_pool{};
     std::array<bool, MAX_ASYNC_UNSWIZZLE_TASKS> cpu_chunk_slot_used{};
-
-    static constexpr size_t UnswizzleSharedStagingCap = 1_GiB;
-    std::optional<AsyncBuffer> unswizzle_shared_staging;
-    size_t unswizzle_shared_staging_capacity = 0;
-    bool unswizzle_shared_staging_pending_gpu_read = false;
-
-    static constexpr bool async_unswizzle_round_robin = true;
     static constexpr std::chrono::microseconds async_unswizzle_frame_budget{1000};
 
     // Join caching

@@ -103,8 +103,8 @@ public:
     void AccelerateImageUpload(Image&, const StagingBufferRef&,
                                std::span<const VideoCommon::SwizzleParameters>,
                                u32 z_src_start, u32 z_image_start, u32 z_count,
-                               std::span<const u8> slice_has_data = {},
-                               bool image_already_uploaded = false);
+                               std::span<const u8> slice_has_data,
+                               bool image_already_uploaded);
 
     void SynchronizePendingGpuWrite(Image& image);
 
