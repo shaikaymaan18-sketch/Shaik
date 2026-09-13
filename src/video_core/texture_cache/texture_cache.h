@@ -1666,7 +1666,8 @@ void TextureCache<P>::TickAsyncUnswizzleGpu(PendingUnswizzle& task, Image& image
         const size_t needed = (std::max)(max_batch_size, size_t{1});
         task.staging_buffer = runtime.UploadStagingBuffer(needed, true);
 
-        task.upload_swizzles = FixSmallVectorADL(FullUploadSwizzles(task.info));
+        const auto uploads_init = FullUploadSwizzles(task.info);
+        task.upload_swizzles.assign(uploads_init.begin(), uploads_init.end());
         task.initialized = true;
     }
 
