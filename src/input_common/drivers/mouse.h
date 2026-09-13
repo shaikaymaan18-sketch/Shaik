@@ -116,7 +116,6 @@ private:
     Common::Vec<int, 2> wheel_position;
     Common::SteadyClock::time_point last_notify_timestamp{};
     bool button_pressed = false;
-    bool has_moved = false;
 };
 
 } // namespace InputCommon
