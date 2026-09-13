@@ -73,7 +73,7 @@ class QPaintEngine;
 class QSurface;
 
 constexpr int default_mouse_constrain_timeout = 10;
-constexpr int default_mouse_update_timeout = 10;
+constexpr int default_mouse_update_timeout = 5;
 
 class RenderWidget : public QWidget {
 public:
