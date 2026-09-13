@@ -73,6 +73,7 @@ class QPaintEngine;
 class QSurface;
 
 constexpr int default_mouse_constrain_timeout = 10;
+constexpr int default_mouse_update_timeout = 10;
 
 class RenderWidget : public QWidget {
 public:
@@ -138,6 +139,10 @@ GRenderWindow::GRenderWindow(MainWindow* parent,
 
     mouse_constrain_timer.setInterval(default_mouse_constrain_timeout);
     connect(&mouse_constrain_timer, &QTimer::timeout, this, &GRenderWindow::ConstrainMouse);
+
+    mouse_update_timer.setInterval(default_mouse_update_timeout);
+    connect(&mouse_update_timer, &QTimer::timeout, this, &GRenderWindow::UpdateMouse);
+    mouse_update_timer.start();
 }
 
 void GRenderWindow::ExecuteProgram(std::size_t program_index) {
@@ -518,8 +523,7 @@ void GRenderWindow::mouseMoveEvent(QMouseEvent* event) {
     // Constrain mouse for mouse emulation with mouse panning
     if (Settings::values.mouse_panning && Settings::values.mouse_enabled) {
         const auto [clamped_mouse_x, clamped_mouse_y] = ClipToTouchScreen(x, y);
-        QCursor::setPos(mapToGlobal(
-            QPoint{static_cast<int>(clamped_mouse_x), static_cast<int>(clamped_mouse_y)}));
+        QCursor::setPos(mapToGlobal(QPoint{int(clamped_mouse_x), int(clamped_mouse_y)}));
     }
 
     mouse_constrain_timer.stop();
@@ -538,12 +542,7 @@ void GRenderWindow::mouseReleaseEvent(QMouseEvent* event) {
 }
 
 void GRenderWindow::ConstrainMouse() {
-    if (QtCommon::emu_thread == nullptr || !Settings::values.mouse_panning) {
-        mouse_constrain_timer.stop();
-        return;
-    }
-
-    if (!this->isActiveWindow()) {
+    if (QtCommon::emu_thread == nullptr || Settings::values.mouse_panning || !this->isActiveWindow()) {
         mouse_constrain_timer.stop();
         return;
     }
@@ -558,6 +557,9 @@ void GRenderWindow::ConstrainMouse() {
         const int center_y = height() / 2;
         QCursor::setPos(mapToGlobal(QPoint{center_x, center_y}));
     }
+}
+
+void GRenderWindow::UpdateMouse() {
     input_subsystem->GetMouse()->NotifyChanged(); // required to reset mouse once it's no longer moved
 }
 
