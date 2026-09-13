@@ -155,7 +155,7 @@ public:
             return false;
         }
         // Map backing placeholder
-        void* const ret = pfn_MapViewOfFile3(backing_handle, process, backing_base, 0, backing_size, MEM_REPLACE_PLACEHOLDER, PAGE_EXECUTE_READWRITE, nullptr, 0);
+        void* const ret = pfn_MapViewOfFile3(backing_handle, process, backing_base, 0, backing_size, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, nullptr, 0);
         if (ret != backing_base) {
             Release();
             LOG_CRITICAL(HW_Memory, "Failed to map {} MiB of virtual memory, error {}", backing_size >> 20, GetLastError());
@@ -216,9 +216,9 @@ public:
             Split(virtual_offset, length);
         }
         ASSERT(placeholders.find({virtual_offset, virtual_offset + length}) == placeholders.end());
-        TrackPlaceholder(virtual_offset, host_offset, length);
+        TrackPlaceholder(virtual_offset, host_offset, length, perms);
 
-        MapView(virtual_offset, host_offset, length);
+        MapView(virtual_offset, host_offset, length, True(perms & MemoryPermission::Execute));
     }
 
     void Unmap(size_t virtual_offset, size_t length) {
@@ -241,8 +241,10 @@ public:
 
         DWORD new_flags{};
         if (read && execute) {
+            RemapView(virtual_offset, length, true);
             new_flags = PAGE_EXECUTE_READ;
         } else if (read && write) {
+            RemapView(virtual_offset, length, false);
             new_flags = PAGE_READWRITE;
         } else if (read && !write) {
             new_flags = PAGE_READONLY;
@@ -324,9 +326,10 @@ private:
         ASSERT(unmap_begin >= placeholder_begin && unmap_begin < placeholder_end);
         ASSERT(unmap_end <= placeholder_end && unmap_end > placeholder_begin);
 
-        const auto host_pointer_it = placeholder_host_pointers.find(placeholder_begin);
-        ASSERT(host_pointer_it != placeholder_host_pointers.end());
-        const size_t host_offset = host_pointer_it->second;
+        const auto placeholder_it = placeholder_data.find(placeholder_begin);
+        ASSERT(placeholder_it != placeholder_data.end());
+        const size_t host_offset = placeholder_it->second.host_ptr;
+        const bool executable = static_cast<bool>(placeholder_it->second.executable);
 
         const bool split_left = unmap_begin > placeholder_begin;
         const bool split_right = unmap_end < placeholder_end;
@@ -344,27 +347,30 @@ private:
             Split(unmap_begin, unmap_end - unmap_begin);
         }
         if (split_left) {
-            MapView(placeholder_begin, host_offset, unmap_begin - placeholder_begin);
+            MapView(placeholder_begin, host_offset, unmap_begin - placeholder_begin, executable);
         }
         if (split_right) {
             MapView(unmap_end, host_offset + unmap_end - placeholder_begin,
-                    placeholder_end - unmap_end);
+                    placeholder_end - unmap_end, executable);
         }
         // End panic region
 
         size_t coalesce_begin = unmap_begin;
         if (!split_left) {
             // Try to coalesce pages to the left
-            coalesce_begin = it == begin ? 0 : std::prev(it)->upper();
-            if (coalesce_begin != placeholder_begin) {
+            const auto prev = std::prev(it);
+            const auto prev_data = placeholder_data.find(prev);
+            coalesce_begin = it == begin ? 0 : prev->upper();
+            if (coalesce_begin != placeholder_begin && executable == prev_data->second.executable) {
                 Coalesce(coalesce_begin, unmap_end - coalesce_begin);
             }
         }
         if (!split_right) {
             // Try to coalesce pages to the right
             const auto next = std::next(it);
+            const auto next_data = placeholder_data.find(next);
             const size_t next_begin = next == end ? virtual_size : next->lower();
-            if (placeholder_end != next_begin) {
+            if (placeholder_end != next_begin && executable == next_data->second.executable) {
                 // We can coalesce to the right
                 Coalesce(coalesce_begin, next_begin - coalesce_begin);
             }
@@ -372,18 +378,50 @@ private:
         // Remove and reinsert placeholder trackers
         UntrackPlaceholder(it);
         if (split_left) {
-            TrackPlaceholder(placeholder_begin, host_offset, unmap_begin - placeholder_begin);
+            TrackPlaceholder(placeholder_begin, host_offset, unmap_begin - placeholder_begin, executable);
         }
         if (split_right) {
             TrackPlaceholder(unmap_end, host_offset + unmap_end - placeholder_begin,
-                             placeholder_end - unmap_end);
+                             placeholder_end - unmap_end, executable);
         }
         return true;
     }
 
-    void MapView(size_t virtual_offset, size_t host_offset, size_t length) {
+#ifdef HAS_NCE
+    void RemapView(size_t virtual_offset, size_t length, bool executable) {
+        const auto it = placeholders.find({virtual_offset, virtual_offset + length});
+        const auto end = placeholders.end();
+        if (it == end) {
+            return;
+        }
+
+        auto placeholder_start = it->lower();
+        auto placeholder_end = it->upper();
+        auto placeholder_offset = virtual_offset - placerholder_start;
+        ASSERT(placeholder_start <= virtual_offset);
+        ASSERT(placeholder_end >= virtual_offset + length); // TODO: protect regions that pass through multiple regions? is that needed?
+
+        auto data = placeholder_data.find(placeholder_start);
+        if (data.executable == executable) {
+            return;
+        }
+
+        UnmapOnePlaceholder(virtual_offset, length));
+
+        MapView(virtual_offset, data->second().host_ptr + placeholder_offset, length, executable);
+        return;
+    }
+#else
+    void RemapView(size_t virtual_offset, size_t length, bool executable) {
+        if (executable) {
+            UNREACHABLE();
+        }
+    }
+#endif
+
+    void MapView(size_t virtual_offset, size_t host_offset, size_t length, bool executable) {
         if (!pfn_MapViewOfFile3(backing_handle, process, virtual_base + virtual_offset, host_offset,
-                                length, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, nullptr, 0)) {
+                                length, MEM_REPLACE_PLACEHOLDER, executable ? PAGE_EXECUTE_READ : PAGE_READWRITE, nullptr, 0)) {
             LOG_CRITICAL(HW_Memory, "Failed to map placeholder, error {}", GetLastError());
         }
     }
@@ -402,13 +440,13 @@ private:
         }
     }
 
-    void TrackPlaceholder(size_t virtual_offset, size_t host_offset, size_t length) {
+    void TrackPlaceholder(size_t virtual_offset, size_t host_offset, size_t length, bool execute) {
         placeholders.insert({virtual_offset, virtual_offset + length});
-        placeholder_host_pointers.emplace(virtual_offset, host_offset);
+        placeholder_data.emplace(virtual_offset, {host_offset, execute});
     }
 
     void UntrackPlaceholder(boost::icl::separate_interval_set<size_t>::iterator it) {
-        placeholder_host_pointers.erase(it->lower());
+        placeholder_data.erase(it->lower());
         placeholders.erase(it);
     }
 
@@ -432,9 +470,14 @@ private:
     PFN_MapViewOfFile3 pfn_MapViewOfFile3{};
     PFN_UnmapViewOfFile2 pfn_UnmapViewOfFile2{};
 
+    struct Placeholder {
+        size_t host_ptr   : 63;
+        size_t executable : 1;
+    };
+
     std::mutex placeholder_mutex;                                 ///< Mutex for placeholders
     boost::icl::separate_interval_set<size_t> placeholders;       ///< Mapped placeholders
-    ::Common::unordered_map<size_t, size_t> placeholder_host_pointers; ///< Placeholder backing offset
+    Common::unordered_map<size_t, Placeholder> placeholder_data; ///< Placeholder backing offset
 };
 
 #elif defined(__OPENORBIS__) || defined(__managarm__)
