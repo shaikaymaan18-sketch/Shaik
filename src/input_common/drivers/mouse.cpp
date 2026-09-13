@@ -164,27 +164,14 @@ void Mouse::Move(int x, int y, int center_x, int center_y) {
 void Mouse::NotifyChanged() {
     auto const timestamp = Common::SteadyClock::Now();
     if (button_pressed || has_moved) {
-        UpdateStickInput(timestamp);
-        UpdateMotionInput(timestamp);
         has_moved = false;
     } else {
         // neutral due to no movement or press
-        SetAxis(identifier, mouse_axis_x, 0.f);
-        SetAxis(identifier, mouse_axis_y, 0.f);
-        SetAxis(real_mouse_identifier, mouse_axis_x, 0.f);
-        SetAxis(real_mouse_identifier, mouse_axis_y, 0.f);
-        SetAxis(touch_identifier, mouse_axis_x, 0.f);
-        SetAxis(touch_identifier, mouse_axis_y, 0.f);
-        SetMotion(motion_identifier, 0, BasicMotion{
-            .gyro_x = 0.0f,
-            .gyro_y = 0.0f,
-            .gyro_z = 0.0f,
-            .accel_x = 0,
-            .accel_y = 0,
-            .accel_z = 0,
-            .delta_timestamp = u64(std::chrono::duration_cast<std::chrono::microseconds>(timestamp - last_notify_timestamp).count()),
-        });
+        last_mouse_change = {0.f, 0.f};
+        last_motion_change = {0.f, 0.f, 0.f};
     }
+    UpdateStickInput(timestamp);
+    UpdateMotionInput(timestamp);
     last_notify_timestamp = timestamp;
 }
 
@@ -239,8 +226,8 @@ void Mouse::MouseWheelChange(int x, int y) {
     wheel_position[0] += x;
     wheel_position[1] += y;
     last_motion_change[2] += static_cast<f32>(y);
-    SetAxis(identifier, wheel_axis_x, static_cast<f32>(wheel_position[0]));
-    SetAxis(identifier, wheel_axis_y, static_cast<f32>(wheel_position[1]));
+    SetAxis(identifier, wheel_axis_x, f32(wheel_position[0]));
+    SetAxis(identifier, wheel_axis_y, f32(wheel_position[1]));
 }
 
 void Mouse::ReleaseAllButtons() {
