@@ -111,7 +111,13 @@ void Mouse::UpdateMotionInput(Common::SteadyClock::time_point timestamp) {
         last_motion_change[1] = last_motion_change[1] * multiplier;
     }
 
-    const BasicMotion motion_data{
+    if (IsMousePanningEnabled()) {
+        last_motion_change[0] = 0;
+        last_motion_change[1] = 0;
+    }
+    last_motion_change[2] = 0;
+
+    SetMotion(motion_identifier, 0, BasicMotion{
         .gyro_x = last_motion_change[0] * sensitivity,
         .gyro_y = last_motion_change[1] * sensitivity,
         .gyro_z = last_motion_change[2] * sensitivity,
@@ -119,15 +125,7 @@ void Mouse::UpdateMotionInput(Common::SteadyClock::time_point timestamp) {
         .accel_y = 0,
         .accel_z = 0,
         .delta_timestamp = u64(std::chrono::duration_cast<std::chrono::microseconds>(timestamp - last_notify_timestamp).count()),
-    };
-
-    if (IsMousePanningEnabled()) {
-        last_motion_change[0] = 0;
-        last_motion_change[1] = 0;
-    }
-    last_motion_change[2] = 0;
-
-    SetMotion(motion_identifier, 0, motion_data);
+    });
 }
 
 void Mouse::Move(int x, int y, int center_x, int center_y) {
@@ -175,6 +173,15 @@ void Mouse::NotifyChanged() {
         SetAxis(real_mouse_identifier, mouse_axis_y, 0.f);
         SetAxis(touch_identifier, mouse_axis_x, 0.f);
         SetAxis(touch_identifier, mouse_axis_y, 0.f);
+        SetMotion(motion_identifier, 0, BasicMotion{
+            .gyro_x = 0.0f,
+            .gyro_y = 0.0f,
+            .gyro_z = 0.0f,
+            .accel_x = 0,
+            .accel_y = 0,
+            .accel_z = 0,
+            .delta_timestamp = u64(std::chrono::duration_cast<std::chrono::microseconds>(timestamp - last_notify_timestamp).count()),
+        });
     }
     UpdateStickInput(timestamp);
     UpdateMotionInput(timestamp);
