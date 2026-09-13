@@ -74,29 +74,27 @@ Mouse::Mouse(std::string input_engine_) : InputEngine(std::move(input_engine_)) 
 }
 
 void Mouse::UpdateStickInput(Common::SteadyClock::time_point timestamp) {
-    if (!IsMousePanningEnabled()) {
-        return;
+    if (IsMousePanningEnabled()) {
+        const float length = last_mouse_change.Length();
+
+        // Prevent input from exceeding the max range (1.0f) too much,
+        // but allow some room to make it easier to sustain
+        if (length > maximum_stick_range) {
+            last_mouse_change /= length;
+            last_mouse_change *= maximum_stick_range;
+        }
+
+        SetAxis(identifier, mouse_axis_x, last_mouse_change[0]);
+        SetAxis(identifier, mouse_axis_y, -last_mouse_change[1]);
+
+        // Decay input over time
+        const float clamped_length = (std::min)(1.0f, length);
+        const float decay_strength = Settings::values.mouse_panning_decay_strength.GetValue();
+        const float decay = 1 - clamped_length * clamped_length * decay_strength * 0.01f;
+        const float min_decay = Settings::values.mouse_panning_min_decay.GetValue();
+        const float clamped_decay = (std::min)(1 - min_decay / 100.0f, decay);
+        last_mouse_change *= clamped_decay;
     }
-
-    const float length = last_mouse_change.Length();
-
-    // Prevent input from exceeding the max range (1.0f) too much,
-    // but allow some room to make it easier to sustain
-    if (length > maximum_stick_range) {
-        last_mouse_change /= length;
-        last_mouse_change *= maximum_stick_range;
-    }
-
-    SetAxis(identifier, mouse_axis_x, last_mouse_change[0]);
-    SetAxis(identifier, mouse_axis_y, -last_mouse_change[1]);
-
-    // Decay input over time
-    const float clamped_length = (std::min)(1.0f, length);
-    const float decay_strength = Settings::values.mouse_panning_decay_strength.GetValue();
-    const float decay = 1 - clamped_length * clamped_length * decay_strength * 0.01f;
-    const float min_decay = Settings::values.mouse_panning_min_decay.GetValue();
-    const float clamped_decay = (std::min)(1 - min_decay / 100.0f, decay);
-    last_mouse_change *= clamped_decay;
 }
 
 void Mouse::UpdateMotionInput(Common::SteadyClock::time_point timestamp) {
@@ -148,23 +146,20 @@ void Mouse::Move(int x, int y, int center_x, int center_y) {
             last_mouse_change /= length;
             last_mouse_change *= deadzone_cw;
         }
-        return;
-    }
-
-    if (button_pressed) {
-        const auto mouse_move = Common::Vec<int, 2>(x, y) - mouse_origin;
-        const float x_sensitivity =
-            Settings::values.mouse_panning_x_sensitivity.GetValue() * default_stick_sensitivity;
-        const float y_sensitivity =
-            Settings::values.mouse_panning_y_sensitivity.GetValue() * default_stick_sensitivity;
-        SetAxis(identifier, mouse_axis_x, float(mouse_move[0]) * x_sensitivity);
-        SetAxis(identifier, mouse_axis_y, float(-mouse_move[1]) * y_sensitivity);
-
-        last_motion_change = {
-            float(-mouse_move[1]) * x_sensitivity,
-            float(-mouse_move[0]) * y_sensitivity,
-            last_motion_change[2],
-        };
+    } else {
+        if (button_pressed) {
+            const auto mouse_move = Common::Vec<int, 2>(x, y) - mouse_origin;
+            const float x_sensitivity = Settings::values.mouse_panning_x_sensitivity.GetValue() * default_stick_sensitivity;
+            const float y_sensitivity = Settings::values.mouse_panning_y_sensitivity.GetValue() * default_stick_sensitivity;
+            SetAxis(identifier, mouse_axis_x, float(mouse_move[0]) * x_sensitivity);
+            SetAxis(identifier, mouse_axis_y, float(-mouse_move[1]) * y_sensitivity);
+            last_motion_change = {
+                float(-mouse_move[1]) * x_sensitivity,
+                float(-mouse_move[0]) * y_sensitivity,
+                last_motion_change[2],
+            };
+            mouse_origin = {x, y};
+        }
     }
 }
 
@@ -172,7 +167,7 @@ void Mouse::NotifyChanged() {
     auto const timestamp = Common::SteadyClock::Now();
     UpdateStickInput(timestamp);
     UpdateMotionInput(timestamp);
-    last_notify_timestamp = Common::SteadyClock::Now();
+    last_notify_timestamp = timestamp;
 }
 
 void Mouse::MouseMove(f32 touch_x, f32 touch_y) {
