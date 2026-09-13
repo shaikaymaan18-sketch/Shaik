@@ -158,13 +158,24 @@ void Mouse::Move(int x, int y, int center_x, int center_y) {
                 float(-mouse_move[0]) * y_sensitivity,
                 last_motion_change[2],
             };
-            mouse_origin = {x, y};
         }
     }
+    has_moved = true;
 }
 
 void Mouse::NotifyChanged() {
     auto const timestamp = Common::SteadyClock::Now();
+    if (button_pressed || has_moved) {
+        has_moved = false;
+    } else {
+        // neutral due to no movement or press
+        SetAxis(identifier, mouse_axis_x, 0.f);
+        SetAxis(identifier, mouse_axis_y, 0.f);
+        SetAxis(real_mouse_identifier, mouse_axis_x, 0.f);
+        SetAxis(real_mouse_identifier, mouse_axis_y, 0.f);
+        SetAxis(touch_identifier, mouse_axis_x, 0.f);
+        SetAxis(touch_identifier, mouse_axis_y, 0.f);
+    }
     UpdateStickInput(timestamp);
     UpdateMotionInput(timestamp);
     last_notify_timestamp = timestamp;
@@ -173,11 +184,13 @@ void Mouse::NotifyChanged() {
 void Mouse::MouseMove(f32 touch_x, f32 touch_y) {
     SetAxis(real_mouse_identifier, mouse_axis_x, touch_x);
     SetAxis(real_mouse_identifier, mouse_axis_y, touch_y);
+    has_moved = true;
 }
 
 void Mouse::TouchMove(f32 touch_x, f32 touch_y) {
     SetAxis(touch_identifier, mouse_axis_x, touch_x);
     SetAxis(touch_identifier, mouse_axis_y, touch_y);
+    has_moved = true;
 }
 
 void Mouse::PressButton(int x, int y, MouseButton button) {
