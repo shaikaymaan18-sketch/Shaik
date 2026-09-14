@@ -1039,41 +1039,6 @@ void MainWindow::InitializeWidgets() {
     tas_label->setFocusPolicy(Qt::NoFocus);
     statusBar()->insertPermanentWidget(0, tas_label);
 
-#ifdef HAS_RESHADE
-    post_shader_status_button = new QPushButton();
-    post_shader_status_button->setObjectName(QStringLiteral("TogglableStatusBarButton"));
-    post_shader_status_button->setFocusPolicy(Qt::NoFocus);
-    post_shader_status_button->setCheckable(true);
-    connect(post_shader_status_button, &QPushButton::clicked, this, [this] {
-        const bool enabled = Settings::values.post_shader_enabled.GetValue();
-        Settings::values.post_shader_enabled.SetValue(!enabled);
-        UpdatePostShaderText();
-    });
-    UpdatePostShaderText();
-    post_shader_status_button->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(post_shader_status_button, &QPushButton::customContextMenuRequested,
-            [this](const QPoint& menu_location) {
-                QMenu context_menu;
-
-                for (auto const& preset : VideoCore::GetFxPresetCatalog()) {
-                    context_menu.addAction(QString::fromStdString(preset.name),
-                                           [this, name = preset.name] {
-                                               VideoCore::ApplyFxPreset(name);
-                                               Settings::values.post_shader_enabled.SetValue(true);
-                                               UpdatePostShaderText();
-                                           });
-                }
-
-                context_menu.addSeparator();
-                context_menu.addAction(tr("Configure Effects..."), this,
-                                       &MainWindow::OnPostProcessingShaders);
-
-                context_menu.exec(post_shader_status_button->mapToGlobal(menu_location));
-                post_shader_status_button->repaint();
-            });
-    statusBar()->insertPermanentWidget(0, post_shader_status_button);
-#endif
-
     volume_popup = new QWidget(this);
     volume_popup->setWindowFlags(Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint | Qt::Popup);
     volume_popup->setLayout(new QVBoxLayout());
@@ -1125,6 +1090,41 @@ void MainWindow::InitializeWidgets() {
     connect(volume_button, &VolumeButton::VolumeChanged, this, &MainWindow::UpdateVolumeUI);
 
     statusBar()->insertPermanentWidget(0, volume_button);
+
+#ifdef HAS_RESHADE
+    post_shader_status_button = new QPushButton();
+    post_shader_status_button->setObjectName(QStringLiteral("TogglableStatusBarButton"));
+    post_shader_status_button->setFocusPolicy(Qt::NoFocus);
+    post_shader_status_button->setCheckable(true);
+    connect(post_shader_status_button, &QPushButton::clicked, this, [this] {
+        const bool enabled = Settings::values.post_shader_enabled.GetValue();
+        Settings::values.post_shader_enabled.SetValue(!enabled);
+        UpdatePostShaderText();
+    });
+    UpdatePostShaderText();
+    post_shader_status_button->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(post_shader_status_button, &QPushButton::customContextMenuRequested,
+            [this](const QPoint& menu_location) {
+                QMenu context_menu;
+
+                for (auto const& preset : VideoCore::GetFxPresetCatalog()) {
+                    context_menu.addAction(QString::fromStdString(preset.name),
+                                           [this, name = preset.name] {
+                                               VideoCore::ApplyFxPreset(name);
+                                               Settings::values.post_shader_enabled.SetValue(true);
+                                               UpdatePostShaderText();
+                                           });
+                }
+
+                context_menu.addSeparator();
+                context_menu.addAction(tr("Configure Effects..."), this,
+                                       &MainWindow::OnPostProcessingShaders);
+
+                context_menu.exec(post_shader_status_button->mapToGlobal(menu_location));
+                post_shader_status_button->repaint();
+            });
+    statusBar()->insertPermanentWidget(0, post_shader_status_button);
+#endif
 
     // setup AA button
     aa_status_button = new QPushButton();
