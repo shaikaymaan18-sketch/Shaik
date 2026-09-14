@@ -228,9 +228,9 @@ IApplicationManagerInterface::IApplicationManagerInterface(Core::System& system_
         {930, nullptr, "Unknown930"}, //20.0.0+
         {931, nullptr, "Unknown931"}, //20.0.0+
         {933, nullptr, "Unknown933"}, //20.0.0+
-        {934, nullptr, "Unknown934"}, //20.0.0+
-        {935, nullptr, "Unknown935"}, //20.0.0+
-        {936, nullptr, "Unknown936"}, //20.0.0+
+        {934, nullptr, "Unknown934"}, //21.0.0+
+        {935, nullptr, "Unknown935"}, //21.0.0+
+        {936, D<&IApplicationManagerInterface::Unknown936>, "Unknown936"}, //21.0.0+
         {1000, nullptr, "RequestVerifyApplicationDeprecated"},
         {1001, nullptr, "CorruptApplicationForDebug"},
         {1002, nullptr, "RequestVerifyAddOnContentsRights"},
@@ -636,6 +636,12 @@ Result IApplicationManagerInterface::GetGameCardWakenReadyEvent(
 Result IApplicationManagerInterface::IsGameCardApplicationRunning(Out<bool> out_is_running) {
     LOG_WARNING(Service_NS, "(STUBBED) called");
     *out_is_running = false;
+    R_SUCCEED();
+}
+
+Result IApplicationManagerInterface::Unknown936(Out<u64> out_result) {
+    LOG_WARNING(Service_NS, "(STUBBED) called.");
+    *out_result = 0;
     R_SUCCEED();
 }
 
