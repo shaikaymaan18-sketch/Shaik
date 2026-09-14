@@ -70,10 +70,8 @@ ConfigurePostProcessing::ConfigurePostProcessing(QWidget* parent) : QDialog(pare
 
     auto* root = new QVBoxLayout(this);
 
-    auto* description = new QLabel(
-        tr("ReShade FX effects are loaded from the post_shaders folder in the Eden data "
-           "directory. Changes apply immediately while a game is running."),
-        this);
+    auto* description =
+        new QLabel(tr("Changes apply immediately while a game is running."), this);
     description->setWordWrap(true);
     root->addWidget(description);
 
