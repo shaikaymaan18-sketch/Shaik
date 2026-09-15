@@ -311,27 +311,30 @@ void IReadOnlyApplicationControlDataInterface::ListApplicationIcon(HLERequestCon
         // u64 - app count
         memory.WriteBlock(t_mem_address + out_length, &app_count, sizeof(u64));
         out_length += sizeof(u64);
+        ASSERT(out_length <= t_mem->GetSize());
         // [list of u64] - size of icons
         for (size_t i = 0; i < app_count; ++i) {
             const u64 app_id = app_ids_buffer[i];
             const FileSys::PatchManager pm{app_id, system.GetFileSystemController(), system.GetContentProvider()};
-            const auto control = pm.GetControlMetadata();
-            u64 full_size = control.second->GetSize();
-            memory.WriteBlock(t_mem_address + out_length, &full_size, sizeof(u64));
+            if (const auto control = pm.GetControlMetadata(); control.second) {
+                u64 full_size = control.second->GetSize();
+                memory.WriteBlock(t_mem_address + out_length, &full_size, sizeof(u64));
+            }
             out_length += sizeof(u64);
+            ASSERT(out_length <= t_mem->GetSize());
         }
         // [list of raw icon data]
-        std::vector<u8> full_icon_data;
         for (size_t i = 0; i < app_count; ++i) {
             const u64 app_id = app_ids_buffer[i];
             const FileSys::PatchManager pm{app_id, system.GetFileSystemController(), system.GetContentProvider()};
-            const auto control = pm.GetControlMetadata();
-            auto const full_size = control.second->GetSize();
-            if (full_size > 0) {
-                full_icon_data.resize(full_size);
-                control.second->Read(full_icon_data.data(), full_size, 0);
-                memory.WriteBlock(t_mem_address + out_length, full_icon_data.data(), full_size);
-                out_length += full_size;
+            if (const auto control = pm.GetControlMetadata(); control.second) {
+                if (auto const full_size = control.second->GetSize(); full_size > 0) {
+                    std::vector<u8> full_icon_data(full_size);
+                    control.second->Read(full_icon_data.data(), full_size, 0);
+                    memory.WriteBlock(t_mem_address + out_length, full_icon_data.data(), full_size);
+                    out_length += full_size;
+                    ASSERT(out_length <= t_mem->GetSize());
+                }
             }
         }
     }
