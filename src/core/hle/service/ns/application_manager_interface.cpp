@@ -422,7 +422,7 @@ IApplicationManagerInterface::IApplicationManagerInterface(Core::System& system_
         {4039, nullptr, "Unknown4039"}, //20.0.0+
         {4040, nullptr, "Unknown4040"}, //20.0.0+
         {4041, nullptr, "Unknown4041"}, //20.0.0+
-        {4042, nullptr, "Unknown4042"}, //20.0.0+
+        {4042, D<&IApplicationManagerInterface::Unknown4042>, "Unknown4042"}, //20.0.0+
         {4043, nullptr, "Unknown4043"}, //20.0.0+
         {4044, nullptr, "Unknown4044"}, //20.0.0+
         {4045, nullptr, "Unknown4045"}, //20.0.0+
@@ -865,6 +865,15 @@ Result IApplicationManagerInterface::Unknown4022(
 Result IApplicationManagerInterface::Unknown4023(Out<u64> out_result) {
     LOG_WARNING(Service_NS, "(STUBBED) called.");
     *out_result = 0;
+    R_SUCCEED();
+}
+
+Result IApplicationManagerInterface::Unknown4042(OutInterface<IAsyncResult> out_interface,
+                                                 OutCopyHandle<Kernel::KReadableEvent> out_event,
+                                                 u64 arg1, u64 arg2) {
+    LOG_WARNING(Service_NS, "(STUBBED) called, arg1={:016X}, arg2={:016X}", arg1, arg2);
+    *out_event = unknown_event.GetHandle();
+    *out_interface = std::make_shared<IAsyncResult>(system, &unknown_event);
     R_SUCCEED();
 }
 
