@@ -348,6 +348,12 @@ void IReadOnlyApplicationControlDataInterface::ListApplicationIcon(HLERequestCon
 void IReadOnlyApplicationControlDataInterface::ListApplicationTitle(HLERequestContext& ctx) {
     const auto app_ids_buffer = ctx.ReadBuffer();
     const size_t app_count = app_ids_buffer.size() / sizeof(u64);
+
+    std::vector<u64> application_ids(app_count);
+    if (app_count > 0) {
+        std::memcpy(application_ids.data(), app_ids_buffer.data(), app_count * sizeof(u64));
+    }
+
     auto t_mem_obj = ctx.GetObjectFromHandle<Kernel::KTransferMemory>(ctx.GetCopyHandle(0));
     auto* t_mem = t_mem_obj.GetPointerUnsafe();
     constexpr size_t title_entry_size = sizeof(FileSys::LanguageEntry);
@@ -357,8 +363,9 @@ void IReadOnlyApplicationControlDataInterface::ListApplicationTitle(HLERequestCo
         auto& memory = system.ApplicationMemory();
         const auto t_mem_address = t_mem->GetSourceAddress();
         for (size_t i = 0; i < app_count; ++i) {
-            const u64 app_id = app_ids_buffer[i];
-            const FileSys::PatchManager pm{app_id, system.GetFileSystemController(), system.GetContentProvider()};
+            const u64 app_id = application_ids[i];
+            const FileSys::PatchManager pm{app_id, system.GetFileSystemController(),
+                                           system.GetContentProvider()};
             const auto control = pm.GetControlMetadata();
             FileSys::LanguageEntry entry{};
             if (control.first != nullptr) {
