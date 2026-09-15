@@ -461,7 +461,7 @@ public:
             {5, &ISslContext::ImportClientPki, "ImportClientPki"},
             {6, nullptr, "RemoveServerPki"},
             {7, nullptr, "RemoveClientPki"},
-            {8, nullptr, "RegisterInternalPki"},
+            {8, D<&ISslContext::RegisterInternalPki>, "RegisterInternalPki"},
             {9, nullptr, "AddPolicyOid"},
             {10, nullptr, "ImportCrl"},
             {11, nullptr, "RemoveCrl"},
@@ -555,6 +555,11 @@ private:
         IPC::ResponseBuilder rb{ctx, 4};
         rb.Push(ResultSuccess);
         rb.Push(client_id);
+    }
+
+    Result RegisterInternalPki() {
+        LOG_WARNING(Service_SSL, "(STUBBED) called");
+        R_SUCCEED();
     }
 };
 
