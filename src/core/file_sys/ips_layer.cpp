@@ -121,7 +121,7 @@ static IPSwitchRecord EscapeStringSequences(std::string_view sv) {
     IPSwitchRecord r{};
     for (auto it = sv.cbegin(); it < sv.cend(); ) {
         if (*it == '\\' && it + 1 < sv.cend()) {
-            auto const escape_char = [it]() {
+            r.data.push_back([it]() {
                 switch (it[1]) {
                 case 'a': return '\a';
                 case 'b': return '\b';
@@ -134,11 +134,10 @@ static IPSwitchRecord EscapeStringSequences(std::string_view sv) {
                 case '?': return '\?';
                 default: return it[1];
                 }
-            }();
-            r.data.push_back(escape_char);
+            }());
             it += 2;
         } else {
-            r.data.push_back(it);
+            r.data.push_back(*it);
             ++it;
         }
     }
