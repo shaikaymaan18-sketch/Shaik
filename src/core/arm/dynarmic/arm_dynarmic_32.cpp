@@ -177,7 +177,7 @@ void ArmDynarmic32::MakeJit(Common::PageTable* page_table) {
         config.page_table = reinterpret_cast<std::array<std::uint8_t*, NumPageTableEntries>*>(
             const_cast<Common::PageTable::PageEntryData*>(page_table->entries.data()));
         config.page_table_pointer_mask = Common::PageTable::ATTRIBUTE_MASK;
-        config.page_table_marked_bit = 0u;
+        config.page_table_marked_bit = uint8_t(0);
         config.absolute_offset_page_table = true;
         config.detect_misaligned_access_via_page_table = 16 | 32 | 64 | 128;
         config.only_detect_misalignment_via_page_table_on_page_boundary = true;
