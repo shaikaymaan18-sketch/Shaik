@@ -191,8 +191,6 @@ class BufferCache : public VideoCommon::ChannelSetupCaches<BufferCacheChannelInf
     static constexpr bool USE_MEMORY_MAPS = P::USE_MEMORY_MAPS;
     static constexpr bool SEPARATE_IMAGE_BUFFERS_BINDINGS = P::SEPARATE_IMAGE_BUFFER_BINDINGS;
     static constexpr bool USE_MEMORY_MAPS_FOR_UPLOADS = P::USE_MEMORY_MAPS_FOR_UPLOADS;
-    static constexpr bool HAS_DEFERRED_DOWNLOADS =
-        requires(typename P::Runtime& r) { r.KnownGpuTick(); };
 
 #ifdef YUZU_LEGACY
     static constexpr s64 TARGET_THRESHOLD = 3_GiB;
@@ -476,10 +474,6 @@ private:
 
     void DownloadBufferMemory(Buffer& buffer_id, DAddr device_addr, u64 size);
 
-    void DownloadBufferMemoryDeferred(Buffer& buffer);
-
-    void DrainPendingDownloads(bool wait);
-
     void DeleteBuffer(BufferId buffer_id, bool do_not_mark = false);
 
     [[nodiscard]] Binding StorageBufferBinding(GPUVAddr ssbo_addr, u32 cbuf_index,
@@ -537,13 +531,6 @@ private:
     std::optional<Async_Buffer> current_buffer;
 
     std::deque<Async_Buffer> async_buffers_death_ring;
-
-    struct PendingDownload {
-        Async_Buffer staging;
-        boost::container::small_vector<BufferCopy, 4> copies;
-        u64 tick;
-    };
-    std::deque<PendingDownload> gc_downloads;
 
     size_t immediate_buffer_capacity = 0;
     Common::ScratchBuffer<u8> immediate_buffer_alloc;

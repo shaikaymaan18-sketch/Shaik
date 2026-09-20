@@ -84,7 +84,7 @@ void BufferCache<P>::RunGarbageCollector() {
         }
         --num_iterations;
         auto& buffer = slot_buffers[buffer_id];
-        DownloadBufferMemoryDeferred(buffer);
+        DownloadBufferMemory(buffer);
         DeleteBuffer(buffer_id);
         return false;
     };
@@ -120,7 +120,6 @@ void BufferCache<P>::TickFrame() {
     if (device_local_memory != 0 && runtime.CanReportMemoryUsage()) {
         heap_pressure = runtime.GetDeviceMemoryUsage() + heap_headroom >= device_local_memory;
     }
-    DrainPendingDownloads(false);
     if (total_used_memory >= minimum_memory || heap_pressure) {
         RunGarbageCollector();
     }
@@ -203,7 +202,6 @@ std::optional<VideoCore::RasterizerDownloadArea> BufferCache<P>::GetFlushArea(DA
 
 template <class P>
 void BufferCache<P>::DownloadMemory(DAddr device_addr, u64 size) {
-    DrainPendingDownloads(true);
     ForEachBufferInRange(device_addr, size, [&](BufferId, Buffer& buffer) {
         DownloadBufferMemory(buffer, device_addr, size);
     });
@@ -1885,83 +1883,6 @@ void BufferCache<P>::InlineMemoryImplementation(DAddr dest_address, size_t copy_
         runtime.CopyBuffer(buffer, upload_staging.buffer, copies, true, can_reorder);
     } else {
         buffer.ImmediateUpload(buffer.Offset(dest_address), inlined_buffer.first(copy_size));
-    }
-}
-
-template <class P>
-void BufferCache<P>::DrainPendingDownloads(bool wait) {
-    if constexpr (HAS_DEFERRED_DOWNLOADS) {
-        while (!gc_downloads.empty()) {
-            PendingDownload& pending = gc_downloads.front();
-            if (runtime.KnownGpuTick() < pending.tick) {
-                if (!wait) {
-                    return;
-                }
-                runtime.Wait(pending.tick);
-            }
-            const u8* const base = pending.staging.mapped_span.data();
-            const size_t base_offset = pending.staging.offset;
-            for (const BufferCopy& copy : pending.copies) {
-                const DAddr copy_addr = static_cast<DAddr>(copy.src_offset);
-                const u8* const read_mapped = base + (copy.dst_offset - base_offset);
-                async_downloads.ForEachInRange(
-                    copy_addr, copy.size, [&](DAddr start, DAddr end, s32) {
-                        device_memory.WriteBlockUnsafe(start, &read_mapped[start - copy_addr],
-                                                       end - start);
-                    });
-                async_downloads.Subtract(copy_addr, copy.size, [&](DAddr start, DAddr end) {
-                    gpu_modified_ranges.Subtract(start, end - start);
-                });
-            }
-            runtime.FreeDeferredStagingBuffer(pending.staging);
-            gc_downloads.pop_front();
-        }
-    }
-}
-
-template <class P>
-void BufferCache<P>::DownloadBufferMemoryDeferred(Buffer& buffer) {
-    if constexpr (!USE_MEMORY_MAPS || !HAS_DEFERRED_DOWNLOADS) {
-        DownloadBufferMemory(buffer);
-    } else {
-        boost::container::small_vector<BufferCopy, 4> copies;
-        u64 total_size_bytes = 0;
-        const DAddr buffer_addr = buffer.CpuAddr();
-        memory_tracker.ForEachDownloadRangeAndClear(
-            buffer_addr, buffer.SizeBytes(), [&](u64 device_addr_out, u64 range_size) {
-                const auto add_download = [&](DAddr start, DAddr end) {
-                    const u64 new_size = end - start;
-                    copies.push_back(BufferCopy{
-                        .src_offset = start - buffer_addr,
-                        .dst_offset = total_size_bytes,
-                        .size = new_size,
-                    });
-                    constexpr u64 align = 64ULL;
-                    constexpr u64 mask = ~(align - 1ULL);
-                    total_size_bytes += (new_size + align - 1) & mask;
-                };
-                gpu_modified_ranges.ForEachInRange(device_addr_out, range_size, add_download);
-                ClearDownload(device_addr_out, range_size);
-            });
-        if (total_size_bytes == 0) {
-            return;
-        }
-        auto staging = runtime.DownloadStagingBuffer(total_size_bytes, true);
-        for (BufferCopy& copy : copies) {
-            copy.dst_offset += staging.offset;
-            buffer.MarkUsage(copy.src_offset, copy.size);
-        }
-        const std::span<BufferCopy> copies_span(copies.data(), copies.size());
-        runtime.CopyBuffer(staging.buffer, buffer, copies_span, true);
-        for (BufferCopy& copy : copies) {
-            copy.src_offset += buffer_addr;
-            async_downloads.Add(static_cast<DAddr>(copy.src_offset), copy.size);
-        }
-        gc_downloads.push_back(PendingDownload{
-            .staging = staging,
-            .copies = std::move(copies),
-            .tick = runtime.CurrentTick(),
-        });
     }
 }
 
