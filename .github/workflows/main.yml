@@ -17,11 +17,11 @@ jobs:
 
       - name: Maximize Server RAM (Prevent OOM Kills)
         run: |
-          # Use 'dd' instead of 'fallocate' to bypass the 'Text file busy' lock
-          sudo dd if=/dev/zero of=/swapfile bs=1M count=10240 status=progress
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+          # Create the swap in /mnt with a unique name so we don't collide with the active system swap
+          sudo fallocate -l 10G /mnt/eden_swap || sudo dd if=/dev/zero of=/mnt/eden_swap bs=1M count=10240 status=progress
+          sudo chmod 600 /mnt/eden_swap
+          sudo mkswap /mnt/eden_swap
+          sudo swapon /mnt/eden_swap
           echo "Memory setup complete:"
           free -h
 
