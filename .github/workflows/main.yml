@@ -27,19 +27,15 @@ jobs:
           GRADLE_DIR=$(dirname $(find . -name gradlew | head -n 1))
           echo "Found gradlew in: $GRADLE_DIR"
           
-          # Navigate to that directory
           cd "$GRADLE_DIR"
-          
-          # Grant execute permissions
           chmod +x ./gradlew
           
-          # Build the Release APK
-          ./gradlew assembleRelease --no-daemon
+          # Inject arm64-v8a parameter to prevent CMake from crashing on x86_64 builds
+          ./gradlew assembleRelease -Pandroid.injected.build.abi=arm64-v8a --no-daemon
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Eden-Mali-Build
-          # Uses a wildcard to grab the APK no matter what subfolder it compiled into
           path: '**/build/outputs/apk/release/*.apk'
           
