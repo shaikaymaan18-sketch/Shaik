@@ -15,29 +15,40 @@ jobs:
         with:
           submodules: recursive 
 
+      - name: Install C++ Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build ccache libvulkan-dev glslang-dev glslang-tools
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Find Gradle and Build APK
-        env:
-          # Force the build to use the highly-stable NDK 26.1 instead of NDK 28
-          ANDROID_NDK_HOME: /usr/local/lib/android/sdk/ndk/26.1.10909125
+      - name: Force NDK Downgrade and Build
         run: |
           GRADLE_DIR=$(dirname $(find . -name gradlew | head -n 1))
           echo "Found gradlew in: $GRADLE_DIR"
-          
           cd "$GRADLE_DIR"
-          chmod +x ./gradlew
           
-          # Added --info to expose hidden C++ compile errors and forced the NDK version
-          ./gradlew assembleRelease -Pandroid.injected.build.abi=arm64-v8a -Pandroid.ndkVersion=26.1.10909125 --info --no-daemon
+          # Aggressively rewrite the hardcoded NDK version in all gradle files to 26.1
+          find . -name "*.gradle*" -exec sed -i 's/ndkVersion.*/ndkVersion "26.1.10909125"/g' {} +
+          
+          chmod +x ./gradlew
+          ./gradlew assembleRelease -Pandroid.injected.build.abi=arm64-v8a --info --no-daemon
+
+      - name: Print CMake Error Logs on Failure
+        if: failure()
+        run: |
+          echo "==== CMAKE ERROR LOG ===="
+          find . -name "CMakeError.log" -exec cat {} + || echo "No CMakeError.log found"
+          echo "==== CMAKE OUTPUT LOG ===="
+          find . -name "CMakeOutput.log" -exec cat {} + || echo "No CMakeOutput.log found"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
-        if: always() # Ensures the artifact uploads even if something fails
+        if: always()
         with:
           name: Eden-Mali-Build
           path: '**/build/outputs/apk/release/*.apk'
