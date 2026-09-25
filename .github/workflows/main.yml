@@ -15,14 +15,18 @@ jobs:
         with:
           submodules: recursive 
 
-      - name: Maximize Server RAM (Prevent OOM Kills)
+      - name: Maximize Server RAM (Bypass OS Lock)
         run: |
-          # Create the swap in /mnt with a unique name so we don't collide with the active system swap
-          sudo fallocate -l 10G /mnt/eden_swap || sudo dd if=/dev/zero of=/mnt/eden_swap bs=1M count=10240 status=progress
-          sudo chmod 600 /mnt/eden_swap
-          sudo mkswap /mnt/eden_swap
-          sudo swapon /mnt/eden_swap
-          echo "Memory setup complete:"
+          # Turn off the active OS swap to release the "Text file busy" lock
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          
+          # Create a massive 10GB swap file safely
+          sudo fallocate -l 10G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          echo "Memory setup complete. 10GB Swap available for C++ Linking:"
           free -h
 
       - name: Install C++ Build Dependencies
@@ -38,16 +42,16 @@ jobs:
 
       - name: Force NDK Downgrade and Build
         run: |
+          # Automatically navigate into the nested src/android directory
           GRADLE_DIR=$(dirname $(find . -name gradlew | head -n 1))
-          echo "Found gradlew in: $GRADLE_DIR"
           cd "$GRADLE_DIR"
           
-          # Force stable NDK
-          find . -name "*.gradle*" -exec sed -i 's/ndkVersion.*/ndkVersion = "26.1.10909125"/g' {} +
+          # Inject the exact NDK downgrade specifically for Kotlin DSL (.kts) scripts
+          find . -name "*.gradle.kts" -exec sed -i 's/ndkVersion.*/ndkVersion = "26.1.10909125"/g' {} +
           
           chmod +x ./gradlew
           
-          # Restrict Java to 2GB RAM, saving the rest for C++
+          # Force ARM64 target, cap JVM memory at 2GB, and compile
           ./gradlew assembleRelease -Pandroid.injected.build.abi=arm64-v8a -Dorg.gradle.jvmargs="-Xmx2g" --info --no-daemon
 
       - name: Upload APK Artifact
