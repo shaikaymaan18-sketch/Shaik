@@ -15,6 +15,16 @@ jobs:
         with:
           submodules: recursive 
 
+      - name: Maximize Server RAM (Prevent OOM Kills)
+        run: |
+          # Create 10GB of virtual RAM to handle massive C++ linking tasks
+          sudo fallocate -l 10G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          echo "Memory setup complete:"
+          free -h
+
       - name: Install C++ Build Dependencies
         run: |
           sudo apt-get update
@@ -32,19 +42,13 @@ jobs:
           echo "Found gradlew in: $GRADLE_DIR"
           cd "$GRADLE_DIR"
           
-          # Fix: Added the '=' sign because build.gradle.kts requires strict Kotlin syntax
+          # Force stable NDK
           find . -name "*.gradle*" -exec sed -i 's/ndkVersion.*/ndkVersion = "26.1.10909125"/g' {} +
           
           chmod +x ./gradlew
-          ./gradlew assembleRelease -Pandroid.injected.build.abi=arm64-v8a --info --no-daemon
-
-      - name: Print CMake Error Logs on Failure
-        if: failure()
-        run: |
-          echo "==== CMAKE ERROR LOG ===="
-          find . -name "CMakeError.log" -exec cat {} + || echo "No CMakeError.log found"
-          echo "==== CMAKE OUTPUT LOG ===="
-          find . -name "CMakeOutput.log" -exec cat {} + || echo "No CMakeOutput.log found"
+          
+          # Added -Dorg.gradle.jvmargs="-Xmx2g" to restrict Java to 2GB RAM, saving the rest for C++
+          ./gradlew assembleRelease -Pandroid.injected.build.abi=arm64-v8a -Dorg.gradle.jvmargs="-Xmx2g" --info --no-daemon
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
