@@ -17,8 +17,8 @@ jobs:
 
       - name: Maximize Server RAM (Prevent OOM Kills)
         run: |
-          # Create 10GB of virtual RAM to handle massive C++ linking tasks
-          sudo fallocate -l 10G /swapfile
+          # Use 'dd' instead of 'fallocate' to bypass the 'Text file busy' lock
+          sudo dd if=/dev/zero of=/swapfile bs=1M count=10240 status=progress
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
@@ -47,7 +47,7 @@ jobs:
           
           chmod +x ./gradlew
           
-          # Added -Dorg.gradle.jvmargs="-Xmx2g" to restrict Java to 2GB RAM, saving the rest for C++
+          # Restrict Java to 2GB RAM, saving the rest for C++
           ./gradlew assembleRelease -Pandroid.injected.build.abi=arm64-v8a -Dorg.gradle.jvmargs="-Xmx2g" --info --no-daemon
 
       - name: Upload APK Artifact
