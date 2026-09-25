@@ -3,7 +3,7 @@ name: Build Eden APK
 on:
   push:
     branches: [ "main", "master" ]
-  workflow_dispatch: # Gives you a manual "Run workflow" button in the Actions tab
+  workflow_dispatch: 
 
 jobs:
   build:
@@ -13,7 +13,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive # CRITICAL for C++ emulator dependencies
+          submodules: recursive 
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -21,15 +21,25 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x ./gradlew
-
-      - name: Build Release APK
-        run: ./gradlew assembleRelease --no-daemon
+      - name: Find Gradle and Build APK
+        run: |
+          # Automatically find the directory containing gradlew
+          GRADLE_DIR=$(dirname $(find . -name gradlew | head -n 1))
+          echo "Found gradlew in: $GRADLE_DIR"
+          
+          # Navigate to that directory
+          cd "$GRADLE_DIR"
+          
+          # Grant execute permissions
+          chmod +x ./gradlew
+          
+          # Build the Release APK
+          ./gradlew assembleRelease --no-daemon
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Eden-Mali-Build
-          path: app/build/outputs/apk/release/*.apk
+          # Uses a wildcard to grab the APK no matter what subfolder it compiled into
+          path: '**/build/outputs/apk/release/*.apk'
           
