@@ -1,0 +1,24 @@
+# Eden Emulator - OPPW4 (Mali GPU / Dimensity 7400 Profile)
+
+emulator:
+  fastmem: true
+  ignore_missing_services: true
+  language: 1 # English
+
+cpu:
+  execution_slots: 4 # Balances load across the Dimensity architecture
+  accurate_nan: false # Sacrifices slight floating-point accuracy for speed
+
+gpu:
+  backend: "Vulkan"
+  use_custom_driver: false # CRITICAL for Mali (Turnip drivers will crash your device)
+  force_maximum_clocks: true
+  enable_disk_shader_cache: true
+  texture_readback: false # Set to 'true' ONLY if character models are invisible/black
+  disable_buffer_flush: true # Major speedup for Mali GPUs
+  resolution_scale: 0.5 # Renders at 360p/540p to survive the massive enemy counts
+  vsync: false # Uncaps frame rendering to prevent stutter-locking
+
+system:
+  docked_mode: false # Forces handheld mode (720p base instead of 1080p)
+  
