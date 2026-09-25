@@ -17,11 +17,8 @@ jobs:
 
       - name: Maximize Server RAM (Bypass OS Lock)
         run: |
-          # Turn off the active OS swap to release the "Text file busy" lock
           sudo swapoff -a
           sudo rm -f /swapfile
-          
-          # Create a massive 10GB swap file safely
           sudo fallocate -l 10G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
@@ -40,18 +37,16 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Force NDK Downgrade and Build
+      - name: Build APK (Native NDK)
         run: |
           # Automatically navigate into the nested src/android directory
           GRADLE_DIR=$(dirname $(find . -name gradlew | head -n 1))
           cd "$GRADLE_DIR"
           
-          # Inject the exact NDK downgrade specifically for Kotlin DSL (.kts) scripts
-          find . -name "*.gradle.kts" -exec sed -i 's/ndkVersion.*/ndkVersion = "26.1.10909125"/g' {} +
-          
           chmod +x ./gradlew
           
-          # Force ARM64 target, cap JVM memory at 2GB, and compile
+          # Removed the NDK 26 downgrade! We are letting it use NDK 28 natively.
+          # Forcing ARM64 target and capping Java memory to save RAM for C++ linking.
           ./gradlew assembleRelease -Pandroid.injected.build.abi=arm64-v8a -Dorg.gradle.jvmargs="-Xmx2g" --info --no-daemon
 
       - name: Upload APK Artifact
