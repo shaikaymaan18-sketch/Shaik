@@ -1,24 +1,35 @@
-# Eden Emulator - OPPW4 (Mali GPU / Dimensity 7400 Profile)
+name: Build Eden APK
 
-emulator:
-  fastmem: true
-  ignore_missing_services: true
-  language: 1 # English
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch: # Gives you a manual "Run workflow" button in the Actions tab
 
-cpu:
-  execution_slots: 4 # Balances load across the Dimensity architecture
-  accurate_nan: false # Sacrifices slight floating-point accuracy for speed
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-gpu:
-  backend: "Vulkan"
-  use_custom_driver: false # CRITICAL for Mali (Turnip drivers will crash your device)
-  force_maximum_clocks: true
-  enable_disk_shader_cache: true
-  texture_readback: false # Set to 'true' ONLY if character models are invisible/black
-  disable_buffer_flush: true # Major speedup for Mali GPUs
-  resolution_scale: 0.5 # Renders at 360p/540p to survive the massive enemy counts
-  vsync: false # Uncaps frame rendering to prevent stutter-locking
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive # CRITICAL for C++ emulator dependencies
 
-system:
-  docked_mode: false # Forces handheld mode (720p base instead of 1080p)
-  
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Eden-Mali-Build
+          path: app/build/outputs/apk/release/*.apk
+          
