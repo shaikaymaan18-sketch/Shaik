@@ -2,7 +2,7 @@ name: Build Eden APK
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "2ndAdjustmentVulkanv2" ]
   workflow_dispatch: 
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
         run: |
           sudo swapoff -a
           sudo rm -f /swapfile
-          sudo fallocate -l 10G /swapfile
+          sudo fallocate -l 10G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=10240 status=progress
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
@@ -37,22 +37,20 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build APK (Native NDK)
+      - name: Build APK (Native NDK 28)
         run: |
-          # Automatically navigate into the nested src/android directory
           GRADLE_DIR=$(dirname $(find . -name gradlew | head -n 1))
           cd "$GRADLE_DIR"
-          
           chmod +x ./gradlew
           
-          # Removed the NDK 26 downgrade! We are letting it use NDK 28 natively.
-          # Forcing ARM64 target and capping Java memory to save RAM for C++ linking.
-          ./gradlew assembleRelease -Pandroid.injected.build.abi=arm64-v8a -Dorg.gradle.jvmargs="-Xmx2g" --info --no-daemon
+          # Added the custom artifacts copy task native to the Eden codebase
+          ./gradlew assembleRelWithDebInfo copyMainlineRelWithDebInfoOutputs -Pandroid.injected.build.abi=arm64-v8a -Dorg.gradle.jvmargs="-Xmx2g" --info --no-daemon
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: Eden-Mali-Build
-          path: '**/build/outputs/apk/release/*.apk'
+          # GitHub will now look in the custom artifacts directory!
+          path: '**/artifacts/*.apk'
           
