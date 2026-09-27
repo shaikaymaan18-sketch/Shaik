@@ -3,7 +3,7 @@ name: Build Eden APK
 on:
   push:
     branches: [ "main", "master", "2ndAdjustmentVulkanv2" ]
-  workflow_dispatch: 
+  workflow_dispatch:
 
 jobs:
   build:
@@ -13,17 +13,16 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive 
+          submodules: recursive
 
       - name: Maximize Server RAM (Bypass OS Lock)
         run: |
-          sudo swapoff -a
+          sudo swapoff -a || true
           sudo rm -f /swapfile
           sudo fallocate -l 10G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=10240 status=progress
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
-          echo "Memory setup complete. 10GB Swap available for C++ Linking:"
           free -h
 
       - name: Install C++ Build Dependencies
@@ -39,22 +38,33 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
 
-      - name: Install Android NDK and CMake
+      - name: Install Android SDK, NDK, and CMake
+        env:
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
         run: |
-          sdkmanager "platforms;android-36" \
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-36" \
             "build-tools;35.0.0" \
             "cmake;3.22.1" \
             "ndk;28.2.13676358"
+          yes | sdkmanager --licenses >/dev/null || true
 
       - name: Build APK (Native NDK 28)
+        working-directory: src/android
+        env:
+          GRADLE_OPTS: -Xmx4g -Dorg.gradle.daemon=false
         run: |
-          cd src/android
           chmod +x ./gradlew
-          ./gradlew copyMainlineRelWithDebInfoOutputs \
-            -Dorg.gradle.jvmargs="-Xmx2g" \
+          ./gradlew clean copyMainlineRelWithDebInfoOutputs \
             -Pnightly=false \
-            --no-daemon
+            --no-daemon \
+            --stacktrace \
+            --info
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -62,3 +72,4 @@ jobs:
         with:
           name: Eden-Mali-Build
           path: '**/artifacts/*.apk'
+          if-no-files-found: error
