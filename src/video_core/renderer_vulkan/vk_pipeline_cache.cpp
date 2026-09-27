@@ -267,6 +267,12 @@ Shader::RuntimeInfo MakeRuntimeInfo(std::span<const Shader::IR::Program> program
                 dst_a == F::Source1Alpha_D3D || dst_a == F::OneMinusSource1Alpha_D3D ||
                 dst_a == F::Source1Color_GL || dst_a == F::OneMinusSource1Color_GL ||
                 dst_a == F::Source1Alpha_GL || dst_a == F::OneMinusSource1Alpha_GL;
+
+            // [MALI HACK]: Disable Dual Source Blending.
+            // Unreal Engine 4 games (like DBZ Kakarot) use this heavily. Mali drivers reject it,
+            // resulting in silent pipeline drops (Black Screens). Forcing this to false allows
+            // the pipeline to compile on Mali, sacrificing some advanced lighting for playable 3D meshes.
+            info.dual_source_blend = false;
         }
 
         if (device.IsMoltenVK()) {
@@ -411,8 +417,10 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         .support_geometry_shader_passthrough = device.IsNvGeometryShaderPassthroughSupported(),
         .support_native_ndc = device.IsExtDepthClipControlSupported(),
         .support_scaled_attributes = !device.MustEmulateScaledFormats(),
-        .support_multi_viewport = device.SupportsMultiViewport(),
-        .support_geometry_streams = device.AreTransformFeedbackGeometryStreamsSupported(),
+        .support_multi_viewport = device.Support        .support_multi_viewport = device.SupportsMultiViewport(),
+        // [MALI HACK]: Force geometry streams to true.
+        // Bypasses the "Geometry streams is not implemented" shader compiler abort on Mali GPUs.
+        .support_geometry_streams = true,
 
         .warp_size_potentially_larger_than_guest = device.IsWarpSizePotentiallyBiggerThanGuest(),
 
@@ -858,7 +866,7 @@ std::unique_ptr<ComputePipeline> PipelineCache::CreateComputePipeline(
     }
     serialization_thread.QueueWork([this, key, env_ = std::move(env)] {
         SerializePipeline(key, std::array<const GenericEnvironment*, 1>{&env_},
-                          pipeline_cache_filename, CACHE_VERSION);
+                                                    pipeline_cache_filename, CACHE_VERSION);
     });
     return pipeline;
 }
