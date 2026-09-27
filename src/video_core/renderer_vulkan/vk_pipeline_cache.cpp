@@ -269,9 +269,6 @@ Shader::RuntimeInfo MakeRuntimeInfo(std::span<const Shader::IR::Program> program
                 dst_a == F::Source1Alpha_GL || dst_a == F::OneMinusSource1Alpha_GL;
 
             // [MALI HACK]: Disable Dual Source Blending.
-            // Unreal Engine 4 games (like DBZ Kakarot) use this heavily. Mali drivers reject it,
-            // resulting in silent pipeline drops (Black Screens). Forcing this to false allows
-            // the pipeline to compile on Mali, sacrificing some advanced lighting for playable 3D meshes.
             info.dual_source_blend = false;
         }
 
@@ -331,8 +328,6 @@ size_t GetTotalPipelineWorkers() {
     const size_t max_core_threads =
         std::max<size_t>(static_cast<size_t>(std::thread::hardware_concurrency()), 2ULL) - 1ULL;
 #ifdef ANDROID
-    // Leave at least one core free on Android. Previously we reserved two, but
-    // shipping builds benefit from one extra compilation worker.
     constexpr size_t free_cores = 1ULL;
     if (max_core_threads <= free_cores) {
         return 1ULL;
@@ -418,17 +413,13 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         .support_native_ndc = device.IsExtDepthClipControlSupported(),
         .support_scaled_attributes = !device.MustEmulateScaledFormats(),
         .support_multi_viewport = device.SupportsMultiViewport(),
-        // [MALI HACK]: Force geometry streams to true.
-        // Bypasses the "Geometry streams is not implemented" shader compiler abort on Mali GPUs.
         .support_geometry_streams = true,
-
         .warp_size_potentially_larger_than_guest = device.IsWarpSizePotentiallyBiggerThanGuest(),
-
         .lower_left_origin_mode = false,
         .need_declared_frag_colors = false,
         .need_gather_subpixel_offset = driver_id == VK_DRIVER_ID_AMD_PROPRIETARY ||
                                        driver_id == VK_DRIVER_ID_AMD_OPEN_SOURCE ||
-                                       driver_id == VK_DRIVER_ID_MESA_RADV ||
+                                               driver_id == VK_DRIVER_ID_MESA_RADV ||
                                        driver_id == VK_DRIVER_ID_INTEL_PROPRIETARY_WINDOWS ||
                                        driver_id == VK_DRIVER_ID_INTEL_OPEN_SOURCE_MESA,
 
@@ -445,7 +436,6 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         .min_ssbo_alignment = device.GetStorageBufferAlignment(),
         .max_user_clip_distances = device.GetMaxUserClipDistances(),
     };
-
     host_info = Shader::HostTranslateInfo{
         .support_float64 = device.IsFloat64Supported(),
         .support_float16 = device.IsFloat16Supported(),
@@ -473,13 +463,6 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
 
     dynamic_features = {};
 
-    // User granularity enforced in vulkan_device.cpp switch statement:
-    //   Level 0: Core Dynamic States only
-    //   Level 1: Core + EDS1
-    //   Level 2: Core + EDS1 + EDS2 (accumulative)
-    //   Level 3: Core + EDS1 + EDS2 + EDS3 (accumulative)
-    // Here we only verify if extensions were successfully loaded by the device
-
     dynamic_features.has_extended_dynamic_state =
         device.IsExtExtendedDynamicStateSupported();
 
@@ -500,7 +483,6 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
     dynamic_features.has_dynamic_state3_line_stipple_enable =
         device.SupportsDynamicState3LineStippleEnable();
 
-    // VIDS: Independent toggle (not affected by dyna_state levels)
     dynamic_features.has_dynamic_vertex_input =
         device.IsExtVertexInputDynamicStateSupported() &&
         Settings::values.vertex_input_dynamic_state.GetValue();
@@ -512,8 +494,7 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         device.SupportsProvokingVertexLastMode();
     dynamic_features.has_provoking_vertex_tf_preserve =
         device.SupportsTransformFeedbackProvokingVertexPreservation();
-}
-
+    }
 PipelineCache::~PipelineCache() {
     if (use_vulkan_pipeline_cache && !vulkan_pipeline_cache_filename.empty()) {
         SerializeVulkanPipelineCache(vulkan_pipeline_cache_filename, vulkan_pipeline_cache,
@@ -522,7 +503,6 @@ PipelineCache::~PipelineCache() {
 }
 
 GraphicsPipeline* PipelineCache::CurrentGraphicsPipeline() {
-
     if (!RefreshStages(graphics_key.unique_hashes)) {
         current_pipeline = nullptr;
         return nullptr;
@@ -538,9 +518,7 @@ GraphicsPipeline* PipelineCache::CurrentGraphicsPipeline() {
     }
     return CurrentGraphicsPipelineSlowPath();
 }
-
 ComputePipeline* PipelineCache::CurrentComputePipeline() {
-
     const ShaderInfo* const shader{ComputeShader()};
     if (!shader) {
         return nullptr;
@@ -578,7 +556,6 @@ void PipelineCache::LoadDiskResources(u64 title_id, std::stop_token stop_loading
         vulkan_pipeline_cache =
             LoadVulkanPipelineCache(vulkan_pipeline_cache_filename, CACHE_VERSION);
     }
-
     struct {
         std::mutex mutex;
         size_t total{};
@@ -706,9 +683,6 @@ GraphicsPipeline* PipelineCache::BuiltPipeline(GraphicsPipeline* pipeline) const
     if (!use_asynchronous_shaders) {
         return pipeline;
     }
-    // If games are using a small index count, we can assume these are full screen quads.
-    // Usually these shaders are only used once for building textures so we can assume they
-    // can't be built async
     const auto& draw_state = maxwell3d->draw_manager->GetDrawState();
     if (draw_state.index_buffer.count <= 6 || draw_state.vertex_buffer.count <= 6) {
         return pipeline;
@@ -722,12 +696,18 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
     bool build_in_parallel) try {
     auto hash = key.Hash();
     LOG_INFO(Render_Vulkan, "0x{:016x}", hash);
+
+    // [MALI HACK]: Skip crashing pipeline 0xd999 to prevent driver fault
+    if (hash == 0xd999) {
+        LOG_ERROR(Render_Vulkan, "[MALI HACK]: Skipping unstable pipeline 0xd999");
+        return nullptr;
+    }
+
     size_t env_index{0};
     std::array<Shader::IR::Program, Maxwell::MaxShaderProgram> programs;
     const bool uses_vertex_a{key.unique_hashes[0] != 0};
     const bool uses_vertex_b{key.unique_hashes[1] != 0};
 
-    // Layer passthrough generation for devices without VK_EXT_shader_viewport_index_layer
     Shader::IR::Program* layer_source_program{};
 
     for (size_t index = 0; index < Maxwell::MaxShaderProgram; ++index) {
@@ -748,10 +728,8 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
         const u32 cfg_offset{static_cast<u32>(env.StartAddress() + sizeof(Shader::ProgramHeader))};
         Shader::Maxwell::Flow::CFG cfg(env, pools.flow_block, cfg_offset, index == 0);
         if (!uses_vertex_a || index != 1) {
-            // Normal path
             programs[index] = TranslateProgram(pools.inst, pools.block, env, cfg, host_info);
         } else {
-            // VertexB path when VertexA is present.
             auto& program_va{programs[0]};
             auto program_vb{TranslateProgram(pools.inst, pools.block, env, cfg, host_info)};
             programs[index] = MergeDualVertexPrograms(program_va, program_vb, env);
@@ -789,7 +767,6 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
         device.SaveShader(code);
         modules[stage_index] = BuildShader(device, code);
 
-        // Log shader compilation to GPU logger (with SPIR-V binary dump if enabled)
         if (Settings::values.gpu_logging_enabled.GetValue()) {
             static constexpr std::array stage_names{"vertex", "tess_control", "tess_eval", "geometry", "fragment"};
             const std::string shader_name = fmt::format("shader_{:016x}_{}", key.unique_hashes[index], stage_names[stage_index]);
@@ -884,7 +861,6 @@ std::unique_ptr<ComputePipeline> PipelineCache::CreateComputePipeline(
 
     Shader::Maxwell::Flow::CFG cfg{env, pools.flow_block, env.StartAddress()};
 
-    // Dump it before error.
     if (Settings::values.dump_shaders) {
         env.Dump(hash, key.unique_hash);
     }
@@ -907,7 +883,6 @@ std::unique_ptr<ComputePipeline> PipelineCache::CreateComputePipeline(
     device.SaveShader(code);
     vk::ShaderModule spv_module{BuildShader(device, code)};
 
-    // Log compute shader compilation to GPU logger (with SPIR-V binary dump if enabled)
     if (Settings::values.gpu_logging_enabled.GetValue()) {
         const std::string shader_name = fmt::format("shader_{:016x}_compute", key.unique_hash);
         const std::string shader_info = fmt::format("SPIR-V size: {} bytes, hash: {:016x}",
@@ -1026,3 +1001,6 @@ vk::PipelineCache PipelineCache::LoadVulkanPipelineCache(const std::filesystem::
 }
 
 } // namespace Vulkan
+    
+
+                                    
