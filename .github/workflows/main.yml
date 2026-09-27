@@ -37,20 +37,28 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK and CMake
+        run: |
+          sdkmanager "platforms;android-36" \
+            "build-tools;35.0.0" \
+            "cmake;3.22.1" \
+            "ndk;28.2.13676358"
+
       - name: Build APK (Native NDK 28)
         run: |
-          GRADLE_DIR=$(dirname $(find . -name gradlew | head -n 1))
-          cd "$GRADLE_DIR"
+          cd src/android
           chmod +x ./gradlew
-          
-          # Added the custom artifacts copy task native to the Eden codebase
-          ./gradlew assembleRelWithDebInfo copyMainlineRelWithDebInfoOutputs -Pandroid.injected.build.abi=arm64-v8a -Dorg.gradle.jvmargs="-Xmx2g" --info --no-daemon
+          ./gradlew copyMainlineRelWithDebInfoOutputs \
+            -Dorg.gradle.jvmargs="-Xmx2g" \
+            -Pnightly=false \
+            --no-daemon
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: Eden-Mali-Build
-          # GitHub will now look in the custom artifacts directory!
           path: '**/artifacts/*.apk'
-          
