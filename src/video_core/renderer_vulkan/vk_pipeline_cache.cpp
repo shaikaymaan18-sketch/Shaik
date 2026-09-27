@@ -417,7 +417,7 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         .support_geometry_shader_passthrough = device.IsNvGeometryShaderPassthroughSupported(),
         .support_native_ndc = device.IsExtDepthClipControlSupported(),
         .support_scaled_attributes = !device.MustEmulateScaledFormats(),
-        .support_multi_viewport = device.Support        .support_multi_viewport = device.SupportsMultiViewport(),
+        .support_multi_viewport = device.SupportsMultiViewport(),
         // [MALI HACK]: Force geometry streams to true.
         // Bypasses the "Geometry streams is not implemented" shader compiler abort on Mali GPUs.
         .support_geometry_streams = true,
