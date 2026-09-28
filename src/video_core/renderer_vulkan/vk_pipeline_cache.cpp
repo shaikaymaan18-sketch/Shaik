@@ -697,10 +697,29 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
     auto hash = key.Hash();
     LOG_INFO(Render_Vulkan, "0x{:016x}", hash);
 
-    // [MALI HACK]: Skip crashing pipeline 0xd999 to prevent driver fault
-    if (hash == 0xd999) {
-        LOG_ERROR(Render_Vulkan, "[MALI HACK]: Skipping unstable pipeline 0xd999");
+    // [LAYER 1]: Intercept master pipeline hash (prefix, suffix, and string pattern)
+    const bool is_target_pipeline = 
+        ((hash >> 48) == 0xd999) || 
+        ((hash & 0xffff) == 0xd999) || 
+        (hash == 0xd999) ||
+        (fmt::format("{:016x}", hash).rfind("d999", 0) == 0);
+
+    if (is_target_pipeline) {
+        LOG_ERROR(Render_Vulkan, "[MALI HACK]: Intercepted crashing pipeline 0x{:016x}", hash);
         return nullptr;
+    }
+
+    // [LAYER 2]: Intercept individual shader stage hashes containing 0xd999
+    for (size_t i = 0; i < Maxwell::MaxShaderProgram; ++i) {
+        const u64 stage_hash = key.unique_hashes[i];
+        if (stage_hash != 0) {
+            if (((stage_hash >> 48) == 0xd999) || 
+                ((stage_hash & 0xffff) == 0xd999) || 
+                (stage_hash == 0xd999)) {
+                LOG_ERROR(Render_Vulkan, "[MALI HACK]: Intercepted crashing stage shader 0x{:016x} in pipeline 0x{:016x}", stage_hash, hash);
+                return nullptr;
+            }
+        }
     }
 
     size_t env_index{0};
@@ -708,6 +727,7 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
     const bool uses_vertex_a{key.unique_hashes[0] != 0};
     const bool uses_vertex_b{key.unique_hashes[1] != 0};
 
+    // Layer passthrough generation for devices without VK_EXT_shader_viewport_index_layer
     Shader::IR::Program* layer_source_program{};
 
     for (size_t index = 0; index < Maxwell::MaxShaderProgram; ++index) {
@@ -764,8 +784,21 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
         const auto runtime_info{MakeRuntimeInfo(programs, key, program, previous_stage, device)};
         ConvertLegacyToGeneric(program, runtime_info);
         const std::vector<u32> code{EmitSPIRV(profile, runtime_info, program, binding, this->optimize_spirv_output)};
+
+        // [LAYER 3]: Guard against empty SPIR-V outputs
+        if (code.empty()) {
+            LOG_ERROR(Render_Vulkan, "[MALI HACK]: Empty SPIR-V generated for stage {}, skipping pipeline 0x{:016x}", stage_index, hash);
+            return nullptr;
+        }
+
         device.SaveShader(code);
         modules[stage_index] = BuildShader(device, code);
+
+        // [LAYER 4]: Guard against driver failing to compile the module
+        if (!modules[stage_index]) {
+            LOG_ERROR(Render_Vulkan, "[MALI HACK]: Driver rejected shader module for stage {}, skipping pipeline 0x{:016x}", stage_index, hash);
+            return nullptr;
+        }
 
         if (Settings::values.gpu_logging_enabled.GetValue()) {
             static constexpr std::array stage_names{"vertex", "tess_control", "tess_eval", "geometry", "fragment"};
@@ -781,7 +814,8 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
             modules[stage_index].SetObjectNameEXT(name.c_str());
         }
         previous_stage = &program;
-    }
+         }
+    
     Common::ThreadWorker* const thread_worker{build_in_parallel ? &workers : nullptr};
     return std::make_unique<GraphicsPipeline>(
         scheduler, buffer_cache, texture_cache, vulkan_pipeline_cache, &shader_notify, device,
