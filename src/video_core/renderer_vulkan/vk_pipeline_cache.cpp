@@ -733,7 +733,7 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
             }
         }
     }
-    }
+    
 
     size_t env_index{0};
     std::array<Shader::IR::Program, Maxwell::MaxShaderProgram> programs;
@@ -796,7 +796,8 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
 
         const auto runtime_info{MakeRuntimeInfo(programs, key, program, previous_stage, device)};
         ConvertLegacyToGeneric(program, runtime_info);
-        const std::vector<u32> code{EmitSPIRV(profile, runtime_info, program, binding, this->optimize_spirv_output)};
+        const std::vector<u32> code{EmitSPIRV(profile, runtime_info, program, binding, local_optimize)};
+             
 
         // [LAYER 3]: Guard against empty SPIR-V outputs
         if (code.empty()) {
