@@ -419,7 +419,7 @@ PipelineCache::PipelineCache(Tegra::MaxwellDeviceMemoryManager& device_memory_,
         .need_declared_frag_colors = false,
         .need_gather_subpixel_offset = driver_id == VK_DRIVER_ID_AMD_PROPRIETARY ||
                                        driver_id == VK_DRIVER_ID_AMD_OPEN_SOURCE ||
-                                               driver_id == VK_DRIVER_ID_MESA_RADV ||
+                                                                     driver_id == VK_DRIVER_ID_MESA_RADV ||
                                        driver_id == VK_DRIVER_ID_INTEL_PROPRIETARY_WINDOWS ||
                                        driver_id == VK_DRIVER_ID_INTEL_OPEN_SOURCE_MESA,
 
@@ -873,7 +873,7 @@ std::unique_ptr<ComputePipeline> PipelineCache::CreateComputePipeline(
     main_pools.ReleaseContents();
     auto pipeline{CreateComputePipeline(main_pools, key, env, nullptr, true)};
     if (!pipeline || pipeline_cache_filename.empty()) {
-        return pipeline;
+                return pipeline;
     }
     serialization_thread.QueueWork([this, key, env_ = std::move(env)] {
         SerializePipeline(key, std::array<const GenericEnvironment*, 1>{&env_},
@@ -1035,6 +1035,3 @@ vk::PipelineCache PipelineCache::LoadVulkanPipelineCache(const std::filesystem::
 }
 
 } // namespace Vulkan
-    
-
-                                    
