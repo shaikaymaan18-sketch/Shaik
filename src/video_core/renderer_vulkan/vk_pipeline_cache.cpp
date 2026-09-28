@@ -694,32 +694,45 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
     ShaderPools& pools, const GraphicsPipelineCacheKey& key,
     std::span<Shader::Environment* const> envs, PipelineStatistics* statistics,
     bool build_in_parallel) try {
-    auto hash = key.Hash();
+        auto hash = key.Hash();
     LOG_INFO(Render_Vulkan, "0x{:016x}", hash);
 
-    // [LAYER 1]: Intercept master pipeline hash (prefix, suffix, and string pattern)
+    // [MALI HACK]: Direct-to-disk hash logger. Bypasses config.ini and forces a flush.
+    {
+        auto log_dir = Common::FS::GetEdenPath(Common::FS::EdenPath::ShaderDir);
+        Common::FS::CreateDir(log_dir);
+        std::ofstream hack_log(Common::FS::PathToUTF8String(log_dir / "mali_hash_hunter.txt"), std::ios::app);
+        if (hack_log.is_open()) {
+            hack_log << "Compiling Pipeline: 0x" << std::hex << hash << std::endl;
+        }
+    }
+
+    // [LAYER 1]: Intercept master pipeline hash
     const bool is_target_pipeline = 
         ((hash >> 48) == 0xd999) || 
         ((hash & 0xffff) == 0xd999) || 
         (hash == 0xd999) ||
         (fmt::format("{:016x}", hash).rfind("d999", 0) == 0);
 
+    bool local_optimize = this->optimize_spirv_output;
+
     if (is_target_pipeline) {
-        LOG_ERROR(Render_Vulkan, "[MALI HACK]: Intercepted crashing pipeline 0x{:016x}", hash);
-        return nullptr;
+        LOG_ERROR(Render_Vulkan, "[MALI HACK]: Intercepted crashing pipeline 0x{:016x}. Disabling SPIR-V opt.", hash);
+        local_optimize = false;
     }
 
-    // [LAYER 2]: Intercept individual shader stage hashes containing 0xd999
+    // [LAYER 2]: Intercept individual shader stage hashes
     for (size_t i = 0; i < Maxwell::MaxShaderProgram; ++i) {
         const u64 stage_hash = key.unique_hashes[i];
         if (stage_hash != 0) {
             if (((stage_hash >> 48) == 0xd999) || 
                 ((stage_hash & 0xffff) == 0xd999) || 
                 (stage_hash == 0xd999)) {
-                LOG_ERROR(Render_Vulkan, "[MALI HACK]: Intercepted crashing stage shader 0x{:016x} in pipeline 0x{:016x}", stage_hash, hash);
-                return nullptr;
+                LOG_ERROR(Render_Vulkan, "[MALI HACK]: Intercepted crashing stage 0x{:016x}. Disabling SPIR-V opt.", stage_hash);
+                local_optimize = false;
             }
         }
+    }
     }
 
     size_t env_index{0};
