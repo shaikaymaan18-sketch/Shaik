@@ -707,30 +707,20 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
         }
     }
 
-    // [LAYER 1]: Intercept master pipeline hash
-    const bool is_target_pipeline = 
-        ((hash >> 48) == 0xd999) || 
-        ((hash & 0xffff) == 0xd999) || 
-        (hash == 0xd999) ||
-        (fmt::format("{:016x}", hash).rfind("d999", 0) == 0);
+        bool local_optimize = this->optimize_spirv_output;
 
-    bool local_optimize = this->optimize_spirv_output;
-
-    if (is_target_pipeline) {
+    // [LAYER 1]: Intercept the exact crashing pipeline
+    if (hash == 0xd999ab6fd5325877ULL) {
         LOG_ERROR(Render_Vulkan, "[MALI HACK]: Intercepted crashing pipeline 0x{:016x}. Disabling SPIR-V opt.", hash);
         local_optimize = false;
     }
 
-    // [LAYER 2]: Intercept individual shader stage hashes
+    // [LAYER 2]: Intercept exact crashing stages
     for (size_t i = 0; i < Maxwell::MaxShaderProgram; ++i) {
         const u64 stage_hash = key.unique_hashes[i];
-        if (stage_hash != 0) {
-            if (((stage_hash >> 48) == 0xd999) || 
-                ((stage_hash & 0xffff) == 0xd999) || 
-                (stage_hash == 0xd999)) {
-                LOG_ERROR(Render_Vulkan, "[MALI HACK]: Intercepted crashing stage 0x{:016x}. Disabling SPIR-V opt.", stage_hash);
-                local_optimize = false;
-            }
+        if (stage_hash == 0xd999ab6fd5325877ULL) {
+            LOG_ERROR(Render_Vulkan, "[MALI HACK]: Intercepted crashing stage 0x{:016x}. Disabling SPIR-V opt.", stage_hash);
+            local_optimize = false;
         }
     }
     
